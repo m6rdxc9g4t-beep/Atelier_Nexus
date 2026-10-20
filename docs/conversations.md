@@ -8,6 +8,7 @@ depuis le bouton **Historique** de l'en-tête de conversation.
 | Table | Contenu |
 |---|---|
 | `conversations` | `id`, `agent`, `title`, `history` (messages au format neutre du routeur, JSON), `turn_meta` (moteur, modèle, jetons et motif d'arrêt de chaque tour), `pending` (actions en attente de validation), `search_text` (texte normalisé pour la recherche, Étape 13), `created_at`, `updated_at` |
+| `attachments` | Fichiers joints aux messages (Étape 15) : original, texte extrait, méta ; l'historique ne garde que leur référence → [`attachments.md`](attachments.md) |
 | `artifacts` | Livrables publiés pendant la conversation (`kind`, `title`, `content`, `language`, `meta`), `position` = nombre de messages au moment de la publication. Suppression en cascade avec la conversation. |
 
 Migration : `backend/migrations/versions/0002_conversations.py`, appliquée au démarrage (`DB_AUTO_MIGRATE=true`).
@@ -24,7 +25,7 @@ Les dates sont renvoyées en UTC explicite (`…Z`) : SQLite les stocke sans fus
 | `POST` | `/api/conversations` | `{agent, title?}` → 201. 404 si l'agent n'existe pas. |
 | `GET` | `/api/conversations/{id}` | Détail : `history`, `artifacts`, `turn_meta`, `pending_approvals` |
 | `PATCH` | `/api/conversations/{id}` | `{title}` (1 à 120 caractères) |
-| `DELETE` | `/api/conversations/{id}` | 204, artefacts compris |
+| `DELETE` | `/api/conversations/{id}` | 204, artefacts et pièces jointes compris |
 
 Les routes `POST /api/agents/{nom}/run` et `/stream` acceptent `conversation_id` :
 

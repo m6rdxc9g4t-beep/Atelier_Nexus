@@ -29,8 +29,12 @@ def message_texts(history: Iterable[dict[str, Any]]) -> list[str]:
     out: list[str] = []
     for message in history:
         for block in message.get("content", []) if isinstance(message, dict) else []:
-            if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text" and block.get("text"):
                 out.append(str(block["text"]))
+            elif block.get("type") == "attachment" and block.get("name"):
+                out.append(f"Pièce jointe : {block['name']}")
     return out
 
 

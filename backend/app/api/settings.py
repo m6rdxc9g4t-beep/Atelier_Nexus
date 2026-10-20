@@ -38,7 +38,7 @@ def same_origin_only(
     if host:
         allowed |= {f"http://{host}", f"https://{host}"}
     if origin not in allowed:
-        raise HTTPException(status_code=403, detail="Réglages réservés à l'interface de Nexus.")
+        raise HTTPException(status_code=403, detail="Action réservée à l'interface de Nexus.")
 
 
 Guard = Annotated[None, Depends(same_origin_only)]

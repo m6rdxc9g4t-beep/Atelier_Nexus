@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.llm.types import Message, ProviderName, Usage
+from app.core.llm.types import AttachmentBlock, Message, ProviderName, Usage
 
 
 def _utc(value: datetime) -> datetime:
@@ -78,7 +78,11 @@ class ConversationRename(BaseModel):
 def title_from(messages: list[Message]) -> str:
     """Titre par défaut : début de la première question de l'utilisateur."""
     for message in messages:
-        if message.role == "user" and message.text.strip():
-            text = " ".join(message.text.split())
+        if message.role != "user":
+            continue
+        text = " ".join(message.text.split())
+        if not text:  # message fait uniquement de pièces jointes : leurs noms
+            text = ", ".join(b.name for b in message.content if isinstance(b, AttachmentBlock))
+        if text:
             return text if len(text) <= 80 else text[:77].rstrip() + "…"
     return "Nouvelle conversation"

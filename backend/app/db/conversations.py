@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.agents.base import AgentResult
+from app.core.llm.attachments import referenced_ids
 from app.core.llm.types import Message
+from app.db.attachments import attach_to_conversation, delete_for_conversation
 from app.db.models import ArtifactRow, ConversationRow
 from app.db.repository import StorageError, _storage_message
 from app.db.search import like_pattern, message_texts, search_text, snippet, terms
@@ -201,6 +203,7 @@ class ConversationRepository:
             pieces = [(a.title, a.content) for a in await self._artifacts_of(s, row.id)]
             pieces += [(a.title, a.content) for a in result.artifacts]
             row.search_text = search_text(row.title, row.history, pieces)
+            await attach_to_conversation(s, row.id, referenced_ids(history))
             for artifact in result.artifacts:
                 s.add(
                     ArtifactRow(
@@ -236,6 +239,7 @@ class ConversationRepository:
             await s.execute(
                 delete(ArtifactRow).where(ArtifactRow.conversation_id == conversation_id)
             )
+            await delete_for_conversation(s, conversation_id)
             res = await s.execute(
                 delete(ConversationRow).where(ConversationRow.id == conversation_id)
             )

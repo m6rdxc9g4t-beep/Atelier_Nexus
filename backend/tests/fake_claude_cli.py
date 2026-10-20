@@ -56,6 +56,25 @@ usage = {
     "cache_read_input_tokens": 7,
     "output_tokens": 20,
 }
+if "--input-format" in args:
+    # Entrée stream-json (conversation avec images) : sortie stream-json, ligne `result` finale
+    assert args[args.index("--input-format") + 1] == "stream-json"
+    assert args[args.index("--output-format") + 1] == "stream-json" and "--verbose" in args
+    message = json.loads(stdin.strip().splitlines()[-1])["message"]
+    kinds = [b["type"] for b in message["content"]]
+    print(json.dumps({"type": "system", "subtype": "init"}))
+    print(json.dumps({"type": "assistant", "message": {"content": []}}))
+    print(
+        json.dumps(
+            {
+                "type": "result",
+                "is_error": False,
+                "usage": usage,
+                "structured_output": {"text": "Blocs reçus : " + ",".join(kinds), "tool_calls": []},
+            }
+        )
+    )
+    sys.exit(0)
 if mode == "slow":
     time.sleep(30)
 if mode == "login":

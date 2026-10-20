@@ -14,7 +14,7 @@ import {
 import { ApiError, api, streamAgent } from "@/lib/api";
 import { lastConversation, rememberConversation } from "@/lib/lastConversation";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
-import type { ConversationDetail, ProviderName } from "@/types/api";
+import type { AttachmentBlock, ConversationDetail, ProviderName } from "@/types/api";
 
 const SAVE_OFF = "Historique indisponible : cette conversation ne sera pas enregistrée.";
 
@@ -38,7 +38,8 @@ interface ChatState {
   setAgent: (agent: string) => void;
   setProvider: (provider: ProviderName | null) => void;
   /** `localOnly` : agent verrouillé sur le modèle local, le choix de moteur est ignoré. */
-  send: (text: string, options?: { localOnly?: boolean }) => Promise<void>;
+  /** `attachments` : fichiers déjà importés (POST /api/attachments), joints au message. */
+  send: (text: string, options?: { localOnly?: boolean; attachments?: AttachmentBlock[] }) => Promise<void>;
   /** Reprend le tour après « Autoriser / Refuser ». */
   decide: (decisions: Record<string, boolean>, options?: { localOnly?: boolean }) => Promise<void>;
   stop: () => void;
@@ -125,10 +126,11 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     send: async (text, options) => {
       const trimmed = text.trim();
+      const attachments = options?.attachments ?? [];
       const { agent, streaming } = get();
-      if (!trimmed || streaming) return;
+      if ((!trimmed && !attachments.length) || streaming) return;
       restored.add(agent); // une conversation commencée ne doit pas être remplacée par la restauration
-      mutate(agent, (c) => addUserTurn(c, trimmed));
+      mutate(agent, (c) => addUserTurn(c, trimmed, attachments));
       await run(agent, null, options?.localOnly ?? false);
     },
 
