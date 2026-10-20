@@ -48,11 +48,13 @@ cd frontend && npx shadcn@latest add button card input
 
 ## Charte graphique (suite Atelier)
 
-Charte « néon holographique 3D » commune à la suite : fond bleu nuit, structure cyan électrique, couleur signature **orange #E8590C** pour Nexus.
+Charte « néon monochrome » commune à la suite : chaque application est **entièrement dans sa couleur signature** — **orange #E8590C** pour Nexus. Fond, barre latérale, cartes, bordures, textes secondaires, halos et grille de fond dérivent tous de cette couleur (mélanges et transparences) ; pas de couleur de structure commune.
 
-- `frontend/src/styles/brand/atelier-brand.css` (+ police Nunito et sa licence OFL) est une **copie exacte** du fichier de marque d'Atelier Projets (`design-system/brand/`) : ne pas l'éditer ici.
-- `data-atelier-app="nexus"` sur `<html>` (`layout.tsx`) pose `--atelier-signature` et ses dérivés ; `primary`, `accent` et l'anneau de focus Shadcn s'appuient dessus (`globals.css`).
-- L'app s'affiche en thème sombre néon (`.dark` + `data-theme="dark"`). Utilitaires Tailwind disponibles : `text-signature`, `bg-signature-soft`, `shadow-glow`, `shadow-glow-strong`, `shadow-signature-glow`, `ring-neon`.
+- `frontend/src/styles/brand/atelier-brand.css` (+ police Nunito et sa licence OFL) est une **copie exacte** du fichier de marque d'Atelier Projets (`design-system/brand/`) : ne pas l'éditer ici. Il définit les jetons `--atelier-*` (`bg`, `sidebar`, `surface(-2|-3)`, `field`, `text`, `muted`, `ink`, `border(-soft)`, `line`, `signature(-soft|-faint)`, `glow(-strong)`, `focus`, `backdrop`, `chart-1..3`) pour le clair et le sombre.
+- `data-atelier-app="nexus"` sur `<html>` (`layout.tsx`) pose la couleur ; les variables Shadcn de `globals.css` sont branchées sur ces jetons, et les composants Shadcn (`data-slot`) reçoivent trait et halo néon.
+- L'app s'affiche en sombre (`.dark` + `data-theme="dark"`) ; le clair est prêt (retirer ces marqueurs). Bouton principal : plein en clair, contour néon en sombre.
+- Utilitaires Tailwind : `shadow-glow`, `shadow-glow-strong`, `shadow-signature-glow`, `shadow-focus`, `text-shadow-glow`, `bg-signature-soft`, `bg-signature-faint`, `bg-atelier-surface(-2|-3)`, `text-atelier-ink`, `text-atelier-muted`, `border-atelier-border(-soft)`, `border-atelier-line`, `fill-atelier-chart-1..3`.
+- Les couleurs qui portent un sens (`--chart-*` multi-séries, `--destructive`) ne changent pas.
 
 ## Workflow Git
 

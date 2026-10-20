@@ -3,7 +3,7 @@ import { Network } from "lucide-react";
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="atelier-brand gap-3">
+      <h1 className="atelier-brand gap-3 text-shadow-glow">
         <span className="atelier-brand__tile size-11 rounded-xl" aria-hidden="true">
           <Network className="size-6" />
         </span>

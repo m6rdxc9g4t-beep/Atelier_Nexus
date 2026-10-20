@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // Thème unique de l'app : le sombre néon de la charte Atelier
+    // Thème unique de l'app : le sombre néon de la charte Atelier « néon monochrome »
     // (.dark pour les variantes Tailwind/Shadcn, data-theme pour les effets néon de atelier-brand.css).
-    // data-atelier-app pose la couleur signature de Nexus (orange #E8590C).
+    // data-atelier-app : toute l'app dans la couleur signature de Nexus (orange #E8590C).
     <html
       lang="fr"
       data-atelier-app="nexus"

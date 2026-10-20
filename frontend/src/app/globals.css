@@ -1,92 +1,76 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-/* Marque commune Atelier (copie exacte de Atelier_Projets/design-system/brand/, ne pas éditer ici).
-   Couche « components » : les utilitaires Tailwind gardent la main sur la marque. */
+/* Marque commune et palette « néon monochrome » Atelier (copie exacte de
+   Atelier_Projets/design-system/brand/, ne pas éditer ici).
+   Couche « components » : les utilitaires Tailwind gardent la main. */
 @import "../styles/brand/atelier-brand.css" layer(components);
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Design tokens Atelier (base Shadcn « neutral ») ─────────────
-   Charte « néon holographique 3D » : base cyan commune (--atelier-neon), couleur
-   signature Nexus (orange #E8590C via data-atelier-app="nexus" sur <html>).
-   L'application s'affiche en thème sombre (classe .dark + data-theme="dark"
-   posées dans layout.tsx) : c'est la face néon de la charte. Les jetons clairs
-   restent cohérents (sobres, sans halo) pour un futur sélecteur de thème. */
+/* ─── Design tokens Atelier (base Shadcn) ─────────────────────────
+   Charte « néon monochrome » : toute l'app est dans sa couleur signature,
+   orange #E8590C pour Nexus (data-atelier-app="nexus" sur <html>).
+   Les variables Shadcn sont branchées sur les jetons --atelier-* de
+   atelier-brand.css, qui changent d'eux-mêmes de valeur entre clair et
+   sombre (.dark / data-theme="dark" sur <html>) : un seul bloc suffit.
+   L'app s'affiche en sombre (marqueurs posés dans layout.tsx) ; le clair
+   est prêt (il suffit de retirer les marqueurs). */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Accent = couleur signature de l'app (bouton principal, éléments actifs). */
+  --background: var(--atelier-bg);
+  --foreground: var(--atelier-text);
+  --card: var(--atelier-surface);
+  --card-foreground: var(--atelier-text);
+  /* Menus, popovers : surface de survol. */
+  --popover: var(--atelier-surface-2);
+  --popover-foreground: var(--atelier-text);
+  /* Accent = signature (bouton principal, case cochée…) ; contour néon en sombre (voir .dark). */
   --primary: var(--atelier-signature);
   --primary-foreground: var(--atelier-signature-contrast);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  /* Survol / entrée active : fond signature léger, texte signature mêlé au texte (lisible sur clair). */
-  --accent: var(--atelier-signature-soft);
-  --accent-foreground: color-mix(in oklab, var(--atelier-signature) 62%, var(--foreground));
-  --signature-text: color-mix(in oklab, var(--atelier-signature) 62%, var(--foreground));
+  --secondary: var(--atelier-surface-2);
+  --secondary-foreground: var(--atelier-text);
+  --muted: var(--atelier-surface-2);
+  --muted-foreground: var(--atelier-muted);
+  /* Survol des menus et boutons fantômes : signature en transparence. */
+  --accent: var(--atelier-signature-faint);
+  --accent-foreground: var(--atelier-text);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  /* Anneau de focus : cyan commun de la suite. */
-  --ring: var(--atelier-neon);
+  /* Traits : séparateurs et lignes (par défaut sur tout élément) ; champs en trait doux.
+     Le contour des cartes (--atelier-border) est posé plus bas sur les composants. */
+  --border: var(--atelier-line);
+  --input: var(--atelier-border-soft);
+  --ring: var(--atelier-signature);
+  /* Palette multi-séries (sens par couleur) : inchangée. */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar: var(--atelier-sidebar);
+  --sidebar-foreground: var(--atelier-text);
   --sidebar-primary: var(--atelier-signature);
   --sidebar-primary-foreground: var(--atelier-signature-contrast);
   --sidebar-accent: var(--atelier-signature-soft);
-  --sidebar-accent-foreground: color-mix(in oklab, var(--atelier-signature) 62%, var(--sidebar-foreground));
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: var(--atelier-neon);
+  --sidebar-accent-foreground: var(--atelier-text);
+  --sidebar-border: var(--atelier-line);
+  --sidebar-ring: var(--atelier-signature);
 }
 
-/* Thème sombre = expression néon : fond bleu nuit, bordures teintées de cyan
-   (valeurs de référence de la charte : dark.css du design system Atelier). */
+/* Sombre : le reste suit les jetons --atelier-* ; ici seulement le bouton principal
+   (contour néon : fond en transparence, texte lumineux, trait posé plus bas) et les
+   couleurs non dérivées de la signature. */
 .dark {
   color-scheme: dark;
-  --background: #06111f;
-  --foreground: #e6f7ff;
-  --card: #0a1b2e;
-  --card-foreground: #e6f7ff;
-  --popover: #10283f;
-  --popover-foreground: #e6f7ff;
-  --primary: var(--atelier-signature);
-  --primary-foreground: var(--atelier-signature-contrast);
-  --secondary: #10283f;
-  --secondary-foreground: #e6f7ff;
-  --muted: #10283f;
-  --muted-foreground: #8db4cc;
-  --accent: var(--atelier-signature-soft);
-  --accent-foreground: var(--atelier-signature-light);
-  --signature-text: var(--atelier-signature-light);
+  --primary: var(--atelier-signature-soft);
+  --primary-foreground: var(--atelier-ink);
+  --sidebar-primary: var(--atelier-signature-soft);
+  --sidebar-primary-foreground: var(--atelier-ink);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #17405c;
-  --input: #17405c;
-  --ring: var(--atelier-neon);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #0a1b2e;
-  --sidebar-foreground: #e6f7ff;
-  --sidebar-primary: var(--atelier-signature);
-  --sidebar-primary-foreground: var(--atelier-signature-contrast);
-  --sidebar-accent: var(--atelier-signature-soft);
-  --sidebar-accent-foreground: var(--atelier-signature-light);
-  --sidebar-border: #17405c;
-  --sidebar-ring: var(--atelier-neon);
 }
 
 @theme inline {
@@ -127,17 +111,33 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  /* Charte néon : utilitaires text-signature, bg-signature-soft, ring-neon,
-     shadow-glow (cartes, panneaux), shadow-glow-strong (modales, menus, sélection),
-     shadow-signature-glow (survol du bouton principal), text-shadow-glow (titres) ;
-     reflet de verre : bg-(image:--atelier-glass). */
+  /* Charte néon monochrome : utilitaires Tailwind sur les jetons Atelier.
+     Couleurs : bg-atelier-surface(-2|-3), bg-atelier-field, text-atelier-ink,
+     text-atelier-muted, border-atelier-border(-soft), border-atelier-line,
+     bg-signature, bg-signature-soft, bg-signature-faint, fill-atelier-chart-1..3
+     (graphiques à une seule mesure).
+     Halos : shadow-glow (cartes, panneaux, tableaux, en-tête), shadow-glow-strong
+     (modales, menus, popovers), shadow-signature-glow (bouton principal),
+     shadow-focus (focus), text-shadow-glow (titres de page). */
   --color-signature: var(--atelier-signature);
   --color-signature-soft: var(--atelier-signature-soft);
-  --color-signature-text: var(--signature-text);
-  --color-neon: var(--atelier-neon);
+  --color-signature-faint: var(--atelier-signature-faint);
+  --color-atelier-surface: var(--atelier-surface);
+  --color-atelier-surface-2: var(--atelier-surface-2);
+  --color-atelier-surface-3: var(--atelier-surface-3);
+  --color-atelier-field: var(--atelier-field);
+  --color-atelier-ink: var(--atelier-ink);
+  --color-atelier-muted: var(--atelier-muted);
+  --color-atelier-border: var(--atelier-border);
+  --color-atelier-border-soft: var(--atelier-border-soft);
+  --color-atelier-line: var(--atelier-line);
+  --color-atelier-chart-1: var(--atelier-chart-1);
+  --color-atelier-chart-2: var(--atelier-chart-2);
+  --color-atelier-chart-3: var(--atelier-chart-3);
   --shadow-glow: var(--atelier-glow);
   --shadow-glow-strong: var(--atelier-glow-strong);
   --shadow-signature-glow: var(--atelier-signature-glow);
+  --shadow-focus: var(--atelier-focus);
   --text-shadow-glow: var(--atelier-text-glow);
 }
 
@@ -145,16 +145,48 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Fond de page : teinte de la signature + fine grille + lueur en haut (clair et sombre).
+     --atelier-backdrop contient positions et tailles des calques (« 0 0 / 32px 32px ») :
+     il ne passe que par la propriété raccourcie background, pas par background-image. */
   body {
-    @apply bg-background text-foreground;
-  }
-  /* Fond de page néon : léger halo cyan en haut (aucun effet en thème clair). */
-  .dark body {
-    background-image: radial-gradient(
-      120% 60% at 50% -10%,
-      color-mix(in oklab, var(--atelier-neon) 10%, transparent),
-      transparent 60%
-    );
+    @apply text-foreground;
+    background: var(--atelier-backdrop), var(--atelier-bg);
     background-attachment: fixed;
+  }
+  /* Composants Shadcn (src/components/ui, attribut data-slot) : trait et halo néon de la charte. */
+  [data-slot="card"],
+  [data-slot="sidebar-inner"],
+  [data-slot="table-container"] {
+    border-color: var(--atelier-border);
+    box-shadow: var(--atelier-glow);
+  }
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="select-content"],
+  [data-slot="command-dialog"] {
+    border-color: var(--atelier-border);
+    box-shadow: var(--atelier-glow-strong);
+  }
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"] {
+    background-color: var(--atelier-field);
+  }
+  [data-slot="input"]:focus-visible,
+  [data-slot="textarea"]:focus-visible,
+  [data-slot="select-trigger"]:focus-visible {
+    border-color: var(--atelier-signature);
+    box-shadow: var(--atelier-focus);
+  }
+  [data-slot="badge"] {
+    border-color: var(--atelier-border-soft);
+  }
+  /* Bouton principal (variante « default ») : plein en clair, contour néon en sombre
+     (le fond et le texte viennent de --primary / --primary-foreground). */
+  [data-slot="button"][data-variant="default"] {
+    border: 1px solid var(--atelier-signature);
+    box-shadow: var(--atelier-signature-glow);
   }
 }
