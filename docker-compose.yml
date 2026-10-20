@@ -21,7 +21,7 @@ services:
       - ./backend/.env
     environment:
       # Surcharge des hôtes pour le réseau Docker interne
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atelier}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-atelier_hub}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atelier}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-atelier_nexus}
       REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://ollama:11434
     ports:
@@ -47,7 +47,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-atelier}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-      POSTGRES_DB: ${POSTGRES_DB:-atelier_hub}
+      POSTGRES_DB: ${POSTGRES_DB:-atelier_nexus}
     ports:
       - "5432:5432"
     volumes:

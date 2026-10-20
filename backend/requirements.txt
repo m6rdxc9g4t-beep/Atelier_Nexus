@@ -16,6 +16,9 @@ ollama~=0.6.3
 # --- HTTP (connecteurs Data Via, GitHub API) ---
 httpx~=0.28.1
 
+# --- Fuseaux horaires IANA (absents de l'image python:slim) ---
+tzdata>=2025.1
+
 # --- Persistance ---
 sqlalchemy[asyncio]~=2.1
 asyncpg~=0.32.0

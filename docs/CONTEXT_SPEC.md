@@ -39,7 +39,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | Étape | Contenu | Statut |
 |-------|---------|--------|
 | 1 | Arborescence, docker-compose, config de base front/back | ✅ |
-| 2 | `LLMRouter` (Anthropic + Ollama) + `BaseAgent` | À faire |
+| 2 | `LLMRouter` (Anthropic + Ollama) + `BaseAgent` → [`llm-router-and-agents.md`](llm-router-and-agents.md) | ✅ |
 | 3 | Connecteur Data Via + schémas Pydantic | À faire |
 | 4 | UI : layout Chat + panneau Artefacts (`useArtifactStore`) | À faire |
 | 5 | Agent Data Analyst / Power BI (DAX Generator) | À faire |
@@ -47,5 +47,6 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
 - Contrat d'API de Data Via (→ `docs/apps/data-via.md`).
-- Modèles Ollama par défaut et politique de bascule Claude ↔ local.
+- Modèle Ollama recommandé en production (défaut actuel : `llama3.1:8b`) et activation ou non du repli automatique (`LLM_FALLBACK_PROVIDER`).
+- Persistance des conversations : aujourd'hui le client renvoie l'historique à chaque tour (`new_messages`).
 - Schéma de base (conversations, artefacts, embeddings).
