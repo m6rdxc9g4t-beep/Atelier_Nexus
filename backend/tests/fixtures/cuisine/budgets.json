@@ -1,0 +1,17 @@
+[
+  {
+    "scope": "alimentaire",
+    "period": "mois",
+    "amount": 400
+  },
+  {
+    "scope": "sorties",
+    "period": "mois",
+    "amount": 60
+  },
+  {
+    "scope": "maison",
+    "period": "semaine",
+    "amount": 15
+  }
+]

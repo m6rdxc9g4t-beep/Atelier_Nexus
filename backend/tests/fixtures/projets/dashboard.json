@@ -1,0 +1,140 @@
+{
+ "project": {
+  "id": 1,
+  "name": "App E-Commerce v2",
+  "slug": "app-ecommerce-v2",
+  "description": "Refonte de la boutique en ligne : authentification GitHub, synchronisation Git / GitHub et nouvelle interface (thèmes clair et sombre).",
+  "localRepoPath": null,
+  "github": {
+   "owner": "user",
+   "repo": "ecom",
+   "url": "https://github.com/user/ecom"
+  },
+  "defaultBranch": "main",
+  "hoursPerDay": 8,
+  "budget": {
+   "hours": 360,
+   "days": 45
+  },
+  "startDate": "2026-10-01",
+  "dueDate": "2026-11-16",
+  "gitScannedAt": null,
+  "githubSyncedAt": null,
+  "createdAt": "2026-10-20T09:49:49.764Z",
+  "updatedAt": "2026-10-20T09:49:49.764Z"
+ },
+ "hoursPerDay": 8,
+ "budget": {
+  "initial": {
+   "hours": 360,
+   "days": 45
+  },
+  "spent": {
+   "hours": 228,
+   "days": 28.5
+  },
+  "remaining": {
+   "hours": 132,
+   "days": 16.5
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 132,
+    "days": 16.5
+   }
+  },
+  "consumedPercent": 63.3
+ },
+ "progress": {
+  "percent": 70.7,
+  "planned": {
+   "hours": 280,
+   "days": 35
+  },
+  "earned": {
+   "hours": 198,
+   "days": 24.75
+  }
+ },
+ "trend": "AHEAD",
+ "workItems": {
+  "total": 17,
+  "done": 8,
+  "donePercent": 50
+ },
+ "histogram": [
+  {
+   "status": "OPEN",
+   "total": 2,
+   "byType": {
+    "FEATURE": 1,
+    "TASK": 1,
+    "BUG": 0
+   }
+  },
+  {
+   "status": "IN_PROGRESS",
+   "total": 3,
+   "byType": {
+    "FEATURE": 2,
+    "TASK": 1,
+    "BUG": 0
+   }
+  },
+  {
+   "status": "IN_REVIEW",
+   "total": 1,
+   "byType": {
+    "FEATURE": 0,
+    "TASK": 0,
+    "BUG": 1
+   }
+  },
+  {
+   "status": "ON_HOLD",
+   "total": 1,
+   "byType": {
+    "FEATURE": 1,
+    "TASK": 0,
+    "BUG": 0
+   }
+  },
+  {
+   "status": "BLOCKED",
+   "total": 1,
+   "byType": {
+    "FEATURE": 0,
+    "TASK": 1,
+    "BUG": 0
+   }
+  },
+  {
+   "status": "RESOLVED",
+   "total": 4,
+   "byType": {
+    "FEATURE": 1,
+    "TASK": 2,
+    "BUG": 1
+   }
+  },
+  {
+   "status": "CLOSED",
+   "total": 4,
+   "byType": {
+    "FEATURE": 2,
+    "TASK": 1,
+    "BUG": 1
+   }
+  },
+  {
+   "status": "REJECTED",
+   "total": 1,
+   "byType": {
+    "FEATURE": 1,
+    "TASK": 0,
+    "BUG": 0
+   }
+  }
+ ]
+}

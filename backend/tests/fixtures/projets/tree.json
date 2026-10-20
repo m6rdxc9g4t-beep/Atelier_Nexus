@@ -1,0 +1,996 @@
+{
+ "project": {
+  "id": 1,
+  "name": "App E-Commerce v2",
+  "slug": "app-ecommerce-v2",
+  "description": "Refonte de la boutique en ligne : authentification GitHub, synchronisation Git / GitHub et nouvelle interface (thèmes clair et sombre).",
+  "localRepoPath": null,
+  "github": {
+   "owner": "user",
+   "repo": "ecom",
+   "url": "https://github.com/user/ecom"
+  },
+  "defaultBranch": "main",
+  "hoursPerDay": 8,
+  "budget": {
+   "hours": 360,
+   "days": 45
+  },
+  "startDate": "2026-10-01",
+  "dueDate": "2026-11-16",
+  "gitScannedAt": null,
+  "githubSyncedAt": null,
+  "createdAt": "2026-10-20T09:49:49.764Z",
+  "updatedAt": "2026-10-20T09:49:49.764Z"
+ },
+ "hoursPerDay": 8,
+ "range": {
+  "start": "2026-10-01",
+  "end": "2026-11-16"
+ },
+ "aggregate": {
+  "status": "IN_PROGRESS",
+  "progress": 70.7,
+  "estimate": {
+   "hours": 280,
+   "days": 35
+  },
+  "spent": {
+   "hours": 228,
+   "days": 28.5
+  },
+  "workItems": 17,
+  "statusCounts": {
+   "OPEN": 2,
+   "IN_PROGRESS": 3,
+   "IN_REVIEW": 1,
+   "ON_HOLD": 1,
+   "BLOCKED": 1,
+   "RESOLVED": 4,
+   "CLOSED": 4,
+   "REJECTED": 1
+  }
+ },
+ "phases": [
+  {
+   "id": 1,
+   "projectId": 1,
+   "title": "Socle Technique",
+   "description": "Fondations techniques : authentification, API et synchronisation Git.",
+   "position": 1,
+   "startDate": "2026-10-01",
+   "dueDate": "2026-10-21",
+   "createdAt": "2026-10-20T09:49:49.768Z",
+   "updatedAt": "2026-10-20T09:49:49.768Z",
+   "code": "1",
+   "span": {
+    "start": "2026-10-01",
+    "end": "2026-10-21"
+   },
+   "aggregate": {
+    "status": "IN_PROGRESS",
+    "progress": 84.3,
+    "estimate": {
+     "hours": 120,
+     "days": 15
+    },
+    "spent": {
+     "hours": 115,
+     "days": 14.375
+    },
+    "workItems": 9,
+    "statusCounts": {
+     "OPEN": 0,
+     "IN_PROGRESS": 1,
+     "IN_REVIEW": 1,
+     "ON_HOLD": 1,
+     "BLOCKED": 0,
+     "RESOLVED": 2,
+     "CLOSED": 3,
+     "REJECTED": 1
+    }
+   },
+   "epics": [
+    {
+     "id": 1,
+     "phaseId": 1,
+     "title": "Architecture",
+     "description": "Architecture backend, authentification et intégration Git / GitHub.",
+     "position": 1,
+     "startDate": "2026-10-01",
+     "dueDate": "2026-10-21",
+     "createdAt": "2026-10-20T09:49:49.771Z",
+     "updatedAt": "2026-10-20T09:49:49.771Z",
+     "code": "1",
+     "span": {
+      "start": "2026-10-01",
+      "end": "2026-10-21"
+     },
+     "aggregate": {
+      "status": "IN_PROGRESS",
+      "progress": 84.3,
+      "estimate": {
+       "hours": 120,
+       "days": 15
+      },
+      "spent": {
+       "hours": 115,
+       "days": 14.375
+      },
+      "workItems": 9,
+      "statusCounts": {
+       "OPEN": 0,
+       "IN_PROGRESS": 1,
+       "IN_REVIEW": 1,
+       "ON_HOLD": 1,
+       "BLOCKED": 0,
+       "RESOLVED": 2,
+       "CLOSED": 3,
+       "REJECTED": 1
+      }
+     },
+     "stories": [
+      {
+       "id": 1,
+       "epicId": 1,
+       "title": "Auth",
+       "description": "En tant que client, je veux me connecter avec mon compte GitHub afin d’accéder à mon espace sans créer de mot de passe.",
+       "position": 1,
+       "startDate": "2026-10-01",
+       "dueDate": "2026-10-09",
+       "createdAt": "2026-10-20T09:49:49.773Z",
+       "updatedAt": "2026-10-20T09:49:49.773Z",
+       "code": "1.1",
+       "span": {
+        "start": "2026-10-01",
+        "end": "2026-10-09"
+       },
+       "aggregate": {
+        "status": "IN_PROGRESS",
+        "progress": 98.3,
+        "estimate": {
+         "hours": 48,
+         "days": 6
+        },
+        "spent": {
+         "hours": 50,
+         "days": 6.25
+        },
+        "workItems": 3,
+        "statusCounts": {
+         "OPEN": 0,
+         "IN_PROGRESS": 0,
+         "IN_REVIEW": 1,
+         "ON_HOLD": 0,
+         "BLOCKED": 0,
+         "RESOLVED": 1,
+         "CLOSED": 1,
+         "REJECTED": 0
+        }
+       },
+       "workItems": [
+        {
+         "id": 101,
+         "projectId": 1,
+         "storyId": 1,
+         "type": "FEATURE",
+         "status": "CLOSED",
+         "priority": "NORMAL",
+         "title": "OAuth2 GitHub",
+         "progress": 100,
+         "position": 1,
+         "startDate": "2026-10-01",
+         "dueDate": "2026-10-06",
+         "estimate": {
+          "hours": 24,
+          "days": 3
+         },
+         "spent": {
+          "hours": 20,
+          "days": 2.5
+         },
+         "balance": {
+          "kind": "UNDER",
+          "delta": {
+           "hours": -4,
+           "days": -0.5
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.787Z",
+         "updatedAt": "2026-10-20T09:49:49.787Z",
+         "span": {
+          "start": "2026-10-01",
+          "end": "2026-10-06"
+         }
+        },
+        {
+         "id": 102,
+         "projectId": 1,
+         "storyId": 1,
+         "type": "TASK",
+         "status": "RESOLVED",
+         "priority": "NORMAL",
+         "title": "Config JWT",
+         "progress": 100,
+         "position": 2,
+         "startDate": "2026-10-05",
+         "dueDate": "2026-10-07",
+         "estimate": {
+          "hours": 16,
+          "days": 2
+         },
+         "spent": {
+          "hours": 16,
+          "days": 2
+         },
+         "balance": {
+          "kind": "ON_BUDGET",
+          "delta": {
+           "hours": 0,
+           "days": 0
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.790Z",
+         "updatedAt": "2026-10-20T09:49:49.790Z",
+         "span": {
+          "start": "2026-10-05",
+          "end": "2026-10-07"
+         }
+        },
+        {
+         "id": 103,
+         "projectId": 1,
+         "storyId": 1,
+         "type": "BUG",
+         "status": "IN_REVIEW",
+         "priority": "HIGH",
+         "title": "Fix CORS Header",
+         "progress": 90,
+         "position": 3,
+         "startDate": "2026-10-08",
+         "dueDate": "2026-10-09",
+         "estimate": {
+          "hours": 8,
+          "days": 1
+         },
+         "spent": {
+          "hours": 14,
+          "days": 1.75
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 6,
+           "days": 0.75
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.798Z",
+         "updatedAt": "2026-10-20T09:49:49.798Z",
+         "span": {
+          "start": "2026-10-08",
+          "end": "2026-10-09"
+         }
+        }
+       ]
+      },
+      {
+       "id": 2,
+       "epicId": 1,
+       "title": "Synchronisation Git",
+       "description": "En tant que chef de projet, je veux que chaque commit citant `#ID` soit rattaché automatiquement à sa tâche afin de suivre la réalisation sans saisie manuelle.",
+       "position": 2,
+       "startDate": "2026-10-09",
+       "dueDate": "2026-10-21",
+       "createdAt": "2026-10-20T09:49:49.801Z",
+       "updatedAt": "2026-10-20T09:49:49.801Z",
+       "code": "1.2",
+       "span": {
+        "start": "2026-10-09",
+        "end": "2026-10-21"
+       },
+       "aggregate": {
+        "status": "IN_PROGRESS",
+        "progress": 75,
+        "estimate": {
+         "hours": 72,
+         "days": 9
+        },
+        "spent": {
+         "hours": 65,
+         "days": 8.125
+        },
+        "workItems": 6,
+        "statusCounts": {
+         "OPEN": 0,
+         "IN_PROGRESS": 1,
+         "IN_REVIEW": 0,
+         "ON_HOLD": 1,
+         "BLOCKED": 0,
+         "RESOLVED": 1,
+         "CLOSED": 2,
+         "REJECTED": 1
+        }
+       },
+       "workItems": [
+        {
+         "id": 104,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "TASK",
+         "status": "CLOSED",
+         "priority": "NORMAL",
+         "title": "Client GitHub API (@octokit/rest)",
+         "progress": 100,
+         "position": 1,
+         "startDate": "2026-10-09",
+         "dueDate": "2026-10-13",
+         "estimate": {
+          "hours": 16,
+          "days": 2
+         },
+         "spent": {
+          "hours": 19,
+          "days": 2.375
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 3,
+           "days": 0.375
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.806Z",
+         "updatedAt": "2026-10-20T09:49:49.806Z",
+         "span": {
+          "start": "2026-10-09",
+          "end": "2026-10-13"
+         }
+        },
+        {
+         "id": 105,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "TASK",
+         "status": "RESOLVED",
+         "priority": "NORMAL",
+         "title": "Tests du parseur de références #ID",
+         "progress": 100,
+         "position": 2,
+         "startDate": "2026-10-13",
+         "dueDate": "2026-10-14",
+         "estimate": {
+          "hours": 8,
+          "days": 1
+         },
+         "spent": {
+          "hours": 10,
+          "days": 1.25
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 2,
+           "days": 0.25
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.808Z",
+         "updatedAt": "2026-10-20T09:49:49.808Z",
+         "span": {
+          "start": "2026-10-13",
+          "end": "2026-10-14"
+         }
+        },
+        {
+         "id": 107,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "BUG",
+         "status": "CLOSED",
+         "priority": "NORMAL",
+         "title": "Accents corrompus dans les messages de commit",
+         "progress": 100,
+         "position": 3,
+         "startDate": "2026-10-14",
+         "dueDate": "2026-10-15",
+         "estimate": {
+          "hours": 8,
+          "days": 1
+         },
+         "spent": {
+          "hours": 11,
+          "days": 1.375
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 3,
+           "days": 0.375
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.815Z",
+         "updatedAt": "2026-10-20T09:49:49.815Z",
+         "span": {
+          "start": "2026-10-14",
+          "end": "2026-10-15"
+         }
+        },
+        {
+         "id": 12345,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "FEATURE",
+         "status": "IN_PROGRESS",
+         "priority": "HIGH",
+         "title": "Implémenter le moteur de synchronisation Git Local / GitHub",
+         "progress": 75,
+         "position": 4,
+         "startDate": "2026-10-12",
+         "dueDate": "2026-10-21",
+         "estimate": {
+          "hours": 24,
+          "days": 3
+         },
+         "spent": {
+          "hours": 18,
+          "days": 2.25
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 6,
+           "days": 0.75
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.822Z",
+         "updatedAt": "2026-10-20T09:49:49.822Z",
+         "span": {
+          "start": "2026-10-12",
+          "end": "2026-10-21"
+         }
+        },
+        {
+         "id": 106,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "FEATURE",
+         "status": "ON_HOLD",
+         "priority": "NORMAL",
+         "title": "Synchronisation des Pull Requests GitHub",
+         "progress": 25,
+         "position": 5,
+         "startDate": "2026-10-15",
+         "dueDate": "2026-10-20",
+         "estimate": {
+          "hours": 16,
+          "days": 2
+         },
+         "spent": {
+          "hours": 7,
+          "days": 0.875
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 9,
+           "days": 1.125
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.827Z",
+         "updatedAt": "2026-10-20T09:49:49.827Z",
+         "span": {
+          "start": "2026-10-15",
+          "end": "2026-10-20"
+         }
+        },
+        {
+         "id": 108,
+         "projectId": 1,
+         "storyId": 2,
+         "type": "FEATURE",
+         "status": "REJECTED",
+         "priority": "LOW",
+         "title": "Support des dépôts Mercurial",
+         "progress": 0,
+         "position": 6,
+         "startDate": null,
+         "dueDate": null,
+         "estimate": null,
+         "spent": {
+          "hours": 0,
+          "days": 0
+         },
+         "balance": null,
+         "createdAt": "2026-10-20T09:49:49.829Z",
+         "updatedAt": "2026-10-20T09:49:49.829Z",
+         "span": null
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "milestones": [
+    {
+     "id": 1,
+     "projectId": 1,
+     "phaseId": 1,
+     "title": "API Prête",
+     "description": "Authentification et API principale opérationnelles.",
+     "date": "2026-10-15",
+     "reachedAt": "2026-10-15T15:30:00.000Z",
+     "reached": true,
+     "createdAt": "2026-10-20T09:49:49.769Z",
+     "updatedAt": "2026-10-20T09:49:49.769Z"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "projectId": 1,
+   "title": "Expérience UI",
+   "description": "Nouvelle interface : thèmes clair / sombre et composants partagés.",
+   "position": 2,
+   "startDate": "2026-10-12",
+   "dueDate": "2026-11-02",
+   "createdAt": "2026-10-20T09:49:49.830Z",
+   "updatedAt": "2026-10-20T09:49:49.830Z",
+   "code": "2",
+   "span": {
+    "start": "2026-10-12",
+    "end": "2026-11-02"
+   },
+   "aggregate": {
+    "status": "IN_PROGRESS",
+    "progress": 60.5,
+    "estimate": {
+     "hours": 160,
+     "days": 20
+    },
+    "spent": {
+     "hours": 113,
+     "days": 14.125
+    },
+    "workItems": 8,
+    "statusCounts": {
+     "OPEN": 2,
+     "IN_PROGRESS": 2,
+     "IN_REVIEW": 0,
+     "ON_HOLD": 0,
+     "BLOCKED": 1,
+     "RESOLVED": 2,
+     "CLOSED": 1,
+     "REJECTED": 0
+    }
+   },
+   "epics": [
+    {
+     "id": 2,
+     "phaseId": 2,
+     "title": "Design System",
+     "description": "Tokens, thèmes et composants réutilisables.",
+     "position": 1,
+     "startDate": "2026-10-12",
+     "dueDate": "2026-11-02",
+     "createdAt": "2026-10-20T09:49:49.832Z",
+     "updatedAt": "2026-10-20T09:49:49.832Z",
+     "code": "2",
+     "span": {
+      "start": "2026-10-12",
+      "end": "2026-11-02"
+     },
+     "aggregate": {
+      "status": "IN_PROGRESS",
+      "progress": 60.5,
+      "estimate": {
+       "hours": 160,
+       "days": 20
+      },
+      "spent": {
+       "hours": 113,
+       "days": 14.125
+      },
+      "workItems": 8,
+      "statusCounts": {
+       "OPEN": 2,
+       "IN_PROGRESS": 2,
+       "IN_REVIEW": 0,
+       "ON_HOLD": 0,
+       "BLOCKED": 1,
+       "RESOLVED": 2,
+       "CLOSED": 1,
+       "REJECTED": 0
+      }
+     },
+     "stories": [
+      {
+       "id": 3,
+       "epicId": 2,
+       "title": "Thèmes",
+       "description": "En tant qu’utilisateur, je veux basculer entre un thème clair et un thème sombre afin de travailler confortablement de jour comme de nuit.",
+       "position": 1,
+       "startDate": "2026-10-12",
+       "dueDate": "2026-10-23",
+       "createdAt": "2026-10-20T09:49:49.832Z",
+       "updatedAt": "2026-10-20T09:49:49.832Z",
+       "code": "2.1",
+       "span": {
+        "start": "2026-10-12",
+        "end": "2026-10-23"
+       },
+       "aggregate": {
+        "status": "IN_PROGRESS",
+        "progress": 50,
+        "estimate": {
+         "hours": 64,
+         "days": 8
+        },
+        "spent": {
+         "hours": 40,
+         "days": 5
+        },
+        "workItems": 2,
+        "statusCounts": {
+         "OPEN": 0,
+         "IN_PROGRESS": 1,
+         "IN_REVIEW": 0,
+         "ON_HOLD": 0,
+         "BLOCKED": 1,
+         "RESOLVED": 0,
+         "CLOSED": 0,
+         "REJECTED": 0
+        }
+       },
+       "workItems": [
+        {
+         "id": 204,
+         "projectId": 1,
+         "storyId": 3,
+         "type": "FEATURE",
+         "status": "IN_PROGRESS",
+         "priority": "NORMAL",
+         "title": "Dark Mode",
+         "progress": 80,
+         "position": 1,
+         "startDate": "2026-10-12",
+         "dueDate": "2026-10-23",
+         "estimate": {
+          "hours": 40,
+          "days": 5
+         },
+         "spent": {
+          "hours": 36,
+          "days": 4.5
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 4,
+           "days": 0.5
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.839Z",
+         "updatedAt": "2026-10-20T09:49:49.839Z",
+         "span": {
+          "start": "2026-10-12",
+          "end": "2026-10-23"
+         }
+        },
+        {
+         "id": 205,
+         "projectId": 1,
+         "storyId": 3,
+         "type": "TASK",
+         "status": "BLOCKED",
+         "priority": "NORMAL",
+         "title": "Tokens CSS",
+         "progress": 0,
+         "position": 2,
+         "startDate": "2026-10-16",
+         "dueDate": "2026-10-23",
+         "estimate": {
+          "hours": 24,
+          "days": 3
+         },
+         "spent": {
+          "hours": 4,
+          "days": 0.5
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 20,
+           "days": 2.5
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.846Z",
+         "updatedAt": "2026-10-20T09:49:49.846Z",
+         "span": {
+          "start": "2026-10-16",
+          "end": "2026-10-23"
+         }
+        }
+       ]
+      },
+      {
+       "id": 4,
+       "epicId": 2,
+       "title": "Composants UI",
+       "description": "En tant que développeur front, je veux une bibliothèque de composants partagés afin de construire les vues sans dupliquer le style.",
+       "position": 2,
+       "startDate": "2026-10-12",
+       "dueDate": "2026-10-30",
+       "createdAt": "2026-10-20T09:49:49.847Z",
+       "updatedAt": "2026-10-20T09:49:49.847Z",
+       "code": "2.2",
+       "span": {
+        "start": "2026-10-12",
+        "end": "2026-10-30"
+       },
+       "aggregate": {
+        "status": "IN_PROGRESS",
+        "progress": 67.5,
+        "estimate": {
+         "hours": 96,
+         "days": 12
+        },
+        "spent": {
+         "hours": 73,
+         "days": 9.125
+        },
+        "workItems": 6,
+        "statusCounts": {
+         "OPEN": 2,
+         "IN_PROGRESS": 1,
+         "IN_REVIEW": 0,
+         "ON_HOLD": 0,
+         "BLOCKED": 0,
+         "RESOLVED": 2,
+         "CLOSED": 1,
+         "REJECTED": 0
+        }
+       },
+       "workItems": [
+        {
+         "id": 206,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "FEATURE",
+         "status": "CLOSED",
+         "priority": "NORMAL",
+         "title": "Badges de type et de statut",
+         "progress": 100,
+         "position": 1,
+         "startDate": "2026-10-12",
+         "dueDate": "2026-10-15",
+         "estimate": {
+          "hours": 24,
+          "days": 3
+         },
+         "spent": {
+          "hours": 28,
+          "days": 3.5
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 4,
+           "days": 0.5
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.849Z",
+         "updatedAt": "2026-10-20T09:49:49.849Z",
+         "span": {
+          "start": "2026-10-12",
+          "end": "2026-10-15"
+         }
+        },
+        {
+         "id": 207,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "FEATURE",
+         "status": "RESOLVED",
+         "priority": "NORMAL",
+         "title": "Barres de progression Budget / Avancement",
+         "progress": 100,
+         "position": 2,
+         "startDate": "2026-10-14",
+         "dueDate": "2026-10-16",
+         "estimate": {
+          "hours": 16,
+          "days": 2
+         },
+         "spent": {
+          "hours": 17,
+          "days": 2.125
+         },
+         "balance": {
+          "kind": "OVER",
+          "delta": {
+           "hours": 1,
+           "days": 0.125
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.851Z",
+         "updatedAt": "2026-10-20T09:49:49.851Z",
+         "span": {
+          "start": "2026-10-14",
+          "end": "2026-10-16"
+         }
+        },
+        {
+         "id": 209,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "BUG",
+         "status": "RESOLVED",
+         "priority": "NORMAL",
+         "title": "Contraste insuffisant des badges en mode sombre",
+         "progress": 100,
+         "position": 3,
+         "startDate": "2026-10-15",
+         "dueDate": "2026-10-16",
+         "estimate": {
+          "hours": 8,
+          "days": 1
+         },
+         "spent": {
+          "hours": 6,
+          "days": 0.75
+         },
+         "balance": {
+          "kind": "UNDER",
+          "delta": {
+           "hours": -2,
+           "days": -0.25
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.853Z",
+         "updatedAt": "2026-10-20T09:49:49.853Z",
+         "span": {
+          "start": "2026-10-15",
+          "end": "2026-10-16"
+         }
+        },
+        {
+         "id": 208,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "TASK",
+         "status": "IN_PROGRESS",
+         "priority": "NORMAL",
+         "title": "Tableau réutilisable (Timesheet)",
+         "progress": 70,
+         "position": 4,
+         "startDate": "2026-10-16",
+         "dueDate": "2026-10-22",
+         "estimate": {
+          "hours": 24,
+          "days": 3
+         },
+         "spent": {
+          "hours": 22,
+          "days": 2.75
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 2,
+           "days": 0.25
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.860Z",
+         "updatedAt": "2026-10-20T09:49:49.860Z",
+         "span": {
+          "start": "2026-10-16",
+          "end": "2026-10-22"
+         }
+        },
+        {
+         "id": 210,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "FEATURE",
+         "status": "OPEN",
+         "priority": "NORMAL",
+         "title": "Slide-over de fiche tâche",
+         "progress": 0,
+         "position": 5,
+         "startDate": "2026-10-26",
+         "dueDate": "2026-10-28",
+         "estimate": {
+          "hours": 16,
+          "days": 2
+         },
+         "spent": {
+          "hours": 0,
+          "days": 0
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 16,
+           "days": 2
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.861Z",
+         "updatedAt": "2026-10-20T09:49:49.861Z",
+         "span": {
+          "start": "2026-10-26",
+          "end": "2026-10-28"
+         }
+        },
+        {
+         "id": 211,
+         "projectId": 1,
+         "storyId": 4,
+         "type": "TASK",
+         "status": "OPEN",
+         "priority": "LOW",
+         "title": "Documentation des composants",
+         "progress": 0,
+         "position": 6,
+         "startDate": "2026-10-29",
+         "dueDate": "2026-10-30",
+         "estimate": {
+          "hours": 8,
+          "days": 1
+         },
+         "spent": {
+          "hours": 0,
+          "days": 0
+         },
+         "balance": {
+          "kind": "REMAINING",
+          "delta": {
+           "hours": 8,
+           "days": 1
+          }
+         },
+         "createdAt": "2026-10-20T09:49:49.865Z",
+         "updatedAt": "2026-10-20T09:49:49.865Z",
+         "span": {
+          "start": "2026-10-29",
+          "end": "2026-10-30"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "milestones": [
+    {
+     "id": 2,
+     "projectId": 1,
+     "phaseId": 2,
+     "title": "Beta UI",
+     "description": "Interface complète (thèmes, composants, vues principales) ouverte aux testeurs.",
+     "date": "2026-11-02",
+     "reachedAt": null,
+     "reached": false,
+     "createdAt": "2026-10-20T09:49:49.831Z",
+     "updatedAt": "2026-10-20T09:49:49.831Z"
+    }
+   ]
+  }
+ ],
+ "milestones": [
+  {
+   "id": 3,
+   "projectId": 1,
+   "phaseId": null,
+   "title": "Mise en production v2",
+   "description": "Bascule de la boutique en ligne sur la v2.",
+   "date": "2026-11-16",
+   "reachedAt": null,
+   "reached": false,
+   "createdAt": "2026-10-20T09:49:49.866Z",
+   "updatedAt": "2026-10-20T09:49:49.866Z"
+  }
+ ],
+ "dependencies": [],
+ "criticalPath": [
+  211
+ ]
+}

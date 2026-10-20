@@ -1,0 +1,38 @@
+[
+ {
+  "id": 1,
+  "projectId": 1,
+  "phaseId": 1,
+  "title": "API Prête",
+  "description": "Authentification et API principale opérationnelles.",
+  "date": "2026-10-15",
+  "reachedAt": "2026-10-15T15:30:00.000Z",
+  "reached": true,
+  "createdAt": "2026-10-20T09:49:49.769Z",
+  "updatedAt": "2026-10-20T09:49:49.769Z"
+ },
+ {
+  "id": 2,
+  "projectId": 1,
+  "phaseId": 2,
+  "title": "Beta UI",
+  "description": "Interface complète (thèmes, composants, vues principales) ouverte aux testeurs.",
+  "date": "2026-11-02",
+  "reachedAt": null,
+  "reached": false,
+  "createdAt": "2026-10-20T09:49:49.831Z",
+  "updatedAt": "2026-10-20T09:49:49.831Z"
+ },
+ {
+  "id": 3,
+  "projectId": 1,
+  "phaseId": null,
+  "title": "Mise en production v2",
+  "description": "Bascule de la boutique en ligne sur la v2.",
+  "date": "2026-11-16",
+  "reachedAt": null,
+  "reached": false,
+  "createdAt": "2026-10-20T09:49:49.866Z",
+  "updatedAt": "2026-10-20T09:49:49.866Z"
+ }
+]

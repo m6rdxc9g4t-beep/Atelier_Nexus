@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from app.core.config import Settings, get_settings
 from app.core.llm.errors import ProviderNotConfiguredError, ProviderUnavailableError
 from app.core.llm.providers import AnthropicProvider, LLMProvider, OllamaProvider
+from app.core.llm.providers.claude_code_provider import ClaudeCodeProvider, find_claude_binary
 from app.core.llm.types import LLMRequest, LLMResponse, LLMStreamEvent, ProviderName
 
 logger = logging.getLogger(__name__)
@@ -54,23 +55,33 @@ class LLMRouter:
         api_key = (
             settings.anthropic_api_key.get_secret_value() if settings.anthropic_api_key else None
         )
+        claude: LLMProvider = AnthropicProvider(
+            api_key=api_key,
+            default_model=settings.anthropic_model,
+            timeout=settings.anthropic_timeout,
+        )
+        if settings.claude_mode == "cli" or (settings.claude_mode == "auto" and not api_key):
+            binary = find_claude_binary(settings.claude_cli_path)
+            if binary or settings.claude_mode == "cli":
+                # Abonnement Claude par Claude Code (sans clé API)
+                claude = ClaudeCodeProvider(
+                    binary=binary,
+                    default_model=settings.claude_cli_model,
+                    timeout=settings.claude_cli_timeout,
+                )
         providers: dict[ProviderName, LLMProvider] = {
-            "anthropic": AnthropicProvider(
-                api_key=api_key,
-                default_model=settings.anthropic_model,
-                timeout=settings.anthropic_timeout,
-            ),
+            "anthropic": claude,
             "ollama": OllamaProvider(
                 base_url=settings.ollama_base_url,
                 default_model=settings.ollama_model,
                 timeout=settings.ollama_timeout,
             ),
         }
-        return cls(
-            providers,
-            default=settings.llm_default_provider,
-            fallback=settings.llm_fallback_provider,
-        )
+        default = settings.llm_default_provider
+        if default == "anthropic" and not claude.is_configured:
+            # Ni clé ni Claude Code : le modèle local répond par défaut (au lieu d'une erreur)
+            default = "ollama"
+        return cls(providers, default=default, fallback=settings.llm_fallback_provider)
 
     # ─── Résolution ───────────────────────────────────────────────
 

@@ -1,14 +1,18 @@
 name: atelier-nexus
 
+# Ports choisis pour cohabiter avec la suite Atelier (docs/SUITE.md) :
+#   Atelier Viz (Data Via) = 8000 · Atelier Projets = 3000 · Ollama natif = 11434
+# Tous les ports sont publiés sur 127.0.0.1 uniquement (rien n'est exposé au réseau).
+
 services:
   # ─── Frontend : Next.js (sortie standalone) ──────────────────
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8100}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3100:3100"
     depends_on:
       backend:
         condition: service_healthy
@@ -24,8 +28,25 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atelier}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-atelier_nexus}
       REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://ollama:11434
+      # Atelier Viz tourne sur la machine hôte, hors de Docker
+      DATA_VIA_BASE_URL: ${DATA_VIA_BASE_URL:-http://host.docker.internal:8000/api}
+      # Projets et Trésorerie n'écoutent que sur 127.0.0.1 de l'hôte : injoignables depuis
+      # un conteneur sans configuration (voir docs/agents.md §6). Lancer le backend Nexus
+      # en local pour ces deux connecteurs, ou exposer les apps et renseigner ces adresses.
+      PROJETS_BASE_URL: ${PROJETS_BASE_URL:-http://host.docker.internal:3000/api}
+      TRESORERIE_BASE_URL: ${TRESORERIE_BASE_URL:-http://host.docker.internal:5050/api}
+      # Ciné écoute sur toutes les interfaces : joignable. Savoir, comme Projets, reste sur 127.0.0.1.
+      CINE_BASE_URL: ${CINE_BASE_URL:-http://host.docker.internal:4000/api}
+      SAVOIR_BASE_URL: ${SAVOIR_BASE_URL:-http://host.docker.internal:5051/api}
+      # Instantanés d'Atelier Tab, montés en lecture seule (voir volumes)
+      TAB_EXPORTS_DIR: /data/atelier_tab_exports
+      CORS_ORIGINS: http://localhost:3100,http://127.0.0.1:3100
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${ATELIER_TAB_EXPORTS:-${HOME}/Atelier_Tab/exports}:/data/atelier_tab_exports:ro
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8100:8100"
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,7 +55,7 @@ services:
       ollama:
         condition: service_started
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +70,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
       POSTGRES_DB: ${POSTGRES_DB:-atelier_nexus}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/init:/docker-entrypoint-initdb.d:ro
@@ -65,7 +86,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -79,7 +100,8 @@ services:
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      # 11435 côté hôte : 11434 reste libre pour un Ollama natif (utilisé par Atelier Viz)
+      - "127.0.0.1:11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped

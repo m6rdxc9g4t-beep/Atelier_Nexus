@@ -19,3 +19,7 @@ class ProviderUnavailableError(LLMError):
 
 class ProviderRequestError(LLMError):
     """Requête refusée (4xx, modèle introuvable, authentification) : pas de repli."""
+
+
+class ProviderNotAllowedError(LLMError):
+    """Provider interdit pour cet agent (données sensibles : modèle local imposé)."""

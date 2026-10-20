@@ -50,6 +50,8 @@ class ToolContext(BaseModel):
     conversation_id: str | None = None
     user_id: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
+    # État partagé entre les outils pendant UN tour d'agent (ex. schémas déjà consultés)
+    state: dict[str, Any] = Field(default_factory=dict)
 
 
 class ToolInput(BaseModel):
@@ -62,10 +64,29 @@ class BaseTool[InputT: ToolInput](ABC):
     name: ClassVar[str]
     description: ClassVar[str]
     input_model: type[InputT]
+    # Erreurs prévisibles : renvoyées au modèle telles quelles, sans trace dans les journaux
+    expected_errors: ClassVar[tuple[type[Exception], ...]] = ()
+    # Action qui modifie des données : l'agent s'arrête et attend « Autoriser » / « Refuser »
+    requires_approval: ClassVar[bool] = False
+    # Données sensibles (finances…) : l'agent qui l'utilise est verrouillé sur un modèle local
+    sensitive: ClassVar[bool] = False
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:
         """Logique métier de l'outil. Les exceptions sont converties en erreur d'outil."""
+
+    def approval_summary(self, params: InputT) -> str:
+        """Phrase montrée à l'utilisateur avant validation (à surcharger : « Créer la tâche … »)."""
+        return f"{self.name} : " + ", ".join(
+            f"{k} = {v!r}" for k, v in params.model_dump(exclude_none=True).items()
+        )
+
+    def summarize(self, raw_input: dict[str, Any]) -> str:
+        """Résumé d'un appel brut (entrée invalide : on montre l'entrée telle quelle)."""
+        try:
+            return self.approval_summary(self.input_model.model_validate(raw_input))
+        except ValidationError:
+            return f"{self.name} (paramètres invalides)"
 
     def spec(self) -> ToolSpec:
         return ToolSpec(
@@ -87,6 +108,9 @@ class BaseTool[InputT: ToolInput](ABC):
             return ToolOutput(content=f"Paramètres invalides — {details}", is_error=True)
         try:
             return await self.run(params, ctx)
+        except self.expected_errors as exc:
+            logger.info("Outil %s : %s", self.name, exc)
+            return ToolOutput(content=str(exc), is_error=True)
         except Exception as exc:
             logger.exception("Échec de l'outil %s", self.name)
             return ToolOutput(content=f"Erreur pendant l'exécution : {exc}", is_error=True)
