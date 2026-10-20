@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.api import agents, apps, data_via, llm
+from app.api import agents, apps, conversations, data_via, llm
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
 
@@ -42,7 +42,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Atelier Nexus API",
-    version="0.5.0",
+    version="0.6.0",
     description="Orchestration des agents IA et connecteurs de la suite Atelier.",
     lifespan=lifespan,
 )
@@ -59,6 +59,7 @@ register_error_handlers(app)
 app.include_router(llm.router)
 app.include_router(agents.router)
 app.include_router(apps.router)
+app.include_router(conversations.router)
 app.include_router(data_via.router)
 
 
