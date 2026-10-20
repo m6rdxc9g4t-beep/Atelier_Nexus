@@ -51,6 +51,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 11 | Réglages dans l'interface (clé Claude, modèles, apps, GitHub), rechargement à chaud et vérification → [`settings.md`](settings.md) | ✅ |
 | 12 | Claude par l'abonnement (Claude Code, `claude -p`) sans clé API, outils des agents conservés → [`claude-code.md`](claude-code.md) | ✅ |
 | 13 | Recherche dans l'historique (titres, messages, artefacts ; un agent ou tous), sans accents ni casse → [`conversations.md`](conversations.md#recherche-étape-13) | ✅ |
+| 14 | Atelier Cuisine (app en ligne, Supabase) : menu Suite « en ligne », connecteur en lecture seule (stock, planning, courses ; budget `sensitive`), agent Cuisine → [`apps/cuisine.md`](apps/cuisine.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
@@ -59,4 +60,5 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 - Modèle Ollama recommandé en production (défaut actuel : `llama3.1:8b`) et activation ou non du repli automatique (`LLM_FALLBACK_PROVIDER`).
 - Port d'Atelier Savoir : le faire passer à 5051 par défaut dans son dépôt (`docs/SUITE.md`), pour ne plus entrer en conflit avec Trésorerie.
 - Exposer Projets, Trésorerie et Savoir à un backend Nexus conteneurisé (voir `agents.md` §6).
+- Atelier Cuisine en écriture (ajouter à la liste de courses, planifier un repas) : outils avec validation (`requires_approval`).
 - Embeddings (pgvector) : recherche dans l'historique et les documents de la suite.

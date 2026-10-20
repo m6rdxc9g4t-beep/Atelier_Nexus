@@ -1,7 +1,7 @@
 # Atelier Nexus
 
-Hub d'agents IA pour la suite **Atelier** : 16 agents experts (données, tableur, projets, développement, finance, apprentissage, médiathèque, marketing, métiers), agents personnalisés créés depuis l'interface et orchestrateur, avec routage LLM hybride Claude ↔ Ollama, validation humaine des actions et données financières traitées 100 % en local.
-Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md) · Agents & routeur LLM : [`docs/llm-router-and-agents.md`](docs/llm-router-and-agents.md) · Connecteur Data Via : [`docs/apps/data-via.md`](docs/apps/data-via.md) · Agents : [`docs/agents.md`](docs/agents.md) · Interface : [`docs/frontend.md`](docs/frontend.md) · Historique : [`docs/conversations.md`](docs/conversations.md) · Connecteurs Tab, Ciné, Savoir : [`docs/apps/`](docs/apps/)
+Hub d'agents IA pour la suite **Atelier** : 17 agents experts (données, tableur, projets, développement, finance, apprentissage, médiathèque, cuisine, marketing, métiers), agents personnalisés créés depuis l'interface et orchestrateur, avec routage LLM hybride Claude ↔ Ollama, validation humaine des actions et données financières traitées 100 % en local.
+Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md) · Agents & routeur LLM : [`docs/llm-router-and-agents.md`](docs/llm-router-and-agents.md) · Connecteur Data Via : [`docs/apps/data-via.md`](docs/apps/data-via.md) · Agents : [`docs/agents.md`](docs/agents.md) · Interface : [`docs/frontend.md`](docs/frontend.md) · Historique : [`docs/conversations.md`](docs/conversations.md) · Connecteurs Tab, Ciné, Savoir, Cuisine : [`docs/apps/`](docs/apps/)
 
 ## Application de bureau (macOS)
 
@@ -12,6 +12,14 @@ Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de de
 Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivantes sont immédiates. Abonnement Claude (via Claude Code, sans clé API —
 [`docs/claude-code.md`](docs/claude-code.md)) ou clé Claude, modèles et adresses des apps : roue dentée **Réglages** de l'interface ([`docs/settings.md`](docs/settings.md)). Données dans
 `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
+
+## Atelier Cuisine (app en ligne)
+
+Atelier Cuisine apparaît dans le menu **Suite Atelier** (« en ligne », jamais sondé ; l'app Mac s'ouvre si elle est
+installée) et sert de connecteur aux agents, **en lecture seule** : agent **Cuisine** (stock et ce qui presse, planning
+des repas, liste de courses) et agent **Finance** (budget du mois et tickets, modèle local imposé). Réglages →
+« Atelier Cuisine » : adresse du projet Supabase, clé publique (jamais la clé `service_role`), e-mail + mot de passe du
+foyer ou jeton de rafraîchissement. Détails : [`docs/apps/cuisine.md`](docs/apps/cuisine.md).
 
 ## Ports (cohabitation avec la suite Atelier)
 

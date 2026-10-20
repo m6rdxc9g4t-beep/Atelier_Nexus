@@ -9,6 +9,7 @@ import httpx
 
 from app.core.config import Settings
 from app.tools.cine import CineClient
+from app.tools.cuisine import CuisineClient
 from app.tools.data_via import DataViaClient, DataViaNotConfiguredError
 from app.tools.github import GitHubClient
 from app.tools.http import AppNotConfiguredError
@@ -95,6 +96,20 @@ class ToolEnvironment:
             return c
 
         client: SavoirClient = self._get("savoir", make)
+        return client
+
+    def cuisine(self) -> CuisineClient:
+        def make() -> CuisineClient:
+            c = CuisineClient.from_settings(self.settings, self._transports.get("cuisine"))
+            if c is None:
+                raise AppNotConfiguredError(
+                    "Atelier Cuisine n'est pas configuré (CUISINE_SUPABASE_URL, clé publique, "
+                    "e-mail + mot de passe ou jeton de rafraîchissement).",
+                    app="cuisine",
+                )
+            return c
+
+        client: CuisineClient = self._get("cuisine", make)
         return client
 
     def tab(self) -> TabSnapshots:

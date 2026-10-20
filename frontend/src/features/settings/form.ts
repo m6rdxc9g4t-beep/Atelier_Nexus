@@ -14,7 +14,15 @@ export interface DraftField {
 
 export type Draft = Record<string, DraftField>;
 
-export const GROUPS: SettingsGroup[] = ["Modèles", "Applications Atelier", "GitHub"];
+export const GROUPS: SettingsGroup[] = ["Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"];
+
+/** Phrase affichée sous le titre d'un groupe. */
+export const GROUP_NOTES: Partial<Record<SettingsGroup, string>> = {
+  "Atelier Cuisine":
+    "App en ligne (Supabase). Nexus lit le stock, les repas, les courses et le budget du foyer, en lecture seule, " +
+    "avec la clé publique et le compte du foyer : seules ses données sont visibles. Le budget n'est lu que par " +
+    "l'agent Finance, sur le modèle local.",
+};
 
 export function initialDraft(view: SettingsView): Draft {
   return Object.fromEntries(

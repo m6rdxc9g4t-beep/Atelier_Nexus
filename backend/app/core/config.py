@@ -69,6 +69,17 @@ class Settings(BaseSettings):
     tab_data_dir: str | None = None
     tab_mcp_timeout: float = Field(default=30.0, gt=0, le=600)
 
+    # Atelier Cuisine : app EN LIGNE (Supabase : Postgres + RLS par compte). Lecture par l'API
+    # REST du projet avec la clé publique (anon / publishable, jamais service_role) et la session
+    # du foyer (e-mail + mot de passe, ou jeton de rafraîchissement). Rien en dur : vide = désactivé.
+    cuisine_supabase_url: str | None = None
+    cuisine_supabase_anon_key: SecretStr | None = None
+    cuisine_email: str | None = None
+    cuisine_password: SecretStr | None = None
+    cuisine_refresh_token: SecretStr | None = None
+    #: Session Supabase en cours (jetons renouvelés) ; vide = cuisine-session.json à côté du .env
+    cuisine_session_file: str | None = None
+
     # GitHub (agent Développeur) : dépôt par défaut + liste blanche, séparés par des virgules
     github_token: SecretStr | None = None
     github_repo: str | None = Field(default=None, description="owner/repo")
@@ -92,6 +103,12 @@ class Settings(BaseSettings):
         "tab_data_dir",
         "github_token",
         "github_repo",
+        "cuisine_supabase_url",
+        "cuisine_supabase_anon_key",
+        "cuisine_email",
+        "cuisine_password",
+        "cuisine_refresh_token",
+        "cuisine_session_file",
         mode="before",
     )
     @classmethod
@@ -108,6 +125,16 @@ class Settings(BaseSettings):
             if repo and repo.lower() not in (s.lower() for s in seen):
                 seen.append(repo)
         return seen
+
+    @property
+    def cuisine_configured(self) -> bool:
+        """Adresse + clé publique + une façon d'ouvrir la session (mot de passe ou jeton)."""
+        has_login = bool(self.cuisine_email and self.cuisine_password)
+        return bool(
+            self.cuisine_supabase_url
+            and self.cuisine_supabase_anon_key
+            and (has_login or self.cuisine_refresh_token)
+        )
 
     @property
     def cors_origin_list(self) -> list[str]:

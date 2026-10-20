@@ -20,9 +20,9 @@ import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { AppStatus, ProviderStatus, SettingsField, SettingsView } from "@/types/api";
 
-import { CHOICE_LABELS, type Draft, byGroup, changes, initialDraft } from "./form";
+import { CHOICE_LABELS, type Draft, GROUP_NOTES, byGroup, changes, initialDraft } from "./form";
 
-/** Bouton « Réglages » et fenêtre de configuration (clé Claude, modèles, apps, GitHub). */
+/** Bouton « Réglages » et fenêtre de configuration (clé Claude, modèles, apps, Cuisine, GitHub). */
 export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | void }) {
   const [open, setOpen] = useState(false);
   return (
@@ -36,8 +36,8 @@ export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | voi
         <DialogHeader>
           <DialogTitle>Réglages</DialogTitle>
           <DialogDescription>
-            Apparence, moteurs d&apos;IA, adresses des applications Atelier et accès GitHub. Les
-            changements s&apos;appliquent tout de suite.
+            Apparence, moteurs d&apos;IA, adresses des applications Atelier, compte Atelier Cuisine et
+            accès GitHub. Les changements s&apos;appliquent tout de suite.
           </DialogDescription>
         </DialogHeader>
         {/* Préférence propre à cet appareil (localStorage), indépendante du serveur */}
@@ -128,6 +128,7 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
       {byGroup(view).map(([group, fields]) => (
         <fieldset key={group} className="flex flex-col gap-3">
           <legend className="mb-1 text-sm font-semibold">{group}</legend>
+          {GROUP_NOTES[group] && <p className="-mt-2 text-xs text-muted-foreground">{GROUP_NOTES[group]}</p>}
           {fields.map((field) => (
             <FieldRow
               key={field.key}

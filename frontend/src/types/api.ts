@@ -268,7 +268,7 @@ export interface ConversationDetail extends ConversationSummary {
 // ─── Réglages (Étape 11) ─────────────────────────────────────────
 
 export type SettingsKind = "text" | "url" | "secret" | "choice" | "path";
-export type SettingsGroup = "Modèles" | "Applications Atelier" | "GitHub";
+export type SettingsGroup = "Modèles" | "Applications Atelier" | "Atelier Cuisine" | "GitHub";
 
 export interface SettingsField {
   key: string;
