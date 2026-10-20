@@ -1,4 +1,4 @@
-"""État des applications connectées (Viz / Data Via, Projets, Trésorerie, GitHub)."""
+"""État des applications connectées (Viz / Data Via, Projets, Trésorerie, Tab, Ciné, Savoir, GitHub)."""
 
 from __future__ import annotations
 
@@ -76,6 +76,19 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
         await env.tresorerie().ping()
         return "en marche (données locales)"
 
+    async def tab() -> str:
+        tables, _ = await env.tab().tables()
+        return f"{len(tables)} table(s) publiée(s)"
+
+    async def cine() -> str:
+        health = await env.cine().health()
+        lib = await env.cine().library()
+        return f"v{health.version} : {len(lib.movies)} film(s), {len(lib.shows)} série(s)"
+
+    async def savoir() -> str:
+        st = await env.savoir().stats()
+        return f"{st.courses} cours, {st.cards} carte(s), {st.due} à réviser (données locales)"
+
     async def github() -> str:
         repo = await env.github().get_repo(None)
         return f"{repo.full_name} ({'jeton présent' if s.github_token else 'sans jeton : lecture publique'})"
@@ -86,6 +99,9 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
                 _probe("viz", "Atelier Viz (Data Via)", s.data_via_base_url, viz),
                 _probe("projets", "Atelier Projets", s.projets_base_url, projets),
                 _probe("tresorerie", "Atelier Trésorerie", s.tresorerie_base_url, tresorerie),
+                _probe("tab", "Atelier Tab", s.tab_exports_dir, tab),
+                _probe("cine", "Atelier Ciné", s.cine_base_url, cine),
+                _probe("savoir", "Atelier Savoir", s.savoir_base_url, savoir),
                 _probe("github", "GitHub", ", ".join(s.github_repo_list) or None, github),
             )
         )

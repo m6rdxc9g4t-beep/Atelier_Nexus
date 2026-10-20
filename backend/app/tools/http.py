@@ -1,4 +1,4 @@
-"""Client HTTP commun aux connecteurs des applications (Projets, Trésorerie, GitHub).
+"""Client HTTP commun aux connecteurs des applications (Projets, Trésorerie, Ciné, Savoir, GitHub).
 
 Chaque connecteur hérite de `AppClient` : erreurs homogènes (`AppError` et dérivées,
 portant le nom de l'application), réponses validées par Pydantic, jamais de redirection.
@@ -79,11 +79,16 @@ class AppClient:
         json_body: Any = None,
         params: Any = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None = None,
     ) -> Any:
-        """Appel brut ; renvoie le JSON décodé (None pour 204)."""
+        """Appel brut ; renvoie le JSON décodé (None pour 204).
+
+        `timeout` : délai propre à cet appel (analyse de médiathèque, génération IA…).
+        """
+        extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
         try:
             response = await self._http.request(
-                method, path.lstrip("/"), json=json_body, params=params, headers=headers
+                method, path.lstrip("/"), json=json_body, params=params, headers=headers, **extra
             )
         except httpx.TimeoutException as exc:
             raise AppUnavailableError(f"{self.label} ne répond pas.", app=self.app) from exc

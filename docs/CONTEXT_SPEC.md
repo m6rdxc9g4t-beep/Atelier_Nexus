@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 6 (historique des conversations)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 7 (Atelier Tab, Ciné et Savoir)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -44,12 +44,14 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 4 | UI : chat en streaming + panneau Artefacts (`useArtifactStore`) → [`frontend.md`](frontend.md) | ✅ |
 | 5 | Plateforme multi-agents : 13 experts, agents créés depuis l'interface, orchestrateur, validations, verrou local, connecteurs Projets / Trésorerie / GitHub → [`agents.md`](agents.md) | ✅ |
 | 6 | Historique : conversations et artefacts enregistrés en base, réouverture, renommage, suppression → [`conversations.md`](conversations.md) | ✅ |
+| 7 | Connecteurs Atelier Tab (instantanés DataFlow), Ciné, Savoir ; agents Tableur, Ciné-club, Tuteur (100 % local) → [`apps/tab.md`](apps/tab.md), [`apps/cine.md`](apps/cine.md), [`apps/savoir.md`](apps/savoir.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
 - Data Via en écriture (enregistrer une mesure dans le modèle de Viz, actualiser un jeu) : quand, et avec quelle confirmation utilisateur ?
 - Ajouter Atelier Nexus au contrat de suite (`docs/SUITE.md` d'Atelier Viz / Tab / Projets) : ports 3100 / 8100, sélecteur de suite.
 - Modèle Ollama recommandé en production (défaut actuel : `llama3.1:8b`) et activation ou non du repli automatique (`LLM_FALLBACK_PROVIDER`).
-- Connecteurs Atelier Tab, Ciné, Savoir (contrats à lire dans leurs dépôts) et agents associés.
-- Exposer Projets et Trésorerie à un backend Nexus conteneurisé (voir `agents.md` §6).
+- Écriture dans Atelier Tab par son serveur MCP (`desktop/mcp-server.ts`) : ajouter des lignes, corriger une formule, avec validation.
+- Port d'Atelier Savoir : le faire passer à 5051 par défaut dans son dépôt (`docs/SUITE.md`), pour ne plus entrer en conflit avec Trésorerie.
+- Exposer Projets, Trésorerie et Savoir à un backend Nexus conteneurisé (voir `agents.md` §6).
 - Embeddings (pgvector) : recherche dans l'historique et les documents de la suite.

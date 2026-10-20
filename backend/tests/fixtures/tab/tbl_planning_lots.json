@@ -1,0 +1,180 @@
+{
+  "target_system": "atelier_projets",
+  "schema_version": "2.1.0",
+  "exported_at": "2026-10-18T12:57:00Z",
+  "workspace": {
+    "id": "ws_arch_01",
+    "name": "Espace Architecture"
+  },
+  "project": {
+    "id": "proj_renovation_2026",
+    "name": "Rénovation Urbaine 2026",
+    "source_table": {
+      "id": "tbl_planning_lots",
+      "name": "Planning & Lots"
+    },
+    "summary_metrics": {
+      "total_rows": 3,
+      "computed_totals": {
+        "C": 88500,
+        "D": 106200
+      }
+    },
+    "columns_schema": [
+      {
+        "col_letter": "A",
+        "id": "task_name",
+        "label": "Lot / Tâche",
+        "type": "text",
+        "atelier_mapping": "entity_title"
+      },
+      {
+        "col_letter": "B",
+        "id": "status",
+        "label": "Statut",
+        "type": "select",
+        "atelier_mapping": "workflow_state"
+      },
+      {
+        "col_letter": "C",
+        "id": "cost_ht",
+        "label": "Coût HT",
+        "type": "currency",
+        "atelier_mapping": "financial_ht"
+      },
+      {
+        "col_letter": "D",
+        "id": "cost_ttc",
+        "label": "Coût TTC",
+        "type": "formula",
+        "atelier_mapping": "financial_ttc"
+      },
+      {
+        "col_letter": "E",
+        "id": "owner",
+        "label": "Responsable",
+        "type": "owner",
+        "atelier_mapping": "assignee"
+      },
+      {
+        "col_letter": "F",
+        "id": "due_date",
+        "label": "Échéance",
+        "type": "date",
+        "atelier_mapping": "due_date"
+      }
+    ],
+    "records": [
+      {
+        "row_index": 1,
+        "record_id": "rec_01",
+        "values": {
+          "A": {
+            "raw": "Gros œuvre",
+            "computed": "Gros œuvre"
+          },
+          "B": {
+            "raw": "En cours",
+            "computed": "En cours"
+          },
+          "C": {
+            "raw": "45000",
+            "computed": 45000
+          },
+          "D": {
+            "raw": "=C1*1.2",
+            "computed": 54000
+          },
+          "E": {
+            "raw": "Marie Dubois",
+            "computed": "Marie Dubois"
+          },
+          "F": {
+            "raw": "2026-11-30",
+            "computed": "2026-11-30"
+          }
+        }
+      },
+      {
+        "row_index": 2,
+        "record_id": "rec_02",
+        "values": {
+          "A": {
+            "raw": "Charpente bois",
+            "computed": "Charpente bois"
+          },
+          "B": {
+            "raw": "Terminé",
+            "computed": "Terminé"
+          },
+          "C": {
+            "raw": "28500",
+            "computed": 28500
+          },
+          "D": {
+            "raw": "=C2*1.2",
+            "computed": 34200
+          },
+          "E": {
+            "raw": "Karim Benali",
+            "computed": "Karim Benali"
+          },
+          "F": {
+            "raw": "2026-12-15",
+            "computed": "2026-12-15"
+          }
+        }
+      },
+      {
+        "row_index": 3,
+        "record_id": "rec_03",
+        "values": {
+          "A": {
+            "raw": "Isolation thermique",
+            "computed": "Isolation thermique"
+          },
+          "B": {
+            "raw": "À faire",
+            "computed": "À faire"
+          },
+          "C": {
+            "raw": "15000",
+            "computed": 15000
+          },
+          "D": {
+            "raw": "=C3*1.2",
+            "computed": 18000
+          },
+          "E": {
+            "raw": "Sophie Laurent",
+            "computed": "Sophie Laurent"
+          },
+          "F": {
+            "raw": "2027-01-20",
+            "computed": "2027-01-20"
+          }
+        }
+      }
+    ],
+    "summary_rows": [
+      {
+        "row_index": 4,
+        "record_id": "rec_total",
+        "values": {
+          "A": {
+            "raw": "TOTAL",
+            "computed": "TOTAL"
+          },
+          "C": {
+            "raw": "=SUM(C1:C3)",
+            "computed": 88500
+          },
+          "D": {
+            "raw": "=SUM(D1:D3)",
+            "computed": 106200
+          }
+        }
+      }
+    ]
+  }
+}

@@ -5,7 +5,11 @@ leurs VRAIS outils, contre les applications lancées sur la machine :
 - Chef de projet / Product Owner (Atelier Projets) : tableau de bord → arborescence →
   création d'un élément, soumise à validation ;
 - Data Analyst / Marketing (Atelier Viz) : jeux → schéma → requête → mesures DAX ;
-- Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets.
+- Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets ;
+- Tableur (Atelier Tab) : tables → contrôle du planning ;
+- Ciné-club (Atelier Ciné) : bilan de la médiathèque → titres en 4K ;
+- Tuteur (Atelier Savoir, moteur local) : séance du jour → question → notes enregistrées
+  après validation.
 
     cd backend && DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server
 Usage réservé au développement : jamais en production.
@@ -101,6 +105,12 @@ class DemoProvider(LLMProvider):
             return self._data_via(done)
         if "tresorerie_dashboard" in tools:
             return self._tresorerie(done)
+        if "savoir_due_cards" in tools:
+            return self._savoir(done, request)
+        if "cine_library_report" in tools:
+            return self._cine(done)
+        if "tab_list_tables" in tools:
+            return self._tab(done)
         if "publish_artifact" in tools and "publish_artifact" not in done:
             return self._call(
                 "publish_artifact",
@@ -184,6 +194,53 @@ class DemoProvider(LLMProvider):
             "Vos dépenses du mois restent **dans les budgets** (51 % consommés au 20 du mois). "
             "Analyse faite **entièrement en local** : aucune donnée financière n'a quitté la machine."
         )
+
+    def _tab(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+        if "tab_list_tables" not in done:
+            return self._call("tab_list_tables", {}, "Je regarde les tables d'Atelier Tab.")
+        if "tab_check_table" not in done:
+            ids = re.findall(r"^\| (tbl_[A-Za-z0-9_-]+) \|", done["tab_list_tables"].content, re.M)
+            return self._call(
+                "tab_check_table", {"table_id": ids[0] if ids else "tbl_planning_lots"}
+            )
+        return self._say(
+            "Contrôle terminé. " + done["tab_check_table"].content.split("\n", 1)[-1][:600]
+        )
+
+    def _cine(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+        if "cine_library_report" not in done:
+            return self._call("cine_library_report", {}, "Je fais le bilan de la médiathèque.")
+        if "cine_library" not in done:
+            return self._call("cine_library", {"kind": "movie", "quality": "4K"})
+        return self._say(
+            "Bilan : la série **Les Veilleurs** n'a que l'épisode 5 de la saison 2 (épisodes 1 à 4 "
+            "manquants). Pour ce soir en 4K : **Orbit** (2024, HDR, sous-titres français)."
+        )
+
+    def _savoir(self, done: dict[str, ToolResultBlock], request: LLMRequest) -> LLMResponse:
+        if "savoir_due_cards" not in done:
+            return self._call("savoir_due_cards", {"limit": 3}, "Je prépare la séance du jour.")
+        due = done["savoir_due_cards"].content
+        card = re.search(r"- #(\d+) .*?\n  Q : (.+)", due)
+        answers = sum(
+            1
+            for m in request.messages
+            if m.role == "user" and any(isinstance(b, TextBlock) and b.text for b in m.content)
+        )
+        if not card:
+            return self._say("Aucune carte à réviser aujourd'hui : bravo !")
+        if answers < 2:
+            return self._say(f"Première question : **{card.group(2)}**")
+        if "savoir_record_reviews" not in done:
+            return self._call(
+                "savoir_record_reviews",
+                {"reviews": [{"card_id": int(card.group(1)), "rating": "correct"}]},
+                "Bonne réponse, avec une petite hésitation : je note **Correct**. J'enregistre la séance :",
+            )
+        result = done["savoir_record_reviews"]
+        if result.is_error:
+            return self._say("D'accord, rien n'est enregistré.")
+        return self._say(f"{result.content}\n\nSéance terminée.")
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         return self._step(request)

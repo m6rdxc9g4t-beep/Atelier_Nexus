@@ -3,7 +3,7 @@
  * Chaque adresse se surcharge par une variable NEXT_PUBLIC_ATELIER_*_URL.
  */
 
-export type SuiteAppId = "nexus" | "viz" | "tab" | "projets" | "tresorerie";
+export type SuiteAppId = "nexus" | "viz" | "tab" | "projets" | "tresorerie" | "cine" | "savoir";
 
 export interface SuiteApp {
   id: SuiteAppId;
@@ -32,6 +32,10 @@ export function suiteApps(): SuiteApp[] {
   const projetsApi = clean(process.env.NEXT_PUBLIC_ATELIER_PROJETS_API_URL, "http://127.0.0.1:3000");
   const tresorerie = clean(process.env.NEXT_PUBLIC_ATELIER_TRESORERIE_URL, "http://127.0.0.1:5050");
   const viz = clean(process.env.NEXT_PUBLIC_ATELIER_VIZ_URL, "http://127.0.0.1:8000");
+  // Ciné sert son interface sur le port de son API en production (4000 ; app Mac : 47321)
+  const cine = clean(process.env.NEXT_PUBLIC_ATELIER_CINE_URL, "http://127.0.0.1:4000");
+  // Savoir écoute sur 5050 par défaut, comme Trésorerie : lancé sur 5051 (docs/apps/savoir.md)
+  const savoir = clean(process.env.NEXT_PUBLIC_ATELIER_SAVOIR_URL, "http://127.0.0.1:5051");
   return [
     {
       id: "nexus",
@@ -72,6 +76,22 @@ export function suiteApps(): SuiteApp[] {
       description: "Comptes, budgets, placements",
       url: tresorerie,
       healthUrl: `${tresorerie}/api/ping`,
+    },
+    {
+      id: "cine",
+      name: "Atelier Ciné",
+      short: "Ciné",
+      description: "Médiathèque : films et séries",
+      url: cine,
+      healthUrl: `${cine}/api/health`,
+    },
+    {
+      id: "savoir",
+      name: "Atelier Savoir",
+      short: "Savoir",
+      description: "Cours et cartes de révision",
+      url: savoir,
+      healthUrl: `${savoir}/api/stats`,
     },
   ];
 }

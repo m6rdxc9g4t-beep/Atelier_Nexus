@@ -4,6 +4,8 @@ import {
   BarChart3,
   CalendarCheck,
   Check,
+  Clapperboard,
+  GraduationCap,
   Landmark,
   LayoutGrid,
   type LucideIcon,
@@ -36,6 +38,8 @@ const ICONS: Record<SuiteAppId, LucideIcon> = {
   tab: Table2,
   projets: CalendarCheck,
   tresorerie: Landmark,
+  cine: Clapperboard,
+  savoir: GraduationCap,
 };
 
 /** Sélecteur « Suite Atelier » (SUITE.md §3) : état vérifié à l'ouverture, sans bloquer le menu. */

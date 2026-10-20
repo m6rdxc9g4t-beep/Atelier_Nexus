@@ -1,4 +1,4 @@
-"""Agent Data Analyst / Power BI, branché sur Data Via (Atelier Viz)."""
+"""Agents de données : Data Analyst / Power BI (Data Via, Atelier Viz) et Tableur (Atelier Tab)."""
 
 from app.agents.base import BaseAgent
 from app.agents.experts.common import prompt
@@ -12,7 +12,7 @@ class DataAnalystAgent(BaseAgent):
     description = "Explore vos jeux Atelier Viz, calcule des indicateurs et écrit des mesures DAX et du Power Query."
     icon = "chart-column"
     category = "Données"
-    toolsets = ("core", "data_via")
+    toolsets = ("core", "data_via", "tab")
     max_iterations = 12
     starters = (
         "Quels jeux de données ai-je dans Atelier Viz, et que contiennent-ils ?",
@@ -43,8 +43,48 @@ Bonnes pratiques Power BI / DAX :
   mets dans `notes` les étapes d'intégration dans Power BI Desktop (table cible, format,
   dossier d'affichage).
 
+Tables d'Atelier Tab : `tab_list_tables`, `tab_read_table`, `tab_aggregate`. Atelier Viz
+peut aussi les importer comme jeu de données (connexion Atelier Tab) pour les requêter avec
+`data_via_query`.
+
 Analyse :
 - Donne d'abord la réponse (le chiffre, la tendance), puis la méthode en une ligne.
 - Signale les limites : données tronquées, valeurs manquantes, période incomplète.
+"""
+    )
+
+
+@register_agent
+class SpreadsheetAgent(BaseAgent):
+    name = "tableur"
+    display_name = "Tableur"
+    description = "Lit vos tables Atelier Tab, calcule des totaux, traque les erreurs de formule et les échéances dépassées."
+    icon = "table-2"
+    category = "Données"
+    toolsets = ("core", "tab")
+    max_iterations = 10
+    starters = (
+        "Quelles tables ai-je dans Atelier Tab ?",
+        "Contrôle le planning : erreurs de formule, lots en retard, responsables manquants.",
+        "Total du coût HT par statut dans la table Planning & Lots.",
+    )
+    system_prompt = prompt(
+        """
+Tu es expert tableur, branché sur Atelier Tab (tables typées : texte, nombre, montant,
+pourcentage, choix, date, case à cocher, responsable, formule) avec les outils `tab_*`.
+
+Méthode :
+- `tab_list_tables` pour trouver la table (espace › projet › table), puis `tab_read_table`
+  pour voir ses colonnes, leurs types et leurs rôles avant tout calcul.
+- Tout total, moyenne ou comptage passe par `tab_aggregate` : ne calcule jamais de tête.
+  Les lignes de total de la table sont exclues des calculs, les erreurs de formule aussi.
+- `tab_check_table` pour un contrôle qualité : erreurs (#DIV/0!, #REF!…), titres vides ou en
+  double, échéances dépassées, responsables manquants, préparation à l'import dans Atelier
+  Projets.
+- Pour corriger une formule, explique la cause et donne la formule corrigée (syntaxe d'Atelier
+  Tab : `=SUM(C1:C10)`, `=AVG()`, `=MIN()`, `=MAX()`, `=IF(cond; si_vrai; si_faux)`).
+
+Les valeurs sont celles du dernier enregistrement dans l'app de bureau. Tu ne modifies pas les
+tables : l'utilisateur applique les corrections dans Atelier Tab.
 """
     )

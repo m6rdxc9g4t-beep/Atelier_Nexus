@@ -8,10 +8,13 @@ from typing import Any
 import httpx
 
 from app.core.config import Settings
+from app.tools.cine import CineClient
 from app.tools.data_via import DataViaClient, DataViaNotConfiguredError
 from app.tools.github import GitHubClient
 from app.tools.http import AppNotConfiguredError
 from app.tools.projets import ProjetsClient
+from app.tools.savoir import SavoirClient
+from app.tools.tab import TabSnapshots
 from app.tools.tresorerie import TresorerieClient
 
 
@@ -71,6 +74,36 @@ class ToolEnvironment:
             return c
 
         client: TresorerieClient = self._get("tresorerie", make)
+        return client
+
+    def cine(self) -> CineClient:
+        def make() -> CineClient:
+            c = CineClient.from_settings(self.settings, self._transports.get("cine"))
+            if c is None:
+                raise AppNotConfiguredError("CINE_BASE_URL n'est pas défini.", app="cine")
+            return c
+
+        client: CineClient = self._get("cine", make)
+        return client
+
+    def savoir(self) -> SavoirClient:
+        def make() -> SavoirClient:
+            c = SavoirClient.from_settings(self.settings, self._transports.get("savoir"))
+            if c is None:
+                raise AppNotConfiguredError("SAVOIR_BASE_URL n'est pas défini.", app="savoir")
+            return c
+
+        client: SavoirClient = self._get("savoir", make)
+        return client
+
+    def tab(self) -> TabSnapshots:
+        def make() -> TabSnapshots:
+            c = TabSnapshots.from_settings(self.settings)
+            if c is None:
+                raise AppNotConfiguredError("TAB_EXPORTS_DIR n'est pas défini.", app="tab")
+            return c
+
+        client: TabSnapshots = self._get("tab", make)
         return client
 
     def github(self) -> GitHubClient:
