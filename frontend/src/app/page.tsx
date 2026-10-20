@@ -1,8 +1,10 @@
 import { Network } from "lucide-react";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+    <main className="relative flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+      <ThemeToggle className="absolute top-4 right-4" />
       <h1 className="atelier-brand gap-3 text-shadow-glow">
         <span className="atelier-brand__tile size-11 rounded-xl" aria-hidden="true">
           <Network className="size-6" />

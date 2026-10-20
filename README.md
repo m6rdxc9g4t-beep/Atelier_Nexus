@@ -52,7 +52,7 @@ Charte « néon monochrome » commune à la suite : chaque application est **ent
 
 - `frontend/src/styles/brand/atelier-brand.css` (+ police Nunito et sa licence OFL) est une **copie exacte** du fichier de marque d'Atelier Projets (`design-system/brand/`) : ne pas l'éditer ici. Il définit les jetons `--atelier-*` (`bg`, `sidebar`, `surface(-2|-3)`, `field`, `text`, `muted`, `ink`, `border(-soft)`, `line`, `signature(-soft|-faint)`, `glow(-strong)`, `focus`, `backdrop`, `chart-1..3`) pour le clair et le sombre.
 - `data-atelier-app="nexus"` sur `<html>` (`layout.tsx`) pose la couleur ; les variables Shadcn de `globals.css` sont branchées sur ces jetons, et les composants Shadcn (`data-slot`) reçoivent trait et halo néon.
-- L'app s'affiche en sombre (`.dark` + `data-theme="dark"`) ; le clair est prêt (retirer ces marqueurs). Bouton principal : plein en clair, contour néon en sombre.
+- Choix du thème **Clair / Sombre / Système** (sélecteur en haut à droite de l'accueil, `src/components/theme/`) : préférence dans `localStorage` (`atelier-nexus-theme`, défaut Système, qui suit `prefers-color-scheme`), appliquée avant le premier affichage par un script inline ; sombre = `.dark` + `data-theme="dark"`, clair = `data-theme="light"`. Bouton principal : plein en clair, contour néon en sombre.
 - Utilitaires Tailwind : `shadow-glow`, `shadow-glow-strong`, `shadow-signature-glow`, `shadow-focus`, `text-shadow-glow`, `bg-signature-soft`, `bg-signature-faint`, `bg-atelier-surface(-2|-3)`, `text-atelier-ink`, `text-atelier-muted`, `border-atelier-border(-soft)`, `border-atelier-line`, `fill-atelier-chart-1..3`.
 - Les couleurs qui portent un sens (`--chart-*` multi-séries, `--destructive`) ne changent pas.
 

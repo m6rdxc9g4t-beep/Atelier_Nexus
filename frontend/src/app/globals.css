@@ -13,9 +13,10 @@
    Les variables Shadcn sont branchées sur les jetons --atelier-* de
    atelier-brand.css, qui changent d'eux-mêmes de valeur entre clair et
    sombre (.dark / data-theme="dark" sur <html>) : un seul bloc suffit.
-   L'app s'affiche en sombre (marqueurs posés dans layout.tsx) ; le clair
-   est prêt (il suffit de retirer les marqueurs). */
+   Clair / Sombre / Système au choix (components/theme) : sombre = .dark +
+   data-theme="dark", clair = data-theme="light". */
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   --background: var(--atelier-bg);
   --foreground: var(--atelier-text);
