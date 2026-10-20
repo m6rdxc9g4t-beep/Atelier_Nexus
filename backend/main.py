@@ -8,8 +8,10 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import __version__
 from app.api import agents, apps, conversations, data_via, llm
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
@@ -42,7 +44,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Atelier Nexus API",
-    version="0.6.0",
+    version=__version__,
     description="Orchestration des agents IA et connecteurs de la suite Atelier.",
     lifespan=lifespan,
 )
@@ -78,3 +80,9 @@ async def health() -> HealthResponse:
         env=settings.app_env,
         llm_default_provider=settings.llm_default_provider,
     )
+
+
+# Application de bureau : le backend sert aussi l'interface compilée (NEXUS_EXPORT=1), en dernier
+# pour que les routes /api gardent la priorité. Voir app/desktop.py et scripts/macos/build_app.sh.
+if settings.frontend_dist and (Path(settings.frontend_dist) / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=settings.frontend_dist, html=True), name="interface")

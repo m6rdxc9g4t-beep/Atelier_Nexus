@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 8 (écriture dans Atelier Tab)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 9 (application de bureau macOS)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -46,6 +46,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 6 | Historique : conversations et artefacts enregistrés en base, réouverture, renommage, suppression → [`conversations.md`](conversations.md) | ✅ |
 | 7 | Connecteurs Atelier Tab (instantanés DataFlow), Ciné, Savoir ; agents Tableur, Ciné-club, Tuteur (100 % local) → [`apps/tab.md`](apps/tab.md), [`apps/cine.md`](apps/cine.md), [`apps/savoir.md`](apps/savoir.md) | ✅ |
 | 8 | Écriture dans Atelier Tab par son serveur MCP (cellules, lignes, colonnes, tables), avec validation → [`apps/tab.md`](apps/tab.md) | ✅ |
+| 9 | Application de bureau macOS « Atelier Nexus.app » : fenêtre native, installation de Python au premier lancement, données dans Application Support → [`desktop.md`](desktop.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/features/chat-agent/Markdown";
+import { saveFile } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 
@@ -35,14 +36,6 @@ const EXTENSIONS: Record<StoredArtifact["kind"], string> = {
   data_preview: "csv",
 };
 
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 const slug = (s: string) =>
   s
@@ -100,7 +93,11 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
             size="icon-sm"
             aria-label="Télécharger"
             onClick={() =>
-              download(`${slug(artifact.title)}.${EXTENSIONS[artifact.kind]}`, exportable.text, exportable.type)
+              void saveFile(
+                `${slug(artifact.title)}.${EXTENSIONS[artifact.kind]}`,
+                exportable.text,
+                exportable.type,
+              ).catch(() => undefined)
             }
           >
             <Download />

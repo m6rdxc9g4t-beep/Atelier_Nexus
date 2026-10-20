@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     tresorerie_base_url: str | None = "http://127.0.0.1:5050/api"
     apps_timeout: float = 20.0
 
+    # Application de bureau : interface compilée (frontend/out) servie par le backend
+    frontend_dist: str | None = None
+
     # Atelier Ciné (Express, 4000 ; app Mac : 47321). Atelier Savoir (Flask) écoute par défaut
     # sur 5050 comme Trésorerie : on le lance avec ATELIER_PORT=5051 (docs/apps/savoir.md).
     cine_base_url: str | None = "http://127.0.0.1:4000/api"
@@ -74,6 +77,7 @@ class Settings(BaseSettings):
         "savoir_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
+        "frontend_dist",
         "tab_data_dir",
         "github_token",
         "github_repo",

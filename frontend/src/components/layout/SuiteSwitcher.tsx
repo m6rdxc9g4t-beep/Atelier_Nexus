@@ -30,6 +30,7 @@ import {
   statusLabel,
   suiteApps,
 } from "@/lib/suite";
+import { openExternal } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<SuiteAppId, LucideIcon> = {
@@ -75,7 +76,7 @@ export function SuiteSwitcher() {
               title={app.url}
               className={cn("gap-2.5 py-2", current && "bg-accent-soft")}
               onSelect={() => {
-                if (!current) window.open(app.url, "_blank", "noopener");
+                if (!current) openExternal(app.url);
               }}
             >
               <span className="atelier-brand__tile atelier-brand__tile--sm" aria-hidden>

@@ -28,7 +28,11 @@ const clean = (url: string | undefined, fallback: string) =>
   url?.trim() ? url.trim().replace(/\/+$/, "") : fallback;
 
 export function suiteApps(): SuiteApp[] {
-  const api = clean(process.env.NEXT_PUBLIC_API_URL, "http://localhost:8100");
+  // Vide = même origine (application de bureau : le backend sert l'interface)
+  const api =
+    process.env.NEXT_PUBLIC_API_URL === ""
+      ? ""
+      : clean(process.env.NEXT_PUBLIC_API_URL, "http://localhost:8100");
   const projetsApi = clean(process.env.NEXT_PUBLIC_ATELIER_PROJETS_API_URL, "http://127.0.0.1:3000");
   const tresorerie = clean(process.env.NEXT_PUBLIC_ATELIER_TRESORERIE_URL, "http://127.0.0.1:5050");
   const viz = clean(process.env.NEXT_PUBLIC_ATELIER_VIZ_URL, "http://127.0.0.1:8000");

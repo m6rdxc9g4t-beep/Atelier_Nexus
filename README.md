@@ -3,6 +3,15 @@
 Hub d'agents IA pour la suite **Atelier** : 16 agents experts (données, tableur, projets, développement, finance, apprentissage, médiathèque, marketing, métiers), agents personnalisés créés depuis l'interface et orchestrateur, avec routage LLM hybride Claude ↔ Ollama, validation humaine des actions et données financières traitées 100 % en local.
 Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md) · Agents & routeur LLM : [`docs/llm-router-and-agents.md`](docs/llm-router-and-agents.md) · Connecteur Data Via : [`docs/apps/data-via.md`](docs/apps/data-via.md) · Agents : [`docs/agents.md`](docs/agents.md) · Interface : [`docs/frontend.md`](docs/frontend.md) · Historique : [`docs/conversations.md`](docs/conversations.md) · Connecteurs Tab, Ciné, Savoir : [`docs/apps/`](docs/apps/)
 
+## Application de bureau (macOS)
+
+```bash
+./scripts/macos/build_app.sh   # « Atelier Nexus.app » dans ~/Applications + raccourci sur le Bureau
+```
+
+Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivantes sont immédiates. Réglages et données
+dans `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
+
 ## Ports (cohabitation avec la suite Atelier)
 
 | Service | Adresse | Remarque |
