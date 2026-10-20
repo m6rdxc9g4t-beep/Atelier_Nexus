@@ -28,6 +28,7 @@ import uvicorn
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.router import LLMRouter, get_llm_router
 from app.core.llm.types import (
+    ImageBlock,
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
@@ -72,6 +73,29 @@ def _results(request: LLMRequest) -> dict[str, ToolResultBlock]:
     return out
 
 
+def _attachments_received(request: LLMRequest) -> list[str]:
+    """Pièces jointes du dernier message utilisateur, telles que le modèle les reçoit."""
+    last = next((m for m in reversed(request.messages) if m.role == "user"), None)
+    lines: list[str] = []
+    for block in last.content if last else []:
+        if isinstance(block, ImageBlock):
+            lines.append(
+                f"une image {block.media_type} ({len(block.data) * 3 // 4:,} octets)".replace(
+                    ",", " "
+                )
+            )
+        elif isinstance(block, TextBlock) and block.text.startswith("<piece_jointe"):
+            head = block.text.split("\n", 1)[0]
+            name = re.search(r'nom="([^"]*)"', head)
+            chars = len(block.text) - len(head)
+            lines.append(
+                f"**{name.group(1) if name else '?'}** : {chars:,} caractères de texte".replace(
+                    ",", " "
+                )
+            )
+    return lines
+
+
 class DemoProvider(LLMProvider):
     def __init__(self, name: ProviderName) -> None:
         super().__init__("demo-scripte")
@@ -112,6 +136,12 @@ class DemoProvider(LLMProvider):
             return self._cine(done)
         if "tab_list_tables" in tools:
             return self._tab(done, request)
+        received = _attachments_received(request)
+        if received and not done:
+            return self._say(
+                "Voici ce que j'ai reçu (contenu réellement transmis au modèle) :\n\n"
+                + "\n".join(f"- {line}" for line in received)
+            )
         if "publish_artifact" in tools and "publish_artifact" not in done:
             return self._call(
                 "publish_artifact",
@@ -202,6 +232,26 @@ class DemoProvider(LLMProvider):
              for b in m.content if isinstance(b, TextBlock) and b.text),
             "",
         )  # fmt: skip
+        if asked.lower().startswith("envoie") and "projets_import_tab_table" in {
+            t.name for t in request.tools
+        }:
+            if "projets_preview_tab_import" not in done:
+                return self._call(
+                    "projets_preview_tab_import",
+                    {"table_id": "tbl_planning_lots"},
+                    "Voici ce que l'import ferait dans Atelier Projets :",
+                )
+            if "projets_import_tab_table" not in done:
+                return self._call(
+                    "projets_import_tab_table",
+                    {"table_id": "tbl_planning_lots"},
+                    "Aperçu vérifié (détail ci-dessus) : une ligne a changé depuis le dernier "
+                    "import. Je l'envoie :",
+                )
+            result = done["projets_import_tab_table"]
+            if result.is_error:
+                return self._say("Entendu, rien n'est envoyé à Atelier Projets.")
+            return self._say(result.content)
         if asked.lower().startswith("ajoute") and "tab_add_rows" in {t.name for t in request.tools}:
             if "tab_add_rows" not in done:
                 return self._call(

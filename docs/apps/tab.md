@@ -1,4 +1,4 @@
-# Connecteur Atelier Tab (étapes 7 et 8)
+# Connecteur Atelier Tab (étapes 7, 8 et 10)
 
 Atelier Tab (tableur + base typée) **n'a pas d'API HTTP**. L'app de bureau publie chaque table, à chaque
 enregistrement, dans `~/Atelier_Tab/exports/<id de table>.json` : une enveloppe **DataFlow v2.1.0** avec les
@@ -80,7 +80,27 @@ faux serveur lancé en vrai sous-processus (`tests/fake_tab_mcp.py`).
 - Docker : l'image du backend n'a pas Node ni l'app Tab ; pour écrire dans Tab, lancez le backend Nexus sur la
   machine.
 
+## Envoyer une table dans Atelier Projets (étape 10, boîte `tab_projets`)
+
+Le pont DataFlow de la suite (`docs/SUITE.md` §4) : une table de Tab devient des éléments de Projets. Nexus lit
+l'enveloppe **telle que Tab l'a publiée** (aucune réécriture) et l'envoie à l'import d'Atelier Projets.
+
+| Outil | Rôle |
+|---|---|
+| `projets_preview_tab_import` | `POST /api/imports/atelier-tab/preview` : projet, phase, epic et story cibles (existants ou à créer), éléments créés / mis à jour / inchangés / ignorés avec la raison, avertissements. **Ne modifie rien.** |
+| `projets_import_tab_table` | `POST /api/imports/atelier-tab` : **validation**. Clé `Idempotency-Key` = empreinte de l'enveloppe et des options : rejouer le même import ne crée rien (Nexus le signale) ; après une modification dans Tab, le réimport met à jour les éléments existants (rattachés par `record_id`). |
+
+Options : `project_id` (sinon le projet du même nom, créé au besoin), `type` (TASK par défaut), `rows` (numéros ou
+`rec_…` ; compteurs et totaux recalculés comme Tab, lignes de total exclues).
+
+En-têtes : `X-Atelier-Schema-Version: 2.1.0` et, si Projets protège l'import (`ATELIER_IMPORT_TOKEN`),
+`Authorization: Bearer` avec la valeur de `PROJETS_IMPORT_TOKEN` côté Nexus.
+
+Code : `backend/app/tools/tab_projets.py` (outils), `ProjetsClient.preview_tab_import` / `import_tab`
+(`app/tools/projets.py`), `TabSnapshots.envelope_json` (`app/tools/tab.py`). Tests : `tests/test_tab_projets.py`.
+
 ## Agents
 
-- **Tableur** (`tableur`) : `core`, `tab`, `tab_write`.
+- **Tableur** (`tableur`) : `core`, `tab`, `tab_write`, `tab_projets`.
+- **Chef de projet** (`chef_de_projet`) : `tab` et `tab_projets` en plus de Projets.
 - **Data Analyst / Power BI** et **Chef de projet** ont aussi la boîte `tab`.

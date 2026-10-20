@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -51,6 +51,8 @@ class ConversationRow(Base):
     turn_meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     #: Appels en attente de validation à la fin du dernier tour
     pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    #: Texte normalisé pour la recherche (app/db/search.py)
+    search_text: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, index=True
@@ -82,3 +84,23 @@ class ArtifactRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     conversation: Mapped[ConversationRow] = relationship(back_populates="artifacts")
+
+
+class AttachmentRow(Base):
+    """Fichier joint à un message : original (image réduite), texte extrait, méta.
+
+    `conversation_id` est renseigné quand le tour qui le cite est enregistré ; une pièce jointe
+    sans conversation après 24 h (envoi abandonné) est supprimée au démarrage."""
+
+    __tablename__ = "attachments"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20))
+    size: Mapped[int] = mapped_column(Integer)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

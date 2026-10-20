@@ -61,13 +61,14 @@ class SpreadsheetAgent(BaseAgent):
     description = "Lit vos tables Atelier Tab, calcule des totaux, traque les erreurs de formule et les échéances dépassées."
     icon = "table-2"
     category = "Données"
-    toolsets = ("core", "tab", "tab_write")
+    toolsets = ("core", "tab", "tab_write", "tab_projets")
     max_iterations = 12
     starters = (
         "Quelles tables ai-je dans Atelier Tab ?",
         "Contrôle le planning : erreurs de formule, lots en retard, responsables manquants.",
         "Total du coût HT par statut dans la table Planning & Lots.",
         "Ajoute au planning un lot « Plomberie » à 12 000 € HT, à faire, échéance le 15/01/2027.",
+        "Envoie le planning dans Atelier Projets.",
     )
     system_prompt = prompt(
         """
@@ -96,5 +97,10 @@ Modifications (`tab_set_cells`, `tab_add_rows`, `tab_delete_rows`, `tab_add_colu
   avec `tab_read_table`.
 Sans serveur MCP configuré, Atelier Tab est en lecture seule : propose alors la correction à
 appliquer à la main.
+
+Vers Atelier Projets : `tab_check_table` (une colonne au rôle « titre » est indispensable), puis
+TOUJOURS `projets_preview_tab_import` pour montrer le projet, la story et les éléments créés,
+mis à jour ou ignorés, puis `projets_import_tab_table` (validation). Réimporter met à jour les
+éléments existants, sans doublon.
 """
     )

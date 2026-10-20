@@ -12,7 +12,9 @@ from anthropic.types import Message as AnthropicMessage
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.types import (
+    AttachmentBlock,
     ContentBlock,
+    ImageBlock,
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
@@ -64,6 +66,14 @@ def _to_anthropic_block(block: ContentBlock) -> dict[str, Any]:
             "content": block.content,
             "is_error": block.is_error,
         }
+    if isinstance(block, ImageBlock):
+        return {
+            "type": "image",
+            "source": {"type": "base64", "media_type": block.media_type, "data": block.data},
+        }
+    if isinstance(block, AttachmentBlock):
+        # Normalement remplacée en amont (expand_attachments) : jamais de référence brute au modèle
+        return {"type": "text", "text": f"[Pièce jointe « {block.name} » non chargée.]"}
     raise TypeError(f"Bloc non supporté : {type(block).__name__}")
 
 
@@ -143,6 +153,16 @@ class AnthropicProvider(LLMProvider):
         except _TRANSIENT_ERRORS as exc:
             raise ProviderUnavailableError(
                 f"Anthropic indisponible : {exc}", provider=self.name
+            ) from exc
+        except anthropic.AuthenticationError as exc:
+            raise ProviderRequestError(
+                "Clé API refusée par Anthropic (401) : vérifiez-la dans les Réglages.",
+                provider=self.name,
+            ) from exc
+        except anthropic.PermissionDeniedError as exc:
+            raise ProviderRequestError(
+                "Accès refusé par Anthropic (403) : la clé n'a pas les droits nécessaires.",
+                provider=self.name,
             ) from exc
         except anthropic.APIError as exc:
             raise ProviderRequestError(

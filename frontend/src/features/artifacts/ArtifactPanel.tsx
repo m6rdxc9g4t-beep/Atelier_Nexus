@@ -24,13 +24,13 @@ export function ArtifactPanel() {
     <aside
       aria-label="Artefacts"
       className={cn(
-        "flex min-h-0 flex-col border-l bg-card",
-        "fixed inset-y-0 right-0 z-40 w-full shadow-xl sm:w-[32rem]",
-        "xl:static xl:z-auto xl:w-[34rem] xl:shrink-0 xl:shadow-none",
+        "flex min-h-0 flex-col border-l border-atelier-border bg-card",
+        "fixed inset-y-0 right-0 z-40 w-full shadow-glow-strong sm:w-[32rem]",
+        "xl:static xl:z-auto xl:w-[34rem] xl:shrink-0 xl:shadow-glow",
       )}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <Layers className="size-4 text-primary" aria-hidden />
+        <Layers className="size-4 text-accent-ink" aria-hidden />
         <label htmlFor="artifact-select" className="sr-only">
           Choisir un artefact
         </label>
@@ -38,7 +38,7 @@ export function ArtifactPanel() {
           id="artifact-select"
           value={selected.id}
           onChange={(e) => select(e.target.value)}
-          className="h-8 min-w-0 flex-1 truncate rounded-md border-0 bg-transparent text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+          className="h-8 min-w-0 flex-1 truncate rounded-md border-0 bg-card text-sm font-medium outline-none focus-visible:shadow-focus"
         >
           {artifacts.map((a) => (
             <option key={a.id} value={a.id}>
