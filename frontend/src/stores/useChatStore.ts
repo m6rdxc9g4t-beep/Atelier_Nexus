@@ -44,7 +44,7 @@ interface ChatState {
   stop: () => void;
   /** Repart d'une conversation vide (l'ancienne reste dans l'historique). */
   reset: () => void;
-  /** Rouvre une conversation enregistrée de l'agent courant. */
+  /** Rouvre une conversation enregistrée (et passe sur son agent). */
   open: (id: string) => Promise<void>;
   /** Au premier passage sur un agent : rouvre sa dernière conversation, si elle existe encore. */
   restore: (agent: string) => Promise<void>;
@@ -160,7 +160,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         const detail = await api.conversation(id);
         restored.add(detail.agent);
         show(detail);
-        set({ saveError: null });
+        set({ agent: detail.agent, saveError: null });
       } catch (err) {
         set({ saveError: err instanceof ApiError ? err.message : "Impossible d'ouvrir la conversation." });
       } finally {

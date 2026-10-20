@@ -73,7 +73,7 @@ export function Workspace() {
             </Button>
           </div>
         ) : (
-          <ChatPanel agent={current} blocked={blocked} />
+          <ChatPanel agent={current} agents={agents} blocked={blocked} />
         )}
 
         <ArtifactPanel />

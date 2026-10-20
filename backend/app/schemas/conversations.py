@@ -49,6 +49,11 @@ class ConversationSummary(BaseModel):
     _tz = field_validator("created_at", "updated_at")(_utc)
 
 
+class SearchHit(ConversationSummary):
+    #: Extrait autour du premier mot trouvé (titre si rien de plus parlant)
+    snippet: str | None = None
+
+
 class ConversationDetail(ConversationSummary):
     history: list[Message]
     artifacts: list[StoredArtifact]

@@ -51,6 +51,8 @@ class ConversationRow(Base):
     turn_meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     #: Appels en attente de validation à la fin du dernier tour
     pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    #: Texte normalisé pour la recherche (app/db/search.py)
+    search_text: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, index=True

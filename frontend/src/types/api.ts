@@ -253,6 +253,11 @@ export interface ConversationSummary {
   artifact_count: number;
 }
 
+/** Résultat de recherche : extrait autour du premier mot trouvé (Étape 13). */
+export interface SearchHit extends ConversationSummary {
+  snippet: string | null;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   history: Message[];
   artifacts: StoredArtifactDto[];

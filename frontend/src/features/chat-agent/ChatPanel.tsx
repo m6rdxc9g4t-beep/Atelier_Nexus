@@ -21,7 +21,16 @@ const FALLBACK_STARTERS = [
   "Quel jour sommes-nous, et combien de semaines reste-t-il avant la fin de l'année ?",
 ];
 
-export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; blocked: string | null }) {
+export function ChatPanel({
+  agent,
+  agents,
+  blocked,
+}: {
+  agent: AgentInfo | undefined;
+  /** Catalogue : noms affichés des agents dans les résultats de recherche */
+  agents: AgentInfo[];
+  blocked: string | null;
+}) {
   const agentName = useChatStore((s) => s.agent);
   const conversation = useChatStore((s) => s.conversations[agentName]) ?? emptyConversation();
   const streaming = useChatStore((s) => s.streaming);
@@ -57,7 +66,7 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
           </Badge>
         )}
         <div className="ml-auto flex items-center gap-1">
-          <ConversationHistory agent={agentName} label={label} />
+          <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
             <Button
               variant="ghost"

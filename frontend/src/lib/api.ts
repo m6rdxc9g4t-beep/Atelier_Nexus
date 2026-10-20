@@ -14,6 +14,7 @@ import type {
   DataViaStatus,
   EditorOptions,
   ProviderStatus,
+  SearchHit,
   SettingsView,
 } from "@/types/api";
 
@@ -95,6 +96,12 @@ export const api = {
     getJson<ConversationSummary[]>(`/api/conversations?agent=${encodeURIComponent(agent)}`, signal),
   conversation: (id: string) =>
     getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`),
+  /** Recherche (titre, messages, artefacts) ; `agent` null = tous les agents. */
+  searchConversations: (query: string, agent: string | null, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ q: query });
+    if (agent) params.set("agent", agent);
+    return getJson<SearchHit[]>(`/api/conversations/search?${params.toString()}`, signal);
+  },
   createConversation: (agent: string) =>
     sendJson<ConversationDetail>("POST", "/api/conversations", { agent }),
   renameConversation: (id: string, title: string) =>
