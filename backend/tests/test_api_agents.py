@@ -217,4 +217,5 @@ def test_apps_status(client: TestClient) -> None:
     status = {a["id"]: a for a in client.get("/api/apps/status").json()}
     assert status["projets"]["available"] is True and "1 projet" in status["projets"]["detail"]
     assert status["github"]["configured"] is False
+    assert status["cuisine"]["configured"] is False  # rien en dur : désactivé par défaut
     assert status["tresorerie"]["available"] is False  # pas de transport simulé : injoignable

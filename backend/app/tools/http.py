@@ -1,4 +1,5 @@
-"""Client HTTP commun aux connecteurs des applications (Projets, Trésorerie, Ciné, Savoir, GitHub).
+"""Client HTTP commun aux connecteurs des applications (Projets, Trésorerie, Ciné, Savoir, Cuisine,
+GitHub).
 
 Chaque connecteur hérite de `AppClient` : erreurs homogènes (`AppError` et dérivées,
 portant le nom de l'application), réponses validées par Pydantic, jamais de redirection.
@@ -58,6 +59,10 @@ class AppClient:
             transport=transport,
             follow_redirects=False,
         )
+        #: En-têtes de la dernière réponse (ex. `idempotency-replayed` d'Atelier Projets)
+        self.last_headers: httpx.Headers | None = None
+        #: Code HTTP de la dernière réponse (ex. 401 : jeton expiré chez Atelier Cuisine)
+        self.last_status: int | None = None
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -97,7 +102,8 @@ class AppClient:
                 f"{self.label} injoignable sur {self.base_url} : {self._unavailable_hint()}",
                 app=self.app,
             ) from exc
-        status = response.status_code
+        self.last_headers = response.headers
+        status = self.last_status = response.status_code
         if status == 204:
             return None
         if status == 404:

@@ -60,12 +60,21 @@ def test_suite_links_open_installed_apps() -> None:
     assert desktop.suite_bundle_for("http://localhost:5051") == "fr.ateliersavoir.app"
     assert desktop.suite_bundle_for("https://example.org:8000") is None
     assert desktop.suite_bundle_for("http://127.0.0.1") is None
+    # Atelier Cuisine : app en ligne enveloppée par une app Tauri
+    cuisine = "https://atelier-cuisine-iota.vercel.app"
+    assert desktop.suite_bundle_for(cuisine) == "fr.ateliercuisine.app"
+    assert desktop.suite_bundle_for(cuisine + "/stock") == "fr.ateliercuisine.app"
+    assert desktop.suite_bundle_for("http://atelier-cuisine-iota.vercel.app") is None
+    assert desktop.suite_bundle_for("https://atelier-cuisine-iota.vercel.app:8443") is None
+    assert desktop.suite_bundle_for("https://evil.example/atelier-cuisine-iota.vercel.app") is None
 
     opened: list[str] = []
     api = desktop.DesktopApi(open_url=opened.append, open_app=lambda b: b == "fr.atelier.tab")
     assert api.open_external("http://127.0.0.1:4175") and opened == []  # app Tab ouverte
     assert api.open_external("http://127.0.0.1:4000") and opened == ["http://127.0.0.1:4000"]
     assert api.open_external("file:///etc/passwd") is False
+    # App Cuisine absente : le navigateur prend le relais
+    assert api.open_external(cuisine) and opened[-1] == cuisine
 
 
 class FakeWindow:
@@ -137,3 +146,16 @@ def test_versioned_url(tmp_path: Path) -> None:
         "http://127.0.0.1:8100/?v="
     )
     assert desktop.versioned_url("http://x", None) == "http://x/?v=0"
+
+
+def test_window_matches_the_brand() -> None:
+    """Fond de fenêtre et page d'erreur aux couleurs de la charte néon (orange de Nexus)."""
+    constants = (
+        Path(__file__).resolve().parents[2] / "frontend/src/components/theme/theme-constants.ts"
+    ).read_text(encoding="utf-8")
+    for theme, color in desktop.WINDOW_BACKGROUND.items():
+        assert f'{theme}: "{color}"' in constants
+    assert desktop.system_appearance() in desktop.WINDOW_BACKGROUND
+    page = desktop.error_page("<port occupé>")
+    assert "&lt;port occupé&gt;" in page
+    assert desktop.WINDOW_BACKGROUND["light"] in page and desktop.WINDOW_BACKGROUND["dark"] in page

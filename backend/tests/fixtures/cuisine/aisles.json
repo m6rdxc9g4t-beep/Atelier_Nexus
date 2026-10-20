@@ -1,0 +1,51 @@
+[
+  {
+    "id": "fruits_legumes",
+    "position": 1,
+    "emoji": "🥬",
+    "name": "Fruits & légumes",
+    "budget": "alimentaire"
+  },
+  {
+    "id": "viandes_poissons",
+    "position": 2,
+    "emoji": "🥩",
+    "name": "Viandes / poissons / protéines",
+    "budget": "alimentaire"
+  },
+  {
+    "id": "produits_frais",
+    "position": 3,
+    "emoji": "🧀",
+    "name": "Produits frais",
+    "budget": "alimentaire"
+  },
+  {
+    "id": "feculents",
+    "position": 4,
+    "emoji": "🥖",
+    "name": "Féculents / céréales",
+    "budget": "alimentaire"
+  },
+  {
+    "id": "surgeles",
+    "position": 5,
+    "emoji": "🍟",
+    "name": "Surgelés / plats rapides",
+    "budget": "alimentaire"
+  },
+  {
+    "id": "entretien",
+    "position": 11,
+    "emoji": "🧽",
+    "name": "Entretien maison",
+    "budget": "maison"
+  },
+  {
+    "id": "autre",
+    "position": 99,
+    "emoji": "📦",
+    "name": "Autre",
+    "budget": "alimentaire"
+  }
+]

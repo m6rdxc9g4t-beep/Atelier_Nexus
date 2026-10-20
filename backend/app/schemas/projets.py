@@ -282,3 +282,62 @@ class TimeEntryCreate(_W):
 class LogEntryCreate(_W):
     text: str = Field(min_length=1, max_length=20_000)
     hours: float | None = Field(default=None, ge=0, le=24)
+
+
+# ─── Import DataFlow depuis Atelier Tab (SUITE.md §4) ────────────
+
+ImportAction = Literal["created", "updated", "unchanged", "skipped"]
+IMPORT_ACTION_LABELS: dict[str, str] = {
+    "created": "créé",
+    "updated": "mis à jour",
+    "unchanged": "inchangé",
+    "skipped": "ignoré",
+}
+
+
+class ImportItem(_R):
+    recordId: str
+    rowIndex: int
+    workItemId: int | None = None
+    action: ImportAction
+    title: str | None = None
+    status: Status | None = None
+    startDate: str | None = None
+    dueDate: str | None = None
+    reason: str | None = None
+
+
+class ImportResult(_R):
+    projectId: int | None = None
+    storyId: int | None = None
+    created: int
+    updated: int
+    unchanged: int
+    skipped: int
+    warnings: list[str] = Field(default_factory=list)
+    items: list[ImportItem] = Field(default_factory=list)
+    #: Renseigné par le client : import déjà fait avec la même Idempotency-Key, rien de nouveau
+    replayed: bool = False
+
+
+class ImportTargetPart(_R):
+    title: str
+    exists: bool
+
+
+class ImportTargetProject(_R):
+    id: int | None = None
+    name: str
+    exists: bool
+
+
+class ImportTarget(_R):
+    project: ImportTargetProject
+    phase: ImportTargetPart
+    epic: ImportTargetPart
+    story: ImportTargetPart
+    type: WorkItemType
+
+
+class ImportPreview(ImportResult):
+    target: ImportTarget

@@ -45,6 +45,9 @@ WINDOW_SIZE = (1440, 900)
 MIN_SIZE = (960, 620)
 BACKEND = Path(__file__).resolve().parents[1]
 LOG_HINT = "Journal : ~/Library/Logs/Atelier Nexus/atelier-nexus.log"
+# Fond de la fenêtre avant l'affichage de l'interface : --atelier-bg de la charte néon dans
+# l'orange de Nexus (frontend/src/components/theme/theme-constants.ts, THEME_COLORS).
+WINDOW_BACKGROUND = {"light": "#fbf3f2", "dark": "#120c0d"}
 
 log = logging.getLogger("atelier_nexus.desktop")
 
@@ -231,16 +234,23 @@ SUITE_BUNDLES = {
     47321: "fr.ateliercine.app",
     5051: "fr.ateliersavoir.app",
 }
+#: Apps en ligne de la suite (adresse HTTPS hébergée) → application macOS qui l'enveloppe
+SUITE_ONLINE_BUNDLES = {
+    "atelier-cuisine-iota.vercel.app": "fr.ateliercuisine.app",  # Atelier Cuisine (Tauri)
+}
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 
 
 def suite_bundle_for(url: str) -> str | None:
-    """Application de bureau à ouvrir pour une adresse locale de la suite, sinon None."""
+    """Application de bureau à ouvrir pour une adresse de la suite (locale, ou en ligne
+    connue en HTTPS sur le port par défaut), sinon None."""
     try:
         parts = urlsplit(str(url))
         port = parts.port
     except ValueError:
         return None
+    if parts.scheme == "https" and port is None and parts.hostname in SUITE_ONLINE_BUNDLES:
+        return SUITE_ONLINE_BUNDLES[parts.hostname]
     if parts.scheme not in {"http", "https"} or parts.hostname not in _LOCAL_HOSTS or port is None:
         return None
     return SUITE_BUNDLES.get(port)
@@ -305,17 +315,42 @@ class DesktopApi:
 # ─── Lancement ────────────────────────────────────────────────────
 
 
+def system_appearance() -> str:
+    """« dark » si macOS est en apparence sombre, sinon « light » (thème par défaut : Système)."""
+    if sys.platform != "darwin":
+        return "light"
+    try:
+        result = subprocess.run(
+            ["/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "light"
+    return "dark" if "dark" in result.stdout.lower() else "light"
+
+
+# Page d'erreur aux couleurs de la charte (jetons --atelier-* calculés pour l'orange de Nexus).
+_ERROR_CSS = (
+    ":root{color-scheme:light dark;--bg:#fbf3f2;--text:#33221f;--muted:#766263;--ink:#7f3a20}"
+    "@media (prefers-color-scheme:dark){:root{--bg:#120c0d;--text:#f7eeec;--muted:#b69a97;"
+    "--ink:#f07b4c}}"
+    "body{font:15px -apple-system,system-ui,sans-serif;display:grid;place-items:center;"
+    "height:90vh;margin:0;background:var(--bg);color:var(--text)}"
+    "h1{font-size:18px;color:var(--ink)}.hint{color:var(--muted);font-size:13px}"
+)
+
+
 def error_page(message: str) -> str:
-    style = (
-        "font:15px -apple-system,system-ui,sans-serif;display:grid;place-items:center;"
-        "height:90vh;margin:0;color:#1f2328"
-    )
     return (
         f'<!doctype html><meta charset="utf-8"><title>{APP_NAME}</title>'
-        f'<body style="{style}"><div style="max-width:34rem;padding:2rem">'
-        f'<h1 style="font-size:18px">{APP_NAME} ne peut pas démarrer</h1>'
+        f"<style>{_ERROR_CSS}</style>"
+        f'<body><div style="max-width:34rem;padding:2rem">'
+        f"<h1>{APP_NAME} ne peut pas démarrer</h1>"
         f"<p>{html.escape(message)}</p>"
-        f'<p style="color:#656d76;font-size:13px">{LOG_HINT}</p></div>'
+        f'<p class="hint">{LOG_HINT}</p></div>'
     )
 
 
@@ -404,6 +439,8 @@ def run(argv: list[str] | None = None) -> int:
             min_size=MIN_SIZE,
             text_select=True,
             zoomable=True,
+            # Pas d'éclair blanc au lancement : fond du kit, clair ou sombre comme le système
+            background_color=WINDOW_BACKGROUND[system_appearance()],
         )
         api.window = window
         menu: list[Any] = []
@@ -415,7 +452,7 @@ def run(argv: list[str] | None = None) -> int:
                     "Réglages",
                     [
                         MenuAction(
-                            "Ouvrir les réglages (clé Claude, adresses des apps)…",
+                            "Ouvrir le fichier de réglages (.env)…",
                             lambda: reveal(env_file, text_editor=True),
                         ),
                         MenuAction("Afficher le dossier des données", lambda: reveal(home)),

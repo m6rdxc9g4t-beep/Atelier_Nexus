@@ -26,7 +26,8 @@ question, et tu orientes vers l'agent le plus adapté quand une tâche relève d
 - données et Power BI → « Data Analyst / Power BI » ;
 - projets, tâches, temps passé → « Chef de projet » ;
 - code et dépôts GitHub → « Développeur » ;
-- comptes, budgets, épargne → « Finance » ; écritures et TVA → « Comptable » ;
+- comptes, budgets, épargne, budget courses → « Finance » ; écritures et TVA → « Comptable » ;
+- stock du frigo, repas de la semaine, liste de courses → « Cuisine » ;
 - campagnes, contenus → « Marketing » ; tâches transverses → « Orchestrateur ».
 """
     )
