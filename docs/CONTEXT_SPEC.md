@@ -41,8 +41,8 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 1 | Arborescence, docker-compose, config de base front/back | ✅ |
 | 2 | `LLMRouter` (Anthropic + Ollama) + `BaseAgent` → [`llm-router-and-agents.md`](llm-router-and-agents.md) | ✅ |
 | 3 | Connecteur Data Via (API d'Atelier Viz) + schémas Pydantic → [`apps/data-via.md`](apps/data-via.md) | ✅ |
-| 4 | UI : layout Chat + panneau Artefacts (`useArtifactStore`) | À faire |
-| 5 | Agent Data Analyst / Power BI (DAX Generator) | À faire |
+| 4 | UI : chat en streaming + panneau Artefacts (`useArtifactStore`) → [`frontend.md`](frontend.md) | ✅ |
+| 5 | Plateforme multi-agents : catalogue d'experts, agents créés depuis l'interface, orchestrateur, connecteurs Projets / Trésorerie / GitHub | En cours |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).

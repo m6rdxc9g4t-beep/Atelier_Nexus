@@ -245,3 +245,13 @@ def test_markdown_table_escapes_pipes_in_keys() -> None:
     table = markdown_table(["date|month", "sum(ca)"], [["2026-01-01", 1.5]])
     header = table.splitlines()[0]
     assert header == "| date\\|month | sum(ca) |"
+
+
+def test_numbers_keep_full_precision_for_the_model() -> None:
+    from app.tools.data_via import markdown_table
+
+    table = markdown_table(["ca"], [[1940427.5600000003], [0.000012345], [-2.5], [3.0]])
+    assert "| 1940427.56 |" in table
+    assert "| 0.000012345 |" in table  # petites valeurs : aucun chiffre significatif perdu
+    assert "| -2.5 |" in table and "| 3 |" in table
+    assert "e+" not in table
