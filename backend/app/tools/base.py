@@ -50,6 +50,8 @@ class ToolContext(BaseModel):
     conversation_id: str | None = None
     user_id: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
+    # État partagé entre les outils pendant UN tour d'agent (ex. schémas déjà consultés)
+    state: dict[str, Any] = Field(default_factory=dict)
 
 
 class ToolInput(BaseModel):
@@ -62,6 +64,8 @@ class BaseTool[InputT: ToolInput](ABC):
     name: ClassVar[str]
     description: ClassVar[str]
     input_model: type[InputT]
+    # Erreurs prévisibles : renvoyées au modèle telles quelles, sans trace dans les journaux
+    expected_errors: ClassVar[tuple[type[Exception], ...]] = ()
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:
@@ -87,6 +91,9 @@ class BaseTool[InputT: ToolInput](ABC):
             return ToolOutput(content=f"Paramètres invalides — {details}", is_error=True)
         try:
             return await self.run(params, ctx)
+        except self.expected_errors as exc:
+            logger.info("Outil %s : %s", self.name, exc)
+            return ToolOutput(content=str(exc), is_error=True)
         except Exception as exc:
             logger.exception("Échec de l'outil %s", self.name)
             return ToolOutput(content=f"Erreur pendant l'exécution : {exc}", is_error=True)

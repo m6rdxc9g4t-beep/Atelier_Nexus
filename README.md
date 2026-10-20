@@ -1,7 +1,16 @@
 # Atelier Nexus
 
 Hub d'agents IA (Data Analyst / Power BI, Dev, …) pour la suite **Atelier**, avec routage LLM hybride Claude ↔ Ollama.
-Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md) · Agents & routeur LLM : [`docs/llm-router-and-agents.md`](docs/llm-router-and-agents.md)
+Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md) · Agents & routeur LLM : [`docs/llm-router-and-agents.md`](docs/llm-router-and-agents.md) · Connecteur Data Via : [`docs/apps/data-via.md`](docs/apps/data-via.md)
+
+## Ports (cohabitation avec la suite Atelier)
+
+| Service | Adresse | Remarque |
+|---|---|---|
+| Nexus — interface | http://localhost:3100 | 3000 = API d'Atelier Projets |
+| Nexus — API | http://localhost:8100/docs | 8000 = Atelier Viz (Data Via) |
+| Ollama (conteneur) | http://localhost:11435 | 11434 reste libre pour un Ollama natif |
+| PostgreSQL / Redis | 127.0.0.1:5432 / 6379 | |
 
 ## Démarrage rapide (tout en Docker)
 
@@ -12,30 +21,27 @@ docker-compose up -d
 docker-compose exec ollama ollama pull llama3.1:8b   # premier lancement uniquement
 ```
 
-| Service  | URL                                  |
-|----------|--------------------------------------|
-| Frontend | http://localhost:3000                |
-| API      | http://localhost:8000/docs           |
-| Ollama   | http://localhost:11434               |
+Pour que les agents accèdent à **Data Via**, lancer Atelier Viz sur la machine (port 8000) : le conteneur backend
+la joint via `host.docker.internal`. État du connecteur : http://localhost:8100/api/data-via/status
 
 ## Développement local (hot reload)
 
 Lancer uniquement l'infrastructure en Docker, puis front et back en local :
 
 ```bash
-docker-compose up -d postgres redis ollama
+docker-compose up -d postgres redis
 
 # Backend
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-uvicorn main:app --reload        # tests : pytest · typage : mypy . · lint : ruff check .
+uvicorn main:app --reload --port 8100   # tests : pytest · typage : mypy . · lint : ruff check .
 
 # Frontend
 cd frontend
 cp .env.example .env.local
 npm install
-npm run dev                      # lint : npm run lint · types : npm run typecheck
+npm run dev                             # http://localhost:3100 · lint : npm run lint · types : npm run typecheck
 ```
 
 ## Ajouter un composant Shadcn UI

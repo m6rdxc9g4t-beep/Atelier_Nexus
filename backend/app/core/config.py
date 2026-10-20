@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     # Application
     app_env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"
-    cors_origins: str = "http://localhost:3000"
+    # Ports Nexus : 3100 (UI) / 8100 (API) — 3000 et 8000 sont pris par Projets et Viz
+    cors_origins: str = "http://localhost:3100,http://127.0.0.1:3100"
 
     # Persistance
     database_url: str = "postgresql+asyncpg://atelier:change-me@localhost:5432/atelier_nexus"
@@ -30,9 +31,10 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1:8b"
     ollama_timeout: float = 300.0
 
-    # Apps Atelier
-    data_via_base_url: str | None = None
+    # Apps Atelier — Data Via = API d'Atelier Viz (docs/SUITE.md : port 8000)
+    data_via_base_url: str | None = "http://127.0.0.1:8000/api"
     data_via_api_key: SecretStr | None = None
+    data_via_timeout: float = 30.0
 
     # GitHub
     github_token: SecretStr | None = None

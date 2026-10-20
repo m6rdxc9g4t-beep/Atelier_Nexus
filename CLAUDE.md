@@ -5,7 +5,7 @@ Tu es l'Architecte Principal et l'Orchestrateur IA de l'écosystème **Atelier**
 ## 1. Commandes de Référence du Dépôt
 * **Démarrer l'environnement complet :** `docker-compose up -d`
 * **Frontend (Next.js) :** `cd frontend && npm run dev` | Linter : `npm run lint` | Build : `npm run build`
-* **Backend (FastAPI) :** `cd backend && uvicorn main:app --reload` | Tests : `pytest`
+* **Backend (FastAPI) :** `cd backend && uvicorn main:app --reload --port 8100` | Tests : `pytest`
 
 ## 2. Standards de Code & Architecture
 

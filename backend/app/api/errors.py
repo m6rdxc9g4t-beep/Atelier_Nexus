@@ -11,6 +11,12 @@ from app.core.llm import (
     ProviderRequestError,
     ProviderUnavailableError,
 )
+from app.tools.data_via import (
+    DataViaError,
+    DataViaNotConfiguredError,
+    DataViaNotFoundError,
+    DataViaUnavailableError,
+)
 
 
 class ErrorBody(BaseModel):
@@ -47,3 +53,19 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AgentNotFoundError)
     async def _agent(_: Request, exc: AgentNotFoundError) -> JSONResponse:
         return _json(404, ErrorBody(code="agent_not_found", message=f"Agent inconnu : {exc}"))
+
+    @app.exception_handler(DataViaError)
+    async def _data_via(_: Request, exc: DataViaError) -> JSONResponse:
+        return _json(*data_via_error_body(exc))
+
+
+def data_via_error_body(exc: DataViaError) -> tuple[int, ErrorBody]:
+    if isinstance(exc, DataViaNotConfiguredError):
+        status, code = 503, "data_via_not_configured"
+    elif isinstance(exc, DataViaUnavailableError):
+        status, code = 503, "data_via_unavailable"
+    elif isinstance(exc, DataViaNotFoundError):
+        status, code = 404, "data_via_not_found"
+    else:
+        status, code = 422, "data_via_request_error"
+    return status, ErrorBody(code=code, message=str(exc), provider="data_via")
