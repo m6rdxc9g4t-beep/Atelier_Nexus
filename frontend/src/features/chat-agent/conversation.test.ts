@@ -85,3 +85,41 @@ describe("conversation", () => {
     expect(conv.history).toHaveLength(2);
   });
 });
+
+describe("validation humaine", () => {
+  const calls = [
+    { id: "c1", name: "projets_create_work_item", input: {}, summary: "Créer la TASK « A »" },
+    { id: "c2", name: "projets_add_time_entry", input: {}, summary: "Saisir 2 h" },
+  ];
+
+  it("affiche la carte puis renvoie les décisions complètes", async () => {
+    const { pendingApproval, submitApprovals } = await import("./conversation");
+    let conv = addUserTurn(emptyConversation(), "Crée et saisis");
+    conv = applyEvent(conv, { type: "approval_required", calls });
+    conv = applyEvent(conv, {
+      type: "done",
+      result: result({
+        stop_reason: "awaiting_approval",
+        new_messages: [
+          { role: "assistant", content: [{ type: "tool_use", id: "c1", name: "x", input: {} }] },
+        ],
+      }),
+    });
+    expect(pendingApproval(conv)?.calls).toHaveLength(2);
+    expect(conv.history.at(-1)?.role).toBe("assistant");
+
+    expect(submitApprovals(conv, { c1: true })).toBeNull(); // décision manquante
+    const submitted = submitApprovals(conv, { c1: true, c2: false });
+    expect(submitted?.approvals).toEqual({ c1: true, c2: false });
+    expect(pendingApproval(submitted!.conv)).toBeNull();
+  });
+
+  it("la reprise complète le même tour assistant", () => {
+    let conv = addUserTurn(emptyConversation(), "?");
+    conv = applyEvent(conv, { type: "approval_required", calls: [calls[0]!] });
+    conv = applyEvent(conv, { type: "tool_call", id: "c1", name: "projets_create_work_item", input: {} });
+    conv = applyEvent(conv, { type: "text_delta", text: "Créée." });
+    expect(conv.turns).toHaveLength(2);
+    expect(conv.turns[1]!.parts.map((p) => p.kind)).toEqual(["approval", "tool", "text"]);
+  });
+});

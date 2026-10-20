@@ -1,0 +1,140 @@
+{
+ "items": [
+  {
+   "color": "#a7f3d0",
+   "icon": null,
+   "id": 15,
+   "kind": "revenu",
+   "name": "Dividendes",
+   "transaction_count": 0
+  },
+  {
+   "color": "#bae6fd",
+   "icon": null,
+   "id": 16,
+   "kind": "revenu",
+   "name": "Intérêts",
+   "transaction_count": 0
+  },
+  {
+   "color": "#99f6e4",
+   "icon": null,
+   "id": 2,
+   "kind": "revenu",
+   "name": "Revenus annexes",
+   "transaction_count": 1
+  },
+  {
+   "color": "#6ee7b7",
+   "icon": null,
+   "id": 1,
+   "kind": "revenu",
+   "name": "Salaire",
+   "transaction_count": 6
+  },
+  {
+   "color": "#fdba74",
+   "icon": null,
+   "id": 9,
+   "kind": "depense",
+   "name": "Abonnements",
+   "transaction_count": 6
+  },
+  {
+   "color": "#fcd34d",
+   "icon": null,
+   "id": 4,
+   "kind": "depense",
+   "name": "Courses",
+   "transaction_count": 23
+  },
+  {
+   "color": "#d6d3d1",
+   "icon": null,
+   "id": 13,
+   "kind": "depense",
+   "name": "Divers",
+   "transaction_count": 0
+  },
+  {
+   "color": "#cbd5e1",
+   "icon": null,
+   "id": 12,
+   "kind": "depense",
+   "name": "Impôts & Taxes",
+   "transaction_count": 0
+  },
+  {
+   "color": "#a5b4fc",
+   "icon": null,
+   "id": 3,
+   "kind": "depense",
+   "name": "Logement",
+   "transaction_count": 6
+  },
+  {
+   "color": "#f9a8d4",
+   "icon": null,
+   "id": 8,
+   "kind": "depense",
+   "name": "Loisirs",
+   "transaction_count": 10
+  },
+  {
+   "color": "#fda4af",
+   "icon": null,
+   "id": 7,
+   "kind": "depense",
+   "name": "Restaurants",
+   "transaction_count": 19
+  },
+  {
+   "color": "#86efac",
+   "icon": null,
+   "id": 10,
+   "kind": "depense",
+   "name": "Santé",
+   "transaction_count": 3
+  },
+  {
+   "color": "#f0abfc",
+   "icon": null,
+   "id": 11,
+   "kind": "depense",
+   "name": "Shopping",
+   "transaction_count": 4
+  },
+  {
+   "color": "#7dd3fc",
+   "icon": null,
+   "id": 5,
+   "kind": "depense",
+   "name": "Transport",
+   "transaction_count": 6
+  },
+  {
+   "color": "#c4b5fd",
+   "icon": null,
+   "id": 6,
+   "kind": "depense",
+   "name": "Énergie & Internet",
+   "transaction_count": 6
+  },
+  {
+   "color": "#ddd6fe",
+   "icon": null,
+   "id": 17,
+   "kind": "transfert",
+   "name": "Achat / vente de titres",
+   "transaction_count": 0
+  },
+  {
+   "color": "#94a3b8",
+   "icon": null,
+   "id": 14,
+   "kind": "transfert",
+   "name": "Virement interne",
+   "transaction_count": 12
+  }
+ ]
+}

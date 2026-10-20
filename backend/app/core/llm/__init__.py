@@ -1,5 +1,6 @@
 from app.core.llm.errors import (
     LLMError,
+    ProviderNotAllowedError,
     ProviderNotConfiguredError,
     ProviderRequestError,
     ProviderUnavailableError,
@@ -24,6 +25,7 @@ __all__ = [
     "LLMRouter",
     "Message",
     "ProviderName",
+    "ProviderNotAllowedError",
     "ProviderNotConfiguredError",
     "ProviderRequestError",
     "ProviderStatus",

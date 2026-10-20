@@ -1,22 +1,50 @@
 """Point d'entrée FastAPI — Atelier Nexus."""
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.api import agents, data_via, llm
+from app.api import agents, apps, data_via, llm
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
+logger = logging.getLogger("atelier_nexus")
+
+
+def _migrate() -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(Path(__file__).with_name("alembic.ini")))
+    cfg.attributes["configure_logger"] = False
+    command.upgrade(cfg, "head")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    if settings.db_auto_migrate:
+        try:
+            await asyncio.to_thread(_migrate)
+        except Exception as exc:  # la base est facultative : les agents experts restent utilisables
+            logger.warning(
+                "Migrations non appliquées (agents personnalisés indisponibles) : %s", exc
+            )
+    yield
+
 
 app = FastAPI(
     title="Atelier Nexus API",
-    version="0.3.0",
+    version="0.5.0",
     description="Orchestration des agents IA et connecteurs de la suite Atelier.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -30,6 +58,7 @@ app.add_middleware(
 register_error_handlers(app)
 app.include_router(llm.router)
 app.include_router(agents.router)
+app.include_router(apps.router)
 app.include_router(data_via.router)
 
 

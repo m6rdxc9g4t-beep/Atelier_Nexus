@@ -1,7 +1,8 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Lock, RotateCcw, TriangleAlert } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { emptyConversation } from "@/features/chat-agent/conversation";
 import { useChatStore } from "@/stores/useChatStore";
@@ -22,11 +23,15 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
   const agentName = useChatStore((s) => s.agent);
   const conversation = useChatStore((s) => s.conversations[agentName]) ?? emptyConversation();
   const streaming = useChatStore((s) => s.streaming);
-  const send = useChatStore((s) => s.send);
+  const sendText = useChatStore((s) => s.send);
+  const decideStore = useChatStore((s) => s.decide);
   const stop = useChatStore((s) => s.stop);
   const reset = useChatStore((s) => s.reset);
 
   const label = agent?.display_name ?? agentName;
+  const localOnly = agent?.local_only ?? false;
+  const send = (text: string) => sendText(text, { localOnly });
+  const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
   const empty = conversation.turns.length === 0;
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
 
@@ -35,6 +40,12 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
       <div className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
         <AgentIcon icon={agent?.icon} className="size-4 text-primary" aria-hidden />
         <h1 className="truncate text-sm font-semibold">{label}</h1>
+        {localOnly && (
+          <Badge variant="secondary" title="Données traitées uniquement par le modèle local (Ollama)">
+            <Lock aria-hidden />
+            100 % local
+          </Badge>
+        )}
         <div className="ml-auto">
           {!empty && (
             <Button variant="ghost" size="sm" onClick={reset} disabled={streaming}>
@@ -56,6 +67,20 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
                   Outils : {agent.tools.map((t) => toolLabel(t.name)).join(", ")}.
                 </p>
               )}
+              {localOnly && (
+                <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                  <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  Cet agent travaille sur des données qui ne quittent pas la machine : il utilise
+                  uniquement le modèle local (Ollama).
+                </p>
+              )}
+              {agent?.unavailable_toolsets?.length ? (
+                <p className="mt-3 flex items-start gap-2 text-sm text-warning">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  Non configuré : {agent.unavailable_toolsets.join(", ")}. Renseignez l&apos;adresse
+                  correspondante dans backend/.env.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-2">
               {starters.map((starter) => (
@@ -72,7 +97,7 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
             </div>
           </div>
         ) : (
-          <MessageList turns={conversation.turns} streaming={streaming} />
+          <MessageList turns={conversation.turns} streaming={streaming} onDecide={decide} />
         )}
       </div>
 

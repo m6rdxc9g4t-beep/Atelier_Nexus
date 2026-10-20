@@ -66,17 +66,35 @@ export interface Artifact {
 export interface ToolInfo {
   name: string;
   description: string;
+  requires_approval?: boolean;
+  sensitive?: boolean;
 }
+
+export type Privacy = "standard" | "local_only";
 
 export interface AgentInfo {
   name: string;
   display_name: string;
   description: string;
   tools: ToolInfo[];
-  /** Champs facultatifs, fournis par le catalogue d'agents (Étape 5). */
   icon?: string | null;
   category?: string | null;
   starters?: string[];
+  source?: "builtin" | "custom";
+  toolsets?: string[];
+  privacy?: Privacy;
+  /** Verrouillé sur le modèle local (déclaré, ou boîte à outils sensible). */
+  local_only?: boolean;
+  default_provider?: ProviderName | null;
+  /** Boîtes déclarées mais écartées (application non configurée). */
+  unavailable_toolsets?: string[];
+}
+
+export interface PendingCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  summary: string;
 }
 
 export type StopReason =
@@ -86,7 +104,8 @@ export type StopReason =
   | "stop_sequence"
   | "refusal"
   | "other"
-  | "max_iterations";
+  | "max_iterations"
+  | "awaiting_approval";
 
 export interface AgentResult {
   agent: string;
@@ -98,6 +117,7 @@ export interface AgentResult {
   usage: Usage;
   artifacts: Artifact[];
   new_messages: Message[];
+  pending_approvals?: PendingCall[];
 }
 
 export interface AgentRunRequest {
@@ -105,6 +125,8 @@ export interface AgentRunRequest {
   provider?: ProviderName | null;
   model?: string | null;
   conversation_id?: string | null;
+  /** Reprise après validation : id d'appel → autorisé. */
+  approvals?: Record<string, boolean> | null;
 }
 
 /** Événements du flux SSE de `POST /api/agents/{name}/stream`. */
@@ -113,6 +135,7 @@ export type AgentEvent =
   | { type: "tool_call"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; id: string; name: string; content: string; is_error: boolean }
   | { type: "artifact"; artifact: Artifact }
+  | { type: "approval_required"; calls: PendingCall[] }
   | { type: "done"; result: AgentResult }
   | { type: "error"; code: string; message: string; provider: string | null };
 
@@ -152,3 +175,51 @@ export interface QueryColumn {
 }
 
 export type Scalar = string | number | boolean | null;
+
+// ─── Éditeur d'agents (Étape 5) ──────────────────────────────────
+
+export interface ToolsetInfo {
+  id: string;
+  label: string;
+  description: string;
+  app: string | null;
+  configured: boolean;
+  sensitive: boolean;
+  writes: boolean;
+  tools: ToolInfo[];
+}
+
+export interface EditorOptions {
+  icons: string[];
+  toolsets: ToolsetInfo[];
+  reserved_names: string[];
+}
+
+export interface CustomAgentFields {
+  display_name: string;
+  description: string;
+  system_prompt: string;
+  icon: string;
+  category: string;
+  toolsets: string[];
+  privacy: Privacy;
+  default_provider: ProviderName | null;
+  starters: string[];
+}
+
+export interface CustomAgentDefinition extends CustomAgentFields {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppStatus {
+  id: string;
+  label: string;
+  configured: boolean;
+  available: boolean;
+  base_url: string | null;
+  detail: string | null;
+  error: string | null;
+}

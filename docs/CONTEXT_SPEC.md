@@ -42,12 +42,14 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 2 | `LLMRouter` (Anthropic + Ollama) + `BaseAgent` → [`llm-router-and-agents.md`](llm-router-and-agents.md) | ✅ |
 | 3 | Connecteur Data Via (API d'Atelier Viz) + schémas Pydantic → [`apps/data-via.md`](apps/data-via.md) | ✅ |
 | 4 | UI : chat en streaming + panneau Artefacts (`useArtifactStore`) → [`frontend.md`](frontend.md) | ✅ |
-| 5 | Plateforme multi-agents : catalogue d'experts, agents créés depuis l'interface, orchestrateur, connecteurs Projets / Trésorerie / GitHub | En cours |
+| 5 | Plateforme multi-agents : 13 experts, agents créés depuis l'interface, orchestrateur, validations, verrou local, connecteurs Projets / Trésorerie / GitHub → [`agents.md`](agents.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
 - Data Via en écriture (enregistrer une mesure dans le modèle de Viz, actualiser un jeu) : quand, et avec quelle confirmation utilisateur ?
 - Ajouter Atelier Nexus au contrat de suite (`docs/SUITE.md` d'Atelier Viz / Tab / Projets) : ports 3100 / 8100, sélecteur de suite.
 - Modèle Ollama recommandé en production (défaut actuel : `llama3.1:8b`) et activation ou non du repli automatique (`LLM_FALLBACK_PROVIDER`).
-- Persistance des conversations : aujourd'hui le client renvoie l'historique à chaque tour (`new_messages`).
+- Persistance des conversations et des artefacts (aujourd'hui en mémoire du navigateur ; le client renvoie l'historique à chaque tour).
+- Connecteurs Atelier Tab, Ciné, Savoir (contrats à lire dans leurs dépôts) et agents associés.
+- Exposer Projets et Trésorerie à un backend Nexus conteneurisé (voir `agents.md` §6).
 - Schéma de base (conversations, artefacts, embeddings).

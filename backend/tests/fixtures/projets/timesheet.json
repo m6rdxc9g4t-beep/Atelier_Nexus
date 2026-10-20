@@ -1,0 +1,666 @@
+{
+ "hoursPerDay": 8,
+ "rows": [
+  {
+   "id": 101,
+   "type": "FEATURE",
+   "title": "OAuth2 GitHub",
+   "status": "CLOSED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 1,
+     "code": "1.1",
+     "title": "Auth"
+    }
+   },
+   "estimate": {
+    "hours": 24,
+    "days": 3
+   },
+   "spent": {
+    "hours": 20,
+    "days": 2.5
+   },
+   "balance": {
+    "kind": "UNDER",
+    "delta": {
+     "hours": -4,
+     "days": -0.5
+    }
+   }
+  },
+  {
+   "id": 102,
+   "type": "TASK",
+   "title": "Config JWT",
+   "status": "RESOLVED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 1,
+     "code": "1.1",
+     "title": "Auth"
+    }
+   },
+   "estimate": {
+    "hours": 16,
+    "days": 2
+   },
+   "spent": {
+    "hours": 16,
+    "days": 2
+   },
+   "balance": {
+    "kind": "ON_BUDGET",
+    "delta": {
+     "hours": 0,
+     "days": 0
+    }
+   }
+  },
+  {
+   "id": 103,
+   "type": "BUG",
+   "title": "Fix CORS Header",
+   "status": "IN_REVIEW",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 1,
+     "code": "1.1",
+     "title": "Auth"
+    }
+   },
+   "estimate": {
+    "hours": 8,
+    "days": 1
+   },
+   "spent": {
+    "hours": 14,
+    "days": 1.75
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 6,
+     "days": 0.75
+    }
+   }
+  },
+  {
+   "id": 104,
+   "type": "TASK",
+   "title": "Client GitHub API (@octokit/rest)",
+   "status": "CLOSED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": {
+    "hours": 16,
+    "days": 2
+   },
+   "spent": {
+    "hours": 19,
+    "days": 2.375
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 3,
+     "days": 0.375
+    }
+   }
+  },
+  {
+   "id": 105,
+   "type": "TASK",
+   "title": "Tests du parseur de références #ID",
+   "status": "RESOLVED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": {
+    "hours": 8,
+    "days": 1
+   },
+   "spent": {
+    "hours": 10,
+    "days": 1.25
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 2,
+     "days": 0.25
+    }
+   }
+  },
+  {
+   "id": 107,
+   "type": "BUG",
+   "title": "Accents corrompus dans les messages de commit",
+   "status": "CLOSED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": {
+    "hours": 8,
+    "days": 1
+   },
+   "spent": {
+    "hours": 11,
+    "days": 1.375
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 3,
+     "days": 0.375
+    }
+   }
+  },
+  {
+   "id": 12345,
+   "type": "FEATURE",
+   "title": "Implémenter le moteur de synchronisation Git Local / GitHub",
+   "status": "IN_PROGRESS",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": {
+    "hours": 24,
+    "days": 3
+   },
+   "spent": {
+    "hours": 18,
+    "days": 2.25
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 6,
+     "days": 0.75
+    }
+   }
+  },
+  {
+   "id": 106,
+   "type": "FEATURE",
+   "title": "Synchronisation des Pull Requests GitHub",
+   "status": "ON_HOLD",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": {
+    "hours": 16,
+    "days": 2
+   },
+   "spent": {
+    "hours": 7,
+    "days": 0.875
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 9,
+     "days": 1.125
+    }
+   }
+  },
+  {
+   "id": 108,
+   "type": "FEATURE",
+   "title": "Support des dépôts Mercurial",
+   "status": "REJECTED",
+   "path": {
+    "phase": {
+     "id": 1,
+     "code": "1",
+     "title": "Socle Technique"
+    },
+    "epic": {
+     "id": 1,
+     "code": "1",
+     "title": "Architecture"
+    },
+    "story": {
+     "id": 2,
+     "code": "1.2",
+     "title": "Synchronisation Git"
+    }
+   },
+   "estimate": null,
+   "spent": {
+    "hours": 0,
+    "days": 0
+   },
+   "balance": null
+  },
+  {
+   "id": 204,
+   "type": "FEATURE",
+   "title": "Dark Mode",
+   "status": "IN_PROGRESS",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 3,
+     "code": "2.1",
+     "title": "Thèmes"
+    }
+   },
+   "estimate": {
+    "hours": 40,
+    "days": 5
+   },
+   "spent": {
+    "hours": 36,
+    "days": 4.5
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 4,
+     "days": 0.5
+    }
+   }
+  },
+  {
+   "id": 205,
+   "type": "TASK",
+   "title": "Tokens CSS",
+   "status": "BLOCKED",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 3,
+     "code": "2.1",
+     "title": "Thèmes"
+    }
+   },
+   "estimate": {
+    "hours": 24,
+    "days": 3
+   },
+   "spent": {
+    "hours": 4,
+    "days": 0.5
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 20,
+     "days": 2.5
+    }
+   }
+  },
+  {
+   "id": 206,
+   "type": "FEATURE",
+   "title": "Badges de type et de statut",
+   "status": "CLOSED",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 24,
+    "days": 3
+   },
+   "spent": {
+    "hours": 28,
+    "days": 3.5
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 4,
+     "days": 0.5
+    }
+   }
+  },
+  {
+   "id": 207,
+   "type": "FEATURE",
+   "title": "Barres de progression Budget / Avancement",
+   "status": "RESOLVED",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 16,
+    "days": 2
+   },
+   "spent": {
+    "hours": 17,
+    "days": 2.125
+   },
+   "balance": {
+    "kind": "OVER",
+    "delta": {
+     "hours": 1,
+     "days": 0.125
+    }
+   }
+  },
+  {
+   "id": 209,
+   "type": "BUG",
+   "title": "Contraste insuffisant des badges en mode sombre",
+   "status": "RESOLVED",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 8,
+    "days": 1
+   },
+   "spent": {
+    "hours": 6,
+    "days": 0.75
+   },
+   "balance": {
+    "kind": "UNDER",
+    "delta": {
+     "hours": -2,
+     "days": -0.25
+    }
+   }
+  },
+  {
+   "id": 208,
+   "type": "TASK",
+   "title": "Tableau réutilisable (Timesheet)",
+   "status": "IN_PROGRESS",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 24,
+    "days": 3
+   },
+   "spent": {
+    "hours": 22,
+    "days": 2.75
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 2,
+     "days": 0.25
+    }
+   }
+  },
+  {
+   "id": 210,
+   "type": "FEATURE",
+   "title": "Slide-over de fiche tâche",
+   "status": "OPEN",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 16,
+    "days": 2
+   },
+   "spent": {
+    "hours": 0,
+    "days": 0
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 16,
+     "days": 2
+    }
+   }
+  },
+  {
+   "id": 211,
+   "type": "TASK",
+   "title": "Documentation des composants",
+   "status": "OPEN",
+   "path": {
+    "phase": {
+     "id": 2,
+     "code": "2",
+     "title": "Expérience UI"
+    },
+    "epic": {
+     "id": 2,
+     "code": "2",
+     "title": "Design System"
+    },
+    "story": {
+     "id": 4,
+     "code": "2.2",
+     "title": "Composants UI"
+    }
+   },
+   "estimate": {
+    "hours": 8,
+    "days": 1
+   },
+   "spent": {
+    "hours": 0,
+    "days": 0
+   },
+   "balance": {
+    "kind": "REMAINING",
+    "delta": {
+     "hours": 8,
+     "days": 1
+    }
+   }
+  }
+ ],
+ "totals": {
+  "count": 17,
+  "done": 8,
+  "donePercent": 50,
+  "estimate": {
+   "hours": 280,
+   "days": 35
+  },
+  "spent": {
+   "hours": 228,
+   "days": 28.5
+  },
+  "remaining": {
+   "hours": 52,
+   "days": 6.5
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 52,
+    "days": 6.5
+   }
+  }
+ }
+}

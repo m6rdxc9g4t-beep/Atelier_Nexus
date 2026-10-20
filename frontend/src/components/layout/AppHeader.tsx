@@ -1,14 +1,14 @@
 "use client";
 
-import { Layers } from "lucide-react";
+import { Layers, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { useChatStore } from "@/stores/useChatStore";
-import type { AgentInfo, DataViaStatus, ProviderName, ProviderStatus } from "@/types/api";
+import type { AgentInfo, AppStatus, ProviderName, ProviderStatus } from "@/types/api";
 
+import { AppsMenu } from "./AppsMenu";
 import { AtelierBrand } from "./AtelierBrand";
 import { SuiteSwitcher } from "./SuiteSwitcher";
 import { ThemeMenu } from "./ThemeMenu";
@@ -24,10 +24,10 @@ function providerNote(p: ProviderStatus): string {
 interface AppHeaderProps {
   agents: AgentInfo[];
   providers: ProviderStatus[];
-  dataVia: DataViaStatus | null;
+  apps: AppStatus[];
 }
 
-export function AppHeader({ agents, providers, dataVia }: AppHeaderProps) {
+export function AppHeader({ agents, providers, apps }: AppHeaderProps) {
   const agent = useChatStore((s) => s.agent);
   const setAgent = useChatStore((s) => s.setAgent);
   const provider = useChatStore((s) => s.provider);
@@ -38,6 +38,8 @@ export function AppHeader({ agents, providers, dataVia }: AppHeaderProps) {
   const setPanelOpen = useArtifactStore((s) => s.setPanelOpen);
 
   const fallback = providers.find((p) => p.is_default);
+  const current = agents.find((a) => a.name === agent);
+  const locked = current?.local_only ?? false;
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-1.5 border-b bg-card px-2 sm:gap-2 sm:px-3">
@@ -63,22 +65,21 @@ export function AppHeader({ agents, providers, dataVia }: AppHeaderProps) {
       </NativeSelect>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
-        {dataVia && (
-          <span
-            className="hidden items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground md:flex"
-            title={dataVia.error ?? dataVia.base_url ?? undefined}
-          >
-            <span
-              aria-hidden
-              className={cn("size-1.5 rounded-full", dataVia.available ? "bg-success" : "bg-muted-foreground/50")}
-            />
-            Data Via {dataVia.available ? `· ${dataVia.datasets ?? 0} jeux` : "arrêté"}
-          </span>
-        )}
+        {apps.length > 0 && <AppsMenu apps={apps} />}
 
         <label htmlFor="provider-select" className="sr-only">
           Moteur d&apos;IA
         </label>
+        {locked ? (
+          <span
+            id="provider-select"
+            className="flex h-8 w-28 items-center gap-1.5 rounded-md border border-input bg-muted px-2.5 text-sm text-muted-foreground sm:w-52"
+            title="Agent verrouillé sur le modèle local : ses données ne quittent pas la machine"
+          >
+            <Lock className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">Ollama (local) imposé</span>
+          </span>
+        ) : (
         <NativeSelect
           id="provider-select"
           className="w-28 sm:w-52"
@@ -95,6 +96,7 @@ export function AppHeader({ agents, providers, dataVia }: AppHeaderProps) {
             </option>
           ))}
         </NativeSelect>
+        )}
 
         {artifactCount > 0 && !panelOpen && (
           <Button variant="ghost" size="sm" onClick={() => setPanelOpen(true)}>

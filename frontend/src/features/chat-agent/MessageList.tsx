@@ -7,13 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 
+import { ApprovalCard } from "./ApprovalCard";
 import type { ChatTurn } from "./conversation";
 import { Markdown } from "./Markdown";
 import { ToolCall } from "./ToolCall";
 
 const PROVIDER_LABEL = { anthropic: "Claude", ollama: "Ollama" } as const;
 
-export function MessageList({ turns, streaming }: { turns: ChatTurn[]; streaming: boolean }) {
+interface MessageListProps {
+  turns: ChatTurn[];
+  streaming: boolean;
+  onDecide: (decisions: Record<string, boolean>) => void;
+}
+
+export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
   const end = useRef<HTMLDivElement>(null);
   const select = useArtifactStore((s) => s.select);
 
@@ -54,6 +61,15 @@ export function MessageList({ turns, streaming }: { turns: ChatTurn[]; streaming
             {turn.parts.map((part, i) => {
               if (part.kind === "text") return <Markdown key={i}>{part.text}</Markdown>;
               if (part.kind === "tool") return <ToolCall key={part.id} part={part} />;
+              if (part.kind === "approval")
+                return (
+                  <ApprovalCard
+                    key={part.calls.map((c) => c.id).join("-")}
+                    part={part}
+                    disabled={streaming}
+                    onSubmit={onDecide}
+                  />
+                );
               return (
                 <button
                   key={part.artifactId}
@@ -85,6 +101,9 @@ export function MessageList({ turns, streaming }: { turns: ChatTurn[]; streaming
                 </span>
                 {turn.meta.stop_reason === "max_tokens" && (
                   <Badge variant="warning">Réponse tronquée</Badge>
+                )}
+                {turn.meta.stop_reason === "awaiting_approval" && (
+                  <Badge variant="warning">En attente de votre validation</Badge>
                 )}
                 {turn.meta.stop_reason === "max_iterations" && (
                   <Badge variant="warning">Limite d&apos;étapes atteinte</Badge>

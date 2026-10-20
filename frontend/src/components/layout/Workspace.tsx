@@ -1,9 +1,10 @@
 "use client";
 
 import { RefreshCw, ServerOff } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AgentEditor } from "@/features/agent-editor/AgentEditor";
 import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
 import { AgentSidebar } from "@/features/chat-agent/AgentSidebar";
 import { ChatPanel } from "@/features/chat-agent/ChatPanel";
@@ -15,19 +16,26 @@ import { AppHeader } from "./AppHeader";
 
 /** Écran principal : agents · conversation · artefacts. */
 export function Workspace() {
-  const { agents, providers, dataVia, loading, error, reload } = useBackend();
+  const { agents, providers, apps, loading, error, reload } = useBackend();
+  const [editor, setEditor] = useState<{ open: boolean; editing: string | null }>({
+    open: false,
+    editing: null,
+  });
   const agent = useChatStore((s) => s.agent);
   const setAgent = useChatStore((s) => s.setAgent);
   const streaming = useChatStore((s) => s.streaming);
   const provider = useChatStore((s) => s.provider);
 
-  // Agent inexistant (catalogue changé) : on revient au premier disponible
+  // Agent inexistant (supprimé, catalogue changé) : on revient au premier disponible
   useEffect(() => {
     if (agents.length && !agents.some((a) => a.name === agent)) setAgent(agents[0]!.name);
   }, [agents, agent, setAgent]);
 
   const current = agents.find((a) => a.name === agent);
-  const chosen = providers.find((p) => p.name === (provider ?? providers.find((x) => x.is_default)?.name));
+  const wanted = current?.local_only
+    ? "ollama"
+    : (provider ?? current?.default_provider ?? providers.find((x) => x.is_default)?.name);
+  const chosen = providers.find((p) => p.name === wanted);
   const blocked = error
     ? error
     : chosen && !chosen.configured
@@ -36,10 +44,17 @@ export function Workspace() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader agents={agents} providers={providers} dataVia={dataVia} />
+      <AppHeader agents={agents} providers={providers} apps={apps} />
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-card lg:block">
-          <AgentSidebar agents={agents} active={agent} disabled={streaming} onSelect={setAgent} />
+          <AgentSidebar
+            agents={agents}
+            active={agent}
+            disabled={streaming}
+            onSelect={setAgent}
+            onCreate={() => setEditor({ open: true, editing: null })}
+            onEdit={(name) => setEditor({ open: true, editing: name })}
+          />
         </aside>
 
         {error && !agents.length && !loading ? (
@@ -52,7 +67,7 @@ export function Workspace() {
                 <code className="font-mono">uvicorn main:app --port 8100</code> dans le dossier backend.
               </p>
             </div>
-            <Button variant="outline" onClick={reload}>
+            <Button variant="outline" onClick={() => void reload()}>
               <RefreshCw />
               Réessayer
             </Button>
@@ -63,6 +78,20 @@ export function Workspace() {
 
         <ArtifactPanel />
       </div>
+
+      {editor.open && (
+        <AgentEditor
+          key={editor.editing ?? "nouvel-agent"}
+          open
+          editing={editor.editing}
+          onOpenChange={(open) => setEditor((e) => ({ ...e, open }))}
+          onSaved={async (name) => {
+            // Sélection une fois le catalogue rechargé (sinon l'agent serait jugé inexistant)
+            await reload();
+            if (name) setAgent(name);
+          }}
+        />
+      )}
     </div>
   );
 }

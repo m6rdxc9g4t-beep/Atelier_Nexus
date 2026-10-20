@@ -6,7 +6,11 @@ import type {
   AgentInfo,
   AgentRunRequest,
   ApiErrorBody,
+  AppStatus,
+  CustomAgentDefinition,
+  CustomAgentFields,
   DataViaStatus,
+  EditorOptions,
   ProviderStatus,
 } from "@/types/api";
 
@@ -31,16 +35,23 @@ async function toApiError(response: Response): Promise<ApiError> {
     const body = (await response.json()) as Partial<ApiErrorBody> & { detail?: unknown };
     if (body.error) return new ApiError(body.error.message, response.status, body.error.code);
     if (typeof body.detail === "string") return new ApiError(body.detail, response.status, "http");
+    if (Array.isArray(body.detail)) {
+      // Erreurs de validation FastAPI : « champ : message »
+      const message = body.detail
+        .map((d: { loc?: unknown[]; msg?: string }) => `${(d.loc ?? []).slice(1).join(".")} : ${d.msg ?? ""}`)
+        .join(" ; ");
+      return new ApiError(message, response.status, "validation");
+    }
   } catch {
     // corps non JSON
   }
   return new ApiError(`Erreur ${response.status}`, response.status, "http");
 }
 
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function getJson<T>(path: string, signal?: AbortSignal, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { signal, cache: "no-store" });
+    response = await fetch(`${API_URL}${path}`, { signal, cache: "no-store", ...init });
   } catch {
     throw new ApiError(
       `Le serveur Atelier Nexus ne répond pas (${API_URL}). Lancez le backend sur le port 8100.`,
@@ -49,13 +60,31 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     );
   }
   if (!response.ok) throw await toApiError(response);
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+const sendJson = <T>(method: string, path: string, body?: unknown) =>
+  getJson<T>(path, undefined, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 
 export const api = {
   agents: (signal?: AbortSignal) => getJson<AgentInfo[]>("/api/agents", signal),
   providers: (signal?: AbortSignal) => getJson<ProviderStatus[]>("/api/llm/providers", signal),
   dataViaStatus: (signal?: AbortSignal) => getJson<DataViaStatus>("/api/data-via/status", signal),
+  appsStatus: (signal?: AbortSignal) => getJson<AppStatus[]>("/api/apps/status", signal),
+  editorOptions: (signal?: AbortSignal) => getJson<EditorOptions>("/api/toolsets", signal),
+  customAgent: (name: string) =>
+    getJson<CustomAgentDefinition>(`/api/custom-agents/${encodeURIComponent(name)}`),
+  createAgent: (body: CustomAgentFields & { name: string }) =>
+    sendJson<AgentInfo>("POST", "/api/custom-agents", body),
+  updateAgent: (name: string, body: CustomAgentFields) =>
+    sendJson<AgentInfo>("PUT", `/api/custom-agents/${encodeURIComponent(name)}`, body),
+  deleteAgent: (name: string) =>
+    sendJson<void>("DELETE", `/api/custom-agents/${encodeURIComponent(name)}`),
 };
 
 /**

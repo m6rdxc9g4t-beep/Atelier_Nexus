@@ -3,7 +3,7 @@
  * sur l'état affiché. Sans React ni réseau, donc testable (conversation.test.ts).
  */
 
-import type { AgentEvent, AgentResult, Message } from "@/types/api";
+import type { AgentEvent, AgentResult, Message, PendingCall } from "@/types/api";
 
 export interface ToolCallPart {
   kind: "tool";
@@ -25,7 +25,16 @@ export interface ArtifactRefPart {
   title: string;
 }
 
-export type Part = TextPart | ToolCallPart | ArtifactRefPart;
+/** Actions en attente de la validation de l'utilisateur. */
+export interface ApprovalPart {
+  kind: "approval";
+  calls: PendingCall[];
+  /** Décision par appel, une fois prise ; tant qu'il en manque, la carte reste active. */
+  decisions: Record<string, boolean>;
+  submitted: boolean;
+}
+
+export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart;
 
 export interface ChatTurn {
   id: string;
@@ -105,6 +114,12 @@ export function applyEvent(
         ),
       }));
 
+    case "approval_required":
+      return updateLast(conv, (turn) => ({
+        ...turn,
+        parts: [...turn.parts, { kind: "approval", calls: event.calls, decisions: {}, submitted: false }],
+      }));
+
     case "artifact":
       if (!artifactId) return conv;
       return updateLast(conv, (turn) => ({
@@ -139,4 +154,28 @@ export function failLastTurn(conv: Conversation, message: string): Conversation 
   const history = conv.history.slice();
   if (history.at(-1)?.role === "user") history.pop();
   return { ...failed, history };
+}
+
+/** Carte de validation en attente (dernière partie du dernier tour), s'il y en a une. */
+export function pendingApproval(conv: Conversation): ApprovalPart | null {
+  const last = conv.turns.at(-1);
+  const part = last?.role === "assistant" ? last.parts.findLast((p) => p.kind === "approval") : undefined;
+  return part && part.kind === "approval" && !part.submitted ? part : null;
+}
+
+/** Enregistre les décisions et fige la carte ; renvoie aussi les validations à envoyer. */
+export function submitApprovals(
+  conv: Conversation,
+  decisions: Record<string, boolean>,
+): { conv: Conversation; approvals: Record<string, boolean> } | null {
+  const pending = pendingApproval(conv);
+  if (!pending || pending.calls.some((c) => decisions[c.id] === undefined)) return null;
+  const approvals = Object.fromEntries(pending.calls.map((c) => [c.id, decisions[c.id] === true]));
+  const next = updateLast(conv, (turn) => ({
+    ...turn,
+    parts: turn.parts.map((p) =>
+      p === pending ? { ...pending, decisions: approvals, submitted: true } : p,
+    ),
+  }));
+  return { conv: next, approvals };
 }

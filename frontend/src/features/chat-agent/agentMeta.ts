@@ -1,29 +1,51 @@
-import { type LucideProps } from "lucide-react";
-import { createElement } from "react";
 import {
   Bot,
+  Briefcase,
+  CalendarCheck,
   ChartColumn,
+  Clapperboard,
   Code2,
+  GraduationCap,
+  Headset,
   Landmark,
+  Lightbulb,
   ListChecks,
   type LucideIcon,
+  type LucideProps,
   Megaphone,
   Network,
+  PenLine,
   Receipt,
+  Scale,
+  ShieldCheck,
   Sparkles,
+  Table2,
+  Users,
 } from "lucide-react";
+import { createElement } from "react";
 
-/** Icône Lucide déclarée par l'agent (champ `icon`), sinon déduite de son nom. */
+/** Icônes Lucide proposées aux agents (liste identique à app/schemas/agents.py). */
 const BY_ICON: Record<string, LucideIcon> = {
   bot: Bot,
   sparkles: Sparkles,
+  network: Network,
   "chart-column": ChartColumn,
   "list-checks": ListChecks,
   code: Code2,
   landmark: Landmark,
   receipt: Receipt,
   megaphone: Megaphone,
-  network: Network,
+  "pen-line": PenLine,
+  briefcase: Briefcase,
+  scale: Scale,
+  users: Users,
+  lightbulb: Lightbulb,
+  "graduation-cap": GraduationCap,
+  clapperboard: Clapperboard,
+  headset: Headset,
+  "shield-check": ShieldCheck,
+  "calendar-check": CalendarCheck,
+  "table-2": Table2,
 };
 
 export function agentIcon(icon?: string | null): LucideIcon {

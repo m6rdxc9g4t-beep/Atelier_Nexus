@@ -1,0 +1,503 @@
+[
+ {
+  "id": 101,
+  "projectId": 1,
+  "storyId": 1,
+  "type": "FEATURE",
+  "status": "CLOSED",
+  "priority": "NORMAL",
+  "title": "OAuth2 GitHub",
+  "progress": 100,
+  "position": 1,
+  "startDate": "2026-10-01",
+  "dueDate": "2026-10-06",
+  "estimate": {
+   "hours": 24,
+   "days": 3
+  },
+  "spent": {
+   "hours": 20,
+   "days": 2.5
+  },
+  "balance": {
+   "kind": "UNDER",
+   "delta": {
+    "hours": -4,
+    "days": -0.5
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.787Z",
+  "updatedAt": "2026-10-20T09:49:49.787Z"
+ },
+ {
+  "id": 102,
+  "projectId": 1,
+  "storyId": 1,
+  "type": "TASK",
+  "status": "RESOLVED",
+  "priority": "NORMAL",
+  "title": "Config JWT",
+  "progress": 100,
+  "position": 2,
+  "startDate": "2026-10-05",
+  "dueDate": "2026-10-07",
+  "estimate": {
+   "hours": 16,
+   "days": 2
+  },
+  "spent": {
+   "hours": 16,
+   "days": 2
+  },
+  "balance": {
+   "kind": "ON_BUDGET",
+   "delta": {
+    "hours": 0,
+    "days": 0
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.790Z",
+  "updatedAt": "2026-10-20T09:49:49.790Z"
+ },
+ {
+  "id": 103,
+  "projectId": 1,
+  "storyId": 1,
+  "type": "BUG",
+  "status": "IN_REVIEW",
+  "priority": "HIGH",
+  "title": "Fix CORS Header",
+  "progress": 90,
+  "position": 3,
+  "startDate": "2026-10-08",
+  "dueDate": "2026-10-09",
+  "estimate": {
+   "hours": 8,
+   "days": 1
+  },
+  "spent": {
+   "hours": 14,
+   "days": 1.75
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 6,
+    "days": 0.75
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.798Z",
+  "updatedAt": "2026-10-20T09:49:49.798Z"
+ },
+ {
+  "id": 104,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "TASK",
+  "status": "CLOSED",
+  "priority": "NORMAL",
+  "title": "Client GitHub API (@octokit/rest)",
+  "progress": 100,
+  "position": 1,
+  "startDate": "2026-10-09",
+  "dueDate": "2026-10-13",
+  "estimate": {
+   "hours": 16,
+   "days": 2
+  },
+  "spent": {
+   "hours": 19,
+   "days": 2.375
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 3,
+    "days": 0.375
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.806Z",
+  "updatedAt": "2026-10-20T09:49:49.806Z"
+ },
+ {
+  "id": 105,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "TASK",
+  "status": "RESOLVED",
+  "priority": "NORMAL",
+  "title": "Tests du parseur de références #ID",
+  "progress": 100,
+  "position": 2,
+  "startDate": "2026-10-13",
+  "dueDate": "2026-10-14",
+  "estimate": {
+   "hours": 8,
+   "days": 1
+  },
+  "spent": {
+   "hours": 10,
+   "days": 1.25
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 2,
+    "days": 0.25
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.808Z",
+  "updatedAt": "2026-10-20T09:49:49.808Z"
+ },
+ {
+  "id": 107,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "BUG",
+  "status": "CLOSED",
+  "priority": "NORMAL",
+  "title": "Accents corrompus dans les messages de commit",
+  "progress": 100,
+  "position": 3,
+  "startDate": "2026-10-14",
+  "dueDate": "2026-10-15",
+  "estimate": {
+   "hours": 8,
+   "days": 1
+  },
+  "spent": {
+   "hours": 11,
+   "days": 1.375
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 3,
+    "days": 0.375
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.815Z",
+  "updatedAt": "2026-10-20T09:49:49.815Z"
+ },
+ {
+  "id": 12345,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "FEATURE",
+  "status": "IN_PROGRESS",
+  "priority": "HIGH",
+  "title": "Implémenter le moteur de synchronisation Git Local / GitHub",
+  "progress": 75,
+  "position": 4,
+  "startDate": "2026-10-12",
+  "dueDate": "2026-10-21",
+  "estimate": {
+   "hours": 24,
+   "days": 3
+  },
+  "spent": {
+   "hours": 18,
+   "days": 2.25
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 6,
+    "days": 0.75
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.822Z",
+  "updatedAt": "2026-10-20T09:49:49.822Z"
+ },
+ {
+  "id": 106,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "FEATURE",
+  "status": "ON_HOLD",
+  "priority": "NORMAL",
+  "title": "Synchronisation des Pull Requests GitHub",
+  "progress": 25,
+  "position": 5,
+  "startDate": "2026-10-15",
+  "dueDate": "2026-10-20",
+  "estimate": {
+   "hours": 16,
+   "days": 2
+  },
+  "spent": {
+   "hours": 7,
+   "days": 0.875
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 9,
+    "days": 1.125
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.827Z",
+  "updatedAt": "2026-10-20T09:49:49.827Z"
+ },
+ {
+  "id": 108,
+  "projectId": 1,
+  "storyId": 2,
+  "type": "FEATURE",
+  "status": "REJECTED",
+  "priority": "LOW",
+  "title": "Support des dépôts Mercurial",
+  "progress": 0,
+  "position": 6,
+  "startDate": null,
+  "dueDate": null,
+  "estimate": null,
+  "spent": {
+   "hours": 0,
+   "days": 0
+  },
+  "balance": null,
+  "createdAt": "2026-10-20T09:49:49.829Z",
+  "updatedAt": "2026-10-20T09:49:49.829Z"
+ },
+ {
+  "id": 204,
+  "projectId": 1,
+  "storyId": 3,
+  "type": "FEATURE",
+  "status": "IN_PROGRESS",
+  "priority": "NORMAL",
+  "title": "Dark Mode",
+  "progress": 80,
+  "position": 1,
+  "startDate": "2026-10-12",
+  "dueDate": "2026-10-23",
+  "estimate": {
+   "hours": 40,
+   "days": 5
+  },
+  "spent": {
+   "hours": 36,
+   "days": 4.5
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 4,
+    "days": 0.5
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.839Z",
+  "updatedAt": "2026-10-20T09:49:49.839Z"
+ },
+ {
+  "id": 205,
+  "projectId": 1,
+  "storyId": 3,
+  "type": "TASK",
+  "status": "BLOCKED",
+  "priority": "NORMAL",
+  "title": "Tokens CSS",
+  "progress": 0,
+  "position": 2,
+  "startDate": "2026-10-16",
+  "dueDate": "2026-10-23",
+  "estimate": {
+   "hours": 24,
+   "days": 3
+  },
+  "spent": {
+   "hours": 4,
+   "days": 0.5
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 20,
+    "days": 2.5
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.846Z",
+  "updatedAt": "2026-10-20T09:49:49.846Z"
+ },
+ {
+  "id": 206,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "FEATURE",
+  "status": "CLOSED",
+  "priority": "NORMAL",
+  "title": "Badges de type et de statut",
+  "progress": 100,
+  "position": 1,
+  "startDate": "2026-10-12",
+  "dueDate": "2026-10-15",
+  "estimate": {
+   "hours": 24,
+   "days": 3
+  },
+  "spent": {
+   "hours": 28,
+   "days": 3.5
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 4,
+    "days": 0.5
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.849Z",
+  "updatedAt": "2026-10-20T09:49:49.849Z"
+ },
+ {
+  "id": 207,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "FEATURE",
+  "status": "RESOLVED",
+  "priority": "NORMAL",
+  "title": "Barres de progression Budget / Avancement",
+  "progress": 100,
+  "position": 2,
+  "startDate": "2026-10-14",
+  "dueDate": "2026-10-16",
+  "estimate": {
+   "hours": 16,
+   "days": 2
+  },
+  "spent": {
+   "hours": 17,
+   "days": 2.125
+  },
+  "balance": {
+   "kind": "OVER",
+   "delta": {
+    "hours": 1,
+    "days": 0.125
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.851Z",
+  "updatedAt": "2026-10-20T09:49:49.851Z"
+ },
+ {
+  "id": 209,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "BUG",
+  "status": "RESOLVED",
+  "priority": "NORMAL",
+  "title": "Contraste insuffisant des badges en mode sombre",
+  "progress": 100,
+  "position": 3,
+  "startDate": "2026-10-15",
+  "dueDate": "2026-10-16",
+  "estimate": {
+   "hours": 8,
+   "days": 1
+  },
+  "spent": {
+   "hours": 6,
+   "days": 0.75
+  },
+  "balance": {
+   "kind": "UNDER",
+   "delta": {
+    "hours": -2,
+    "days": -0.25
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.853Z",
+  "updatedAt": "2026-10-20T09:49:49.853Z"
+ },
+ {
+  "id": 208,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "TASK",
+  "status": "IN_PROGRESS",
+  "priority": "NORMAL",
+  "title": "Tableau réutilisable (Timesheet)",
+  "progress": 70,
+  "position": 4,
+  "startDate": "2026-10-16",
+  "dueDate": "2026-10-22",
+  "estimate": {
+   "hours": 24,
+   "days": 3
+  },
+  "spent": {
+   "hours": 22,
+   "days": 2.75
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 2,
+    "days": 0.25
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.860Z",
+  "updatedAt": "2026-10-20T09:49:49.860Z"
+ },
+ {
+  "id": 210,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "FEATURE",
+  "status": "OPEN",
+  "priority": "NORMAL",
+  "title": "Slide-over de fiche tâche",
+  "progress": 0,
+  "position": 5,
+  "startDate": "2026-10-26",
+  "dueDate": "2026-10-28",
+  "estimate": {
+   "hours": 16,
+   "days": 2
+  },
+  "spent": {
+   "hours": 0,
+   "days": 0
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 16,
+    "days": 2
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.861Z",
+  "updatedAt": "2026-10-20T09:49:49.861Z"
+ },
+ {
+  "id": 211,
+  "projectId": 1,
+  "storyId": 4,
+  "type": "TASK",
+  "status": "OPEN",
+  "priority": "LOW",
+  "title": "Documentation des composants",
+  "progress": 0,
+  "position": 6,
+  "startDate": "2026-10-29",
+  "dueDate": "2026-10-30",
+  "estimate": {
+   "hours": 8,
+   "days": 1
+  },
+  "spent": {
+   "hours": 0,
+   "days": 0
+  },
+  "balance": {
+   "kind": "REMAINING",
+   "delta": {
+    "hours": 8,
+    "days": 1
+   }
+  },
+  "createdAt": "2026-10-20T09:49:49.865Z",
+  "updatedAt": "2026-10-20T09:49:49.865Z"
+ }
+]

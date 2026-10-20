@@ -25,3 +25,7 @@ next-env.d.ts
 .DS_Store
 .idea/
 .vscode/
+
+# Bases locales (SQLite) et données de démonstration
+backend/data/
+*.db

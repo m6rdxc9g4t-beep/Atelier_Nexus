@@ -1,31 +1,32 @@
 """Serveur de démonstration SANS LLM : vérifier l'interface de bout en bout.
 
-Remplace le routeur LLM par un moteur scripté qui joue le parcours d'un agent
-(liste des jeux Data Via → schéma → requête → publication d'un DAX → réponse).
-Les outils, eux, sont réels : il faut Atelier Viz lancé avec ses données d'exemple.
+Remplace les moteurs par un moteur scripté qui joue le parcours des agents experts avec
+leurs VRAIS outils, contre les applications lancées sur la machine :
+- Chef de projet / Product Owner (Atelier Projets) : tableau de bord → arborescence →
+  création d'un élément, soumise à validation ;
+- Data Analyst / Marketing (Atelier Viz) : jeux → schéma → requête → mesures DAX ;
+- Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets.
 
-    cd backend && python -m scripts.demo_server     # http://localhost:8100
+    cd backend && DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server
 Usage réservé au développement : jamais en production.
 """
 
 from __future__ import annotations
 
-import json
+import asyncio
 import re
 from collections.abc import AsyncIterator
 from typing import Any
 
 import uvicorn
 
-from app.agents.base import BaseAgent
-from app.agents.registry import register_agent
-from app.core.config import get_settings
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.router import LLMRouter, get_llm_router
 from app.core.llm.types import (
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
+    ProviderName,
     ResponseComplete,
     TextBlock,
     TextDelta,
@@ -33,8 +34,6 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
-from app.tools import BaseTool, PublishArtifactTool
-from app.tools.data_via import DataViaClient, data_via_tools
 from main import app
 
 DAX = """// Chiffre d'affaires sur la période filtrée
@@ -58,95 +57,131 @@ NOTES = (
 )
 
 
-def _last_results(request: LLMRequest) -> list[ToolResultBlock]:
-    last = request.messages[-1]
-    return [b for b in last.content if isinstance(b, ToolResultBlock)]
+def _results(request: LLMRequest) -> dict[str, ToolResultBlock]:
+    """Derniers résultats par outil, sur toute la conversation."""
+    out: dict[str, ToolResultBlock] = {}
+    for message in request.messages:
+        for block in message.content:
+            if isinstance(block, ToolResultBlock):
+                out[block.tool_name] = block
+    return out
 
 
 class DemoProvider(LLMProvider):
-    name = "anthropic"
-
-    def __init__(self) -> None:
+    def __init__(self, name: ProviderName) -> None:
         super().__init__("demo-scripte")
+        self.name = name  # type: ignore[misc]
+        self.calls = 0
 
     @property
     def is_configured(self) -> bool:
         return True
 
-    def _step(self, request: LLMRequest) -> LLMResponse:
-        results = _last_results(request)
-        done = {
-            r.tool_name
-            for m in request.messages
-            for r in m.content
-            if isinstance(r, ToolResultBlock)
-        }
-        tools = {t.name for t in request.tools}
-
-        def call(name: str, args: dict[str, Any], text: str = "") -> LLMResponse:
-            content: list[TextBlock | ToolUseBlock] = [TextBlock(text=text)] if text else []
-            content.append(ToolUseBlock(id=f"demo_{len(done)}", name=name, input=args))
-            return LLMResponse(
-                provider="anthropic", model="demo-scripte", content=list(content),
-                stop_reason="tool_use", usage=Usage(input_tokens=420, output_tokens=60),
-            )  # fmt: skip
-
-        if "data_via_list_datasets" in tools and "data_via_list_datasets" not in done:
-            return call(
-                "data_via_list_datasets", {}, "Je regarde les jeux disponibles dans Data Via."
-            )
-        if "data_via_describe_dataset" not in done and results:
-            ids = re.findall(r"\| ([0-9a-f]{12}) \| ventes", results[0].content)
-            if ids:
-                return call("data_via_describe_dataset", {"dataset_id": ids[0]})
-        if "data_via_query" not in done and "data_via_describe_dataset" in done:
-            ds = re.search(r"\(id ([0-9a-f]{12})\)", results[0].content) if results else None
-            if ds:
-                return call(
-                    "data_via_query",
-                    {
-                        "dataset_id": ds.group(1),
-                        "dimensions": [{"field": "produit"}],
-                        "measures": [{"field": "chiffre_affaires", "agg": "sum"}, {"agg": "count"}],
-                        "sort": [{"key": "sum(chiffre_affaires)", "desc": True}],
-                    },
-                    "Le schéma est clair : je calcule le chiffre d'affaires par produit.",
-                )
-        if "publish_artifact" not in done and "data_via_query" in done:
-            return call(
-                "publish_artifact",
-                {"kind": "dax", "title": "Mesures CA et part du CA", "content": DAX,
-                 "language": "dax", "notes": NOTES},
-                "Je prépare les mesures DAX correspondantes.",
-            )  # fmt: skip
-        answer = (
-            "**Le logiciel porte l'activité** : c'est le premier produit en chiffre d'affaires, "
-            "devant le matériel, la formation puis le support.\n\n"
-            "| Produit | Lecture |\n|---|---|\n"
-            "| Logiciel | ≈ 44 % du CA, panier le plus élevé |\n"
-            "| Support | moins de 10 % du CA : levier de récurrence |\n\n"
-            "Le détail chiffré et les deux mesures DAX (`CA Total`, `Part du CA`) sont dans le "
-            "panneau Artefacts, avec les étapes d'intégration dans Power BI Desktop."
-        )
-        if "data_via_list_datasets" not in tools:
-            answer = (
-                "Bonjour ! Ce serveur de démonstration ne joue un scénario complet "
-                "qu'avec l'agent Démo Data Via."
-            )
+    def _call(self, name: str, args: dict[str, Any], text: str = "") -> LLMResponse:
+        self.calls += 1
+        content: list[TextBlock | ToolUseBlock] = [TextBlock(text=text)] if text else []
+        content.append(ToolUseBlock(id=f"demo_{self.calls}", name=name, input=args))
         return LLMResponse(
-            provider="anthropic", model="demo-scripte", content=[TextBlock(text=answer)],
+            provider=self.name, model="demo-scripte", content=list(content),
+            stop_reason="tool_use", usage=Usage(input_tokens=420, output_tokens=60),
+        )  # fmt: skip
+
+    def _say(self, text: str) -> LLMResponse:
+        return LLMResponse(
+            provider=self.name, model="demo-scripte", content=[TextBlock(text=text)],
             stop_reason="end_turn", usage=Usage(input_tokens=900, output_tokens=180),
         )  # fmt: skip
+
+    def _step(self, request: LLMRequest) -> LLMResponse:
+        tools = {t.name for t in request.tools}
+        done = _results(request)
+        if "projets_dashboard" in tools:
+            return self._projets(done)
+        if "data_via_list_datasets" in tools:
+            return self._data_via(done)
+        if "tresorerie_dashboard" in tools:
+            return self._tresorerie(done)
+        return self._say(
+            "Bonjour ! Ce serveur de démonstration joue un scénario avec le **Chef de projet**, "
+            "le **Data Analyst** et l'agent **Finance**."
+        )
+
+    def _projets(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+        if "projets_dashboard" not in done:
+            return self._call(
+                "projets_dashboard", {"project_id": 1}, "Je regarde le tableau de bord du projet."
+            )
+        if "projets_structure" not in done:
+            return self._call("projets_structure", {"project_id": 1})
+        if "projets_create_work_item" not in done:
+            story = re.search(r"story_id (\d+)", done["projets_structure"].content)
+            return self._call(
+                "projets_create_work_item",
+                {"story_id": int(story.group(1)) if story else 1, "type": "TASK",
+                 "title": "Préparer la recette de l'authentification", "estimated_hours": 6,
+                 "description": "Scénarios de recette OAuth2 + critères d'acceptation."},
+                "Le projet est **en avance** (avancement 70,7 % pour 63,3 % du budget consommé), "
+                "mais la recette n'est pas planifiée. Je propose d'ajouter une tâche :",
+            )  # fmt: skip
+        created = done["projets_create_work_item"]
+        if created.is_error:
+            return self._say("Entendu, je ne crée rien. Voulez-vous une autre estimation ?")
+        return self._say(
+            f"{created.content}\n\n**Point d'étape** : 8 éléments sur 17 terminés, un élément "
+            "bloqué à débloquer en priorité, jalon « API Prête » atteint."
+        )
+
+    def _data_via(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+        if "data_via_list_datasets" not in done:
+            return self._call(
+                "data_via_list_datasets", {}, "Je regarde les jeux disponibles dans Data Via."
+            )
+        if "data_via_describe_dataset" not in done:
+            ids = re.findall(r"\| ([0-9a-f]{12}) \| ventes", done["data_via_list_datasets"].content)
+            return self._call("data_via_describe_dataset", {"dataset_id": ids[0] if ids else "x"})
+        if "data_via_query" not in done:
+            ds = re.search(r"\(id ([0-9a-f]{12})\)", done["data_via_describe_dataset"].content)
+            return self._call(
+                "data_via_query",
+                {"dataset_id": ds.group(1) if ds else "x", "dimensions": [{"field": "produit"}],
+                 "measures": [{"field": "chiffre_affaires", "agg": "sum"}, {"agg": "count"}],
+                 "sort": [{"key": "sum(chiffre_affaires)", "desc": True}]},
+                "Le schéma est clair : je calcule le chiffre d'affaires par produit.",
+            )  # fmt: skip
+        if "publish_artifact" not in done:
+            return self._call(
+                "publish_artifact",
+                {
+                    "kind": "dax",
+                    "title": "Mesures CA et part du CA",
+                    "content": DAX,
+                    "language": "dax",
+                    "notes": NOTES,
+                },
+                "Je prépare les mesures DAX correspondantes.",
+            )
+        return self._say(
+            "**Le logiciel porte l'activité** : premier produit en chiffre d'affaires, devant le "
+            "matériel, la formation puis le support. Détail et mesures DAX dans le panneau Artefacts."
+        )
+
+    def _tresorerie(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+        if "tresorerie_dashboard" not in done:
+            return self._call("tresorerie_dashboard", {}, "Je fais le point sur le mois en cours.")
+        if "tresorerie_budgets" not in done:
+            return self._call("tresorerie_budgets", {})
+        return self._say(
+            "Vos dépenses du mois restent **dans les budgets** (51 % consommés au 20 du mois). "
+            "Analyse faite **entièrement en local** : aucune donnée financière n'a quitté la machine."
+        )
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         return self._step(request)
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[LLMStreamEvent]:
-        import asyncio
-
         response = self._step(request)
         for chunk in re.findall(r"\S+\s*", response.text):
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.015)
             yield TextDelta(text=chunk)
         yield ResponseComplete(response=response)
 
@@ -154,34 +189,10 @@ class DemoProvider(LLMProvider):
         return ["demo-scripte"]
 
 
-class _Offline(DemoProvider):
-    name = "ollama"  # type: ignore[assignment]
-
-    @property
-    def is_configured(self) -> bool:
-        return False
-
-
-_client = DataViaClient.from_settings(get_settings())
-
-
-@register_agent
-class DemoDataViaAgent(BaseAgent):
-    name = "demo_data_via"
-    display_name = "Démo Data Via"
-    description = (
-        "Scénario de démonstration : analyse du CA par produit dans Atelier Viz, puis mesures DAX."
-    )
-    system_prompt = "Démonstration."
-
-    def default_tools(self) -> list[BaseTool[Any]]:
-        assert _client is not None
-        return [*data_via_tools(_client), PublishArtifactTool()]
-
-
-router = LLMRouter({"anthropic": DemoProvider(), "ollama": _Offline()}, default="anthropic")
+router = LLMRouter(
+    {"anthropic": DemoProvider("anthropic"), "ollama": DemoProvider("ollama")}, default="anthropic"
+)
 app.dependency_overrides[get_llm_router] = lambda: router
 
 if __name__ == "__main__":
-    print(json.dumps({"demo": True, "port": 8100}))
     uvicorn.run(app, host="127.0.0.1", port=8100)
