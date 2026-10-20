@@ -31,6 +31,30 @@ const meta = {
 };
 
 describe("fromStored", () => {
+  it("rend les fichiers joints des messages de l'utilisateur", () => {
+    const file = {
+      type: "attachment" as const,
+      id: "b".repeat(32),
+      name: "graphe.png",
+      media_type: "image/png",
+      kind: "image" as const,
+      size: 900,
+    };
+    const conv = fromStored(
+      detail({
+        history: [
+          { role: "user", content: [file, { type: "text", text: "Analyse" }] },
+          { role: "assistant", content: [{ type: "text", text: "Hausse de 12 %." }] },
+        ],
+      }),
+      {},
+    );
+    expect(conv.turns[0]?.parts).toEqual([
+      { kind: "attachment", attachment: file },
+      { kind: "text", text: "Analyse" },
+    ]);
+  });
+
   it("reconstruit les tours, les outils, la méta et les artefacts", () => {
     const history: Message[] = [
       user("Fais un plan"),

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { emptyConversation } from "@/features/chat-agent/conversation";
 import { useChatStore } from "@/stores/useChatStore";
-import type { AgentInfo } from "@/types/api";
+import type { AgentInfo, AttachmentBlock } from "@/types/api";
 
 import { AgentIcon } from "./agentMeta";
 import { Composer } from "./Composer";
@@ -49,7 +49,7 @@ export function ChatPanel({
 
   const label = agent?.display_name ?? agentName;
   const localOnly = agent?.local_only ?? false;
-  const send = (text: string) => sendText(text, { localOnly });
+  const send = (text: string, attachments: AttachmentBlock[] = []) => sendText(text, { localOnly, attachments });
   const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
   const empty = conversation.turns.length === 0;
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
@@ -145,7 +145,7 @@ export function ChatPanel({
         agentName={label}
         streaming={streaming}
         disabled={!!blocked}
-        onSend={(text) => void send(text)}
+        onSend={(text, attachments) => void send(text, attachments)}
         onStop={stop}
       />
     </section>
