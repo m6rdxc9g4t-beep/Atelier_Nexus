@@ -23,7 +23,7 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 - Charte « néon monochrome » : toute l'app est dans l'orange de Nexus (`#E8590C`, `data-atelier-app="nexus"` sur `<html>`). `globals.css` branche les jetons Shadcn sur les jetons `--atelier-*` de `brand/atelier-brand.css` (fond, surfaces, texte, bordures, accent, focus), qui changent seuls entre clair et sombre ; fond de page `background: var(--atelier-backdrop), var(--atelier-bg)` fixé. Cartes, panneaux, en-tête : `border-atelier-border` + `shadow-glow` ; modales et menus : `shadow-glow-strong` ; entrée active : `.atelier-nav-active`. Les statuts (`--destructive`, `--success`, `--warning`) et les séries de graphiques gardent leurs couleurs. Aucun code hex dans `globals.css`.
 - Polices : pile système ; la police Nunito embarquée ne sert qu'à la marque. Aucune ressource externe (pas de Google Fonts).
 - Thème : Clair / Sombre / Système (`src/components/theme/`), dans l'en-tête et dans Réglages › Apparence ; classe `dark` **et** `data-theme` sur `<html>`, clé `atelier-nexus-theme` (l'ancienne `atelier-nexus:theme` est reprise) ; script de démarrage anti-flash dans `layout.tsx`.
-- Marque `atelier_Nexus` (icône Lucide `network`) + fenêtre « À propos », sélecteur « Suite Atelier » avec état des API (Nexus, Viz, Tab, Projets, Trésorerie).
+- Marque `atelier_Nexus` (icône Lucide `network`) + fenêtre « À propos », sélecteur « Suite Atelier » avec état des API (Nexus, Viz, Tab, Projets, Trésorerie, Ciné, Savoir) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
 
 ## 3. Code
 

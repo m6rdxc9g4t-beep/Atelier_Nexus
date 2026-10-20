@@ -234,16 +234,23 @@ SUITE_BUNDLES = {
     47321: "fr.ateliercine.app",
     5051: "fr.ateliersavoir.app",
 }
+#: Apps en ligne de la suite (adresse HTTPS hébergée) → application macOS qui l'enveloppe
+SUITE_ONLINE_BUNDLES = {
+    "atelier-cuisine-iota.vercel.app": "fr.ateliercuisine.app",  # Atelier Cuisine (Tauri)
+}
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 
 
 def suite_bundle_for(url: str) -> str | None:
-    """Application de bureau à ouvrir pour une adresse locale de la suite, sinon None."""
+    """Application de bureau à ouvrir pour une adresse de la suite (locale, ou en ligne
+    connue en HTTPS sur le port par défaut), sinon None."""
     try:
         parts = urlsplit(str(url))
         port = parts.port
     except ValueError:
         return None
+    if parts.scheme == "https" and port is None and parts.hostname in SUITE_ONLINE_BUNDLES:
+        return SUITE_ONLINE_BUNDLES[parts.hostname]
     if parts.scheme not in {"http", "https"} or parts.hostname not in _LOCAL_HOSTS or port is None:
         return None
     return SUITE_BUNDLES.get(port)

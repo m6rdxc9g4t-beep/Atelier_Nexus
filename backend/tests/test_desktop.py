@@ -60,12 +60,21 @@ def test_suite_links_open_installed_apps() -> None:
     assert desktop.suite_bundle_for("http://localhost:5051") == "fr.ateliersavoir.app"
     assert desktop.suite_bundle_for("https://example.org:8000") is None
     assert desktop.suite_bundle_for("http://127.0.0.1") is None
+    # Atelier Cuisine : app en ligne enveloppée par une app Tauri
+    cuisine = "https://atelier-cuisine-iota.vercel.app"
+    assert desktop.suite_bundle_for(cuisine) == "fr.ateliercuisine.app"
+    assert desktop.suite_bundle_for(cuisine + "/stock") == "fr.ateliercuisine.app"
+    assert desktop.suite_bundle_for("http://atelier-cuisine-iota.vercel.app") is None
+    assert desktop.suite_bundle_for("https://atelier-cuisine-iota.vercel.app:8443") is None
+    assert desktop.suite_bundle_for("https://evil.example/atelier-cuisine-iota.vercel.app") is None
 
     opened: list[str] = []
     api = desktop.DesktopApi(open_url=opened.append, open_app=lambda b: b == "fr.atelier.tab")
     assert api.open_external("http://127.0.0.1:4175") and opened == []  # app Tab ouverte
     assert api.open_external("http://127.0.0.1:4000") and opened == ["http://127.0.0.1:4000"]
     assert api.open_external("file:///etc/passwd") is False
+    # App Cuisine absente : le navigateur prend le relais
+    assert api.open_external(cuisine) and opened[-1] == cuisine
 
 
 class FakeWindow:

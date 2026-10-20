@@ -51,7 +51,8 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
   (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
 - Pont JavaScript (`frontend/src/lib/desktop.ts` ↔ `DesktopApi`) : « Enregistrer sous » natif pour les artefacts
   (`saveFile`), liens externes dans le navigateur ; l'adresse d'une app de la suite ouvre son application si elle est
-  installée (`openExternal`). Dans la fenêtre, `a.download` et `window.open` sont ignorés par WKWebView : toujours
+  installée (`openExternal` ; ports locaux `SUITE_BUNDLES`, apps en ligne `SUITE_ONLINE_BUNDLES` : Atelier Cuisine
+  `https://atelier-cuisine-iota.vercel.app` → `fr.ateliercuisine.app`). Dans la fenêtre, `a.download` et `window.open` sont ignorés par WKWebView : toujours
   passer par ces deux fonctions.
 
 Sans fenêtre : `cd backend && python desktop.py --navigateur`.
