@@ -1,0 +1,24 @@
+# Versions vérifiées le 2026-10-20 (Python 3.12+). `~=` = mises à jour de correctifs uniquement.
+
+# --- API ---
+fastapi~=0.151.0
+uvicorn[standard]~=0.54.0
+sse-starlette~=3.5
+
+# --- Validation & configuration ---
+pydantic~=2.14
+pydantic-settings~=2.16
+
+# --- LLM (toujours consommés via app/core/llm/router.py) ---
+anthropic~=1.15
+ollama~=0.6.3
+
+# --- HTTP (connecteurs Data Via, GitHub API) ---
+httpx~=0.28.1
+
+# --- Persistance ---
+sqlalchemy[asyncio]~=2.1
+asyncpg~=0.32.0
+pgvector~=0.5.1
+alembic~=1.20
+redis~=8.1
