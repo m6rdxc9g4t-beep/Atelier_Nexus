@@ -1,0 +1,179 @@
+{
+  "target_system": "atelier_projets",
+  "schema_version": "2.1.0",
+  "exported_at": "2026-10-19T08:30:00Z",
+  "workspace": {
+    "id": "ws_inge",
+    "name": "Espace Ingénierie"
+  },
+  "project": {
+    "id": "proj_chiffrage_materiaux",
+    "name": "Chiffrage Matériaux",
+    "source_table": {
+      "id": "tbl_materiaux",
+      "name": "Matériaux"
+    },
+    "summary_metrics": {
+      "total_rows": 3,
+      "computed_totals": {
+        "B": 448,
+        "C": 204.8
+      }
+    },
+    "columns_schema": [
+      {
+        "col_letter": "A",
+        "id": "mt_name",
+        "label": "Matériau",
+        "type": "text",
+        "atelier_mapping": "entity_title"
+      },
+      {
+        "col_letter": "B",
+        "id": "mt_qty",
+        "label": "Quantité",
+        "type": "number",
+        "atelier_mapping": "quantity"
+      },
+      {
+        "col_letter": "C",
+        "id": "mt_unit",
+        "label": "Prix unitaire",
+        "type": "currency",
+        "atelier_mapping": "custom"
+      },
+      {
+        "col_letter": "D",
+        "id": "mt_total",
+        "label": "Total HT",
+        "type": "formula",
+        "atelier_mapping": "financial_ht"
+      },
+      {
+        "col_letter": "E",
+        "id": "mt_ordered",
+        "label": "Commandé",
+        "type": "checkbox",
+        "atelier_mapping": "flag"
+      },
+      {
+        "col_letter": "F",
+        "id": "mt_ref",
+        "label": "Référence",
+        "type": "text",
+        "atelier_mapping": "custom"
+      },
+      {
+        "col_letter": "G",
+        "id": "mt_vat",
+        "label": "TVA",
+        "type": "percent",
+        "atelier_mapping": "custom"
+      }
+    ],
+    "records": [
+      {
+        "row_index": 1,
+        "record_id": "rec_mt_1",
+        "values": {
+          "A": {
+            "raw": "Béton C25/30 (m³)",
+            "computed": "Béton C25/30 (m³)"
+          },
+          "B": {
+            "raw": "42",
+            "computed": 42
+          },
+          "C": {
+            "raw": "118.5",
+            "computed": 118.5
+          },
+          "D": {
+            "raw": "=B1*C1",
+            "computed": 4977
+          },
+          "E": {
+            "raw": "true",
+            "computed": true
+          },
+          "F": {
+            "raw": "00123",
+            "computed": "00123"
+          },
+          "G": {
+            "raw": "0.2",
+            "computed": 0.2
+          }
+        }
+      },
+      {
+        "row_index": 2,
+        "record_id": "rec_mt_2",
+        "values": {
+          "A": {
+            "raw": "Poutres lamellé-collé (ml)",
+            "computed": "Poutres lamellé-collé (ml)"
+          },
+          "B": {
+            "raw": "96",
+            "computed": 96
+          },
+          "C": {
+            "raw": "",
+            "computed": ""
+          },
+          "D": {
+            "raw": "=B2/C2",
+            "computed": "#DIV/0!"
+          },
+          "E": {
+            "raw": "false",
+            "computed": false
+          },
+          "F": {
+            "raw": "00456",
+            "computed": "00456"
+          },
+          "G": {
+            "raw": "0.2",
+            "computed": 0.2
+          }
+        }
+      },
+      {
+        "row_index": 3,
+        "record_id": "rec_mt_3",
+        "values": {
+          "A": {
+            "raw": "Laine de bois 160 mm (m²)",
+            "computed": "Laine de bois 160 mm (m²)"
+          },
+          "B": {
+            "raw": "310",
+            "computed": 310
+          },
+          "C": {
+            "raw": "21.4",
+            "computed": 21.4
+          },
+          "D": {
+            "raw": "=B3*C3",
+            "computed": 6634
+          },
+          "E": {
+            "raw": "",
+            "computed": null
+          },
+          "F": {
+            "raw": "",
+            "computed": ""
+          },
+          "G": {
+            "raw": "0.055",
+            "computed": 0.055
+          }
+        }
+      }
+    ]
+  }
+}

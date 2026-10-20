@@ -1,6 +1,9 @@
 /** Clé localStorage de la préférence de thème (contrat de la suite Atelier : atelier-<app>-theme). */
 export const THEME_STORAGE_KEY = "atelier-nexus-theme";
 
+/** Ancienne clé (avant la charte néon) : reprise une fois par le script anti-flash, puis effacée. */
+export const LEGACY_THEME_STORAGE_KEY = "atelier-nexus:theme";
+
 export const THEME_PREFERENCES = ["light", "dark", "system"] as const;
 export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 

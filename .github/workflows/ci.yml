@@ -29,7 +29,7 @@ jobs:
       - run: pytest
 
   frontend:
-    name: Frontend (lint · typecheck · build)
+    name: Frontend (lint · typecheck · test · build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,7 +44,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
+      # Interface de l'application de bureau (export statique, adresses relatives)
+      - run: NEXUS_EXPORT=1 NEXT_PUBLIC_API_URL='' npm run build && test -f out/index.html
 
   docker:
     name: Docker Compose (config)

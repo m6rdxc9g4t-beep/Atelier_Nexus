@@ -1,0 +1,19 @@
+/* ==========================================================================
+   Atelier_Projets · Design System — Thème CLAIR ☀️
+   CSS natif pur (Custom Properties), sans aucune dépendance métier :
+   ce fichier se copie tel quel dans n'importe quelle autre application.
+
+   Activation : thème par défaut (:root), ou data-theme="light" sur un conteneur.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-main: #F8FAFC;       /* Fond principal de l'application      */
+  --bg-surface: #FFFFFF;    /* Cartes, tableaux, panneaux latéraux  */
+  --bg-elevated: #F1F5F9;   /* Modales, menus déroulants, survols   */
+  --text-primary: #0F172A;  /* Texte principal                      */
+  --text-muted: #64748B;    /* Texte secondaire, métadonnées        */
+  --border-color: #E2E8F0;  /* Bordures fines et séparateurs        */
+}

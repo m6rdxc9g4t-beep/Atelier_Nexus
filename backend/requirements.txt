@@ -16,9 +16,20 @@ ollama~=0.6.3
 # --- HTTP (connecteurs Data Via, GitHub API) ---
 httpx~=0.28.1
 
+# --- Fuseaux horaires IANA (absents de l'image python:slim) ---
+tzdata>=2025.1
+
+# --- Pièces jointes : images (réduction, métadonnées retirées), PDF, Word, Excel ---
+pillow~=12.0
+pypdf~=5.9
+python-docx~=1.2
+openpyxl~=3.1
+python-multipart>=0.0.20  # envoi de fichiers (multipart/form-data)
+
 # --- Persistance ---
 sqlalchemy[asyncio]~=2.1
 asyncpg~=0.32.0
+aiosqlite~=0.22  # SQLite local (DATABASE_URL=sqlite+aiosqlite:///./data/nexus.db) et tests
 pgvector~=0.5.1
 alembic~=1.20
 redis~=8.1

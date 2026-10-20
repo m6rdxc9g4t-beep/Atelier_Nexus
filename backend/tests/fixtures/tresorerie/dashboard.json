@@ -1,0 +1,385 @@
+{
+ "accounts": [
+  {
+   "color": "#a5b4fc",
+   "id": 1,
+   "name": "Compte courant",
+   "total_value_cents": 667373,
+   "type": "courant"
+  },
+  {
+   "color": "#6ee7b7",
+   "id": 2,
+   "name": "Livret A",
+   "total_value_cents": 800000,
+   "type": "epargne"
+  },
+  {
+   "color": "#fdba74",
+   "id": 4,
+   "name": "Or physique",
+   "total_value_cents": 218000,
+   "type": "investissement"
+  },
+  {
+   "color": "#fcd34d",
+   "id": 3,
+   "name": "PEA",
+   "total_value_cents": 496760,
+   "type": "investissement"
+  }
+ ],
+ "budgets": {
+  "count": 5,
+  "items": [
+   {
+    "amount_limit_cents": 3000,
+    "category_color": "#fdba74",
+    "category_id": 9,
+    "category_name": "Abonnements",
+    "id": 10,
+    "month": "2026-10",
+    "percent": 93.3,
+    "remaining_cents": 202,
+    "spent_cents": 2798,
+    "status": "attention"
+   },
+   {
+    "amount_limit_cents": 38000,
+    "category_color": "#fcd34d",
+    "category_id": 4,
+    "category_name": "Courses",
+    "id": 2,
+    "month": "2026-10",
+    "percent": 72.4,
+    "remaining_cents": 10484,
+    "spent_cents": 27516,
+    "status": "ok"
+   },
+   {
+    "amount_limit_cents": 12000,
+    "category_color": "#fda4af",
+    "category_id": 7,
+    "category_name": "Restaurants",
+    "id": 4,
+    "month": "2026-10",
+    "percent": 66.9,
+    "remaining_cents": 3973,
+    "spent_cents": 8027,
+    "status": "ok"
+   },
+   {
+    "amount_limit_cents": 10000,
+    "category_color": "#f9a8d4",
+    "category_id": 8,
+    "category_name": "Loisirs",
+    "id": 6,
+    "month": "2026-10",
+    "percent": 0.0,
+    "remaining_cents": 10000,
+    "spent_cents": 0,
+    "status": "ok"
+   },
+   {
+    "amount_limit_cents": 12000,
+    "category_color": "#f0abfc",
+    "category_id": 11,
+    "category_name": "Shopping",
+    "id": 8,
+    "month": "2026-10",
+    "percent": 0.0,
+    "remaining_cents": 12000,
+    "spent_cents": 0,
+    "status": "ok"
+   }
+  ],
+  "total_limit_cents": 75000,
+  "total_spent_cents": 38341
+ },
+ "categories": {
+  "items": [
+   {
+    "amount_cents": 95000,
+    "category_id": 3,
+    "color": "#a5b4fc",
+    "name": "Logement",
+    "percent": 62.4
+   },
+   {
+    "amount_cents": 27516,
+    "category_id": 4,
+    "color": "#fcd34d",
+    "name": "Courses",
+    "percent": 18.1
+   },
+   {
+    "amount_cents": 10254,
+    "category_id": 6,
+    "color": "#c4b5fd",
+    "name": "Énergie & Internet",
+    "percent": 6.7
+   },
+   {
+    "amount_cents": 8640,
+    "category_id": 5,
+    "color": "#7dd3fc",
+    "name": "Transport",
+    "percent": 5.7
+   },
+   {
+    "amount_cents": 8027,
+    "category_id": 7,
+    "color": "#fda4af",
+    "name": "Restaurants",
+    "percent": 5.3
+   },
+   {
+    "amount_cents": 2798,
+    "category_id": 9,
+    "color": "#fdba74",
+    "name": "Abonnements",
+    "percent": 1.8
+   }
+  ],
+  "month": "2026-10",
+  "total_cents": 152235
+ },
+ "comparison_day": 20,
+ "history": [
+  {
+   "cash_cents": 947544,
+   "end_date": "2026-05-31",
+   "expense_cents": -177456,
+   "income_cents": 285000,
+   "investments_cents": 572000,
+   "label": "mai 26",
+   "month": "2026-05",
+   "partial": false,
+   "total_cents": 1519544
+  },
+  {
+   "cash_cents": 1046643,
+   "end_date": "2026-06-30",
+   "expense_cents": -185901,
+   "income_cents": 285000,
+   "investments_cents": 572000,
+   "label": "juin 26",
+   "month": "2026-06",
+   "partial": false,
+   "total_cents": 1618643
+  },
+  {
+   "cash_cents": 1180267,
+   "end_date": "2026-07-31",
+   "expense_cents": -181632,
+   "income_cents": 315256,
+   "investments_cents": 572000,
+   "label": "juil. 26",
+   "month": "2026-07",
+   "partial": false,
+   "total_cents": 1752267
+  },
+  {
+   "cash_cents": 1268013,
+   "end_date": "2026-08-31",
+   "expense_cents": -197254,
+   "income_cents": 285000,
+   "investments_cents": 572000,
+   "label": "août 26",
+   "month": "2026-08",
+   "partial": false,
+   "total_cents": 1840013
+  },
+  {
+   "cash_cents": 1369608,
+   "end_date": "2026-09-30",
+   "expense_cents": -183405,
+   "income_cents": 285000,
+   "investments_cents": 659358,
+   "label": "sept. 26",
+   "month": "2026-09",
+   "partial": false,
+   "total_cents": 2028966
+  },
+  {
+   "cash_cents": 1502373,
+   "end_date": "2026-10-20",
+   "expense_cents": -152235,
+   "income_cents": 285000,
+   "investments_cents": 679760,
+   "label": "oct. 26",
+   "month": "2026-10",
+   "partial": true,
+   "total_cents": 2182133
+  }
+ ],
+ "kpis": {
+  "expense_cents": -152235,
+  "expense_change_percent": -5.3,
+  "income_cents": 285000,
+  "income_change_percent": 0.0,
+  "investments_cents": 679760,
+  "net_worth_cents": 2182133,
+  "net_worth_change_cents": 153167,
+  "net_worth_change_percent": 7.5,
+  "savings_rate": 46.6,
+  "savings_rate_change": 3.0
+ },
+ "month": "2026-10",
+ "previous_month_label": "septembre",
+ "recent": [
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -8465,
+   "category_color": "#fcd34d",
+   "category_id": 4,
+   "category_kind": "depense",
+   "category_name": "Courses",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-18",
+   "id": 100,
+   "label": "Supermarché",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -5842,
+   "category_color": "#fda4af",
+   "category_id": 7,
+   "category_kind": "depense",
+   "category_name": "Restaurants",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-17",
+   "id": 101,
+   "label": "Restaurant",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -8771,
+   "category_color": "#fcd34d",
+   "category_id": 4,
+   "category_kind": "depense",
+   "category_name": "Courses",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-11",
+   "id": 99,
+   "label": "Supermarché",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -8640,
+   "category_color": "#7dd3fc",
+   "category_id": 5,
+   "category_kind": "depense",
+   "category_name": "Transport",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-08",
+   "id": 95,
+   "label": "Pass transport",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -2798,
+   "category_color": "#fdba74",
+   "category_id": 9,
+   "category_kind": "depense",
+   "category_name": "Abonnements",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-06",
+   "id": 94,
+   "label": "Abonnements streaming",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -10254,
+   "category_color": "#c4b5fd",
+   "category_id": 6,
+   "category_kind": "depense",
+   "category_name": "Énergie & Internet",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-05",
+   "id": 93,
+   "label": "Électricité & Internet",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -10280,
+   "category_color": "#fcd34d",
+   "category_id": 4,
+   "category_kind": "depense",
+   "category_name": "Courses",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-04",
+   "id": 98,
+   "label": "Supermarché",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  },
+  {
+   "account_color": "#a5b4fc",
+   "account_id": 1,
+   "account_name": "Compte courant",
+   "amount_cents": -2185,
+   "category_color": "#fda4af",
+   "category_id": 7,
+   "category_kind": "depense",
+   "category_name": "Restaurants",
+   "created_at": "2026-10-20 09:46:53",
+   "date": "2026-10-03",
+   "id": 102,
+   "label": "Restaurant",
+   "notes": null,
+   "source": "demo",
+   "status": "valide",
+   "transfer_group": null,
+   "updated_at": "2026-10-20 09:46:53"
+  }
+ ],
+ "today": "2026-10-20"
+}
