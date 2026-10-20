@@ -60,11 +60,11 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
             )}
             {turn.parts.map((part, i) => {
               if (part.kind === "text") return <Markdown key={i}>{part.text}</Markdown>;
-              if (part.kind === "tool") return <ToolCall key={part.id} part={part} />;
+              if (part.kind === "tool") return <ToolCall key={`tool-${part.id}`} part={part} />;
               if (part.kind === "approval")
                 return (
                   <ApprovalCard
-                    key={part.calls.map((c) => c.id).join("-")}
+                    key={`approval-${part.calls.map((c) => c.id).join("-")}`}
                     part={part}
                     disabled={streaming}
                     onSubmit={onDecide}
@@ -72,7 +72,7 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
                 );
               return (
                 <button
-                  key={part.artifactId}
+                  key={`artifact-${part.artifactId}`}
                   type="button"
                   onClick={() => select(part.artifactId)}
                   className="flex w-fit items-center gap-2 rounded-md border border-primary/30 bg-accent-soft px-3 py-2 text-sm text-accent-ink hover:border-primary/60"

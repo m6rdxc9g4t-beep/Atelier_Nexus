@@ -101,6 +101,16 @@ class DemoProvider(LLMProvider):
             return self._data_via(done)
         if "tresorerie_dashboard" in tools:
             return self._tresorerie(done)
+        if "publish_artifact" in tools and "publish_artifact" not in done:
+            return self._call(
+                "publish_artifact",
+                {
+                    "kind": "markdown",
+                    "title": "Note de démonstration",
+                    "content": "# Note\n\nUn artefact pour vérifier l'historique.",
+                },
+                "Je publie une note dans le panneau Artefacts.",
+            )
         return self._say(
             "Bonjour ! Ce serveur de démonstration joue un scénario avec le **Chef de projet**, "
             "le **Data Analyst** et l'agent **Finance**."

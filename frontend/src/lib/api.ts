@@ -7,6 +7,8 @@ import type {
   AgentRunRequest,
   ApiErrorBody,
   AppStatus,
+  ConversationDetail,
+  ConversationSummary,
   CustomAgentDefinition,
   CustomAgentFields,
   DataViaStatus,
@@ -85,6 +87,16 @@ export const api = {
     sendJson<AgentInfo>("PUT", `/api/custom-agents/${encodeURIComponent(name)}`, body),
   deleteAgent: (name: string) =>
     sendJson<void>("DELETE", `/api/custom-agents/${encodeURIComponent(name)}`),
+  conversations: (agent: string, signal?: AbortSignal) =>
+    getJson<ConversationSummary[]>(`/api/conversations?agent=${encodeURIComponent(agent)}`, signal),
+  conversation: (id: string) =>
+    getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`),
+  createConversation: (agent: string) =>
+    sendJson<ConversationDetail>("POST", "/api/conversations", { agent }),
+  renameConversation: (id: string, title: string) =>
+    sendJson<ConversationDetail>("PATCH", `/api/conversations/${encodeURIComponent(id)}`, { title }),
+  deleteConversation: (id: string) =>
+    sendJson<void>("DELETE", `/api/conversations/${encodeURIComponent(id)}`),
 };
 
 /**

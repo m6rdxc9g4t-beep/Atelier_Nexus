@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.llm.types import Message, ProviderName, Usage
+
+
+def _utc(value: datetime) -> datetime:
+    """SQLite rend des dates sans fuseau : elles sont en UTC, on le dit (sinon le navigateur les lit en heure locale)."""
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
 
 class TurnMeta(BaseModel):
@@ -29,6 +34,8 @@ class StoredArtifact(BaseModel):
     position: int
     created_at: datetime
 
+    _tz = field_validator("created_at")(_utc)
+
 
 class ConversationSummary(BaseModel):
     id: str
@@ -38,6 +45,8 @@ class ConversationSummary(BaseModel):
     updated_at: datetime
     message_count: int
     artifact_count: int
+
+    _tz = field_validator("created_at", "updated_at")(_utc)
 
 
 class ConversationDetail(ConversationSummary):

@@ -137,6 +137,8 @@ export type AgentEvent =
   | { type: "artifact"; artifact: Artifact }
   | { type: "approval_required"; calls: PendingCall[] }
   | { type: "done"; result: AgentResult }
+  | { type: "saved"; conversation_id: string }
+  | { type: "save_error"; message: string }
   | { type: "error"; code: string; message: string; provider: string | null };
 
 // ─── Supervision ─────────────────────────────────────────────────
@@ -222,4 +224,38 @@ export interface AppStatus {
   base_url: string | null;
   detail: string | null;
   error: string | null;
+}
+
+// ─── Historique (Étape 6) ────────────────────────────────────────
+
+export interface TurnMeta {
+  provider: ProviderName;
+  model: string;
+  usage: Usage;
+  stop_reason: StopReason;
+  iterations: number;
+}
+
+export interface StoredArtifactDto extends Artifact {
+  id: string;
+  agent: string;
+  position: number;
+  created_at: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  agent: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  artifact_count: number;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  history: Message[];
+  artifacts: StoredArtifactDto[];
+  turn_meta: Record<string, TurnMeta>;
+  pending_approvals: PendingCall[];
 }

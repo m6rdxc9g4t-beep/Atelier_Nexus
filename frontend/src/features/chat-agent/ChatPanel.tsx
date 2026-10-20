@@ -1,6 +1,7 @@
 "use client";
 
 import { Lock, RotateCcw, TriangleAlert } from "lucide-react";
+import { useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import type { AgentInfo } from "@/types/api";
 
 import { AgentIcon } from "./agentMeta";
 import { Composer } from "./Composer";
+import { ConversationHistory } from "./ConversationHistory";
 import { MessageList } from "./MessageList";
 import { toolLabel } from "./ToolCall";
 
@@ -27,6 +29,14 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
   const decideStore = useChatStore((s) => s.decide);
   const stop = useChatStore((s) => s.stop);
   const reset = useChatStore((s) => s.reset);
+  const restore = useChatStore((s) => s.restore);
+  const opening = useChatStore((s) => s.opening);
+  const saveError = useChatStore((s) => s.saveError);
+
+  // Premier passage sur l'agent : rouvrir sa dernière conversation enregistrée
+  useEffect(() => {
+    void restore(agentName);
+  }, [agentName, restore]);
 
   const label = agent?.display_name ?? agentName;
   const localOnly = agent?.local_only ?? false;
@@ -46,18 +56,29 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
             100 % local
           </Badge>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <ConversationHistory agent={agentName} label={label} />
           {!empty && (
-            <Button variant="ghost" size="sm" onClick={reset} disabled={streaming}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={reset}
+              disabled={streaming}
+              aria-label="Nouvelle conversation"
+            >
               <RotateCcw />
-              Nouvelle conversation
+              <span className="hidden sm:inline">Nouvelle conversation</span>
             </Button>
           )}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {empty ? (
+        {opening && empty ? (
+          <p role="status" className="px-6 py-10 text-center text-sm text-muted-foreground">
+            Ouverture de la conversation…
+          </p>
+        ) : empty ? (
           <div className="mx-auto flex h-full max-w-xl flex-col justify-center gap-6 px-6 py-10">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
@@ -101,6 +122,11 @@ export function ChatPanel({ agent, blocked }: { agent: AgentInfo | undefined; bl
         )}
       </div>
 
+      {saveError && !blocked && (
+        <p role="status" className="mx-auto w-full max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
+          {saveError}
+        </p>
+      )}
       {blocked && (
         <p role="status" className="mx-auto w-full max-w-3xl px-4 pb-2 text-sm text-destructive">
           {blocked}

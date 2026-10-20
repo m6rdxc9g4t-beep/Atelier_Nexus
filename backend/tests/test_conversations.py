@@ -86,6 +86,8 @@ def test_conversation_lifecycle(client: TestClient, anthropic: ScriptedProvider)
     assert roles == ["user", "assistant", "user", "assistant"]
     assert detail["artifacts"][0]["title"] == "Plan" and detail["artifacts"][0]["position"] == 4
     assert detail["turn_meta"]["3"]["provider"] == "anthropic"
+    # Dates explicitement en UTC (SQLite les rend sans fuseau)
+    assert detail["updated_at"].endswith("Z") and detail["artifacts"][0]["created_at"].endswith("Z")
 
     # Deuxième tour : l'historique s'allonge, le titre ne change pas
     anthropic.script = [text_response("Avec plaisir.")]
