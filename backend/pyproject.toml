@@ -20,3 +20,5 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# Longueur de ligne gérée par « ruff format » ; restent des chaînes impossibles à couper
+ignore = ["E501"]

@@ -20,6 +20,8 @@ interface ArtifactState {
   panelOpen: boolean;
   /** `open` : afficher le panneau (faux sur petit écran, où il recouvrirait la conversation). */
   add: (artifact: Artifact, agent: string, open?: boolean) => StoredArtifact;
+  /** Conversation rouverte ou nouvelle : les artefacts de l'agent sont remplacés (panneau non ouvert). */
+  replaceForAgent: (agent: string, artifacts: StoredArtifact[]) => void;
   select: (id: string) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -44,6 +46,14 @@ export const useArtifactStore = create<ArtifactState>((set) => ({
     }));
     return stored;
   },
+
+  replaceForAgent: (agent, incoming) =>
+    set((s) => {
+      const artifacts = [...incoming, ...s.artifacts.filter((a) => a.agent !== agent)];
+      const kept = artifacts.some((a) => a.id === s.selectedId);
+      const selectedId = kept ? s.selectedId : (artifacts[0]?.id ?? null);
+      return { artifacts, selectedId, panelOpen: s.panelOpen && artifacts.length > 0 };
+    }),
 
   select: (id) => set({ selectedId: id, panelOpen: true }),
 

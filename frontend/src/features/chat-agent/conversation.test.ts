@@ -24,6 +24,25 @@ describe("conversation", () => {
     expect(conv.history).toEqual([{ role: "user", content: [{ type: "text", text: "Bonjour" }] }]);
   });
 
+  it("joint les fichiers avant le texte, ou seuls", () => {
+    const file = {
+      type: "attachment" as const,
+      id: "a".repeat(32),
+      name: "contrat.pdf",
+      media_type: "application/pdf",
+      kind: "document" as const,
+      size: 120,
+    };
+    const conv = addUserTurn(emptyConversation(), "Résume", [file]);
+    expect(conv.history[0]?.content).toEqual([file, { type: "text", text: "Résume" }]);
+    expect(conv.turns[0]?.parts).toEqual([
+      { kind: "attachment", attachment: file },
+      { kind: "text", text: "Résume" },
+    ]);
+    const alone = addUserTurn(emptyConversation(), "", [file]);
+    expect(alone.history[0]?.content).toEqual([file]);
+  });
+
   it("concatène les deltas de texte dans la même partie", () => {
     let conv = addUserTurn(emptyConversation(), "?");
     conv = applyEvent(conv, { type: "text_delta", text: "Bon" });
@@ -83,5 +102,43 @@ describe("conversation", () => {
     conv = applyEvent(conv, { type: "done", result: result() });
     conv = failLastTurn(conv, "Réponse arrêtée.");
     expect(conv.history).toHaveLength(2);
+  });
+});
+
+describe("validation humaine", () => {
+  const calls = [
+    { id: "c1", name: "projets_create_work_item", input: {}, summary: "Créer la TASK « A »" },
+    { id: "c2", name: "projets_add_time_entry", input: {}, summary: "Saisir 2 h" },
+  ];
+
+  it("affiche la carte puis renvoie les décisions complètes", async () => {
+    const { pendingApproval, submitApprovals } = await import("./conversation");
+    let conv = addUserTurn(emptyConversation(), "Crée et saisis");
+    conv = applyEvent(conv, { type: "approval_required", calls });
+    conv = applyEvent(conv, {
+      type: "done",
+      result: result({
+        stop_reason: "awaiting_approval",
+        new_messages: [
+          { role: "assistant", content: [{ type: "tool_use", id: "c1", name: "x", input: {} }] },
+        ],
+      }),
+    });
+    expect(pendingApproval(conv)?.calls).toHaveLength(2);
+    expect(conv.history.at(-1)?.role).toBe("assistant");
+
+    expect(submitApprovals(conv, { c1: true })).toBeNull(); // décision manquante
+    const submitted = submitApprovals(conv, { c1: true, c2: false });
+    expect(submitted?.approvals).toEqual({ c1: true, c2: false });
+    expect(pendingApproval(submitted!.conv)).toBeNull();
+  });
+
+  it("la reprise complète le même tour assistant", () => {
+    let conv = addUserTurn(emptyConversation(), "?");
+    conv = applyEvent(conv, { type: "approval_required", calls: [calls[0]!] });
+    conv = applyEvent(conv, { type: "tool_call", id: "c1", name: "projets_create_work_item", input: {} });
+    conv = applyEvent(conv, { type: "text_delta", text: "Créée." });
+    expect(conv.turns).toHaveLength(2);
+    expect(conv.turns[1]!.parts.map((p) => p.kind)).toEqual(["approval", "tool", "text"]);
   });
 });

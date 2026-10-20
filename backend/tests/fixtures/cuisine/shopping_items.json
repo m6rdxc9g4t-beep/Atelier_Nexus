@@ -1,0 +1,46 @@
+[
+  {
+    "id": "20000000-0000-4000-8000-000000000001",
+    "name": "Éponges",
+    "quantity": null,
+    "unit": null,
+    "category": "entretien",
+    "checked": false,
+    "source": "manuel",
+    "note": "les vertes",
+    "created_at": "2026-10-11T18:00:00+00:00"
+  },
+  {
+    "id": "20000000-0000-4000-8000-000000000002",
+    "name": "Lait demi-écrémé",
+    "quantity": 6,
+    "unit": "L",
+    "category": "produits_frais",
+    "checked": false,
+    "source": "planning",
+    "note": null,
+    "created_at": "2026-10-12T18:00:00+00:00"
+  },
+  {
+    "id": "20000000-0000-4000-8000-000000000003",
+    "name": "Pâtes",
+    "quantity": 500,
+    "unit": "g",
+    "category": "feculents",
+    "checked": false,
+    "source": "a_racheter",
+    "note": null,
+    "created_at": "2026-10-13T18:00:00+00:00"
+  },
+  {
+    "id": "20000000-0000-4000-8000-000000000004",
+    "name": "Pain de mie",
+    "quantity": null,
+    "unit": null,
+    "category": "feculents",
+    "checked": true,
+    "source": "ticket",
+    "note": null,
+    "created_at": "2026-10-14T18:00:00+00:00"
+  }
+]

@@ -1,0 +1,2 @@
+# Application de bureau (fenêtre native macOS) : installée par l'application au premier lancement.
+pywebview>=5.3
