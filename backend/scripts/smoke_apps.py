@@ -186,7 +186,7 @@ async def main(write: bool, apps: tuple[str, ...]) -> int:
 
 
 if __name__ == "__main__":
-    chosen = ALL_APPS
+    chosen: tuple[str, ...] = ALL_APPS
     for arg in sys.argv[1:]:
         if arg.startswith("--apps"):
             chosen = tuple(a for a in arg.split("=", 1)[1].split(",") if a in SECTIONS)
