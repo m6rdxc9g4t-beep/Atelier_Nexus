@@ -295,8 +295,8 @@ function SearchResults({
                   type="button"
                   onClick={() => onOpen(hit.id)}
                   className={cn(
-                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring",
-                    hit.id === currentId && "bg-accent",
+                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
+                    hit.id === currentId && "atelier-nav-active",
                   )}
                 >
                   <span className="w-full truncate text-sm font-medium">
@@ -332,7 +332,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     <>
       {highlight(text, query).map((seg, i) =>
         seg.match ? (
-          <mark key={i} className="rounded-sm bg-primary/15 px-0.5 text-foreground">
+          <mark key={i} className="rounded-sm bg-signature-soft px-0.5 text-accent-ink">
             {seg.text}
           </mark>
         ) : (
@@ -415,7 +415,7 @@ function HistoryRow({
   }
 
   return (
-    <li className={cn("group flex items-center gap-1 rounded-md px-2", current && "bg-accent")}>
+    <li className={cn("group flex items-center gap-1 rounded-md px-2", current ? "atelier-nav-active" : "hover:bg-accent")}>
       <button
         type="button"
         onClick={onOpen}

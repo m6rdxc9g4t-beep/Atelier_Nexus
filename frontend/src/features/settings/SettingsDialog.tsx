@@ -3,6 +3,7 @@
 import { CircleCheck, CircleX, LoaderCircle, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,10 +36,20 @@ export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | voi
         <DialogHeader>
           <DialogTitle>Réglages</DialogTitle>
           <DialogDescription>
-            Moteurs d&apos;IA, adresses des applications Atelier et accès GitHub. Les changements
-            s&apos;appliquent tout de suite.
+            Apparence, moteurs d&apos;IA, adresses des applications Atelier et accès GitHub. Les
+            changements s&apos;appliquent tout de suite.
           </DialogDescription>
         </DialogHeader>
+        {/* Préférence propre à cet appareil (localStorage), indépendante du serveur */}
+        <section aria-labelledby="settings-theme" className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 id="settings-theme" className="text-sm font-semibold">
+              Apparence
+            </h3>
+            <p className="text-xs text-muted-foreground">Thème clair, sombre ou celui du système.</p>
+          </div>
+          <ThemeToggle />
+        </section>
         {/* Monté à chaque ouverture : valeurs relues */}
         {open && <SettingsForm onSaved={onSaved} onClose={() => setOpen(false)} />}
       </DialogContent>
@@ -263,7 +274,7 @@ function CheckSummary({ check }: { check: Check }) {
       .map((a) => ({ label: a.label, ok: a.available, detail: a.available ? (a.detail ?? "") : (a.error ?? "injoignable") })),
   ];
   return (
-    <section aria-label="Vérification" className="rounded-md border bg-muted/40 p-3">
+    <section aria-label="Vérification" className="rounded-md border border-atelier-border-soft bg-signature-faint p-3">
       <h3 className="mb-2 text-sm font-medium">Vérification</h3>
       <ul className="flex flex-col gap-1.5">
         {lines.map((l) => (

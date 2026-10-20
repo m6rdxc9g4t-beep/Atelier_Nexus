@@ -32,7 +32,7 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
         submit();
       }}
     >
-      <div className="relative rounded-lg border border-input bg-card shadow-sm focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring">
+      <div className="relative rounded-lg border border-atelier-border bg-atelier-field shadow-glow focus-within:border-primary focus-within:shadow-focus">
         <label htmlFor="composer" className="sr-only">
           Message pour {agentName}
         </label>
@@ -49,7 +49,7 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
           }}
           placeholder={`Écrire à ${agentName}…`}
           rows={1}
-          className="max-h-60 min-h-12 resize-none border-0 bg-transparent py-3 pr-14 shadow-none focus-visible:ring-0"
+          className="max-h-60 min-h-12 resize-none border-0 bg-transparent py-3 pr-14 shadow-none focus-visible:shadow-none"
         />
         <div className="absolute right-2 bottom-2">
           {streaming ? (

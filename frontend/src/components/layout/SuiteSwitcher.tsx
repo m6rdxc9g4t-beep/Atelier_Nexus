@@ -74,12 +74,17 @@ export function SuiteSwitcher() {
               key={app.id}
               aria-label={`${app.name}${st ? ` (${statusLabel(st)})` : ""}`}
               title={app.url}
-              className={cn("gap-2.5 py-2", current && "bg-accent-soft")}
+              className={cn("gap-2.5 py-2", current && "bg-signature-soft")}
               onSelect={() => {
                 if (!current) openExternal(app.url);
               }}
             >
-              <span className="atelier-brand__tile atelier-brand__tile--sm" aria-hidden>
+              {/* Chaque tuile dans la couleur signature de SON application */}
+              <span
+                className="atelier-brand__tile atelier-brand__tile--sm"
+                data-atelier-app={app.id}
+                aria-hidden
+              >
                 <Icon />
               </span>
               <span className="min-w-0 flex-1">
@@ -94,7 +99,7 @@ export function SuiteSwitcher() {
                   {app.description}
                 </span>
               </span>
-              {current && <Check className="text-primary" aria-hidden />}
+              {current && <Check className="text-accent-ink" aria-hidden />}
             </DropdownMenuItem>
           );
         })}

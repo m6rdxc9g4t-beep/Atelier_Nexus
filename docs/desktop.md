@@ -45,6 +45,8 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Serveur sur `127.0.0.1` uniquement, port 8100 s'il est libre, sinon un port libre : l'interface utilise des adresses
   relatives (`NEXT_PUBLIC_API_URL` vide), elle fonctionne sur n'importe quel port.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
+- Fond de la fenêtre avant l'affichage de l'interface : celui de la charte néon (`WINDOW_BACKGROUND` dans
+  `app/desktop.py`, `#fbf3f2` clair / `#120c0d` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app`), l'écriture dans Tab est activée sans réglage
   (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
 - Pont JavaScript (`frontend/src/lib/desktop.ts` ↔ `DesktopApi`) : « Enregistrer sous » natif pour les artefacts

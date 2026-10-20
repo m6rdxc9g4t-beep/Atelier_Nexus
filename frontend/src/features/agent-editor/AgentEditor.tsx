@@ -242,7 +242,7 @@ export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEdito
                     key={t.id}
                     className={cn(
                       "flex cursor-pointer gap-2.5 rounded-md border p-2.5 text-sm transition-colors",
-                      checked ? "border-primary/60 bg-accent-soft/60" : "hover:bg-accent",
+                      checked ? "border-primary bg-signature-soft" : "border-atelier-border-soft hover:bg-accent",
                     )}
                   >
                     <input
@@ -279,7 +279,7 @@ export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEdito
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id={field("provider")} label="Moteur par défaut">
               {locked ? (
-                <p className="flex h-9 items-center gap-1.5 rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                <p className="flex h-9 items-center gap-1.5 rounded-md border border-input bg-signature-faint px-3 text-sm text-muted-foreground">
                   <Lock className="size-3.5" aria-hidden />
                   Ollama (local) imposé par les outils choisis
                 </p>

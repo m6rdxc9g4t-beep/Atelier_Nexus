@@ -137,3 +137,16 @@ def test_versioned_url(tmp_path: Path) -> None:
         "http://127.0.0.1:8100/?v="
     )
     assert desktop.versioned_url("http://x", None) == "http://x/?v=0"
+
+
+def test_window_matches_the_brand() -> None:
+    """Fond de fenêtre et page d'erreur aux couleurs de la charte néon (orange de Nexus)."""
+    constants = (
+        Path(__file__).resolve().parents[2] / "frontend/src/components/theme/theme-constants.ts"
+    ).read_text(encoding="utf-8")
+    for theme, color in desktop.WINDOW_BACKGROUND.items():
+        assert f'{theme}: "{color}"' in constants
+    assert desktop.system_appearance() in desktop.WINDOW_BACKGROUND
+    page = desktop.error_page("<port occupé>")
+    assert "&lt;port occupé&gt;" in page
+    assert desktop.WINDOW_BACKGROUND["light"] in page and desktop.WINDOW_BACKGROUND["dark"] in page

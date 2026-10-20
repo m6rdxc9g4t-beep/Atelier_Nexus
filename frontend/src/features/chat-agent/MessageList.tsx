@@ -35,7 +35,7 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
         if (turn.role === "user") {
           return (
             <div key={turn.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-lg rounded-br-sm bg-accent-soft px-3.5 py-2 text-[0.9375rem] whitespace-pre-wrap">
+              <div className="max-w-[85%] rounded-lg rounded-br-sm border border-atelier-border-soft bg-accent-soft px-3.5 py-2 text-[0.9375rem] whitespace-pre-wrap">
                 {turn.parts.map((p) => (p.kind === "text" ? p.text : null))}
               </div>
             </div>
@@ -75,7 +75,7 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
                   key={`artifact-${part.artifactId}`}
                   type="button"
                   onClick={() => select(part.artifactId)}
-                  className="flex w-fit items-center gap-2 rounded-md border border-primary/30 bg-accent-soft px-3 py-2 text-sm text-accent-ink hover:border-primary/60"
+                  className="flex w-fit items-center gap-2 rounded-md border border-atelier-border bg-accent-soft px-3 py-2 text-sm text-accent-ink shadow-glow hover:border-primary"
                 >
                   <PanelRight className="size-4" aria-hidden />
                   <span>{part.title}</span>
