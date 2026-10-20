@@ -39,14 +39,14 @@ export function Workspace() {
   const blocked = error
     ? error
     : chosen && !chosen.configured
-      ? `${chosen.name === "anthropic" ? "Claude" : "Ollama"} n'est pas configuré : choisissez un autre moteur ou complétez backend/.env.`
+      ? `${chosen.name === "anthropic" ? "Claude" : "Ollama"} n'est pas configuré : choisissez un autre moteur ou ouvrez les Réglages (roue dentée en haut à droite).`
       : null;
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader agents={agents} providers={providers} apps={apps} />
+      <AppHeader agents={agents} providers={providers} apps={apps} onSettingsSaved={reload} />
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-card lg:block">
+        <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-atelier-border-soft bg-sidebar lg:block">
           <AgentSidebar
             agents={agents}
             active={agent}
@@ -59,9 +59,9 @@ export function Workspace() {
 
         {error && !agents.length && !loading ? (
           <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-            <ServerOff className="size-8 text-muted-foreground" aria-hidden />
+            <ServerOff className="size-8 text-accent-ink" aria-hidden />
             <div>
-              <h1 className="text-lg font-semibold">Le serveur Atelier Nexus ne répond pas</h1>
+              <h1 className="text-lg font-semibold text-shadow-glow">Le serveur Atelier Nexus ne répond pas</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 L&apos;interface attend l&apos;API sur <code className="font-mono">{API_URL}</code>. Lancez-la avec{" "}
                 <code className="font-mono">uvicorn main:app --port 8100</code> dans le dossier backend.
@@ -73,7 +73,7 @@ export function Workspace() {
             </Button>
           </div>
         ) : (
-          <ChatPanel agent={current} blocked={blocked} />
+          <ChatPanel agent={current} agents={agents} blocked={blocked} />
         )}
 
         <ArtifactPanel />

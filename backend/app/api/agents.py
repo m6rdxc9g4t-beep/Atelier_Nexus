@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from typing import Annotated, Any, Self
 
@@ -9,11 +11,30 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sse_starlette import EventSourceResponse
 
-from app.agents import AgentCatalog, AgentInfo, AgentResult, BaseAgent, builtin_names, describe
-from app.api.deps import get_catalog, get_custom_repository, get_env_factory, prepare_environment
+from app.agents import (
+    AgentCatalog,
+    AgentInfo,
+    AgentResult,
+    BaseAgent,
+    DoneEvent,
+    builtin_names,
+    describe,
+)
+from app.api.deps import (
+    get_attachment_repository,
+    get_catalog,
+    get_conversation_repository,
+    get_custom_repository,
+    get_env_factory,
+    prepare_environment,
+)
 from app.api.errors import ErrorResponse, app_error_body, llm_error_body
 from app.core.llm import LLMError, LLMRouter, Message, ProviderName, ToolUseBlock, get_llm_router
-from app.db.repository import CustomAgentRepository
+from app.core.llm.attachments import AttachmentContent, referenced_ids
+from app.core.llm.types import ImageBlock
+from app.db.attachments import AttachmentRepository
+from app.db.conversations import ConversationRepository
+from app.db.repository import CustomAgentRepository, StorageError
 from app.schemas.agents import (
     ICONS,
     CustomAgentCreate,
@@ -26,11 +47,63 @@ from app.tools.http import AppError
 from app.tools.toolsets import ToolsetInfo, describe_toolsets
 
 router = APIRouter(prefix="/api", tags=["agents"])
+logger = logging.getLogger(__name__)
 
 LLMDep = Annotated[LLMRouter, Depends(get_llm_router)]
 CatalogDep = Annotated[AgentCatalog, Depends(get_catalog)]
 EnvFactoryDep = Annotated[Callable[[], ToolEnvironment], Depends(get_env_factory)]
 RepoDep = Annotated[CustomAgentRepository, Depends(get_custom_repository)]
+ConvDep = Annotated[ConversationRepository, Depends(get_conversation_repository)]
+FilesDep = Annotated[AttachmentRepository, Depends(get_attachment_repository)]
+
+
+async def _attachments(
+    body: AgentRunRequest, files: AttachmentRepository
+) -> dict[str, AttachmentContent]:
+    """Contenu des pièces jointes citées par la conversation (503 si la base ne répond pas)."""
+    ids = referenced_ids(body.messages)
+    if not ids:
+        return {}
+    try:
+        return await files.contents(ids)
+    except StorageError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"Pièces jointes indisponibles : {exc}"
+        ) from exc
+
+
+async def _check_conversation(
+    body: AgentRunRequest, agent_name: str, conversations: ConversationRepository
+) -> bool:
+    """Vrai si le tour doit être enregistré. 404 / 409 si la conversation ne colle pas."""
+    if not body.conversation_id:
+        return False
+    try:
+        owner = await conversations.agent_of(body.conversation_id)
+    except StorageError as exc:
+        logger.warning("Historique indisponible, tour non enregistré : %s", exc)
+        return False
+    if owner is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation introuvable.")
+    if owner != agent_name:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"Cette conversation appartient à l'agent « {owner} »."
+        )
+    return True
+
+
+async def _save(
+    conversations: ConversationRepository, body: AgentRunRequest, result: AgentResult
+) -> str | None:
+    """Enregistre le tour ; renvoie un message d'erreur lisible en cas d'échec."""
+    assert body.conversation_id
+    try:
+        await conversations.save_turn(body.conversation_id, list(body.messages), result)
+        return None
+    except StorageError as exc:
+        logger.warning("Tour non enregistré : %s", exc)
+        return str(exc)
+
 
 _ERRORS: dict[int | str, dict[str, Any]] = {
     403: {
@@ -59,6 +132,11 @@ class AgentRunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
+        if any(isinstance(b, ImageBlock) for m in self.messages for b in m.content):
+            raise ValueError(
+                "Les images se joignent par POST /api/attachments, puis un bloc "
+                "« attachment » qui les cite."
+            )
         last = self.messages[-1]
         if last.role == "user":
             return self
@@ -124,19 +202,27 @@ async def run_agent(
     llm: LLMDep,
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
+    conversations: ConvDep,
+    files: FilesDep,
 ) -> AgentResult:
+    save = await _check_conversation(body, agent_name, conversations)
+    attachments = await _attachments(body, files)
     env = make_env()
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
-        return await agent.run(
+        result = await agent.run(
             body.messages,
             provider=body.provider,
             model=body.model,
             context=ToolContext(conversation_id=body.conversation_id),
             approvals=body.approvals,
+            attachments=attachments,
         )
     finally:
         await env.aclose()
+    if save:
+        await _save(conversations, body, result)
+    return result
 
 
 @router.post("/agents/{agent_name}/stream", responses=_ERRORS)
@@ -146,9 +232,14 @@ async def stream_agent(
     llm: LLMDep,
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
+    conversations: ConvDep,
+    files: FilesDep,
 ) -> EventSourceResponse:
     """Flux SSE. Événements : `text_delta`, `tool_call`, `tool_result`, `artifact`,
-    `approval_required`, `done` (résultat final) ou `error`. Le champ `data` est du JSON."""
+    `approval_required`, `done` (résultat final), `saved` / `save_error` (historique) ou
+    `error`. Le champ `data` est du JSON."""
+    save = await _check_conversation(body, agent_name, conversations)
+    attachments = await _attachments(body, files)
     env = make_env()
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
@@ -164,8 +255,18 @@ async def stream_agent(
                 model=body.model,
                 context=ToolContext(conversation_id=body.conversation_id),
                 approvals=body.approvals,
+                attachments=attachments,
             ):
                 yield {"event": event.type, "data": event.model_dump_json()}
+                if save and isinstance(event, DoneEvent):
+                    problem = await _save(conversations, body, event.result)
+                    if problem:
+                        yield {"event": "save_error", "data": json.dumps({"message": problem})}
+                    else:
+                        yield {
+                            "event": "saved",
+                            "data": json.dumps({"conversation_id": body.conversation_id}),
+                        }
         except LLMError as exc:
             _, error = llm_error_body(exc)
             yield {"event": "error", "data": error.model_dump_json()}

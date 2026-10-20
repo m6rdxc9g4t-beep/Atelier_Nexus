@@ -15,13 +15,13 @@ AGENT_NAME = r"^[a-z][a-z0-9_]{2,40}$"
 ICONS = (
     "bot", "sparkles", "network", "chart-column", "list-checks", "code", "landmark", "receipt",
     "megaphone", "pen-line", "briefcase", "scale", "users", "lightbulb", "graduation-cap",
-    "clapperboard", "headset", "shield-check", "calendar-check", "table-2",
+    "clapperboard", "headset", "shield-check", "calendar-check", "table-2", "cooking-pot",
 )  # fmt: skip
 
 Icon = Literal[
     "bot", "sparkles", "network", "chart-column", "list-checks", "code", "landmark", "receipt",
     "megaphone", "pen-line", "briefcase", "scale", "users", "lightbulb", "graduation-cap",
-    "clapperboard", "headset", "shield-check", "calendar-check", "table-2",
+    "clapperboard", "headset", "shield-check", "calendar-check", "table-2", "cooking-pot",
 ]  # fmt: skip
 
 

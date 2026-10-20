@@ -8,6 +8,8 @@ from functools import lru_cache
 from app.agents import AgentCatalog
 from app.core.config import get_settings
 from app.core.llm.router import LLMRouter
+from app.db.attachments import AttachmentRepository
+from app.db.conversations import ConversationRepository
 from app.db.repository import CustomAgentRepository
 from app.db.session import get_sessionmaker
 from app.tools.environment import ToolEnvironment
@@ -16,6 +18,16 @@ from app.tools.environment import ToolEnvironment
 @lru_cache
 def get_custom_repository() -> CustomAgentRepository:
     return CustomAgentRepository(get_sessionmaker())
+
+
+@lru_cache
+def get_conversation_repository() -> ConversationRepository:
+    return ConversationRepository(get_sessionmaker())
+
+
+@lru_cache
+def get_attachment_repository() -> AttachmentRepository:
+    return AttachmentRepository(get_sessionmaker())
 
 
 def get_catalog() -> AgentCatalog:

@@ -43,4 +43,17 @@ describe("useArtifactStore", () => {
     expect(state.selectedId).toBeNull();
     expect(state.panelOpen).toBe(false);
   });
+
+  it("remplace les artefacts d'un seul agent quand on change de conversation", () => {
+    const { add, replaceForAgent } = useArtifactStore.getState();
+    add(sample("Autre agent"), "data_analyst");
+    const old = add(sample("Ancien"), "assistant");
+    replaceForAgent("assistant", [
+      { ...sample("Rouvert"), id: "srv_1", agent: "assistant", createdAt: 1 },
+    ]);
+    const state = useArtifactStore.getState();
+    expect(state.artifacts.map((a) => a.title)).toEqual(["Rouvert", "Autre agent"]);
+    expect(state.artifacts.some((a) => a.id === old.id)).toBe(false);
+    expect(state.selectedId).toBe("srv_1");
+  });
 });

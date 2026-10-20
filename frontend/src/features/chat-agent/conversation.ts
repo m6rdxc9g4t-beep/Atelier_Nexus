@@ -3,7 +3,15 @@
  * sur l'état affiché. Sans React ni réseau, donc testable (conversation.test.ts).
  */
 
-import type { AgentEvent, AgentResult, Message, PendingCall } from "@/types/api";
+import type {
+  AgentEvent,
+  AgentResult,
+  AttachmentBlock,
+  ContentBlock,
+  ConversationDetail,
+  Message,
+  PendingCall,
+} from "@/types/api";
 
 export interface ToolCallPart {
   kind: "tool";
@@ -34,7 +42,13 @@ export interface ApprovalPart {
   submitted: boolean;
 }
 
-export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart;
+/** Fichier joint à un message de l'utilisateur. */
+export interface AttachmentPart {
+  kind: "attachment";
+  attachment: AttachmentBlock;
+}
+
+export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart | AttachmentPart;
 
 export interface ChatTurn {
   id: string;
@@ -56,15 +70,15 @@ export const emptyConversation = (): Conversation => ({ turns: [], history: [] }
 let seq = 0;
 export const turnId = () => `t_${Date.now().toString(36)}_${(seq++).toString(36)}`;
 
-export function addUserTurn(conv: Conversation, text: string): Conversation {
-  const message: Message = { role: "user", content: [{ type: "text", text }] };
+/** Pièces jointes d'abord (le modèle lit le fichier avant la question), puis le texte. */
+export function addUserTurn(conv: Conversation, text: string, attachments: AttachmentBlock[] = []): Conversation {
+  const content: ContentBlock[] = [...attachments];
+  if (text) content.push({ type: "text", text });
+  const parts: Part[] = attachments.map((attachment) => ({ kind: "attachment", attachment }));
+  if (text) parts.push({ kind: "text", text });
   return {
-    turns: [
-      ...conv.turns,
-      { id: turnId(), role: "user", parts: [{ kind: "text", text }] },
-      { id: turnId(), role: "assistant", parts: [] },
-    ],
-    history: [...conv.history, message],
+    turns: [...conv.turns, { id: turnId(), role: "user", parts }, { id: turnId(), role: "assistant", parts: [] }],
+    history: [...conv.history, { role: "user", content }],
   };
 }
 
@@ -138,6 +152,10 @@ export function applyEvent(
 
     case "error":
       return failLastTurn(conv, event.message);
+
+    case "saved":
+    case "save_error":
+      return conv; // gérés par le store (historique), sans effet sur l'affichage
   }
 }
 
@@ -178,4 +196,87 @@ export function submitApprovals(
     ),
   }));
   return { conv: next, approvals };
+}
+
+/**
+ * Reconstruit l'affichage d'une conversation enregistrée.
+ * Un tour assistant va d'une question de l'utilisateur à la suivante ; les résultats d'outils
+ * (messages `user` sans texte) complètent les appels du tour en cours.
+ * `artifactIds` : identifiant serveur → identifiant dans le store d'artefacts.
+ */
+export function fromStored(detail: ConversationDetail, artifactIds: Record<string, string>): Conversation {
+  const turns: ChatTurn[] = [];
+  let current: ChatTurn | null = null;
+  const toolParts = new Map<string, ToolCallPart>();
+  let lastAssistantIndex: Record<string, number> = {};
+
+  detail.history.forEach((message, index) => {
+    const results = message.content.filter((b) => b.type === "tool_result");
+    if (message.role === "user" && results.length === 0) {
+      const parts: Part[] = [];
+      for (const b of message.content) {
+        if (b.type === "attachment") parts.push({ kind: "attachment", attachment: b });
+        else if (b.type === "text") parts.push({ kind: "text", text: b.text });
+      }
+      turns.push({ id: turnId(), role: "user", parts });
+      current = null;
+      return;
+    }
+    if (message.role === "user") {
+      for (const r of results) {
+        const part = toolParts.get(r.tool_use_id);
+        if (part) {
+          part.status = r.is_error ? "error" : "done";
+          part.result = r.content;
+        }
+      }
+      return;
+    }
+    if (!current) {
+      current = { id: turnId(), role: "assistant", parts: [] };
+      turns.push(current);
+    }
+    for (const block of message.content) {
+      if (block.type === "text" && block.text) current.parts.push({ kind: "text", text: block.text });
+      if (block.type === "tool_use") {
+        const part: ToolCallPart = { kind: "tool", id: block.id, name: block.name, input: block.input, status: "running" };
+        toolParts.set(block.id, part);
+        current.parts.push(part);
+      }
+    }
+    lastAssistantIndex = { ...lastAssistantIndex, [current.id]: index };
+  });
+
+  // Méta et artefacts rattachés à la fin de chaque tour assistant
+  for (const turn of turns) {
+    const end = lastAssistantIndex[turn.id];
+    if (end === undefined) continue;
+    const meta = detail.turn_meta[String(end)];
+    if (meta) {
+      const { provider, model, usage, stop_reason, iterations } = meta;
+      turn.meta = { provider, model, usage, stop_reason, iterations };
+    }
+  }
+  for (const artifact of detail.artifacts) {
+    const owner = [...turns]
+      .reverse()
+      .find((t) => t.role === "assistant" && (lastAssistantIndex[t.id] ?? Infinity) < artifact.position);
+    const id = artifactIds[artifact.id];
+    if (owner && id) owner.parts.push({ kind: "artifact", artifactId: id, title: artifact.title });
+  }
+
+  // Validations restées en attente à la fin du dernier tour
+  const last = turns.at(-1);
+  if (detail.pending_approvals.length && last?.role === "assistant") {
+    last.parts.push({ kind: "approval", calls: detail.pending_approvals, decisions: {}, submitted: false });
+  }
+  // Appels sans résultat : en attente de validation (exécutés à la reprise, donc masqués comme
+  // dans le flux en direct), sinon tour interrompu (affichés en erreur, jamais « en cours »).
+  const waiting = detail.pending_approvals.length > 0;
+  for (const turn of turns) {
+    turn.parts = turn.parts.filter((p) => !(waiting && p.kind === "tool" && p.status === "running"));
+    for (const p of turn.parts) if (p.kind === "tool" && p.status === "running") p.status = "error";
+  }
+
+  return { turns, history: detail.history };
 }

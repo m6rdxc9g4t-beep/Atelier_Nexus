@@ -19,11 +19,11 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 
 ## 2. Design system de la suite
 
-- `src/styles/atelier-ds/{light,dark,colors}.css` et `src/styles/atelier-brand/` : **copies verbatim** d'`Atelier_Projets/design-system` (SUITE.md §1.1). Ne jamais les modifier ici ; `designSystem.test.ts` vérifie les 6 variables de fondation et les 15 couleurs officielles.
-- `globals.css` dérive les jetons Shadcn de ces variables (`--primary` = `--type-epic`, fonds, textes, bordures, statuts). Aucun nouveau code hex.
+- `src/styles/atelier-ds/{light,dark,colors}.css` et `src/styles/brand/` (marque, police Nunito et sa licence) : **copies verbatim** d'`Atelier_Projets/design-system` (SUITE.md §1.1). Ne jamais les modifier ici ; `designSystem.test.ts` vérifie les 6 variables de fondation, les 15 couleurs officielles et le branchement sur la charte.
+- Charte « néon monochrome » : toute l'app est dans l'orange de Nexus (`#E8590C`, `data-atelier-app="nexus"` sur `<html>`). `globals.css` branche les jetons Shadcn sur les jetons `--atelier-*` de `brand/atelier-brand.css` (fond, surfaces, texte, bordures, accent, focus), qui changent seuls entre clair et sombre ; fond de page `background: var(--atelier-backdrop), var(--atelier-bg)` fixé. Cartes, panneaux, en-tête : `border-atelier-border` + `shadow-glow` ; modales et menus : `shadow-glow-strong` ; entrée active : `.atelier-nav-active`. Les statuts (`--destructive`, `--success`, `--warning`) et les séries de graphiques gardent leurs couleurs. Aucun code hex dans `globals.css`.
 - Polices : pile système ; la police Nunito embarquée ne sert qu'à la marque. Aucune ressource externe (pas de Google Fonts).
-- Thème : Clair / Sombre / Système, classe `dark` **et** `data-theme` sur `<html>`, clé `atelier-nexus:theme` ; script de démarrage anti-flash dans `layout.tsx`.
-- Marque `atelier_Nexus` (icône Lucide `network`) + fenêtre « À propos », sélecteur « Suite Atelier » avec état des API (Nexus, Viz, Tab, Projets, Trésorerie).
+- Thème : Clair / Sombre / Système (`src/components/theme/`), dans l'en-tête et dans Réglages › Apparence ; classe `dark` **et** `data-theme` sur `<html>`, clé `atelier-nexus-theme` (l'ancienne `atelier-nexus:theme` est reprise) ; script de démarrage anti-flash dans `layout.tsx`.
+- Marque `atelier_Nexus` (icône Lucide `network`) + fenêtre « À propos », sélecteur « Suite Atelier » avec état des API (Nexus, Viz, Tab, Projets, Trésorerie, Ciné, Savoir) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
 
 ## 3. Code
 

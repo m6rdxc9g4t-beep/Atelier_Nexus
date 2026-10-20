@@ -7,11 +7,16 @@ import type {
   AgentRunRequest,
   ApiErrorBody,
   AppStatus,
+  AttachmentInfo,
+  ConversationDetail,
+  ConversationSummary,
   CustomAgentDefinition,
   CustomAgentFields,
   DataViaStatus,
   EditorOptions,
   ProviderStatus,
+  SearchHit,
+  SettingsView,
 } from "@/types/api";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100").replace(
@@ -24,6 +29,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code: string,
+    /** Message par champ (réglages refusés). */
+    readonly fields: Record<string, string> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -33,7 +40,8 @@ export class ApiError extends Error {
 async function toApiError(response: Response): Promise<ApiError> {
   try {
     const body = (await response.json()) as Partial<ApiErrorBody> & { detail?: unknown };
-    if (body.error) return new ApiError(body.error.message, response.status, body.error.code);
+    if (body.error)
+      return new ApiError(body.error.message, response.status, body.error.code, body.error.fields ?? {});
     if (typeof body.detail === "string") return new ApiError(body.detail, response.status, "http");
     if (Array.isArray(body.detail)) {
       // Erreurs de validation FastAPI : « champ : message »
@@ -71,7 +79,18 @@ const sendJson = <T>(method: string, path: string, body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
+/** Adresse du fichier joint (image affichée, autre fichier téléchargé). */
+export const attachmentUrl = (id: string) => `${API_URL}/api/attachments/${encodeURIComponent(id)}/content`;
+
 export const api = {
+  /** Importe un fichier joint (texte extrait et image réduite côté serveur). */
+  uploadAttachment: (file: File, signal?: AbortSignal) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    return getJson<AttachmentInfo>("/api/attachments", signal, { method: "POST", body: form });
+  },
+  /** Retire un fichier joint pas encore envoyé. */
+  removeAttachment: (id: string) => sendJson<void>("DELETE", `/api/attachments/${encodeURIComponent(id)}`),
   agents: (signal?: AbortSignal) => getJson<AgentInfo[]>("/api/agents", signal),
   providers: (signal?: AbortSignal) => getJson<ProviderStatus[]>("/api/llm/providers", signal),
   dataViaStatus: (signal?: AbortSignal) => getJson<DataViaStatus>("/api/data-via/status", signal),
@@ -85,6 +104,25 @@ export const api = {
     sendJson<AgentInfo>("PUT", `/api/custom-agents/${encodeURIComponent(name)}`, body),
   deleteAgent: (name: string) =>
     sendJson<void>("DELETE", `/api/custom-agents/${encodeURIComponent(name)}`),
+  conversations: (agent: string, signal?: AbortSignal) =>
+    getJson<ConversationSummary[]>(`/api/conversations?agent=${encodeURIComponent(agent)}`, signal),
+  conversation: (id: string) =>
+    getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`),
+  /** Recherche (titre, messages, artefacts) ; `agent` null = tous les agents. */
+  searchConversations: (query: string, agent: string | null, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ q: query });
+    if (agent) params.set("agent", agent);
+    return getJson<SearchHit[]>(`/api/conversations/search?${params.toString()}`, signal);
+  },
+  createConversation: (agent: string) =>
+    sendJson<ConversationDetail>("POST", "/api/conversations", { agent }),
+  renameConversation: (id: string, title: string) =>
+    sendJson<ConversationDetail>("PATCH", `/api/conversations/${encodeURIComponent(id)}`, { title }),
+  deleteConversation: (id: string) =>
+    sendJson<void>("DELETE", `/api/conversations/${encodeURIComponent(id)}`),
+  settings: (signal?: AbortSignal) => getJson<SettingsView>("/api/settings", signal),
+  updateSettings: (values: Record<string, string | null>) =>
+    sendJson<SettingsView>("PUT", "/api/settings", { values }),
 };
 
 /**

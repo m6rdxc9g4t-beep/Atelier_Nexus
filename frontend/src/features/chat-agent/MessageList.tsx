@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 
 import { ApprovalCard } from "./ApprovalCard";
+import { MessageAttachments } from "./AttachmentView";
 import type { ChatTurn } from "./conversation";
 import { Markdown } from "./Markdown";
 import { ToolCall } from "./ToolCall";
@@ -33,11 +34,16 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
       {turns.map((turn, index) => {
         const last = index === turns.length - 1;
         if (turn.role === "user") {
+          const files = turn.parts.flatMap((p) => (p.kind === "attachment" ? [p.attachment] : []));
+          const text = turn.parts.map((p) => (p.kind === "text" ? p.text : "")).join("");
           return (
-            <div key={turn.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-lg rounded-br-sm bg-accent-soft px-3.5 py-2 text-[0.9375rem] whitespace-pre-wrap">
-                {turn.parts.map((p) => (p.kind === "text" ? p.text : null))}
-              </div>
+            <div key={turn.id} className="flex flex-col items-end gap-2">
+              {files.length > 0 && <MessageAttachments items={files} />}
+              {text && (
+                <div className="max-w-[85%] rounded-lg rounded-br-sm border border-atelier-border-soft bg-accent-soft px-3.5 py-2 text-[0.9375rem] whitespace-pre-wrap">
+                  {text}
+                </div>
+              )}
             </div>
           );
         }
@@ -60,11 +66,12 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
             )}
             {turn.parts.map((part, i) => {
               if (part.kind === "text") return <Markdown key={i}>{part.text}</Markdown>;
-              if (part.kind === "tool") return <ToolCall key={part.id} part={part} />;
+              if (part.kind === "tool") return <ToolCall key={`tool-${part.id}`} part={part} />;
+              if (part.kind === "attachment") return null;
               if (part.kind === "approval")
                 return (
                   <ApprovalCard
-                    key={part.calls.map((c) => c.id).join("-")}
+                    key={`approval-${part.calls.map((c) => c.id).join("-")}`}
                     part={part}
                     disabled={streaming}
                     onSubmit={onDecide}
@@ -72,10 +79,10 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
                 );
               return (
                 <button
-                  key={part.artifactId}
+                  key={`artifact-${part.artifactId}`}
                   type="button"
                   onClick={() => select(part.artifactId)}
-                  className="flex w-fit items-center gap-2 rounded-md border border-primary/30 bg-accent-soft px-3 py-2 text-sm text-accent-ink hover:border-primary/60"
+                  className="flex w-fit items-center gap-2 rounded-md border border-atelier-border bg-accent-soft px-3 py-2 text-sm text-accent-ink shadow-glow hover:border-primary"
                 >
                   <PanelRight className="size-4" aria-hidden />
                   <span>{part.title}</span>
