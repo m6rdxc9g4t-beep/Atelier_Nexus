@@ -1,4 +1,4 @@
-# Atelier Agent Hub
+# Atelier Nexus
 
 Hub d'agents IA (Data Analyst / Power BI, Dev, …) pour la suite **Atelier**, avec routage LLM hybride Claude ↔ Ollama.
 Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de dev : [`CLAUDE.md`](CLAUDE.md)

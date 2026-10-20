@@ -1,4 +1,4 @@
-# Atelier Agent Hub — Spécification de contexte
+# Atelier Nexus — Spécification de contexte
 
 > Statut : **squelette initial (Étape 1)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 

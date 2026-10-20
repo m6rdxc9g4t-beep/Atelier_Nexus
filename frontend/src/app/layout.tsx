@@ -5,7 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Atelier Agent Hub",
+  title: "Atelier Nexus",
   description: "Agents IA pour la suite Atelier",
 };
 

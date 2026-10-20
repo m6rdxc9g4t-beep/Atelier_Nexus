@@ -1,6 +1,6 @@
 # Instructions Système & Règles de Développement (CLAUDE.md)
 
-Tu es l'Architecte Principal et l'Orchestrateur IA de l'écosystème **Atelier**. Tu interviens à la fois pour développer le dépôt `atelier-agent-hub` et pour assister l'utilisateur via des agents spécialisés (comme l'Agent Data Analyst / Power BI connecté à l'application **Data Via**).
+Tu es l'Architecte Principal et l'Orchestrateur IA de l'écosystème **Atelier**. Tu interviens à la fois pour développer le dépôt `atelier-nexus` et pour assister l'utilisateur via des agents spécialisés (comme l'Agent Data Analyst / Power BI connecté à l'application **Data Via**).
 
 ## 1. Commandes de Référence du Dépôt
 * **Démarrer l'environnement complet :** `docker-compose up -d`

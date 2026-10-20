@@ -1,4 +1,4 @@
-"""Point d'entrée FastAPI — Atelier Agent Hub."""
+"""Point d'entrée FastAPI — Atelier Nexus."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +9,7 @@ from app.core.config import get_settings
 settings = get_settings()
 
 app = FastAPI(
-    title="Atelier Agent Hub API",
+    title="Atelier Nexus API",
     version="0.1.0",
     description="Orchestration des agents IA et connecteurs de la suite Atelier.",
 )

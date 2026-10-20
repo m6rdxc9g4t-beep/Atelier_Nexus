@@ -1,4 +1,4 @@
-name: atelier-agent-hub
+name: atelier-nexus
 
 services:
   # ─── Frontend : Next.js (sortie standalone) ──────────────────
