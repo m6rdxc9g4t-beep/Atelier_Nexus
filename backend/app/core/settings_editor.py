@@ -42,9 +42,13 @@ class EditableField:
 
 
 FIELDS: tuple[EditableField, ...] = (
+    EditableField("CLAUDE_MODE", "Accès à Claude", "Modèles", "choice",
+                  "Abonnement : le programme claude (Claude Code) de cet ordinateur, connecté à votre compte. "
+                  "Automatique : la clé API si elle est renseignée, sinon l'abonnement.", ("auto", "cli", "api")),
+    EditableField("CLAUDE_CLI_MODEL", "Modèle Claude (abonnement)", "Modèles", "choice", "", ("sonnet", "opus", "haiku")),
     EditableField("ANTHROPIC_API_KEY", "Clé API Claude", "Modèles", "secret",
-                  "console.anthropic.com → API Keys. Sans clé, seuls les modèles locaux (Ollama) répondent."),
-    EditableField("ANTHROPIC_MODEL", "Modèle Claude", "Modèles", "text"),
+                  "Seulement sans abonnement : console.anthropic.com → API Keys (facturé à l'usage)."),
+    EditableField("ANTHROPIC_MODEL", "Modèle Claude (clé API)", "Modèles", "text"),
     EditableField("OLLAMA_BASE_URL", "Adresse d'Ollama", "Modèles", "url"),
     EditableField("OLLAMA_MODEL", "Modèle local (Ollama)", "Modèles", "text",
                   "Doit être installé : ollama pull <modèle>."),

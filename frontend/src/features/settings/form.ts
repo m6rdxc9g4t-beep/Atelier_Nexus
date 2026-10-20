@@ -49,4 +49,10 @@ export const CHOICE_LABELS: Record<string, string> = {
   "": "Aucun",
   anthropic: "Claude",
   ollama: "Ollama (local)",
+  auto: "Automatique (recommandé)",
+  cli: "Abonnement Claude (Claude Code)",
+  api: "Clé API Anthropic",
+  sonnet: "Sonnet (recommandé)",
+  opus: "Opus (le plus performant, plus lent)",
+  haiku: "Haiku (le plus rapide)",
 };

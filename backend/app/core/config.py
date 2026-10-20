@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Provider de secours en cas de panne transitoire du provider demandé
     llm_fallback_provider: Literal["anthropic", "ollama"] | None = None
     anthropic_api_key: SecretStr | None = None
+    # Accès à Claude : clé API, ou abonnement Claude par Claude Code (`claude -p`, sans clé).
+    # auto = la clé si elle est définie, sinon Claude Code s'il est installé.
+    claude_mode: Literal["auto", "api", "cli"] = "auto"
+    claude_cli_model: str = "sonnet"
+    #: Chemin de `claude` si introuvable automatiquement (jamais modifiable depuis l'interface)
+    claude_cli_path: str | None = None
+    claude_cli_timeout: float = Field(default=300.0, gt=0, le=1800)
     anthropic_model: str = "claude-sonnet-5-5"
     anthropic_timeout: float = 120.0
     ollama_base_url: str = "http://localhost:11434"
@@ -71,6 +78,7 @@ class Settings(BaseSettings):
     @field_validator(
         "llm_fallback_provider",
         "anthropic_api_key",
+        "claude_cli_path",
         "data_via_base_url",
         "data_via_api_key",
         "projets_base_url",

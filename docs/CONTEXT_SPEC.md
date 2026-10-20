@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 11 (réglages dans l'interface)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 12 (Claude par l'abonnement)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -49,6 +49,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 9 | Application de bureau macOS « Atelier Nexus.app » : fenêtre native, installation de Python au premier lancement, données dans Application Support → [`desktop.md`](desktop.md) | ✅ |
 | 10 | Pont Atelier Tab → Atelier Projets : aperçu puis import idempotent d'une table en éléments → [`apps/tab.md`](apps/tab.md) | ✅ |
 | 11 | Réglages dans l'interface (clé Claude, modèles, apps, GitHub), rechargement à chaud et vérification → [`settings.md`](settings.md) | ✅ |
+| 12 | Claude par l'abonnement (Claude Code, `claude -p`) sans clé API, outils des agents conservés → [`claude-code.md`](claude-code.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
