@@ -1,9 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Marque commune Atelier (copie exacte de Atelier_Projets/design-system/brand/, ne pas éditer ici).
+   Couche « components » : les utilitaires Tailwind gardent la main sur la marque. */
+@import "../styles/brand/atelier-brand.css" layer(components);
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Design tokens Atelier (base Shadcn « neutral ») ─────────── */
+/* ─── Design tokens Atelier (base Shadcn « neutral ») ─────────────
+   Charte « néon holographique 3D » : base cyan commune (--atelier-neon), couleur
+   signature Nexus (orange #E8590C via data-atelier-app="nexus" sur <html>).
+   L'application s'affiche en thème sombre (classe .dark + data-theme="dark"
+   posées dans layout.tsx) : c'est la face néon de la charte. Les jetons clairs
+   restent cohérents (sobres, sans halo) pour un futur sélecteur de thème. */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -12,18 +20,22 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* Accent = couleur signature de l'app (bouton principal, éléments actifs). */
+  --primary: var(--atelier-signature);
+  --primary-foreground: var(--atelier-signature-contrast);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Survol / entrée active : fond signature léger, texte signature mêlé au texte (lisible sur clair). */
+  --accent: var(--atelier-signature-soft);
+  --accent-foreground: color-mix(in oklab, var(--atelier-signature) 62%, var(--foreground));
+  --signature-text: color-mix(in oklab, var(--atelier-signature) 62%, var(--foreground));
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Anneau de focus : cyan commun de la suite. */
+  --ring: var(--atelier-neon);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -31,46 +43,50 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-primary: var(--atelier-signature);
+  --sidebar-primary-foreground: var(--atelier-signature-contrast);
+  --sidebar-accent: var(--atelier-signature-soft);
+  --sidebar-accent-foreground: color-mix(in oklab, var(--atelier-signature) 62%, var(--sidebar-foreground));
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: var(--atelier-neon);
 }
 
+/* Thème sombre = expression néon : fond bleu nuit, bordures teintées de cyan
+   (valeurs de référence de la charte : dark.css du design system Atelier). */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  color-scheme: dark;
+  --background: #06111f;
+  --foreground: #e6f7ff;
+  --card: #0a1b2e;
+  --card-foreground: #e6f7ff;
+  --popover: #10283f;
+  --popover-foreground: #e6f7ff;
+  --primary: var(--atelier-signature);
+  --primary-foreground: var(--atelier-signature-contrast);
+  --secondary: #10283f;
+  --secondary-foreground: #e6f7ff;
+  --muted: #10283f;
+  --muted-foreground: #8db4cc;
+  --accent: var(--atelier-signature-soft);
+  --accent-foreground: var(--atelier-signature-light);
+  --signature-text: var(--atelier-signature-light);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: #17405c;
+  --input: #17405c;
+  --ring: var(--atelier-neon);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #0a1b2e;
+  --sidebar-foreground: #e6f7ff;
+  --sidebar-primary: var(--atelier-signature);
+  --sidebar-primary-foreground: var(--atelier-signature-contrast);
+  --sidebar-accent: var(--atelier-signature-soft);
+  --sidebar-accent-foreground: var(--atelier-signature-light);
+  --sidebar-border: #17405c;
+  --sidebar-ring: var(--atelier-neon);
 }
 
 @theme inline {
@@ -111,6 +127,18 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Charte néon : utilitaires text-signature, bg-signature-soft, ring-neon,
+     shadow-glow (cartes, panneaux), shadow-glow-strong (modales, menus, sélection),
+     shadow-signature-glow (survol du bouton principal), text-shadow-glow (titres) ;
+     reflet de verre : bg-(image:--atelier-glass). */
+  --color-signature: var(--atelier-signature);
+  --color-signature-soft: var(--atelier-signature-soft);
+  --color-signature-text: var(--signature-text);
+  --color-neon: var(--atelier-neon);
+  --shadow-glow: var(--atelier-glow);
+  --shadow-glow-strong: var(--atelier-glow-strong);
+  --shadow-signature-glow: var(--atelier-signature-glow);
+  --text-shadow-glow: var(--atelier-text-glow);
 }
 
 @layer base {
@@ -119,5 +147,14 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Fond de page néon : léger halo cyan en haut (aucun effet en thème clair). */
+  .dark body {
+    background-image: radial-gradient(
+      120% 60% at 50% -10%,
+      color-mix(in oklab, var(--atelier-neon) 10%, transparent),
+      transparent 60%
+    );
+    background-attachment: fixed;
   }
 }

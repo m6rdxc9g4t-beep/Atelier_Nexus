@@ -11,9 +11,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // Thème unique de l'app : le sombre néon de la charte Atelier
+    // (.dark pour les variantes Tailwind/Shadcn, data-theme pour les effets néon de atelier-brand.css).
+    // data-atelier-app pose la couleur signature de Nexus (orange #E8590C).
     <html
       lang="fr"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      data-atelier-app="nexus"
+      data-theme="dark"
+      className={`${GeistSans.variable} ${GeistMono.variable} dark h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
