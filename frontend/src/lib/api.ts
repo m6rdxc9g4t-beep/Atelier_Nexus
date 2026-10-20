@@ -7,6 +7,7 @@ import type {
   AgentRunRequest,
   ApiErrorBody,
   AppStatus,
+  AttachmentInfo,
   ConversationDetail,
   ConversationSummary,
   CustomAgentDefinition,
@@ -14,6 +15,7 @@ import type {
   DataViaStatus,
   EditorOptions,
   ProviderStatus,
+  SearchHit,
   SettingsView,
 } from "@/types/api";
 
@@ -77,7 +79,18 @@ const sendJson = <T>(method: string, path: string, body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
+/** Adresse du fichier joint (image affichée, autre fichier téléchargé). */
+export const attachmentUrl = (id: string) => `${API_URL}/api/attachments/${encodeURIComponent(id)}/content`;
+
 export const api = {
+  /** Importe un fichier joint (texte extrait et image réduite côté serveur). */
+  uploadAttachment: (file: File, signal?: AbortSignal) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    return getJson<AttachmentInfo>("/api/attachments", signal, { method: "POST", body: form });
+  },
+  /** Retire un fichier joint pas encore envoyé. */
+  removeAttachment: (id: string) => sendJson<void>("DELETE", `/api/attachments/${encodeURIComponent(id)}`),
   agents: (signal?: AbortSignal) => getJson<AgentInfo[]>("/api/agents", signal),
   providers: (signal?: AbortSignal) => getJson<ProviderStatus[]>("/api/llm/providers", signal),
   dataViaStatus: (signal?: AbortSignal) => getJson<DataViaStatus>("/api/data-via/status", signal),
@@ -95,6 +108,12 @@ export const api = {
     getJson<ConversationSummary[]>(`/api/conversations?agent=${encodeURIComponent(agent)}`, signal),
   conversation: (id: string) =>
     getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`),
+  /** Recherche (titre, messages, artefacts) ; `agent` null = tous les agents. */
+  searchConversations: (query: string, agent: string | null, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ q: query });
+    if (agent) params.set("agent", agent);
+    return getJson<SearchHit[]>(`/api/conversations/search?${params.toString()}`, signal);
+  },
   createConversation: (agent: string) =>
     sendJson<ConversationDetail>("POST", "/api/conversations", { agent }),
   renameConversation: (id: string, title: string) =>

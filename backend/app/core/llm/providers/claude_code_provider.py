@@ -31,7 +31,9 @@ from typing import Any
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.types import (
+    AttachmentBlock,
     ContentBlock,
+    ImageBlock,
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
@@ -140,11 +142,16 @@ def system_prompt(request: LLMRequest) -> str:
     return "\n".join(parts)
 
 
-def transcript(messages: Sequence[Message]) -> str:
-    out: list[str] = []
+def transcript_parts(messages: Sequence[Message]) -> list[str | ImageBlock]:
+    """La conversation en sections de texte, images à leur place (pour l'entrée stream-json)."""
+    out: list[str | ImageBlock] = []
     for message in messages:
         for block in message.content:
-            if isinstance(block, TextBlock) and block.text.strip():
+            if isinstance(block, ImageBlock):
+                out.append(block)
+            elif isinstance(block, AttachmentBlock):
+                out.append(f"## Utilisateur\n[Pièce jointe « {block.name} » non chargée.]")
+            elif isinstance(block, TextBlock) and block.text.strip():
                 who = "Utilisateur" if message.role == "user" else "Assistant"
                 out.append(f"## {who}\n{block.text.strip()}")
             elif isinstance(block, ToolUseBlock):
@@ -160,7 +167,50 @@ def transcript(messages: Sequence[Message]) -> str:
                 out.append(
                     f"## Résultat de `{block.tool_name}` (id {block.tool_use_id}){flag}\n{content}"
                 )
-    return "\n\n".join(out)
+    return out
+
+
+def transcript(messages: Sequence[Message]) -> str:
+    return "\n\n".join(p for p in transcript_parts(messages) if isinstance(p, str))
+
+
+def stream_json_input(messages: Sequence[Message]) -> str:
+    """Conversation avec images : un message utilisateur au format stream-json de Claude Code
+    (sections de texte et images dans l'ordre)."""
+    content: list[dict[str, Any]] = []
+    pending: list[str] = []
+
+    def flush() -> None:
+        if pending:
+            content.append({"type": "text", "text": "\n\n".join(pending)})
+            pending.clear()
+
+    for part in transcript_parts(messages):
+        if isinstance(part, ImageBlock):
+            flush()
+            content.append(
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": part.media_type, "data": part.data},
+                }
+            )
+        else:
+            pending.append(part)
+    flush()
+    line = {"type": "user", "message": {"role": "user", "content": content}}
+    return json.dumps(line, ensure_ascii=False) + "\n"
+
+
+def result_line(stdout: str) -> str:
+    """Sortie stream-json : la dernière ligne `result` (même forme que --output-format json)."""
+    for line in reversed(stdout.strip().splitlines()):
+        try:
+            payload = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and payload.get("type") == "result":
+            return line
+    return ""
 
 
 def parse_arguments(raw: Any) -> dict[str, Any]:
@@ -281,7 +331,18 @@ class ClaudeCodeProvider(LLMProvider):
             "--disable-slash-commands",
             "--no-session-persistence",
         ]  # fmt: skip
-        code, stdout, stderr = await self._exec(args, transcript(request.messages), self.timeout)
+        if any(isinstance(b, ImageBlock) for m in request.messages for b in m.content):
+            # Images : entrée stream-json (le texte simple ne peut pas les porter)
+            i = args.index("--output-format")
+            args[i + 1 : i + 2] = ["stream-json", "--verbose", "--input-format", "stream-json"]
+            code, stdout, stderr = await self._exec(
+                args, stream_json_input(request.messages), self.timeout
+            )
+            stdout = result_line(stdout) or stdout[-2000:]
+        else:
+            code, stdout, stderr = await self._exec(
+                args, transcript(request.messages), self.timeout
+            )
         return self._extract(code, stdout, stderr, model)
 
     def _extract(self, code: int, stdout: str, stderr: str, model: str) -> LLMResponse:

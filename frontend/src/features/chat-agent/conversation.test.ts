@@ -24,6 +24,25 @@ describe("conversation", () => {
     expect(conv.history).toEqual([{ role: "user", content: [{ type: "text", text: "Bonjour" }] }]);
   });
 
+  it("joint les fichiers avant le texte, ou seuls", () => {
+    const file = {
+      type: "attachment" as const,
+      id: "a".repeat(32),
+      name: "contrat.pdf",
+      media_type: "application/pdf",
+      kind: "document" as const,
+      size: 120,
+    };
+    const conv = addUserTurn(emptyConversation(), "Résume", [file]);
+    expect(conv.history[0]?.content).toEqual([file, { type: "text", text: "Résume" }]);
+    expect(conv.turns[0]?.parts).toEqual([
+      { kind: "attachment", attachment: file },
+      { kind: "text", text: "Résume" },
+    ]);
+    const alone = addUserTurn(emptyConversation(), "", [file]);
+    expect(alone.history[0]?.content).toEqual([file]);
+  });
+
   it("concatène les deltas de texte dans la même partie", () => {
     let conv = addUserTurn(emptyConversation(), "?");
     conv = applyEvent(conv, { type: "text_delta", text: "Bon" });

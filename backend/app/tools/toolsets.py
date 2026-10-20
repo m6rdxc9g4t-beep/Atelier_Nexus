@@ -17,6 +17,7 @@ from app.core.config import Settings
 from app.tools.artifacts import PublishArtifactTool
 from app.tools.base import BaseTool
 from app.tools.cine import cine_read_tools, cine_write_tools
+from app.tools.cuisine import cuisine_budget_tools, cuisine_tools
 from app.tools.data_via import DataViaNotConfiguredError, data_via_tools
 from app.tools.environment import ToolEnvironment
 from app.tools.github import github_read_tools, github_write_tools
@@ -283,6 +284,27 @@ register_toolset(
         app="savoir",
         sensitive=True,
         writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="cuisine",
+        label="Atelier Cuisine",
+        description="Stock du foyer (ce qui presse d'abord), planning des repas et liste de courses, en lecture. App en ligne (Supabase).",
+        build=lambda env: cuisine_tools(env.cuisine()),
+        is_configured=lambda s: s.cuisine_configured,
+        app="cuisine",
+    )
+)
+register_toolset(
+    Toolset(
+        id="cuisine_budget",
+        label="Atelier Cuisine — budget",
+        description="Dépenses du mois par périmètre, plafonds, tickets de caisse, en lecture. Données financières : modèle local imposé.",
+        build=lambda env: cuisine_budget_tools(env.cuisine()),
+        is_configured=lambda s: s.cuisine_configured,
+        app="cuisine",
+        sensitive=True,
     )
 )
 register_toolset(

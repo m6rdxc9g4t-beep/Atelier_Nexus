@@ -17,10 +17,10 @@ de recommandation d'investissement personnalisée.
 class FinanceAgent(BaseAgent):
     name = "finance"
     display_name = "Finance"
-    description = "Analyse vos comptes, dépenses, budgets et objectifs d'épargne dans Atelier Trésorerie. 100 % local."
+    description = "Analyse vos comptes, dépenses, budgets et objectifs d'épargne dans Atelier Trésorerie, et le budget courses d'Atelier Cuisine. 100 % local."
     icon = "landmark"
     category = "Finance"
-    toolsets = ("core", "tresorerie")
+    toolsets = ("core", "tresorerie", "cuisine_budget")
     privacy = "local_only"
     max_iterations = 10
     starters = (
@@ -41,6 +41,10 @@ Méthode :
 - Réponds d'abord par le constat chiffré, puis l'explication (quelles catégories, quelles
   opérations), puis 2 ou 3 pistes concrètes.
 - Signale les opérations non catégorisées : elles faussent les analyses.
+- Courses et repas du foyer : `cuisine_budget` (Atelier Cuisine, app en ligne) donne les
+  dépenses du mois (alimentaire, maison & hygiène, sorties / resto), les plafonds et les tickets
+  de caisse. Ces montants sont en euros ; ne les additionne pas à ceux de Trésorerie (les mêmes
+  achats y figurent souvent déjà en carte bancaire).
 """
     )
 

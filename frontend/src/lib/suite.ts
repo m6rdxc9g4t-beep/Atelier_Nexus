@@ -3,7 +3,15 @@
  * Chaque adresse se surcharge par une variable NEXT_PUBLIC_ATELIER_*_URL.
  */
 
-export type SuiteAppId = "nexus" | "viz" | "tab" | "projets" | "tresorerie" | "cine" | "savoir";
+export type SuiteAppId =
+  | "nexus"
+  | "viz"
+  | "tab"
+  | "projets"
+  | "tresorerie"
+  | "cine"
+  | "savoir"
+  | "cuisine";
 
 export interface SuiteApp {
   id: SuiteAppId;
@@ -15,6 +23,11 @@ export interface SuiteApp {
   url: string;
   /** `GET /api/health` (ou équivalent) des applications qui ont une API ; sinon null. */
   healthUrl: string | null;
+  /**
+   * Application en ligne (hébergée, ex. Atelier Cuisine sur Vercel) : jamais sondée,
+   * affichée « en ligne » au lieu d'un état.
+   */
+  online?: boolean;
 }
 
 export type SuiteStatus = "unknown" | "up" | "down";
@@ -40,6 +53,11 @@ export function suiteApps(): SuiteApp[] {
   const cine = clean(process.env.NEXT_PUBLIC_ATELIER_CINE_URL, "http://127.0.0.1:4000");
   // Savoir écoute sur 5050 par défaut, comme Trésorerie : lancé sur 5051 (docs/apps/savoir.md)
   const savoir = clean(process.env.NEXT_PUBLIC_ATELIER_SAVOIR_URL, "http://127.0.0.1:5051");
+  // Cuisine est une app en ligne (PWA Vercel + app Mac Tauri) : jamais sondée
+  const cuisine = clean(
+    process.env.NEXT_PUBLIC_ATELIER_CUISINE_URL,
+    "https://atelier-cuisine-iota.vercel.app",
+  );
   return [
     {
       id: "nexus",
@@ -97,8 +115,20 @@ export function suiteApps(): SuiteApp[] {
       url: savoir,
       healthUrl: `${savoir}/api/stats`,
     },
+    {
+      id: "cuisine",
+      name: "Atelier Cuisine",
+      short: "Cuisine",
+      description: "Stock, repas, courses et budget du foyer",
+      url: cuisine,
+      healthUrl: null,
+      online: true,
+    },
   ];
 }
+
+/** Libellé affiché à la place de l'état pour une application en ligne. */
+export const ONLINE_LABEL = "en ligne";
 
 export function statusLabel(status: SuiteStatus): string {
   return status === "up" ? "en marche" : status === "down" ? "arrêtée" : "vérification…";

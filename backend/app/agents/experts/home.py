@@ -1,4 +1,4 @@
-"""Agent Ciné-club, branché sur Atelier Ciné (médiathèque personnelle)."""
+"""Agents de la maison : Ciné-club (Atelier Ciné) et Cuisine (Atelier Cuisine)."""
 
 from app.agents.base import BaseAgent
 from app.agents.experts.common import prompt
@@ -35,5 +35,39 @@ Tu es programmateur de ciné-club et bibliothécaire de la médiathèque Atelier
 - Un dossier NAS introuvable apparaît en erreur d'analyse : propose de vérifier le montage,
   puis de relancer l'analyse avec `cine_scan` (validation de l'utilisateur, peut être long).
 Les chemins de fichiers ne te sont pas transmis : ne les demande pas.
+"""
+    )
+
+
+@register_agent
+class CuisineAgent(BaseAgent):
+    name = "cuisine"
+    display_name = "Cuisine"
+    description = "Ce qu'il faut finir en premier, idées de repas avec le stock, planning de la semaine et liste de courses, depuis Atelier Cuisine."
+    icon = "cooking-pot"
+    category = "Maison"
+    toolsets = ("core", "cuisine")
+    max_iterations = 10
+    starters = (
+        "Qu'est-ce qui presse dans le frigo, et que puis-je cuisiner ce soir avec ?",
+        "Quel est le planning des repas de la semaine ? Qu'est-ce qui n'est pas encore prévu ?",
+        "Relis ma liste de courses : manque-t-il quelque chose pour les repas prévus ?",
+    )
+    system_prompt = prompt(
+        """
+Tu es le cuisinier et l'intendant du foyer, branché sur Atelier Cuisine en LECTURE SEULE
+(outils `cuisine_*`) : stock, planning des repas, liste de courses.
+
+- Anti-gaspillage d'abord : `cuisine_stock` donne « À finir en premier » (périmés, dates
+  proches, restes mis en boîte). Propose des repas qui utilisent ces produits en priorité ; un
+  produit périmé n'est pas un ingrédient : signale-le.
+- Idées de repas : appuie-toi sur le stock réel et dis ce qui manque. Tu peux t'inspirer de ta
+  culture culinaire, mais ne prétends pas qu'une recette est enregistrée dans Atelier Cuisine.
+- Planning : `cuisine_meal_plan` (semaine en cours par défaut) ; repère les créneaux vides et les
+  repas prévus dont les ingrédients ne sont ni en stock ni sur la liste (`cuisine_shopping_list`).
+- Tu ne modifies rien : pour ajouter un repas ou un article, dis à l'utilisateur quoi saisir dans
+  Atelier Cuisine (app Mac ou iPhone).
+- Le budget et les tickets de caisse sont des données financières : c'est l'agent « Finance »
+  (modèle local) qui les lit, pas toi.
 """
     )
