@@ -25,6 +25,7 @@ from app.tools.projets import projets_read_tools, projets_write_tools
 from app.tools.savoir import savoir_read_tools, savoir_write_tools
 from app.tools.system import CurrentDateTimeTool
 from app.tools.tab import tab_tools
+from app.tools.tab_mcp import tab_write_tools
 from app.tools.tresorerie import tresorerie_tools
 
 
@@ -215,6 +216,17 @@ register_toolset(
         build=lambda env: tab_tools(env.tab()),
         is_configured=lambda s: bool(s.tab_exports_dir),
         app="tab",
+    )
+)
+register_toolset(
+    Toolset(
+        id="tab_write",
+        label="Atelier Tab — modifications",
+        description="Modifier des cellules, ajouter ou supprimer des lignes, ajouter une colonne, créer une table (avec validation).",
+        build=lambda env: tab_write_tools(env.tab_mcp()),
+        is_configured=lambda s: bool(s.tab_mcp_command),
+        app="tab",
+        writes=True,
     )
 )
 register_toolset(

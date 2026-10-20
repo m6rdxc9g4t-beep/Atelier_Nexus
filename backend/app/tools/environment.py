@@ -15,6 +15,7 @@ from app.tools.http import AppNotConfiguredError
 from app.tools.projets import ProjetsClient
 from app.tools.savoir import SavoirClient
 from app.tools.tab import TabSnapshots
+from app.tools.tab_mcp import TabMcpClient
 from app.tools.tresorerie import TresorerieClient
 
 
@@ -104,6 +105,19 @@ class ToolEnvironment:
             return c
 
         client: TabSnapshots = self._get("tab", make)
+        return client
+
+    def tab_mcp(self) -> TabMcpClient:
+        def make() -> TabMcpClient:
+            c = TabMcpClient.from_settings(self.settings)
+            if c is None:
+                raise AppNotConfiguredError(
+                    "TAB_MCP_COMMAND n'est pas défini : Atelier Tab est en lecture seule.",
+                    app="tab",
+                )
+            return c
+
+        client: TabMcpClient = self._get("tab_mcp", make)
         return client
 
     def github(self) -> GitHubClient:

@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
     tab_exports_dir: str | None = "~/Atelier_Tab/exports"
     tab_max_snapshot_mb: int = Field(default=50, ge=1, le=2000)
+    # Écriture : serveur MCP de Tab (app Mac : /Applications/Atelier_Tab.app/Contents/Resources/
+    # atelier-mcp ; dépôt : « node <atelier-tab>/dist-desktop/atelier-mcp.mjs »). Vide = lecture seule.
+    tab_mcp_command: str | None = None
+    #: Dossier de données de Tab passé au serveur MCP (ATELIER_TAB_DATA) ; vide = ~/Atelier_Tab
+    tab_data_dir: str | None = None
+    tab_mcp_timeout: float = Field(default=30.0, gt=0, le=600)
 
     # GitHub (agent Développeur) : dépôt par défaut + liste blanche, séparés par des virgules
     github_token: SecretStr | None = None
@@ -67,6 +73,8 @@ class Settings(BaseSettings):
         "cine_base_url",
         "savoir_base_url",
         "tab_exports_dir",
+        "tab_mcp_command",
+        "tab_data_dir",
         "github_token",
         "github_repo",
         mode="before",

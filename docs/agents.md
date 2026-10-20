@@ -1,4 +1,4 @@
-# Plateforme multi-agents (étapes 5 et 7)
+# Plateforme multi-agents (étapes 5, 7 et 8)
 
 Atelier Nexus réunit des **agents experts** (codés), des **agents personnalisés** (créés depuis l'interface)
 et un **orchestrateur** qui confie des sous-tâches aux autres. Tous partagent la même boucle (`BaseAgent`),
@@ -13,7 +13,7 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Communication | Rédacteur (`redacteur`) | core | Courriels, comptes rendus, documentation |
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
 | Données | Data Analyst / Power BI (`data_analyst`) | core, data_via, tab | Exploration préalable obligatoire, DAX `VAR … RETURN`, modèle en étoile |
-| Données | Tableur (`tableur`) | core, tab | Totaux calculés par l'outil, erreurs de formule, échéances dépassées |
+| Données | Tableur (`tableur`) | core, tab, tab_write | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
 | Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab | Points d'avancement, saisie de temps, statuts, plannings Tab |
 | Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write | User stories, critères d'acceptation, estimations |
 | Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read | Branches `feat/…`, commits `#ID`, PR brouillons |
@@ -38,6 +38,7 @@ Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîte
 | `projets_write` | `projets_create_work_item`, `_update_work_item`, `_add_time_entry`, `_add_log_entry` | ✅ validation | — |
 | `tresorerie` | `tresorerie_dashboard`, `_accounts`, `_categories`, `_transactions`, `_budgets`, `_goals`, `_holdings` | — (lecture seule) | ✅ local imposé |
 | `tab` | `tab_list_tables`, `_read_table`, `_aggregate`, `_check_table` | — (lecture des instantanés) | — |
+| `tab_write` | `tab_set_cells`, `_add_rows`, `_delete_rows`, `_add_column`, `_create_table` (serveur MCP de Tab) | ✅ validation | — |
 | `cine` | `cine_library`, `_title`, `_library_report`, `_ai_summary` | — | — |
 | `cine_write` | `cine_scan` | ✅ validation | — |
 | `savoir_read` | `savoir_overview`, `_course`, `_chapter`, `_flashcards`, `_due_cards` | — | ✅ local imposé |
@@ -108,6 +109,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `PROJETS_BASE_URL` | `http://127.0.0.1:3000/api` | Atelier Projets |
 | `TRESORERIE_BASE_URL` | `http://127.0.0.1:5050/api` | Atelier Trésorerie |
 | `TAB_EXPORTS_DIR` | `~/Atelier_Tab/exports` | Instantanés d'Atelier Tab ([`apps/tab.md`](apps/tab.md)) |
+| `TAB_MCP_COMMAND`, `TAB_DATA_DIR` | vide | Écriture dans Atelier Tab par son serveur MCP ([`apps/tab.md`](apps/tab.md)) |
 | `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
 | `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
 | `APPS_TIMEOUT` | `20` | Délai par appel (s) |
@@ -143,7 +145,7 @@ Toute nouvelle boîte se déclare dans `app/tools/toolsets.py` (`register_toolse
 ## 8. Vérifier
 
 ```bash
-cd backend && pytest                     # 134 tests, dont réponses réelles de Projets, Trésorerie, Ciné, Savoir
+cd backend && pytest                     # 141 tests, dont réponses réelles de Projets, Trésorerie, Ciné, Savoir
 python -m scripts.smoke_apps             # tous les outils contre les applications lancées
 python -m scripts.smoke_apps --apps=tab,cine,savoir --write   # + écritures (DONNÉES DE TEST uniquement)
 DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server   # démo sans LLM

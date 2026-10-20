@@ -6,7 +6,8 @@ leurs VRAIS outils, contre les applications lancées sur la machine :
   création d'un élément, soumise à validation ;
 - Data Analyst / Marketing (Atelier Viz) : jeux → schéma → requête → mesures DAX ;
 - Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets ;
-- Tableur (Atelier Tab) : tables → contrôle du planning ;
+- Tableur (Atelier Tab) : tables → contrôle du planning ; ou ajout d'un lot par le serveur MCP
+  de Tab (TAB_MCP_COMMAND), soumis à validation ;
 - Ciné-club (Atelier Ciné) : bilan de la médiathèque → titres en 4K ;
 - Tuteur (Atelier Savoir, moteur local) : séance du jour → question → notes enregistrées
   après validation.
@@ -110,7 +111,7 @@ class DemoProvider(LLMProvider):
         if "cine_library_report" in tools:
             return self._cine(done)
         if "tab_list_tables" in tools:
-            return self._tab(done)
+            return self._tab(done, request)
         if "publish_artifact" in tools and "publish_artifact" not in done:
             return self._call(
                 "publish_artifact",
@@ -195,7 +196,25 @@ class DemoProvider(LLMProvider):
             "Analyse faite **entièrement en local** : aucune donnée financière n'a quitté la machine."
         )
 
-    def _tab(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+    def _tab(self, done: dict[str, ToolResultBlock], request: LLMRequest) -> LLMResponse:
+        asked = next(
+            (b.text for m in reversed(request.messages) if m.role == "user"
+             for b in m.content if isinstance(b, TextBlock) and b.text),
+            "",
+        )  # fmt: skip
+        if asked.lower().startswith("ajoute") and "tab_add_rows" in {t.name for t in request.tools}:
+            if "tab_add_rows" not in done:
+                return self._call(
+                    "tab_add_rows",
+                    {"table_id": "tbl_planning_lots",
+                     "rows": [{"Lot / Tâche": "Plomberie", "Statut": "À faire", "Coût HT": "12 000",
+                               "Échéance": "15/01/2027"}]},
+                    "J'ajoute le lot au-dessus de la ligne de total du planning :",
+                )  # fmt: skip
+            added = done["tab_add_rows"]
+            if added.is_error:
+                return self._say("D'accord, je n'ajoute rien.")
+            return self._say(f"{added.content}\n\nLe total du planning inclut maintenant ce lot.")
         if "tab_list_tables" not in done:
             return self._call("tab_list_tables", {}, "Je regarde les tables d'Atelier Tab.")
         if "tab_check_table" not in done:
