@@ -26,6 +26,7 @@ from app.tools.savoir import savoir_read_tools, savoir_write_tools
 from app.tools.system import CurrentDateTimeTool
 from app.tools.tab import tab_tools
 from app.tools.tab_mcp import tab_write_tools
+from app.tools.tab_projets import tab_projets_tools
 from app.tools.tresorerie import tresorerie_tools
 
 
@@ -226,6 +227,17 @@ register_toolset(
         build=lambda env: tab_write_tools(env.tab_mcp()),
         is_configured=lambda s: bool(s.tab_mcp_command),
         app="tab",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="tab_projets",
+        label="Atelier Tab → Atelier Projets",
+        description="Aperçu puis import d'une table de Tab en éléments de Projets (import avec validation, sans doublon).",
+        build=lambda env: tab_projets_tools(env.projets(), env.tab()),
+        is_configured=lambda s: bool(s.tab_exports_dir and s.projets_base_url),
+        app="projets",
         writes=True,
     )
 )

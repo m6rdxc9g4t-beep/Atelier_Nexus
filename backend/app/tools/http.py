@@ -58,6 +58,8 @@ class AppClient:
             transport=transport,
             follow_redirects=False,
         )
+        #: En-têtes de la dernière réponse (ex. `idempotency-replayed` d'Atelier Projets)
+        self.last_headers: httpx.Headers | None = None
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -97,6 +99,7 @@ class AppClient:
                 f"{self.label} injoignable sur {self.base_url} : {self._unavailable_hint()}",
                 app=self.app,
             ) from exc
+        self.last_headers = response.headers
         status = response.status_code
         if status == 204:
             return None

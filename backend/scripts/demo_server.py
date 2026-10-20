@@ -202,6 +202,26 @@ class DemoProvider(LLMProvider):
              for b in m.content if isinstance(b, TextBlock) and b.text),
             "",
         )  # fmt: skip
+        if asked.lower().startswith("envoie") and "projets_import_tab_table" in {
+            t.name for t in request.tools
+        }:
+            if "projets_preview_tab_import" not in done:
+                return self._call(
+                    "projets_preview_tab_import",
+                    {"table_id": "tbl_planning_lots"},
+                    "Voici ce que l'import ferait dans Atelier Projets :",
+                )
+            if "projets_import_tab_table" not in done:
+                return self._call(
+                    "projets_import_tab_table",
+                    {"table_id": "tbl_planning_lots"},
+                    "Aperçu vérifié (détail ci-dessus) : une ligne a changé depuis le dernier "
+                    "import. Je l'envoie :",
+                )
+            result = done["projets_import_tab_table"]
+            if result.is_error:
+                return self._say("Entendu, rien n'est envoyé à Atelier Projets.")
+            return self._say(result.content)
         if asked.lower().startswith("ajoute") and "tab_add_rows" in {t.name for t in request.tools}:
             if "tab_add_rows" not in done:
                 return self._call(

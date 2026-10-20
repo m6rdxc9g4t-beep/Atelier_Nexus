@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     # Atelier Projets (SUITE.md : API sur 3000) et Atelier Trésorerie (5050)
     projets_base_url: str | None = "http://127.0.0.1:3000/api"
     tresorerie_base_url: str | None = "http://127.0.0.1:5050/api"
+    #: ATELIER_IMPORT_TOKEN d'Atelier Projets, si l'import depuis Atelier Tab est protégé
+    projets_import_token: SecretStr | None = None
     apps_timeout: float = 20.0
 
     # Application de bureau : interface compilée (frontend/out) servie par le backend
@@ -72,6 +74,7 @@ class Settings(BaseSettings):
         "data_via_base_url",
         "data_via_api_key",
         "projets_base_url",
+        "projets_import_token",
         "tresorerie_base_url",
         "cine_base_url",
         "savoir_base_url",

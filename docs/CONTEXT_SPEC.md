@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 9 (application de bureau macOS)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 10 (Atelier Tab → Atelier Projets)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -47,13 +47,13 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 7 | Connecteurs Atelier Tab (instantanés DataFlow), Ciné, Savoir ; agents Tableur, Ciné-club, Tuteur (100 % local) → [`apps/tab.md`](apps/tab.md), [`apps/cine.md`](apps/cine.md), [`apps/savoir.md`](apps/savoir.md) | ✅ |
 | 8 | Écriture dans Atelier Tab par son serveur MCP (cellules, lignes, colonnes, tables), avec validation → [`apps/tab.md`](apps/tab.md) | ✅ |
 | 9 | Application de bureau macOS « Atelier Nexus.app » : fenêtre native, installation de Python au premier lancement, données dans Application Support → [`desktop.md`](desktop.md) | ✅ |
+| 10 | Pont Atelier Tab → Atelier Projets : aperçu puis import idempotent d'une table en éléments → [`apps/tab.md`](apps/tab.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
 - Data Via en écriture (enregistrer une mesure dans le modèle de Viz, actualiser un jeu) : quand, et avec quelle confirmation utilisateur ?
 - Ajouter Atelier Nexus au contrat de suite (`docs/SUITE.md` d'Atelier Viz / Tab / Projets) : ports 3100 / 8100, sélecteur de suite.
 - Modèle Ollama recommandé en production (défaut actuel : `llama3.1:8b`) et activation ou non du repli automatique (`LLM_FALLBACK_PROVIDER`).
-- Atelier Tab : export d'une table vers Atelier Projets depuis Nexus (`check_export` / `export_table` du serveur MCP).
 - Port d'Atelier Savoir : le faire passer à 5051 par défaut dans son dépôt (`docs/SUITE.md`), pour ne plus entrer en conflit avec Trésorerie.
 - Exposer Projets, Trésorerie et Savoir à un backend Nexus conteneurisé (voir `agents.md` §6).
 - Embeddings (pgvector) : recherche dans l'historique et les documents de la suite.

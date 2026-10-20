@@ -42,6 +42,8 @@ const TOOL_LABELS: Record<string, string> = {
   tab_delete_rows: "Tab · suppression de lignes",
   tab_add_column: "Tab · ajout d'une colonne",
   tab_create_table: "Tab · création d'une table",
+  projets_preview_tab_import: "Projets · aperçu de l'import Tab",
+  projets_import_tab_table: "Projets · import d'une table Tab",
   cine_library: "Ciné · médiathèque",
   cine_title: "Ciné · fiche",
   cine_library_report: "Ciné · bilan",
