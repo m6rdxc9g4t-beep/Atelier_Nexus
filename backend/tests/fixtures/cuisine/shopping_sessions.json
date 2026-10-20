@@ -1,0 +1,42 @@
+[
+  {
+    "id": "30000000-0000-4000-8000-000000000001",
+    "purchased_at": "2026-09-28T10:00:00+00:00",
+    "store_name": "Carrefour",
+    "total_amount": 55,
+    "food_subtotal": 50,
+    "home_subtotal": 5,
+    "items_count": 14,
+    "source": "ticket_pdf"
+  },
+  {
+    "id": "30000000-0000-4000-8000-000000000002",
+    "purchased_at": "2026-10-04T09:30:00+00:00",
+    "store_name": "Carrefour",
+    "total_amount": 86.4,
+    "food_subtotal": 74.1,
+    "home_subtotal": 12.3,
+    "items_count": 23,
+    "source": "ticket_pdf"
+  },
+  {
+    "id": "30000000-0000-4000-8000-000000000003",
+    "purchased_at": "2026-10-12T15:05:00+00:00",
+    "store_name": "Marché",
+    "total_amount": 21.5,
+    "food_subtotal": 21.5,
+    "home_subtotal": 0,
+    "items_count": 6,
+    "source": "liste"
+  },
+  {
+    "id": "30000000-0000-4000-8000-000000000004",
+    "purchased_at": "2026-10-19T10:00:00+00:00",
+    "store_name": "Lidl",
+    "total_amount": 40,
+    "food_subtotal": 32,
+    "home_subtotal": 8,
+    "items_count": 12,
+    "source": "ticket_photo"
+  }
+]

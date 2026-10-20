@@ -32,7 +32,7 @@ Si Python est introuvable ou que l'installation échoue, une alerte dit quoi fai
 
 | Chemin | Contenu |
 |---|---|
-| `~/Library/Application Support/Atelier Nexus/.env` | Réglages (créé au premier lancement depuis `.env.example`, droits 600) : `ANTHROPIC_API_KEY`, adresses des apps, Ollama… Menu **Réglages** de l'application. |
+| `~/Library/Application Support/Atelier Nexus/.env` | Réglages (créé au premier lancement depuis `.env.example`, droits 600) : modifiables depuis la **roue dentée** de l'interface ([`settings.md`](settings.md)), ou à la main (menu Réglages → « Ouvrir le fichier de réglages »). |
 | `…/Atelier Nexus/nexus.db` | Base SQLite : agents personnalisés, conversations, artefacts (imposée, quel que soit `DATABASE_URL`) |
 | `…/Atelier Nexus/webview/` | Stockage de la fenêtre (thème, dernière conversation par agent) |
 | `…/Atelier Nexus/venv/` | Environnement Python |
@@ -45,11 +45,14 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Serveur sur `127.0.0.1` uniquement, port 8100 s'il est libre, sinon un port libre : l'interface utilise des adresses
   relatives (`NEXT_PUBLIC_API_URL` vide), elle fonctionne sur n'importe quel port.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
+- Fond de la fenêtre avant l'affichage de l'interface : celui de la charte néon (`WINDOW_BACKGROUND` dans
+  `app/desktop.py`, `#fbf3f2` clair / `#120c0d` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app`), l'écriture dans Tab est activée sans réglage
   (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
 - Pont JavaScript (`frontend/src/lib/desktop.ts` ↔ `DesktopApi`) : « Enregistrer sous » natif pour les artefacts
   (`saveFile`), liens externes dans le navigateur ; l'adresse d'une app de la suite ouvre son application si elle est
-  installée (`openExternal`). Dans la fenêtre, `a.download` et `window.open` sont ignorés par WKWebView : toujours
+  installée (`openExternal` ; ports locaux `SUITE_BUNDLES`, apps en ligne `SUITE_ONLINE_BUNDLES` : Atelier Cuisine
+  `https://atelier-cuisine-iota.vercel.app` → `fr.ateliercuisine.app`). Dans la fenêtre, `a.download` et `window.open` sont ignorés par WKWebView : toujours
   passer par ces deux fonctions.
 
 Sans fenêtre : `cd backend && python desktop.py --navigateur`.

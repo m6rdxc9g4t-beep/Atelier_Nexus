@@ -4,18 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.agents.base import AgentResult
+from app.core.llm.attachments import referenced_ids
 from app.core.llm.types import Message
+from app.db.attachments import attach_to_conversation, delete_for_conversation
 from app.db.models import ArtifactRow, ConversationRow
 from app.db.repository import StorageError, _storage_message
+from app.db.search import like_pattern, message_texts, search_text, snippet, terms
 from app.schemas.conversations import (
     ConversationDetail,
     ConversationSummary,
+    SearchHit,
     StoredArtifact,
     TurnMeta,
     title_from,
@@ -102,6 +106,54 @@ class ConversationRepository:
         result: list[ConversationSummary] = await self._run(op)
         return result
 
+    @staticmethod
+    async def _artifacts_of(s: AsyncSession, conversation_id: str) -> list[ArtifactRow]:
+        rows = await s.scalars(
+            select(ArtifactRow).where(ArtifactRow.conversation_id == conversation_id)
+        )
+        return list(rows)
+
+    async def search(
+        self, query: str, agent: str | None = None, limit: int = 30
+    ) -> list[SearchHit]:
+        """Conversations contenant TOUS les mots (sans accents ni casse), les plus récentes d'abord."""
+        words = terms(query)
+        if not words:
+            return []
+
+        async def op(s: AsyncSession) -> list[SearchHit]:
+            counts = (
+                select(ArtifactRow.conversation_id, func.count().label("n"))
+                .group_by(ArtifactRow.conversation_id)
+                .subquery()
+            )
+            condition = and_(
+                *(ConversationRow.search_text.like(like_pattern(w), escape="\\") for w in words)
+            )
+            q = (
+                select(ConversationRow, func.coalesce(counts.c.n, 0))
+                .outerjoin(counts, counts.c.conversation_id == ConversationRow.id)
+                .where(condition)
+                .order_by(ConversationRow.updated_at.desc())
+                .limit(min(limit, MAX_LIST))
+            )
+            if agent:
+                q = q.where(ConversationRow.agent == agent)
+            hits = []
+            for row, n in (await s.execute(q)).all():
+                arts = await self._artifacts_of(s, row.id)
+                texts = [
+                    *message_texts(row.history or []),
+                    *(f"{a.title} : {a.content}" for a in arts),
+                ]
+                hits.append(
+                    SearchHit(**_summary(row, int(n)).model_dump(), snippet=snippet(texts, words))
+                )
+            return hits
+
+        result: list[SearchHit] = await self._run(op)
+        return result
+
     async def get(self, conversation_id: str) -> ConversationDetail | None:
         async def op(s: AsyncSession) -> ConversationDetail | None:
             row = await s.scalar(
@@ -148,6 +200,10 @@ class ConversationRepository:
                 ).model_dump(mode="json")
             row.turn_meta = meta
             row.pending = [p.model_dump(mode="json") for p in result.pending_approvals]
+            pieces = [(a.title, a.content) for a in await self._artifacts_of(s, row.id)]
+            pieces += [(a.title, a.content) for a in result.artifacts]
+            row.search_text = search_text(row.title, row.history, pieces)
+            await attach_to_conversation(s, row.id, referenced_ids(history))
             for artifact in result.artifacts:
                 s.add(
                     ArtifactRow(
@@ -171,6 +227,8 @@ class ConversationRepository:
             if row is None:
                 return False
             row.title = title
+            pieces = [(a.title, a.content) for a in await self._artifacts_of(s, row.id)]
+            row.search_text = search_text(title, row.history or [], pieces)
             await s.commit()
             return True
 
@@ -181,6 +239,7 @@ class ConversationRepository:
             await s.execute(
                 delete(ArtifactRow).where(ArtifactRow.conversation_id == conversation_id)
             )
+            await delete_for_conversation(s, conversation_id)
             res = await s.execute(
                 delete(ConversationRow).where(ConversationRow.id == conversation_id)
             )

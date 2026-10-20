@@ -5,6 +5,7 @@ import {
   ChartColumn,
   Clapperboard,
   Code2,
+  CookingPot,
   GraduationCap,
   Headset,
   Landmark,
@@ -46,6 +47,7 @@ const BY_ICON: Record<string, LucideIcon> = {
   "shield-check": ShieldCheck,
   "calendar-check": CalendarCheck,
   "table-2": Table2,
+  "cooking-pot": CookingPot,
 };
 
 export function agentIcon(icon?: string | null): LucideIcon {

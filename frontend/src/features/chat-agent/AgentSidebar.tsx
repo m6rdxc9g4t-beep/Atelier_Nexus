@@ -45,13 +45,13 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
                       "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors disabled:opacity-50",
                       agent.source === "custom" && "pr-8",
                       current
-                        ? "bg-accent-soft font-medium text-accent-ink"
+                        ? "atelier-nav-active font-medium"
                         : "text-foreground hover:bg-accent",
                     )}
                   >
                     <AgentIcon
                       icon={agent.icon}
-                      className={cn("size-4 shrink-0", !current && "text-muted-foreground")}
+                      className={cn("size-4 shrink-0", current ? "text-accent-ink" : "text-muted-foreground")}
                       aria-hidden
                     />
                     <span className="min-w-0 flex-1 truncate">{agent.display_name}</span>
@@ -64,7 +64,7 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
                       type="button"
                       onClick={() => onEdit(agent.name)}
                       aria-label={`Modifier ${agent.display_name}`}
-                      className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100"
+                      className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signature-soft hover:text-foreground focus-visible:opacity-100"
                     >
                       <Pencil className="size-3.5" aria-hidden />
                     </button>
@@ -76,7 +76,7 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
         </section>
       ))}
       {/* Toujours visible, même quand la liste défile */}
-      <div className="sticky bottom-0 mt-auto -mx-3 border-t bg-card px-3 py-3">
+      <div className="sticky bottom-0 mt-auto -mx-3 border-t bg-sidebar px-3 py-3">
         <Button variant="outline" className="w-full justify-start" onClick={onCreate} disabled={disabled}>
           <Plus />
           Créer un agent

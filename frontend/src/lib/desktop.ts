@@ -22,12 +22,7 @@ export const isDesktop = (): boolean => desktopBridge() !== null;
 
 /** Texte → base64 (UTF-8), pour le pont. */
 export function textToBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(binary);
+  return bytesToBase64(new TextEncoder().encode(text));
 }
 
 /** Enregistre un fichier texte : boîte « Enregistrer sous » native, sinon téléchargement. */
@@ -39,6 +34,32 @@ export async function saveFile(name: string, text: string, type: string): Promis
     return res.saved ? { kind: "saved", path: res.saved } : { kind: "cancelled" };
   }
   const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+  return { kind: "downloaded" };
+}
+
+/** Octets → base64, pour le pont. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/** Enregistre un fichier binaire (pièce jointe) : « Enregistrer sous » natif, sinon téléchargement. */
+export async function saveBlob(name: string, blob: Blob): Promise<SaveOutcome> {
+  const bridge = desktopBridge();
+  if (bridge) {
+    const res = await bridge.save_file(name, bytesToBase64(new Uint8Array(await blob.arrayBuffer())));
+    if (res.error) throw new Error(res.error);
+    return res.saved ? { kind: "saved", path: res.saved } : { kind: "cancelled" };
+  }
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;

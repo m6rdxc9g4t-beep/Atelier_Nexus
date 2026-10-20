@@ -3,7 +3,15 @@
  * sur l'état affiché. Sans React ni réseau, donc testable (conversation.test.ts).
  */
 
-import type { AgentEvent, AgentResult, ConversationDetail, Message, PendingCall } from "@/types/api";
+import type {
+  AgentEvent,
+  AgentResult,
+  AttachmentBlock,
+  ContentBlock,
+  ConversationDetail,
+  Message,
+  PendingCall,
+} from "@/types/api";
 
 export interface ToolCallPart {
   kind: "tool";
@@ -34,7 +42,13 @@ export interface ApprovalPart {
   submitted: boolean;
 }
 
-export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart;
+/** Fichier joint à un message de l'utilisateur. */
+export interface AttachmentPart {
+  kind: "attachment";
+  attachment: AttachmentBlock;
+}
+
+export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart | AttachmentPart;
 
 export interface ChatTurn {
   id: string;
@@ -56,15 +70,15 @@ export const emptyConversation = (): Conversation => ({ turns: [], history: [] }
 let seq = 0;
 export const turnId = () => `t_${Date.now().toString(36)}_${(seq++).toString(36)}`;
 
-export function addUserTurn(conv: Conversation, text: string): Conversation {
-  const message: Message = { role: "user", content: [{ type: "text", text }] };
+/** Pièces jointes d'abord (le modèle lit le fichier avant la question), puis le texte. */
+export function addUserTurn(conv: Conversation, text: string, attachments: AttachmentBlock[] = []): Conversation {
+  const content: ContentBlock[] = [...attachments];
+  if (text) content.push({ type: "text", text });
+  const parts: Part[] = attachments.map((attachment) => ({ kind: "attachment", attachment }));
+  if (text) parts.push({ kind: "text", text });
   return {
-    turns: [
-      ...conv.turns,
-      { id: turnId(), role: "user", parts: [{ kind: "text", text }] },
-      { id: turnId(), role: "assistant", parts: [] },
-    ],
-    history: [...conv.history, message],
+    turns: [...conv.turns, { id: turnId(), role: "user", parts }, { id: turnId(), role: "assistant", parts: [] }],
+    history: [...conv.history, { role: "user", content }],
   };
 }
 
@@ -197,10 +211,14 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
   let lastAssistantIndex: Record<string, number> = {};
 
   detail.history.forEach((message, index) => {
-    const texts = message.content.filter((b) => b.type === "text");
     const results = message.content.filter((b) => b.type === "tool_result");
     if (message.role === "user" && results.length === 0) {
-      turns.push({ id: turnId(), role: "user", parts: texts.map((b) => ({ kind: "text", text: b.text })) });
+      const parts: Part[] = [];
+      for (const b of message.content) {
+        if (b.type === "attachment") parts.push({ kind: "attachment", attachment: b });
+        else if (b.type === "text") parts.push({ kind: "text", text: b.text });
+      }
+      turns.push({ id: turnId(), role: "user", parts });
       current = null;
       return;
     }
