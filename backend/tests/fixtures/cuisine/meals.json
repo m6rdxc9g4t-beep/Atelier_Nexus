@@ -1,0 +1,79 @@
+[
+  {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "eaten_on": "2026-09-30",
+    "slot": "diner",
+    "title": "Pizza maison",
+    "servings": null,
+    "notes": null,
+    "meal_type": "recette",
+    "status": "cuisine",
+    "external_cost": null
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000002",
+    "eaten_on": "2026-10-05",
+    "slot": "dejeuner",
+    "title": "Crêpes",
+    "servings": 4,
+    "notes": null,
+    "meal_type": "recette",
+    "status": "cuisine",
+    "external_cost": null
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000003",
+    "eaten_on": "2026-10-10",
+    "slot": "diner",
+    "title": "MacDo",
+    "servings": null,
+    "notes": null,
+    "meal_type": "exterieur",
+    "status": "cuisine",
+    "external_cost": 18.9
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000004",
+    "eaten_on": "2026-10-19",
+    "slot": "diner",
+    "title": "Nouilles sautées crevettes",
+    "servings": 2,
+    "notes": null,
+    "meal_type": "recette",
+    "status": "cuisine",
+    "external_cost": null
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000005",
+    "eaten_on": "2026-10-20",
+    "slot": "diner",
+    "title": "Restes de gratin",
+    "servings": null,
+    "notes": null,
+    "meal_type": "libre",
+    "status": "prevu",
+    "external_cost": null
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000006",
+    "eaten_on": "2026-10-20",
+    "slot": "dejeuner",
+    "title": "Burger frites",
+    "servings": null,
+    "notes": "Pain à décongeler la veille",
+    "meal_type": "assemblage",
+    "status": "prevu",
+    "external_cost": null
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000007",
+    "eaten_on": "2026-10-22",
+    "slot": "diner",
+    "title": "Resto italien",
+    "servings": null,
+    "notes": null,
+    "meal_type": "exterieur",
+    "status": "prevu",
+    "external_cost": 46.5
+  }
+]

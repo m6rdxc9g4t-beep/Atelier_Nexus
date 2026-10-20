@@ -167,6 +167,20 @@ async def test_anthropic_error_translation(status: int, error: type[Exception]) 
         await _anthropic(handler).complete(LLMRequest(messages=CONVERSATION[:1]))
 
 
+async def test_anthropic_rejected_key_has_a_readable_message() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            401,
+            json={
+                "type": "error",
+                "error": {"type": "authentication_error", "message": "invalid x-api-key"},
+            },
+        )
+
+    with pytest.raises(ProviderRequestError, match="Clé API refusée par Anthropic"):
+        await _anthropic(handler).list_models()
+
+
 # ─── Ollama ───────────────────────────────────────────────────────
 
 

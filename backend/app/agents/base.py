@@ -24,11 +24,17 @@ Garde-fous communs :
 from __future__ import annotations
 
 from abc import ABC
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.llm.attachments import (
+    ATTACHMENTS_NOTE,
+    AttachmentContent,
+    expand_attachments,
+    has_attachments,
+)
 from app.core.llm.errors import ProviderNotAllowedError
 from app.core.llm.router import LLMRouter
 from app.core.llm.types import (
@@ -225,9 +231,15 @@ class BaseAgent(ABC):
         model: str | None = None,
         context: ToolContext | None = None,
         approvals: dict[str, bool] | None = None,
+        attachments: Mapping[str, AttachmentContent] | None = None,
     ) -> AgentResult:
         async for event in self.run_stream(
-            messages, provider=provider, model=model, context=context, approvals=approvals
+            messages,
+            provider=provider,
+            model=model,
+            context=context,
+            approvals=approvals,
+            attachments=attachments,
         ):
             if isinstance(event, DoneEvent):
                 return event.result
@@ -241,7 +253,10 @@ class BaseAgent(ABC):
         model: str | None = None,
         context: ToolContext | None = None,
         approvals: dict[str, bool] | None = None,
+        attachments: Mapping[str, AttachmentContent] | None = None,
     ) -> AsyncIterator[AnyAgentEvent]:
+        """`attachments` : contenu des pièces jointes citées (id → texte ou image), substitué
+        aux références juste avant chaque appel au modèle ; l'historique garde les références."""
         if not messages:
             raise ValueError("La conversation est vide.")
         last = messages[-1]
@@ -260,6 +275,8 @@ class BaseAgent(ABC):
         artifacts: list[Artifact] = []
         usage = Usage()
         system = self.build_system_prompt(ctx)
+        if has_attachments(history):
+            system += ATTACHMENTS_NOTE
         specs = [t.spec() for t in self.tools.values()]
         response: LLMResponse | None = None
         iteration = 0
@@ -326,7 +343,7 @@ class BaseAgent(ABC):
 
             ctx.state["provider"] = provider or self.router.default
             request = LLMRequest(
-                messages=history,
+                messages=expand_attachments(history, attachments),
                 system=system,
                 tools=specs,
                 max_tokens=self.max_tokens,

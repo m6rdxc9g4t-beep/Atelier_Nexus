@@ -35,9 +35,16 @@ services:
       # en local pour ces deux connecteurs, ou exposer les apps et renseigner ces adresses.
       PROJETS_BASE_URL: ${PROJETS_BASE_URL:-http://host.docker.internal:3000/api}
       TRESORERIE_BASE_URL: ${TRESORERIE_BASE_URL:-http://host.docker.internal:5050/api}
+      # Ciné écoute sur toutes les interfaces : joignable. Savoir, comme Projets, reste sur 127.0.0.1.
+      CINE_BASE_URL: ${CINE_BASE_URL:-http://host.docker.internal:4000/api}
+      SAVOIR_BASE_URL: ${SAVOIR_BASE_URL:-http://host.docker.internal:5051/api}
+      # Instantanés d'Atelier Tab, montés en lecture seule (voir volumes)
+      TAB_EXPORTS_DIR: /data/atelier_tab_exports
       CORS_ORIGINS: http://localhost:3100,http://127.0.0.1:3100
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ${ATELIER_TAB_EXPORTS:-${HOME}/Atelier_Tab/exports}:/data/atelier_tab_exports:ro
     ports:
       - "127.0.0.1:8100:8100"
     depends_on:

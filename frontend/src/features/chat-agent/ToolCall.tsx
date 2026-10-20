@@ -33,6 +33,31 @@ const TOOL_LABELS: Record<string, string> = {
   tresorerie_budgets: "Trésorerie · budgets",
   tresorerie_goals: "Trésorerie · objectifs",
   tresorerie_holdings: "Trésorerie · placements",
+  tab_list_tables: "Tab · tables",
+  tab_read_table: "Tab · lecture d'une table",
+  tab_aggregate: "Tab · totaux",
+  tab_check_table: "Tab · contrôle",
+  tab_set_cells: "Tab · modification de cellules",
+  tab_add_rows: "Tab · ajout de lignes",
+  tab_delete_rows: "Tab · suppression de lignes",
+  tab_add_column: "Tab · ajout d'une colonne",
+  tab_create_table: "Tab · création d'une table",
+  projets_preview_tab_import: "Projets · aperçu de l'import Tab",
+  projets_import_tab_table: "Projets · import d'une table Tab",
+  cine_library: "Ciné · médiathèque",
+  cine_title: "Ciné · fiche",
+  cine_library_report: "Ciné · bilan",
+  cine_ai_summary: "Ciné · synopsis (IA locale)",
+  cine_scan: "Ciné · analyse des dossiers",
+  savoir_overview: "Savoir · vue d'ensemble",
+  savoir_course: "Savoir · cours",
+  savoir_chapter: "Savoir · chapitre",
+  savoir_flashcards: "Savoir · cartes",
+  savoir_due_cards: "Savoir · séance du jour",
+  savoir_create_course: "Savoir · création d'un cours",
+  savoir_add_chapter: "Savoir · ajout d'un chapitre",
+  savoir_add_flashcards: "Savoir · ajout de cartes",
+  savoir_record_reviews: "Savoir · résultats de la séance",
   github_repo_overview: "GitHub · dépôt",
   github_list_files: "GitHub · fichiers",
   github_read_file: "GitHub · lecture d'un fichier",
@@ -56,7 +81,7 @@ export function ToolCall({ part }: { part: ToolCallPart }) {
     part.status === "running" ? "en cours" : part.status === "error" ? "en erreur" : "terminé";
 
   return (
-    <div className="rounded-md border bg-sunken text-sm">
+    <div className="rounded-md border border-atelier-border-soft bg-sunken text-sm">
       <button
         type="button"
         aria-expanded={open}
@@ -90,7 +115,7 @@ function Detail({ label, children }: { label: string; children: string }) {
   return (
     <div>
       <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <pre className="max-h-64 overflow-auto rounded-sm bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
+      <pre className="max-h-64 overflow-auto rounded-sm border border-atelier-line bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
         {children}
       </pre>
     </div>

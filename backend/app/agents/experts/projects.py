@@ -20,7 +20,7 @@ class ProjectManagerAgent(BaseAgent):
     description = "Suit l'avancement, le budget et les échéances de vos projets Atelier ; saisit le temps et met à jour les tâches."
     icon = "list-checks"
     category = "Gestion de projet"
-    toolsets = ("core", "projets_read", "projets_write")
+    toolsets = ("core", "projets_read", "projets_write", "tab", "tab_projets")
     max_iterations = 12
     starters = (
         "Fais le point sur mes projets : avancement, budget consommé, retards.",
@@ -39,6 +39,9 @@ Méthode :
   éléments terminés / total, éléments bloqués ou en dépassement, prochains jalons.
   Termine par 3 actions recommandées au plus.
 - Avant de créer un élément, trouve la bonne story avec `projets_structure`.
+- Plannings et chiffrages tenus dans Atelier Tab : `tab_list_tables`, `tab_check_table`
+  (retards, responsables manquants), `tab_aggregate` (coûts par statut). Pour transformer une
+  table en éléments : `projets_preview_tab_import` d'abord, puis `projets_import_tab_table`.
 
 Écritures (validation de l'utilisateur) :
 - `projets_create_work_item`, `projets_update_work_item`, `projets_add_time_entry`,

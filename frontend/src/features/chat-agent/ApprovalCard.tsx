@@ -39,7 +39,7 @@ export function ApprovalCard({ part, disabled, onSubmit }: ApprovalCardProps) {
       aria-label="Action à valider"
       className={cn(
         "rounded-lg border p-3",
-        part.submitted ? "bg-card" : "border-warning/50 bg-warning/8",
+        part.submitted ? "border-atelier-border bg-card shadow-glow" : "border-warning/50 bg-warning/8",
       )}
     >
       <header className="mb-2 flex items-center gap-2 text-sm font-medium">
@@ -54,7 +54,7 @@ export function ApprovalCard({ part, disabled, onSubmit }: ApprovalCardProps) {
         {part.calls.map((call) => {
           const choice = decided[call.id];
           return (
-            <li key={call.id} className="flex flex-wrap items-center gap-2 rounded-md bg-card px-3 py-2">
+            <li key={call.id} className="flex flex-wrap items-center gap-2 rounded-md border border-atelier-line bg-card px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="text-sm">{call.summary}</p>
                 <p className="text-xs text-muted-foreground">{toolLabel(call.name)}</p>

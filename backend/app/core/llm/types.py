@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ProviderName = Literal["anthropic", "ollama"]
 
@@ -46,12 +46,50 @@ class ToolResultBlock(_Strict):
     is_error: bool = False
 
 
-ContentBlock = Annotated[TextBlock | ToolUseBlock | ToolResultBlock, Field(discriminator="type")]
+ImageMediaType = Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
+AttachmentKind = Literal["image", "document"]
+
+
+class ImageBlock(_Strict):
+    """Image transmise au modèle (base64). Jamais enregistrée ni renvoyée au client : produite
+    juste avant l'appel au modèle à partir d'une pièce jointe (app/core/llm/attachments.py)."""
+
+    type: Literal["image"] = "image"
+    media_type: ImageMediaType
+    data: str
+
+
+class AttachmentBlock(_Strict):
+    """Pièce jointe d'un message utilisateur : référence à la table `attachments`.
+
+    C'est elle qui est enregistrée dans l'historique et renvoyée au client ; son contenu
+    (texte extrait ou image) n'est ajouté qu'au moment d'appeler le modèle."""
+
+    type: Literal["attachment"] = "attachment"
+    id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    name: str = Field(min_length=1, max_length=255)
+    media_type: str = Field(max_length=120)
+    kind: AttachmentKind
+    size: int = Field(ge=0)
+
+
+ContentBlock = Annotated[
+    TextBlock | ToolUseBlock | ToolResultBlock | ImageBlock | AttachmentBlock,
+    Field(discriminator="type"),
+]
 
 
 class Message(_Strict):
     role: Literal["user", "assistant"]
     content: list[ContentBlock]
+
+    @model_validator(mode="after")
+    def _user_only_media(self) -> Message:
+        if self.role == "assistant" and any(
+            isinstance(b, ImageBlock | AttachmentBlock) for b in self.content
+        ):
+            raise ValueError("Images et pièces jointes : réservées aux messages de l'utilisateur.")
+        return self
 
     @classmethod
     def user(cls, text: str) -> Message:

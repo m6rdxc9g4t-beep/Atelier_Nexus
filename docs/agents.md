@@ -1,4 +1,4 @@
-# Plateforme multi-agents — Étape 5
+# Plateforme multi-agents (étapes 5, 7 et 8)
 
 Atelier Nexus réunit des **agents experts** (codés), des **agents personnalisés** (créés depuis l'interface)
 et un **orchestrateur** qui confie des sous-tâches aux autres. Tous partagent la même boucle (`BaseAgent`),
@@ -12,12 +12,16 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Général | Orchestrateur (`orchestrateur`) | core, delegation | Découpe, délègue, assemble ; 12 étapes |
 | Communication | Rédacteur (`redacteur`) | core | Courriels, comptes rendus, documentation |
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
-| Données | Data Analyst / Power BI (`data_analyst`) | core, data_via | Exploration préalable obligatoire, DAX `VAR … RETURN`, modèle en étoile |
-| Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write | Points d'avancement, saisie de temps, statuts |
+| Données | Data Analyst / Power BI (`data_analyst`) | core, data_via, tab | Exploration préalable obligatoire, DAX `VAR … RETURN`, modèle en étoile |
+| Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
+| Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets | Points d'avancement, saisie de temps, statuts, plannings Tab |
 | Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write | User stories, critères d'acceptation, estimations |
 | Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read | Branches `feat/…`, commits `#ID`, PR brouillons |
-| Finance | Finance (`finance`) | core, tresorerie | **100 % local** |
+| Finance | Finance (`finance`) | core, tresorerie, cuisine_budget | **100 % local** ; budget courses d'Atelier Cuisine |
 | Finance | Comptable (`comptable`) | core, tresorerie | **100 % local**, PCG / TVA, ne modifie rien |
+| Apprentissage | Tuteur (`tuteur`) | core, savoir_read, savoir_write | **100 % local** ; interrogation, cartes, notes enregistrées en une validation |
+| Maison | Ciné-club (`cineclub`) | core, cine, cine_write | Recommandations dans la médiathèque, épisodes manquants, doublons |
+| Maison | Cuisine (`cuisine`) | core, cuisine | Ce qui presse dans le stock, idées de repas, planning, liste de courses ; lecture seule |
 | Métiers | Commercial (`commercial`) | core, data_via | Propositions, objections, relances |
 | Métiers | Juridique (`juridique`) | core | Droit français ; renvoie vers un avocat |
 | Métiers | Ressources humaines (`rh`) | core | Fiches de poste, entretiens, intégration |
@@ -34,6 +38,15 @@ Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîte
 | `projets_read` | `projets_list_projects`, `_dashboard`, `_structure`, `_list_work_items`, `_work_item`, `_timesheet`, `_milestones` | — | — |
 | `projets_write` | `projets_create_work_item`, `_update_work_item`, `_add_time_entry`, `_add_log_entry` | ✅ validation | — |
 | `tresorerie` | `tresorerie_dashboard`, `_accounts`, `_categories`, `_transactions`, `_budgets`, `_goals`, `_holdings` | — (lecture seule) | ✅ local imposé |
+| `tab` | `tab_list_tables`, `_read_table`, `_aggregate`, `_check_table` | — (lecture des instantanés) | — |
+| `tab_write` | `tab_set_cells`, `_add_rows`, `_delete_rows`, `_add_column`, `_create_table` (serveur MCP de Tab) | ✅ validation | — |
+| `tab_projets` | `projets_preview_tab_import`, `projets_import_tab_table` (Tab → Projets) | ✅ validation (import) | — |
+| `cine` | `cine_library`, `_title`, `_library_report`, `_ai_summary` | — | — |
+| `cine_write` | `cine_scan` | ✅ validation | — |
+| `savoir_read` | `savoir_overview`, `_course`, `_chapter`, `_flashcards`, `_due_cards` | — | ✅ local imposé |
+| `savoir_write` | `savoir_create_course`, `_add_chapter`, `_add_flashcards`, `_record_reviews` | ✅ validation | ✅ local imposé |
+| `cuisine` | `cuisine_stock`, `_meal_plan`, `_shopping_list` (Atelier Cuisine, app en ligne) | — (lecture seule) | — |
+| `cuisine_budget` | `cuisine_budget` (dépenses du mois, plafonds, tickets) | — (lecture seule) | ✅ local imposé |
 | `github_read` | `github_repo_overview`, `_list_files`, `_read_file`, `_search_code`, `_list_pull_requests`, `_list_issues` | — | — |
 | `github_write` | `github_create_branch`, `_commit_files`, `_open_pull_request` | ✅ validation | — |
 | `delegation` | `delegate_to_agent` | — | — |
@@ -52,7 +65,7 @@ Une boîte **non configurée** (adresse ou jeton absent) est écartée sans cass
    et poursuit. Un appel sans décision provoque une nouvelle demande. Rien n'est stocké côté serveur.
 
 **Confidentialité (« 100 % local »).** Un agent est verrouillé sur Ollama s'il le déclare (`privacy = "local_only"`)
-ou s'il utilise une boîte sensible (`tresorerie`). Demander Claude → 403 `provider_not_allowed` ; pas de repli
+ou s'il utilise une boîte sensible (`tresorerie`, `savoir_*`, `cuisine_budget`). Demander Claude → 403 `provider_not_allowed` ; pas de repli
 vers Claude si Ollama tombe. L'orchestrateur ne peut déléguer à un agent local que s'il tourne lui-même sur Ollama,
 sinon la réponse partirait chez Claude.
 
@@ -89,7 +102,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 |---|---|---|
 | GET | `/api/agents` | Catalogue complet : `icon`, `category`, `starters`, `source`, `toolsets`, `local_only`, `tools[].requires_approval`, `unavailable_toolsets` |
 | POST | `/api/agents/{name}/run` · `/stream` | Corps : `messages`, `provider`, `model`, `conversation_id`, **`approvals`** |
-| GET | `/api/apps/status` | État de Viz, Projets, Trésorerie, GitHub (3 s max chacun, ne lève jamais) |
+| GET | `/api/apps/status` | État de Viz, Projets, Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais) |
 
 Événements SSE : `text_delta`, `tool_call`, `tool_result`, `artifact`, **`approval_required`**, `done`, `error`.
 
@@ -99,12 +112,18 @@ Manuellement : `cd backend && alembic upgrade head`.
 |---|---|---|
 | `PROJETS_BASE_URL` | `http://127.0.0.1:3000/api` | Atelier Projets |
 | `TRESORERIE_BASE_URL` | `http://127.0.0.1:5050/api` | Atelier Trésorerie |
+| `TAB_EXPORTS_DIR` | `~/Atelier_Tab/exports` | Instantanés d'Atelier Tab ([`apps/tab.md`](apps/tab.md)) |
+| `PROJETS_IMPORT_TOKEN` | vide | Jeton `ATELIER_IMPORT_TOKEN` d'Atelier Projets, si l'import depuis Tab est protégé |
+| `TAB_MCP_COMMAND`, `TAB_DATA_DIR` | vide | Écriture dans Atelier Tab par son serveur MCP ([`apps/tab.md`](apps/tab.md)) |
+| `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
+| `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
+| `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |
 | `APPS_TIMEOUT` | `20` | Délai par appel (s) |
 | `GITHUB_TOKEN` | vide | Jeton *fine-grained* : Contents + Pull requests (lecture/écriture), dépôts choisis |
 | `GITHUB_REPO` / `GITHUB_ALLOWED_REPOS` | vide | Dépôt par défaut / autres dépôts autorisés |
 | `DATABASE_URL`, `DB_AUTO_MIGRATE` | PostgreSQL, `true` | Agents personnalisés |
 
-> **Docker.** Atelier Projets et Atelier Trésorerie n'écoutent que sur `127.0.0.1` (et Projets vérifie l'en-tête
+> **Docker.** Atelier Projets, Atelier Trésorerie et Atelier Savoir n'écoutent que sur `127.0.0.1` (et Projets vérifie l'en-tête
 > `Host`) : un backend Nexus conteneurisé ne les joint pas. Pour ces connecteurs, lancez le backend Nexus sur la
 > machine (`uvicorn main:app --port 8100`), ou exposez les applications (Projets : `HOST=0.0.0.0`,
 > `ALLOWED_HOSTS=host.docker.internal`).
@@ -132,9 +151,9 @@ Toute nouvelle boîte se déclare dans `app/tools/toolsets.py` (`register_toolse
 ## 8. Vérifier
 
 ```bash
-cd backend && pytest                     # 109 tests, dont réponses réelles de Projets et Trésorerie
-python -m scripts.smoke_apps             # tous les outils contre Projets et Trésorerie lancés
-python -m scripts.smoke_apps --write     # + écritures Projets (BASE DE TEST uniquement)
+cd backend && pytest                     # 195 tests, dont réponses réelles de Projets, Trésorerie, Ciné, Savoir ; Supabase simulé pour Cuisine
+python -m scripts.smoke_apps             # tous les outils contre les applications lancées
+python -m scripts.smoke_apps --apps=tab,cine,savoir --write   # + écritures (DONNÉES DE TEST uniquement)
 DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server   # démo sans LLM
 ```
 

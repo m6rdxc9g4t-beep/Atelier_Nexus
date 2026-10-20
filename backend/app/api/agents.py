@@ -21,6 +21,7 @@ from app.agents import (
     describe,
 )
 from app.api.deps import (
+    get_attachment_repository,
     get_catalog,
     get_conversation_repository,
     get_custom_repository,
@@ -29,6 +30,9 @@ from app.api.deps import (
 )
 from app.api.errors import ErrorResponse, app_error_body, llm_error_body
 from app.core.llm import LLMError, LLMRouter, Message, ProviderName, ToolUseBlock, get_llm_router
+from app.core.llm.attachments import AttachmentContent, referenced_ids
+from app.core.llm.types import ImageBlock
+from app.db.attachments import AttachmentRepository
 from app.db.conversations import ConversationRepository
 from app.db.repository import CustomAgentRepository, StorageError
 from app.schemas.agents import (
@@ -50,6 +54,22 @@ CatalogDep = Annotated[AgentCatalog, Depends(get_catalog)]
 EnvFactoryDep = Annotated[Callable[[], ToolEnvironment], Depends(get_env_factory)]
 RepoDep = Annotated[CustomAgentRepository, Depends(get_custom_repository)]
 ConvDep = Annotated[ConversationRepository, Depends(get_conversation_repository)]
+FilesDep = Annotated[AttachmentRepository, Depends(get_attachment_repository)]
+
+
+async def _attachments(
+    body: AgentRunRequest, files: AttachmentRepository
+) -> dict[str, AttachmentContent]:
+    """Contenu des pièces jointes citées par la conversation (503 si la base ne répond pas)."""
+    ids = referenced_ids(body.messages)
+    if not ids:
+        return {}
+    try:
+        return await files.contents(ids)
+    except StorageError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"Pièces jointes indisponibles : {exc}"
+        ) from exc
 
 
 async def _check_conversation(
@@ -112,6 +132,11 @@ class AgentRunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
+        if any(isinstance(b, ImageBlock) for m in self.messages for b in m.content):
+            raise ValueError(
+                "Les images se joignent par POST /api/attachments, puis un bloc "
+                "« attachment » qui les cite."
+            )
         last = self.messages[-1]
         if last.role == "user":
             return self
@@ -178,8 +203,10 @@ async def run_agent(
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
     conversations: ConvDep,
+    files: FilesDep,
 ) -> AgentResult:
     save = await _check_conversation(body, agent_name, conversations)
+    attachments = await _attachments(body, files)
     env = make_env()
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
@@ -189,6 +216,7 @@ async def run_agent(
             model=body.model,
             context=ToolContext(conversation_id=body.conversation_id),
             approvals=body.approvals,
+            attachments=attachments,
         )
     finally:
         await env.aclose()
@@ -205,11 +233,13 @@ async def stream_agent(
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
     conversations: ConvDep,
+    files: FilesDep,
 ) -> EventSourceResponse:
     """Flux SSE. Événements : `text_delta`, `tool_call`, `tool_result`, `artifact`,
     `approval_required`, `done` (résultat final), `saved` / `save_error` (historique) ou
     `error`. Le champ `data` est du JSON."""
     save = await _check_conversation(body, agent_name, conversations)
+    attachments = await _attachments(body, files)
     env = make_env()
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
@@ -225,6 +255,7 @@ async def stream_agent(
                 model=body.model,
                 context=ToolContext(conversation_id=body.conversation_id),
                 approvals=body.approvals,
+                attachments=attachments,
             ):
                 yield {"event": event.type, "data": event.model_dump_json()}
                 if save and isinstance(event, DoneEvent):
