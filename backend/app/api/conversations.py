@@ -15,6 +15,7 @@ from app.schemas.conversations import (
     ConversationDetail,
     ConversationRename,
     ConversationSummary,
+    SearchHit,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -37,6 +38,17 @@ async def list_conversations(
 ) -> list[ConversationSummary]:
     """Les plus récentes d'abord ; filtre facultatif par agent."""
     return await repo.recent(agent, limit)
+
+
+@router.get("/search", response_model=list[SearchHit])
+async def search_conversations(
+    repo: RepoDep,
+    q: Annotated[str, Query(min_length=2, max_length=200)],
+    agent: Annotated[str | None, Query(max_length=41)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> list[SearchHit]:
+    """Recherche dans les conversations (titre, messages, artefacts), sans accents ni casse."""
+    return await repo.search(q, agent, limit)
 
 
 @router.post("", response_model=ConversationDetail, status_code=status.HTTP_201_CREATED)

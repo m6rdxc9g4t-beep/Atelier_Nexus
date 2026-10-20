@@ -6,7 +6,8 @@ leurs VRAIS outils, contre les applications lancées sur la machine :
   création d'un élément, soumise à validation ;
 - Data Analyst / Marketing (Atelier Viz) : jeux → schéma → requête → mesures DAX ;
 - Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets ;
-- Tableur (Atelier Tab) : tables → contrôle du planning ;
+- Tableur (Atelier Tab) : tables → contrôle du planning ; ou ajout d'un lot par le serveur MCP
+  de Tab (TAB_MCP_COMMAND), soumis à validation ;
 - Ciné-club (Atelier Ciné) : bilan de la médiathèque → titres en 4K ;
 - Tuteur (Atelier Savoir, moteur local) : séance du jour → question → notes enregistrées
   après validation.
@@ -27,6 +28,7 @@ import uvicorn
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.router import LLMRouter, get_llm_router
 from app.core.llm.types import (
+    ImageBlock,
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
@@ -71,6 +73,29 @@ def _results(request: LLMRequest) -> dict[str, ToolResultBlock]:
     return out
 
 
+def _attachments_received(request: LLMRequest) -> list[str]:
+    """Pièces jointes du dernier message utilisateur, telles que le modèle les reçoit."""
+    last = next((m for m in reversed(request.messages) if m.role == "user"), None)
+    lines: list[str] = []
+    for block in last.content if last else []:
+        if isinstance(block, ImageBlock):
+            lines.append(
+                f"une image {block.media_type} ({len(block.data) * 3 // 4:,} octets)".replace(
+                    ",", " "
+                )
+            )
+        elif isinstance(block, TextBlock) and block.text.startswith("<piece_jointe"):
+            head = block.text.split("\n", 1)[0]
+            name = re.search(r'nom="([^"]*)"', head)
+            chars = len(block.text) - len(head)
+            lines.append(
+                f"**{name.group(1) if name else '?'}** : {chars:,} caractères de texte".replace(
+                    ",", " "
+                )
+            )
+    return lines
+
+
 class DemoProvider(LLMProvider):
     def __init__(self, name: ProviderName) -> None:
         super().__init__("demo-scripte")
@@ -110,7 +135,13 @@ class DemoProvider(LLMProvider):
         if "cine_library_report" in tools:
             return self._cine(done)
         if "tab_list_tables" in tools:
-            return self._tab(done)
+            return self._tab(done, request)
+        received = _attachments_received(request)
+        if received and not done:
+            return self._say(
+                "Voici ce que j'ai reçu (contenu réellement transmis au modèle) :\n\n"
+                + "\n".join(f"- {line}" for line in received)
+            )
         if "publish_artifact" in tools and "publish_artifact" not in done:
             return self._call(
                 "publish_artifact",
@@ -195,7 +226,45 @@ class DemoProvider(LLMProvider):
             "Analyse faite **entièrement en local** : aucune donnée financière n'a quitté la machine."
         )
 
-    def _tab(self, done: dict[str, ToolResultBlock]) -> LLMResponse:
+    def _tab(self, done: dict[str, ToolResultBlock], request: LLMRequest) -> LLMResponse:
+        asked = next(
+            (b.text for m in reversed(request.messages) if m.role == "user"
+             for b in m.content if isinstance(b, TextBlock) and b.text),
+            "",
+        )  # fmt: skip
+        if asked.lower().startswith("envoie") and "projets_import_tab_table" in {
+            t.name for t in request.tools
+        }:
+            if "projets_preview_tab_import" not in done:
+                return self._call(
+                    "projets_preview_tab_import",
+                    {"table_id": "tbl_planning_lots"},
+                    "Voici ce que l'import ferait dans Atelier Projets :",
+                )
+            if "projets_import_tab_table" not in done:
+                return self._call(
+                    "projets_import_tab_table",
+                    {"table_id": "tbl_planning_lots"},
+                    "Aperçu vérifié (détail ci-dessus) : une ligne a changé depuis le dernier "
+                    "import. Je l'envoie :",
+                )
+            result = done["projets_import_tab_table"]
+            if result.is_error:
+                return self._say("Entendu, rien n'est envoyé à Atelier Projets.")
+            return self._say(result.content)
+        if asked.lower().startswith("ajoute") and "tab_add_rows" in {t.name for t in request.tools}:
+            if "tab_add_rows" not in done:
+                return self._call(
+                    "tab_add_rows",
+                    {"table_id": "tbl_planning_lots",
+                     "rows": [{"Lot / Tâche": "Plomberie", "Statut": "À faire", "Coût HT": "12 000",
+                               "Échéance": "15/01/2027"}]},
+                    "J'ajoute le lot au-dessus de la ligne de total du planning :",
+                )  # fmt: skip
+            added = done["tab_add_rows"]
+            if added.is_error:
+                return self._say("D'accord, je n'ajoute rien.")
+            return self._say(f"{added.content}\n\nLe total du planning inclut maintenant ce lot.")
         if "tab_list_tables" not in done:
             return self._call("tab_list_tables", {}, "Je regarde les tables d'Atelier Tab.")
         if "tab_check_table" not in done:

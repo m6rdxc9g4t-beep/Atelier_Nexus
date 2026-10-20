@@ -170,6 +170,24 @@ class TabSnapshots:
             )
         return best[table_id]
 
+    async def envelope_json(self, table_id: str) -> tuple[dict[str, Any], TableInfo]:
+        """Enveloppe DataFlow telle que publiée par Tab (pour la transmettre sans la réécrire)."""
+        _, info = await self.table(table_id)
+
+        def read() -> dict[str, Any]:
+            path = self._folder() / info.file
+            with path.open("rb") as fh:
+                raw = fh.read(self.max_bytes + 1)
+            data: dict[str, Any] = json.loads(raw.decode("utf-8-sig"))
+            return data
+
+        try:
+            return await asyncio.to_thread(read), info
+        except (OSError, ValueError) as exc:
+            raise AppUnavailableError(
+                f"Instantané « {info.file} » illisible ; réessayez dans un instant.", app=self.app
+            ) from exc
+
 
 # ─── Valeurs et colonnes ──────────────────────────────────────────
 

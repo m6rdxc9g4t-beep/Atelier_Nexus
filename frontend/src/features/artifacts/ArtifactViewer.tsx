@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/features/chat-agent/Markdown";
+import { saveFile } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 
@@ -35,14 +36,6 @@ const EXTENSIONS: Record<StoredArtifact["kind"], string> = {
   data_preview: "csv",
 };
 
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 const slug = (s: string) =>
   s
@@ -100,7 +93,11 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
             size="icon-sm"
             aria-label="Télécharger"
             onClick={() =>
-              download(`${slug(artifact.title)}.${EXTENSIONS[artifact.kind]}`, exportable.text, exportable.type)
+              void saveFile(
+                `${slug(artifact.title)}.${EXTENSIONS[artifact.kind]}`,
+                exportable.text,
+                exportable.type,
+              ).catch(() => undefined)
             }
           >
             <Download />
@@ -113,7 +110,7 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
 
       <div className="min-h-0 flex-1 overflow-auto">
         {notes && (
-          <div className="border-b bg-accent-soft/50 px-4 py-3">
+          <div className="border-b bg-signature-faint px-4 py-3">
             <p className="mb-1 text-xs font-medium text-accent-ink">Intégration</p>
             <Markdown className="text-sm">{notes}</Markdown>
           </div>
@@ -154,7 +151,7 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
 function CodeBlock({ code }: { code: string }) {
   const lines = code.replace(/\n$/, "").split("\n");
   return (
-    <pre className="overflow-x-auto rounded-md border bg-sunken py-3 font-mono text-[0.8125rem] leading-relaxed">
+    <pre className="overflow-x-auto rounded-md border border-atelier-border-soft bg-sunken py-3 font-mono text-[0.8125rem] leading-relaxed">
       <code className="grid grid-cols-[auto_1fr]">
         {lines.map((line, i) => (
           <span key={i} className="contents">
@@ -173,9 +170,9 @@ function DataTable({ table, caption }: { table: TableData; caption?: string }) {
   return (
     <div>
       {caption && <h3 className="mb-2 text-xs font-medium text-muted-foreground">{caption}</h3>}
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border border-atelier-border bg-card shadow-glow">
         <table className="w-full text-sm">
-          <thead className="bg-muted">
+          <thead className="bg-signature-faint text-accent-ink">
             <tr>
               {table.headers.map((h, i) => (
                 <th

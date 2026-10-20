@@ -17,6 +17,7 @@ from app.core.config import Settings
 from app.tools.artifacts import PublishArtifactTool
 from app.tools.base import BaseTool
 from app.tools.cine import cine_read_tools, cine_write_tools
+from app.tools.cuisine import cuisine_budget_tools, cuisine_tools
 from app.tools.data_via import DataViaNotConfiguredError, data_via_tools
 from app.tools.environment import ToolEnvironment
 from app.tools.github import github_read_tools, github_write_tools
@@ -25,6 +26,8 @@ from app.tools.projets import projets_read_tools, projets_write_tools
 from app.tools.savoir import savoir_read_tools, savoir_write_tools
 from app.tools.system import CurrentDateTimeTool
 from app.tools.tab import tab_tools
+from app.tools.tab_mcp import tab_write_tools
+from app.tools.tab_projets import tab_projets_tools
 from app.tools.tresorerie import tresorerie_tools
 
 
@@ -219,6 +222,28 @@ register_toolset(
 )
 register_toolset(
     Toolset(
+        id="tab_write",
+        label="Atelier Tab — modifications",
+        description="Modifier des cellules, ajouter ou supprimer des lignes, ajouter une colonne, créer une table (avec validation).",
+        build=lambda env: tab_write_tools(env.tab_mcp()),
+        is_configured=lambda s: bool(s.tab_mcp_command),
+        app="tab",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="tab_projets",
+        label="Atelier Tab → Atelier Projets",
+        description="Aperçu puis import d'une table de Tab en éléments de Projets (import avec validation, sans doublon).",
+        build=lambda env: tab_projets_tools(env.projets(), env.tab()),
+        is_configured=lambda s: bool(s.tab_exports_dir and s.projets_base_url),
+        app="projets",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
         id="cine",
         label="Atelier Ciné",
         description="Médiathèque : films, séries, épisodes manquants, qualités, synopsis proposés par l'IA locale de Ciné.",
@@ -259,6 +284,27 @@ register_toolset(
         app="savoir",
         sensitive=True,
         writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="cuisine",
+        label="Atelier Cuisine",
+        description="Stock du foyer (ce qui presse d'abord), planning des repas et liste de courses, en lecture. App en ligne (Supabase).",
+        build=lambda env: cuisine_tools(env.cuisine()),
+        is_configured=lambda s: s.cuisine_configured,
+        app="cuisine",
+    )
+)
+register_toolset(
+    Toolset(
+        id="cuisine_budget",
+        label="Atelier Cuisine — budget",
+        description="Dépenses du mois par périmètre, plafonds, tickets de caisse, en lecture. Données financières : modèle local imposé.",
+        build=lambda env: cuisine_budget_tools(env.cuisine()),
+        is_configured=lambda s: s.cuisine_configured,
+        app="cuisine",
+        sensitive=True,
     )
 )
 register_toolset(

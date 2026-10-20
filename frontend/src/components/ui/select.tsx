@@ -9,7 +9,7 @@ function NativeSelect({ className, children, ...props }: React.ComponentProps<"s
     <div className={cn("relative inline-flex", className)}>
       <select
         data-slot="native-select"
-        className="h-8 w-full appearance-none rounded-md border border-input bg-card py-1 pr-8 pl-2.5 text-sm outline-none transition-colors focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring disabled:opacity-50"
+        className="h-8 w-full appearance-none rounded-md border border-input bg-atelier-field py-1 pr-8 pl-2.5 text-sm outline-none transition-colors focus-visible:border-primary focus-visible:shadow-focus disabled:opacity-50"
         {...props}
       >
         {children}

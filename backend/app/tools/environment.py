@@ -9,12 +9,14 @@ import httpx
 
 from app.core.config import Settings
 from app.tools.cine import CineClient
+from app.tools.cuisine import CuisineClient
 from app.tools.data_via import DataViaClient, DataViaNotConfiguredError
 from app.tools.github import GitHubClient
 from app.tools.http import AppNotConfiguredError
 from app.tools.projets import ProjetsClient
 from app.tools.savoir import SavoirClient
 from app.tools.tab import TabSnapshots
+from app.tools.tab_mcp import TabMcpClient
 from app.tools.tresorerie import TresorerieClient
 
 
@@ -96,6 +98,20 @@ class ToolEnvironment:
         client: SavoirClient = self._get("savoir", make)
         return client
 
+    def cuisine(self) -> CuisineClient:
+        def make() -> CuisineClient:
+            c = CuisineClient.from_settings(self.settings, self._transports.get("cuisine"))
+            if c is None:
+                raise AppNotConfiguredError(
+                    "Atelier Cuisine n'est pas configuré (CUISINE_SUPABASE_URL, clé publique, "
+                    "e-mail + mot de passe ou jeton de rafraîchissement).",
+                    app="cuisine",
+                )
+            return c
+
+        client: CuisineClient = self._get("cuisine", make)
+        return client
+
     def tab(self) -> TabSnapshots:
         def make() -> TabSnapshots:
             c = TabSnapshots.from_settings(self.settings)
@@ -104,6 +120,19 @@ class ToolEnvironment:
             return c
 
         client: TabSnapshots = self._get("tab", make)
+        return client
+
+    def tab_mcp(self) -> TabMcpClient:
+        def make() -> TabMcpClient:
+            c = TabMcpClient.from_settings(self.settings)
+            if c is None:
+                raise AppNotConfiguredError(
+                    "TAB_MCP_COMMAND n'est pas défini : Atelier Tab est en lecture seule.",
+                    app="tab",
+                )
+            return c
+
+        client: TabMcpClient = self._get("tab_mcp", make)
         return client
 
     def github(self) -> GitHubClient:

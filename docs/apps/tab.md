@@ -1,4 +1,4 @@
-# Connecteur Atelier Tab (Étape 7)
+# Connecteur Atelier Tab (étapes 7, 8 et 10)
 
 Atelier Tab (tableur + base typée) **n'a pas d'API HTTP**. L'app de bureau publie chaque table, à chaque
 enregistrement, dans `~/Atelier_Tab/exports/<id de table>.json` : une enveloppe **DataFlow v2.1.0** avec les
@@ -42,9 +42,65 @@ Docker : le `docker-compose.yml` monte `${HOME}/Atelier_Tab/exports` en lecture 
 | `tab_aggregate` | Somme, moyenne, min, max, nombre ; regroupement par une colonne ; filtres d'égalité |
 | `tab_check_table` | Erreurs de formule, titres vides ou en double, échéances dépassées non terminées (`as_of`), responsables manquants, préparation à l'import dans Atelier Projets |
 
-Écrire dans Tab passe par son serveur MCP (`desktop/mcp-server.ts`) : hors du périmètre de cette étape.
+## Écriture par le serveur MCP de Tab (étape 8, boîte `tab_write`)
+
+Tab expose ses outils de données par un serveur **MCP en stdio** (`desktop/mcp-server.ts`), qui utilise le même
+store et le même moteur de formules que l'application. Nexus le lance à la première écriture d'un tour d'agent,
+lui parle en JSON-RPC (une ligne par message : `initialize`, `notifications/initialized`, `tools/call`), puis
+l'arrête à la fin du tour. À chaque appel, le serveur relit le dossier de données, applique l'outil, écrit les seuls
+fichiers modifiés et **met à jour l'instantané** : `tab_read_table` voit le changement aussitôt. Si l'app est
+ouverte, elle se recharge d'elle-même.
+
+Code : `backend/app/tools/tab_mcp.py` (client `TabMcpClient` et outils). Tests : `tests/test_tab_write.py`, avec un
+faux serveur lancé en vrai sous-processus (`tests/fake_tab_mcp.py`).
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `TAB_MCP_COMMAND` | vide (lecture seule) | App Mac : `/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp`. Dépôt : `node <atelier-tab>/dist-desktop/atelier-mcp.mjs` après `npm run build:desktop`. |
+| `TAB_DATA_DIR` | vide (`~/Atelier_Tab`) | Dossier de données transmis au serveur (`ATELIER_TAB_DATA`). Si vous le changez, `TAB_EXPORTS_DIR` = `<ce dossier>/exports`. |
+| `TAB_MCP_TIMEOUT` | `30` | Délai d'un appel (s) |
+
+| Outil | Rôle | Outil de Tab |
+|---|---|---|
+| `tab_set_cells` | Modifier jusqu'à 100 cellules (ligne par numéro ou `rec_…`, colonne par lettre, libellé ou id) | `set_cells` |
+| `tab_add_rows` | Ajouter des lignes `{colonne: valeur}`, au-dessus de la ligne de total par défaut | `add_rows` |
+| `tab_delete_rows` | Supprimer des lignes (formules ajustées comme dans Excel) | `delete_rows` |
+| `tab_add_column` | Ajouter une colonne typée ; formule de la ligne 1 recopiée ; préréglage « Statuts Atelier » | `add_column` |
+| `tab_create_table` | Créer une table dans un projet, avec ses colonnes et leurs rôles DataFlow | `create_table` |
+
+- **Toutes soumises à validation**, avec un résumé lisible (« Ajouter 1 ligne(s) à la table tbl_planning_lots :
+  « Plomberie » »).
+- Les valeurs s'écrivent comme une saisie dans la grille (« 12 000 », « 15/01/2027 », libellé du statut, nom du
+  responsable, `=C5*1.2`) : c'est Tab qui les interprète.
+- Les entrées sont validées avant tout lancement du serveur (identifiant de table, formule obligatoire pour une
+  colonne formula…). Les refus de Tab (table ou colonne introuvable) reviennent tels quels à l'agent.
+- **Environnement minimal** : le serveur ne reçoit que `PATH`, `HOME`, la langue et `ATELIER_TAB_DATA`, jamais les
+  clés ni les secrets de Nexus.
+- Non exposés : renommage, suppression de colonne, configuration et lancement des exports vers Atelier Projets.
+- Docker : l'image du backend n'a pas Node ni l'app Tab ; pour écrire dans Tab, lancez le backend Nexus sur la
+  machine.
+
+## Envoyer une table dans Atelier Projets (étape 10, boîte `tab_projets`)
+
+Le pont DataFlow de la suite (`docs/SUITE.md` §4) : une table de Tab devient des éléments de Projets. Nexus lit
+l'enveloppe **telle que Tab l'a publiée** (aucune réécriture) et l'envoie à l'import d'Atelier Projets.
+
+| Outil | Rôle |
+|---|---|
+| `projets_preview_tab_import` | `POST /api/imports/atelier-tab/preview` : projet, phase, epic et story cibles (existants ou à créer), éléments créés / mis à jour / inchangés / ignorés avec la raison, avertissements. **Ne modifie rien.** |
+| `projets_import_tab_table` | `POST /api/imports/atelier-tab` : **validation**. Clé `Idempotency-Key` = empreinte de l'enveloppe et des options : rejouer le même import ne crée rien (Nexus le signale) ; après une modification dans Tab, le réimport met à jour les éléments existants (rattachés par `record_id`). |
+
+Options : `project_id` (sinon le projet du même nom, créé au besoin), `type` (TASK par défaut), `rows` (numéros ou
+`rec_…` ; compteurs et totaux recalculés comme Tab, lignes de total exclues).
+
+En-têtes : `X-Atelier-Schema-Version: 2.1.0` et, si Projets protège l'import (`ATELIER_IMPORT_TOKEN`),
+`Authorization: Bearer` avec la valeur de `PROJETS_IMPORT_TOKEN` côté Nexus.
+
+Code : `backend/app/tools/tab_projets.py` (outils), `ProjetsClient.preview_tab_import` / `import_tab`
+(`app/tools/projets.py`), `TabSnapshots.envelope_json` (`app/tools/tab.py`). Tests : `tests/test_tab_projets.py`.
 
 ## Agents
 
-- **Tableur** (`tableur`) : `core`, `tab`.
+- **Tableur** (`tableur`) : `core`, `tab`, `tab_write`, `tab_projets`.
+- **Chef de projet** (`chef_de_projet`) : `tab` et `tab_projets` en plus de Projets.
 - **Data Analyst / Power BI** et **Chef de projet** ont aussi la boîte `tab`.

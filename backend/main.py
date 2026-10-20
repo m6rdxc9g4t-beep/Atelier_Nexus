@@ -8,11 +8,16 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.api import agents, apps, conversations, data_via, llm
+from app import __version__
+from app.api import agents, apps, attachments, conversations, data_via, llm
+from app.api import settings as settings_api
+from app.api.deps import get_attachment_repository
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
+from app.db.repository import StorageError
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -37,12 +42,18 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logger.warning(
                 "Migrations non appliquées (agents personnalisés indisponibles) : %s", exc
             )
+    try:  # envois abandonnés : pièces jointes jamais rattachées à une conversation
+        purged = await get_attachment_repository().purge_orphans()
+        if purged:
+            logger.info("%d pièce(s) jointe(s) abandonnée(s) supprimée(s)", purged)
+    except StorageError as exc:
+        logger.debug("Nettoyage des pièces jointes ignoré : %s", exc)
     yield
 
 
 app = FastAPI(
     title="Atelier Nexus API",
-    version="0.6.0",
+    version=__version__,
     description="Orchestration des agents IA et connecteurs de la suite Atelier.",
     lifespan=lifespan,
 )
@@ -60,7 +71,9 @@ app.include_router(llm.router)
 app.include_router(agents.router)
 app.include_router(apps.router)
 app.include_router(conversations.router)
+app.include_router(attachments.router)
 app.include_router(data_via.router)
+app.include_router(settings_api.router)
 
 
 class HealthResponse(BaseModel):
@@ -78,3 +91,9 @@ async def health() -> HealthResponse:
         env=settings.app_env,
         llm_default_provider=settings.llm_default_provider,
     )
+
+
+# Application de bureau : le backend sert aussi l'interface compilée (NEXUS_EXPORT=1), en dernier
+# pour que les routes /api gardent la priorité. Voir app/desktop.py et scripts/macos/build_app.sh.
+if settings.frontend_dist and (Path(settings.frontend_dist) / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=settings.frontend_dist, html=True), name="interface")

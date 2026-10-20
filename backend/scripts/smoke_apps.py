@@ -20,6 +20,7 @@ from app.tools.environment import ToolEnvironment
 from app.tools.projets import projets_read_tools, projets_write_tools
 from app.tools.savoir import savoir_read_tools, savoir_write_tools
 from app.tools.tab import tab_tools
+from app.tools.tab_mcp import tab_write_tools
 from app.tools.tresorerie import tresorerie_tools
 
 ALL_APPS = ("projets", "tresorerie", "tab", "cine", "savoir")
@@ -108,6 +109,35 @@ async def tab(env: ToolEnvironment, ctx: ToolContext, write: bool) -> None:
             t["tab_aggregate"],
             {"table_id": ids[0], "measures": [{"column": "A", "agg": "count"}]},
             ctx,
+        )
+    if write and "tbl_planning_lots" in ids and env.settings.tab_mcp_command:
+        # Écritures réelles par le serveur MCP de Tab, puis contrôle dans l'instantané
+        w = {x.name: x for x in tab_write_tools(env.tab_mcp())}
+        added = await call(
+            w["tab_add_rows"],
+            {"table_id": "tbl_planning_lots",
+             "rows": [{"Lot / Tâche": "Essai Nexus", "Statut": "À faire", "Coût HT": "12 000",
+                       "Échéance": "15/01/2027"}]},
+            ctx,
+        )  # fmt: skip
+        row = int(added.split("ligne ")[1].split(" ")[0])
+        await call(
+            w["tab_set_cells"],
+            {"table_id": "tbl_planning_lots",
+             "cells": [{"row": row, "column": "Coût HT", "value": "13 500"}]},
+            ctx,
+        )  # fmt: skip
+        check = await call(
+            t["tab_aggregate"],
+            {"table_id": "tbl_planning_lots", "measures": [{"column": "Coût HT"}],
+             "filters": {"Lot / Tâche": "Essai Nexus"}},
+            ctx,
+        )  # fmt: skip
+        if "| 1 | 13500 |" not in check:
+            failures.append("tab : l'instantané ne reflète pas l'écriture")
+        await call(w["tab_delete_rows"], {"table_id": "tbl_planning_lots", "rows": [row]}, ctx)
+        await call(
+            t["tab_read_table"], {"table_id": "tbl_planning_lots", "columns": ["A", "C"]}, ctx
         )
 
 

@@ -61,12 +61,14 @@ class SpreadsheetAgent(BaseAgent):
     description = "Lit vos tables Atelier Tab, calcule des totaux, traque les erreurs de formule et les échéances dépassées."
     icon = "table-2"
     category = "Données"
-    toolsets = ("core", "tab")
-    max_iterations = 10
+    toolsets = ("core", "tab", "tab_write", "tab_projets")
+    max_iterations = 12
     starters = (
         "Quelles tables ai-je dans Atelier Tab ?",
         "Contrôle le planning : erreurs de formule, lots en retard, responsables manquants.",
         "Total du coût HT par statut dans la table Planning & Lots.",
+        "Ajoute au planning un lot « Plomberie » à 12 000 € HT, à faire, échéance le 15/01/2027.",
+        "Envoie le planning dans Atelier Projets.",
     )
     system_prompt = prompt(
         """
@@ -84,7 +86,21 @@ Méthode :
 - Pour corriger une formule, explique la cause et donne la formule corrigée (syntaxe d'Atelier
   Tab : `=SUM(C1:C10)`, `=AVG()`, `=MIN()`, `=MAX()`, `=IF(cond; si_vrai; si_faux)`).
 
-Les valeurs sont celles du dernier enregistrement dans l'app de bureau. Tu ne modifies pas les
-tables : l'utilisateur applique les corrections dans Atelier Tab.
+Modifications (`tab_set_cells`, `tab_add_rows`, `tab_delete_rows`, `tab_add_column`,
+`tab_create_table`), toutes soumises à la validation de l'utilisateur :
+- Lis d'abord la table pour viser la bonne colonne (libellé exact) et la bonne ligne.
+- Saisis les valeurs comme dans la grille : « 12 000 », « 15/01/2027 », libellé du statut,
+  nom du responsable, formule « =C5*1.2 ». Une colonne formula se recopie toute seule : ne
+  remplis pas ses cellules.
+- Les nouvelles lignes vont au-dessus de la ligne de total, qui les inclut.
+- Une intention claire = une écriture ; décris-la avant de la lancer, puis vérifie le résultat
+  avec `tab_read_table`.
+Sans serveur MCP configuré, Atelier Tab est en lecture seule : propose alors la correction à
+appliquer à la main.
+
+Vers Atelier Projets : `tab_check_table` (une colonne au rôle « titre » est indispensable), puis
+TOUJOURS `projets_preview_tab_import` pour montrer le projet, la story et les éléments créés,
+mis à jour ou ignorés, puis `projets_import_tab_table` (validation). Réimporter met à jour les
+éléments existants, sans doublon.
 """
     )

@@ -19,6 +19,8 @@ from app.schemas.projets import (
     Dashboard,
     Duration,
     Health,
+    ImportPreview,
+    ImportResult,
     LogEntryCreate,
     Milestone,
     Priority,
@@ -38,6 +40,16 @@ from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.formatting import data_artifact, fmt, table_for_model
 from app.tools.http import AppClient, AppError, safe_id
 
+
+def _import_params(project_id: int | None, item_type: str | None) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    if project_id is not None:
+        params["projectId"] = safe_id(project_id)
+    if item_type:
+        params["type"] = item_type
+    return params
+
+
 # ═══ Client ═══════════════════════════════════════════════════════
 
 
@@ -51,10 +63,58 @@ class ProjetsClient(AppClient):
     ) -> ProjetsClient | None:
         if not settings.projets_base_url:
             return None
-        return cls(settings.projets_base_url, timeout=settings.apps_timeout, transport=transport)
+        client = cls(settings.projets_base_url, timeout=settings.apps_timeout, transport=transport)
+        token = settings.projets_import_token
+        client.import_token = token.get_secret_value() if token else None
+        return client
+
+    #: Jeton ATELIER_IMPORT_TOKEN d'Atelier Projets (import depuis Tab), s'il est configuré
+    import_token: str | None = None
 
     async def health(self) -> Health:
         return self.parse(Health, await self.request("GET", "health"))
+
+    def _import_headers(self, idempotency_key: str | None) -> dict[str, str]:
+        headers = {"X-Atelier-Schema-Version": "2.1.0"}
+        if self.import_token:
+            headers["Authorization"] = f"Bearer {self.import_token}"
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        return headers
+
+    async def preview_tab_import(
+        self, envelope: dict[str, Any], *, project_id: int | None, item_type: str | None
+    ) -> ImportPreview:
+        """Aperçu de l'import d'une table Atelier Tab : rien n'est modifié."""
+        data = await self.request(
+            "POST",
+            "imports/atelier-tab/preview",
+            json_body=envelope,
+            params=_import_params(project_id, item_type),
+            headers=self._import_headers(None),
+        )
+        return self.parse(ImportPreview, data)
+
+    async def import_tab(
+        self,
+        envelope: dict[str, Any],
+        *,
+        project_id: int | None,
+        item_type: str | None,
+        idempotency_key: str,
+    ) -> ImportResult:
+        """Import (création / mise à jour par `record_id`), idempotent par `Idempotency-Key`."""
+        data = await self.request(
+            "POST",
+            "imports/atelier-tab",
+            json_body=envelope,
+            params=_import_params(project_id, item_type),
+            headers=self._import_headers(idempotency_key),
+        )
+        result = self.parse(ImportResult, data)
+        headers = self.last_headers
+        result.replayed = bool(headers and headers.get("idempotency-replayed") == "true")
+        return result
 
     async def projects(self) -> list[Project]:
         return self.parse_list(Project, await self.request("GET", "projects"))
