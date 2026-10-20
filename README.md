@@ -62,6 +62,17 @@ npm run dev                             # http://localhost:3100 · lint : npm ru
 cd frontend && npx shadcn@latest add button card input
 ```
 
+## Charte graphique (suite Atelier)
+
+Charte « néon monochrome » commune à la suite : chaque application est **entièrement dans sa couleur signature** — **orange #E8590C** pour Nexus. Fond, barre latérale, cartes, bordures, textes secondaires, halos et grille de fond dérivent tous de cette couleur (mélanges et transparences) ; pas de couleur de structure commune.
+
+- `frontend/src/styles/brand/atelier-brand.css` (+ police Nunito et sa licence OFL) est une **copie exacte** du fichier de marque d'Atelier Projets (`design-system/brand/`) : ne pas l'éditer ici. Il définit les jetons `--atelier-*` (`bg`, `sidebar`, `surface(-2|-3)`, `field`, `text`, `muted`, `ink`, `border(-soft)`, `line`, `signature(-soft|-faint)`, `glow(-strong)`, `focus`, `backdrop`, `chart-1..3`) pour le clair et le sombre.
+- `data-atelier-app="nexus"` sur `<html>` (`layout.tsx`) pose la couleur ; les variables Shadcn de `globals.css` sont branchées sur ces jetons, et tous les écrans (en-tête, barre des agents, chat, panneau Artefacts, historique, réglages, éditeur d'agent, menus) reçoivent trait et halo néon par les composants de `src/components/ui/`. Chaque tuile du sélecteur « Suite Atelier » prend la couleur de SON application.
+- Choix du thème **Clair / Sombre / Système** (`src/components/theme/`) : dans l'en-tête de l'écran principal, et dans **Réglages › Apparence** (petits écrans). Préférence dans `localStorage` (`atelier-nexus-theme`, défaut Système, qui suit `prefers-color-scheme` ; l'ancienne clé `atelier-nexus:theme` est reprise une fois), appliquée avant le premier affichage par un script inline ; sombre = `.dark` + `data-theme="dark"`, clair = `data-theme="light"`. Bouton principal : plein en clair, contour néon en sombre.
+- Application de bureau : la fenêtre s'ouvre sur le fond du kit (`#fbf3f2` clair, `#120c0d` sombre, selon l'apparence de macOS), sans éclair blanc.
+- Utilitaires Tailwind : `shadow-glow`, `shadow-glow-strong`, `shadow-signature-glow`, `shadow-focus`, `text-shadow-glow`, `bg-signature-soft`, `bg-signature-faint`, `bg-atelier-surface(-2|-3)`, `text-atelier-ink`, `text-atelier-muted`, `border-atelier-border(-soft)`, `border-atelier-line`, `fill-atelier-chart-1..3`.
+- Les couleurs qui portent un sens (`--chart-*` multi-séries, `--destructive`) ne changent pas.
+
 ## Workflow Git
 
 Jamais de push direct sur `main` : une branche `feat/…` ou `fix/…` par évolution, PR obligatoire, la CI (`.github/workflows/ci.yml`) doit être verte.
