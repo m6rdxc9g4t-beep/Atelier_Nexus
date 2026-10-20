@@ -2,6 +2,7 @@
 
 import { Layers, Lock } from "lucide-react";
 
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
@@ -12,7 +13,6 @@ import type { AgentInfo, AppStatus, ProviderName, ProviderStatus } from "@/types
 import { AppsMenu } from "./AppsMenu";
 import { AtelierBrand } from "./AtelierBrand";
 import { SuiteSwitcher } from "./SuiteSwitcher";
-import { ThemeMenu } from "./ThemeMenu";
 
 const PROVIDER_LABEL: Record<ProviderName, string> = { anthropic: "Claude", ollama: "Ollama (local)" };
 
@@ -45,7 +45,7 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
   const locked = current?.local_only ?? false;
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1.5 border-b bg-card px-2 sm:gap-2 sm:px-3">
+    <header className="relative z-10 flex h-14 shrink-0 items-center gap-1.5 border-b border-atelier-border-soft bg-sidebar/85 px-2 shadow-glow backdrop-blur-md sm:gap-2 sm:px-3">
       <SuiteSwitcher />
       <AtelierBrand />
 
@@ -76,7 +76,7 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
         {locked ? (
           <span
             id="provider-select"
-            className="flex h-8 w-28 items-center gap-1.5 rounded-md border border-input bg-muted px-2.5 text-sm text-muted-foreground sm:w-52"
+            className="flex h-8 w-28 items-center gap-1.5 rounded-md border border-input bg-signature-faint px-2.5 text-sm text-muted-foreground sm:w-52"
             title="Agent verrouillé sur le modèle local : ses données ne quittent pas la machine"
           >
             <Lock className="size-3.5 shrink-0" aria-hidden />
@@ -108,8 +108,9 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
             <span className="text-muted-foreground">{artifactCount}</span>
           </Button>
         )}
+        {/* Clair / Sombre / Système ; sur petit écran, dans les Réglages (rubrique Apparence) */}
+        <ThemeToggle className="hidden sm:inline-flex" />
         <SettingsDialog onSaved={onSettingsSaved} />
-        <ThemeMenu />
       </div>
     </header>
   );

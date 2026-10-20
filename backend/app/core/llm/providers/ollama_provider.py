@@ -13,7 +13,9 @@ import ollama
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
 from app.core.llm.providers.base import LLMProvider
 from app.core.llm.types import (
+    AttachmentBlock,
     ContentBlock,
+    ImageBlock,
     LLMRequest,
     LLMResponse,
     LLMStreamEvent,
@@ -58,12 +60,21 @@ def to_ollama_messages(system: str | None, messages: list[Message]) -> list[dict
                 ]
             out.append(msg)
             continue
+        images: list[str] = []
         for block in m.content:
             if isinstance(block, ToolResultBlock):
                 content = f"[ERREUR] {block.content}" if block.is_error else block.content
                 out.append({"role": "tool", "tool_name": block.tool_name, "content": content})
-        if m.text:
-            out.append({"role": "user", "content": m.text})
+            elif isinstance(block, ImageBlock):
+                images.append(block.data)
+            elif isinstance(block, AttachmentBlock):
+                images_note = f"[Pièce jointe « {block.name} » non chargée.]"
+                out.append({"role": "user", "content": images_note})
+        if m.text or images:
+            user: dict[str, Any] = {"role": "user", "content": m.text}
+            if images:
+                user["images"] = images  # modèle de vision requis (gemma3, qwen2.5vl, llava…)
+            out.append(user)
     return out
 
 
@@ -149,6 +160,13 @@ class OllamaProvider(LLMProvider):
         except ollama.ResponseError as exc:
             if exc.status_code >= 500:
                 raise ProviderUnavailableError(f"Ollama : {exc.error}", provider=self.name) from exc
+            if "image" in (exc.error or "").lower() or "vision" in (exc.error or "").lower():
+                raise ProviderRequestError(
+                    f"Le modèle local « {model} » ne lit pas les images. Installez un modèle de "
+                    "vision (par exemple : ollama pull gemma3) et choisissez-le dans les Réglages, "
+                    "ou retirez l'image.",
+                    provider=self.name,
+                ) from exc
             hint = f" (essayer : ollama pull {model})" if exc.status_code == 404 else ""
             raise ProviderRequestError(f"Ollama : {exc.error}{hint}", provider=self.name) from exc
 

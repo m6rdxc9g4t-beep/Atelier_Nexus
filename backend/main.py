@@ -12,10 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import __version__
-from app.api import agents, apps, conversations, data_via, llm
+from app.api import agents, apps, attachments, conversations, data_via, llm
 from app.api import settings as settings_api
+from app.api.deps import get_attachment_repository
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
+from app.db.repository import StorageError
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -40,6 +42,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logger.warning(
                 "Migrations non appliquées (agents personnalisés indisponibles) : %s", exc
             )
+    try:  # envois abandonnés : pièces jointes jamais rattachées à une conversation
+        purged = await get_attachment_repository().purge_orphans()
+        if purged:
+            logger.info("%d pièce(s) jointe(s) abandonnée(s) supprimée(s)", purged)
+    except StorageError as exc:
+        logger.debug("Nettoyage des pièces jointes ignoré : %s", exc)
     yield
 
 
@@ -63,6 +71,7 @@ app.include_router(llm.router)
 app.include_router(agents.router)
 app.include_router(apps.router)
 app.include_router(conversations.router)
+app.include_router(attachments.router)
 app.include_router(data_via.router)
 app.include_router(settings_api.router)
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SettingsField, SettingsView } from "@/types/api";
 
-import { byGroup, changes, initialDraft } from "./form";
+import { GROUP_NOTES, byGroup, changes, initialDraft } from "./form";
 
 const f = (over: Partial<SettingsField>): SettingsField => ({
   key: "K",
@@ -60,5 +60,23 @@ describe("réglages", () => {
       ["Modèles", 3],
       ["GitHub", 1],
     ]);
+  });
+
+  it("Atelier Cuisine : groupe entre les apps et GitHub, mot de passe jamais renvoyé", () => {
+    const cuisine: SettingsView = {
+      env_file: "/x/.env",
+      fields: [
+        f({ key: "GITHUB_REPO", group: "GitHub" }),
+        f({ key: "CUISINE_SUPABASE_URL", group: "Atelier Cuisine", kind: "url", value: "https://p.supabase.co" }),
+        f({ key: "CUISINE_PASSWORD", group: "Atelier Cuisine", kind: "secret", value: null, configured: true }),
+        f({ key: "CINE_BASE_URL", group: "Applications Atelier", kind: "url" }),
+      ],
+    };
+    expect(byGroup(cuisine).map(([g]) => g)).toEqual(["Applications Atelier", "Atelier Cuisine", "GitHub"]);
+    const draft = initialDraft(cuisine);
+    expect(draft.CUISINE_PASSWORD).toEqual({ value: "", clear: false });
+    draft.CUISINE_PASSWORD!.value = "nouveau";
+    expect(changes(cuisine, draft)).toEqual({ CUISINE_PASSWORD: "nouveau" });
+    expect(GROUP_NOTES["Atelier Cuisine"]).toContain("lecture seule");
   });
 });

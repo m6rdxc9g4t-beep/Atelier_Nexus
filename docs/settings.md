@@ -17,12 +17,14 @@ Code : `backend/app/core/settings_editor.py` (liste blanche, lecture / écriture
 
 ## Règles
 
-- **Liste blanche** (`FIELDS`) : ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
+- **Liste blanche** (`FIELDS`) : CLAUDE_MODE, CLAUDE_CLI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
   LLM_DEFAULT_PROVIDER, LLM_FALLBACK_PROVIDER, DATA_VIA_BASE_URL, PROJETS_BASE_URL, PROJETS_IMPORT_TOKEN,
-  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, TAB_EXPORTS_DIR, GITHUB_TOKEN, GITHUB_REPO,
+  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
+  CUISINE_EMAIL, CUISINE_PASSWORD, CUISINE_REFRESH_TOKEN (groupe « Atelier Cuisine »), GITHUB_TOKEN, GITHUB_REPO,
   GITHUB_ALLOWED_REPOS. Tout le reste est refusé — en particulier **`TAB_MCP_COMMAND`** (commande exécutée) et
-  `DATABASE_URL`, qui restent dans le fichier.
-- Validation : adresses `http(s)://`, choix fermés, pas de retour à la ligne (aucune injection d'une autre clé), puis
+  `DATABASE_URL`, ainsi que `CLAUDE_CLI_PATH`, qui restent dans le fichier.
+- Validation : adresses `http(s)://`, choix fermés, Atelier Cuisine (adresse HTTPS du projet, clé publique seulement :
+  `service_role` / `sb_secret_…` refusées, e-mail valide — [`apps/cuisine.md`](apps/cuisine.md)), pas de retour à la ligne (aucune injection d'une autre clé), puis
   contrôle par le modèle `Settings`. Une valeur refusée ne modifie pas le fichier.
 - Écriture : commentaires, ordre et autres clés préservés ; clé existante remplacée sur place, nouvelle clé ajoutée sous
   un en-tête dédié ; écriture atomique ; droits **600**.
@@ -30,7 +32,7 @@ Code : `backend/app/core/settings_editor.py` (liste blanche, lecture / écriture
 - **Origine contrôlée** : refus (403) d'un appel venant d'une autre origine que l'interface de Nexus (origines CORS
   déclarées ou même origine dans l'application de bureau). Le corps JSON impose de toute façon une requête de contrôle
   CORS aux navigateurs.
-- Sans clé Claude, le moteur par défaut devient Ollama (au lieu d'une erreur à chaque message).
+- Sans clé Claude ni Claude Code, le moteur par défaut devient Ollama (au lieu d'une erreur à chaque message).
 
 Fichier utilisé : `backend/.env` en développement, `~/Library/Application Support/Atelier Nexus/.env` dans
 l'application de bureau.

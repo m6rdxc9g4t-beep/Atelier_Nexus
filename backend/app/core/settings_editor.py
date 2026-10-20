@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 from app.core.config import Settings
 
 Kind = Literal["text", "url", "secret", "choice", "path"]
-Group = Literal["Modèles", "Applications Atelier", "GitHub"]
+Group = Literal["Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"]
 
 
 @dataclass(frozen=True)
@@ -42,9 +42,13 @@ class EditableField:
 
 
 FIELDS: tuple[EditableField, ...] = (
+    EditableField("CLAUDE_MODE", "Accès à Claude", "Modèles", "choice",
+                  "Abonnement : le programme claude (Claude Code) de cet ordinateur, connecté à votre compte. "
+                  "Automatique : la clé API si elle est renseignée, sinon l'abonnement.", ("auto", "cli", "api")),
+    EditableField("CLAUDE_CLI_MODEL", "Modèle Claude (abonnement)", "Modèles", "choice", "", ("sonnet", "opus", "haiku")),
     EditableField("ANTHROPIC_API_KEY", "Clé API Claude", "Modèles", "secret",
-                  "console.anthropic.com → API Keys. Sans clé, seuls les modèles locaux (Ollama) répondent."),
-    EditableField("ANTHROPIC_MODEL", "Modèle Claude", "Modèles", "text"),
+                  "Seulement sans abonnement : console.anthropic.com → API Keys (facturé à l'usage)."),
+    EditableField("ANTHROPIC_MODEL", "Modèle Claude (clé API)", "Modèles", "text"),
     EditableField("OLLAMA_BASE_URL", "Adresse d'Ollama", "Modèles", "url"),
     EditableField("OLLAMA_MODEL", "Modèle local (Ollama)", "Modèles", "text",
                   "Doit être installé : ollama pull <modèle>."),
@@ -63,6 +67,17 @@ FIELDS: tuple[EditableField, ...] = (
                   "Lancez Savoir avec ATELIER_PORT=5051 (5050 est pris par Trésorerie)."),
     EditableField("TAB_EXPORTS_DIR", "Instantanés d'Atelier Tab", "Applications Atelier", "path",
                   "Dossier exports de Tab (par défaut ~/Atelier_Tab/exports)."),
+    EditableField("CUISINE_SUPABASE_URL", "Adresse du projet Supabase", "Atelier Cuisine", "url",
+                  "App en ligne. Supabase → Project Settings → API → Project URL (https://<projet>.supabase.co)."),
+    EditableField("CUISINE_SUPABASE_ANON_KEY", "Clé publique (anon)", "Atelier Cuisine", "secret",
+                  "Clé « publishable » (sb_publishable_…) ou « anon » de l'app. Jamais la clé service_role "
+                  "ou secrète : elle est refusée."),
+    EditableField("CUISINE_EMAIL", "E-mail du foyer", "Atelier Cuisine", "text",
+                  "Le compte avec lequel vous vous connectez à Atelier Cuisine."),
+    EditableField("CUISINE_PASSWORD", "Mot de passe du foyer", "Atelier Cuisine", "secret",
+                  "Lecture seule : Nexus ne voit que les données de ce compte (règles RLS de Supabase)."),
+    EditableField("CUISINE_REFRESH_TOKEN", "Ou jeton de rafraîchissement", "Atelier Cuisine", "secret",
+                  "À la place du mot de passe : renouvelé automatiquement ensuite (cuisine-session.json)."),
     EditableField("GITHUB_TOKEN", "Jeton GitHub", "GitHub", "secret",
                   "Jeton « fine-grained » limité aux dépôts voulus : Contents + Pull requests."),
     EditableField("GITHUB_REPO", "Dépôt par défaut", "GitHub", "text", "owner/repo"),
@@ -195,6 +210,9 @@ def validate_changes(update: SettingsUpdate, current: Settings) -> dict[str, str
         if value and spec.kind == "choice" and value not in spec.choices:
             errors[key] = f"choix possibles : {', '.join(c for c in spec.choices if c)}"
             continue
+        if value and (problem := _cuisine_problem(key, value)):
+            errors[key] = problem
+            continue
         changes[key] = value or None
     if not errors:
         # Contrôle final par le modèle Settings lui-même (types, littéraux)
@@ -210,6 +228,19 @@ def validate_changes(update: SettingsUpdate, current: Settings) -> dict[str, str
     if errors:
         raise SettingsError(errors)
     return changes
+
+
+def _cuisine_problem(key: str, value: str) -> str | None:
+    """Atelier Cuisine : adresse HTTPS du projet, clé publique uniquement (RLS)."""
+    from app.tools.cuisine import anon_key_problem, supabase_url_problem
+
+    if key == "CUISINE_SUPABASE_URL":
+        return supabase_url_problem(value)
+    if key == "CUISINE_SUPABASE_ANON_KEY":
+        return anon_key_problem(value)
+    if key == "CUISINE_EMAIL" and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value):
+        return "adresse e-mail attendue"
+    return None
 
 
 def view(settings: Settings, path: Path) -> SettingsView:

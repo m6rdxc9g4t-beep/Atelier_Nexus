@@ -28,7 +28,41 @@ export interface ToolResultBlock {
   is_error: boolean;
 }
 
-export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
+/** Pièce jointe d'un message utilisateur : référence au fichier importé (POST /api/attachments). */
+export interface AttachmentBlock {
+  type: "attachment";
+  id: string;
+  name: string;
+  media_type: string;
+  kind: AttachmentKind;
+  size: number;
+}
+
+export type AttachmentKind = "image" | "document";
+
+export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock | AttachmentBlock;
+
+/** Fichier importé (Étape 15). */
+export interface AttachmentInfo {
+  id: string;
+  name: string;
+  media_type: string;
+  kind: AttachmentKind;
+  size: number;
+  meta: AttachmentMeta;
+  created_at: string;
+}
+
+export interface AttachmentMeta {
+  pages?: number;
+  sheets?: string[];
+  rows?: number;
+  chars?: number;
+  width?: number;
+  height?: number;
+  /** Motif d'une coupure (document très long, image animée…) */
+  truncated?: string;
+}
 
 export interface Message {
   role: "user" | "assistant";
@@ -253,6 +287,11 @@ export interface ConversationSummary {
   artifact_count: number;
 }
 
+/** Résultat de recherche : extrait autour du premier mot trouvé (Étape 13). */
+export interface SearchHit extends ConversationSummary {
+  snippet: string | null;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   history: Message[];
   artifacts: StoredArtifactDto[];
@@ -263,7 +302,7 @@ export interface ConversationDetail extends ConversationSummary {
 // ─── Réglages (Étape 11) ─────────────────────────────────────────
 
 export type SettingsKind = "text" | "url" | "secret" | "choice" | "path";
-export type SettingsGroup = "Modèles" | "Applications Atelier" | "GitHub";
+export type SettingsGroup = "Modèles" | "Applications Atelier" | "Atelier Cuisine" | "GitHub";
 
 export interface SettingsField {
   key: string;
