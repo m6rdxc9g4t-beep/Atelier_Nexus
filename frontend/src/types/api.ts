@@ -164,7 +164,7 @@ export interface DataViaStatus {
 }
 
 export interface ApiErrorBody {
-  error: { code: string; message: string; provider: string | null };
+  error: { code: string; message: string; provider: string | null; fields?: Record<string, string> };
 }
 
 // ─── Data Via (aperçus) ──────────────────────────────────────────
@@ -258,4 +258,29 @@ export interface ConversationDetail extends ConversationSummary {
   artifacts: StoredArtifactDto[];
   turn_meta: Record<string, TurnMeta>;
   pending_approvals: PendingCall[];
+}
+
+// ─── Réglages (Étape 11) ─────────────────────────────────────────
+
+export type SettingsKind = "text" | "url" | "secret" | "choice" | "path";
+export type SettingsGroup = "Modèles" | "Applications Atelier" | "GitHub";
+
+export interface SettingsField {
+  key: string;
+  label: string;
+  group: SettingsGroup;
+  kind: SettingsKind;
+  help: string;
+  choices: string[];
+  /** Valeur effective ; null pour un secret (jamais renvoyé). */
+  value: string | null;
+  configured: boolean;
+  /** Secret configuré : « …abcd ». */
+  hint: string | null;
+  source: "fichier" | "environnement" | "défaut";
+}
+
+export interface SettingsView {
+  env_file: string;
+  fields: SettingsField[];
 }

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app import __version__
 from app.api import agents, apps, conversations, data_via, llm
+from app.api import settings as settings_api
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
 
@@ -63,6 +64,7 @@ app.include_router(agents.router)
 app.include_router(apps.router)
 app.include_router(conversations.router)
 app.include_router(data_via.router)
+app.include_router(settings_api.router)
 
 
 class HealthResponse(BaseModel):

@@ -144,6 +144,16 @@ class AnthropicProvider(LLMProvider):
             raise ProviderUnavailableError(
                 f"Anthropic indisponible : {exc}", provider=self.name
             ) from exc
+        except anthropic.AuthenticationError as exc:
+            raise ProviderRequestError(
+                "Clé API refusée par Anthropic (401) : vérifiez-la dans les Réglages.",
+                provider=self.name,
+            ) from exc
+        except anthropic.PermissionDeniedError as exc:
+            raise ProviderRequestError(
+                "Accès refusé par Anthropic (403) : la clé n'a pas les droits nécessaires.",
+                provider=self.name,
+            ) from exc
         except anthropic.APIError as exc:
             raise ProviderRequestError(
                 f"Requête Anthropic refusée : {exc}", provider=self.name

@@ -32,7 +32,7 @@ Si Python est introuvable ou que l'installation échoue, une alerte dit quoi fai
 
 | Chemin | Contenu |
 |---|---|
-| `~/Library/Application Support/Atelier Nexus/.env` | Réglages (créé au premier lancement depuis `.env.example`, droits 600) : `ANTHROPIC_API_KEY`, adresses des apps, Ollama… Menu **Réglages** de l'application. |
+| `~/Library/Application Support/Atelier Nexus/.env` | Réglages (créé au premier lancement depuis `.env.example`, droits 600) : modifiables depuis la **roue dentée** de l'interface ([`settings.md`](settings.md)), ou à la main (menu Réglages → « Ouvrir le fichier de réglages »). |
 | `…/Atelier Nexus/nexus.db` | Base SQLite : agents personnalisés, conversations, artefacts (imposée, quel que soit `DATABASE_URL`) |
 | `…/Atelier Nexus/webview/` | Stockage de la fenêtre (thème, dernière conversation par agent) |
 | `…/Atelier Nexus/venv/` | Environnement Python |

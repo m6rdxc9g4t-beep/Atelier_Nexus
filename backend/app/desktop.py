@@ -415,7 +415,7 @@ def run(argv: list[str] | None = None) -> int:
                     "Réglages",
                     [
                         MenuAction(
-                            "Ouvrir les réglages (clé Claude, adresses des apps)…",
+                            "Ouvrir le fichier de réglages (.env)…",
                             lambda: reveal(env_file, text_editor=True),
                         ),
                         MenuAction("Afficher le dossier des données", lambda: reveal(home)),

@@ -9,8 +9,9 @@ Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de de
 ./scripts/macos/build_app.sh   # « Atelier Nexus.app » dans ~/Applications + raccourci sur le Bureau
 ```
 
-Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivantes sont immédiates. Réglages et données
-dans `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
+Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivantes sont immédiates. Clé Claude, modèles et
+adresses des apps : roue dentée **Réglages** de l'interface ([`docs/settings.md`](docs/settings.md)). Données dans
+`~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
 
 ## Ports (cohabitation avec la suite Atelier)
 

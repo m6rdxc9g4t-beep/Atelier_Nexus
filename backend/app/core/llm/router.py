@@ -66,11 +66,11 @@ class LLMRouter:
                 timeout=settings.ollama_timeout,
             ),
         }
-        return cls(
-            providers,
-            default=settings.llm_default_provider,
-            fallback=settings.llm_fallback_provider,
-        )
+        default = settings.llm_default_provider
+        if default == "anthropic" and not api_key:
+            # Sans clé Claude, le modèle local répond par défaut (au lieu d'une erreur à chaque message)
+            default = "ollama"
+        return cls(providers, default=default, fallback=settings.llm_fallback_provider)
 
     # ─── Résolution ───────────────────────────────────────────────
 

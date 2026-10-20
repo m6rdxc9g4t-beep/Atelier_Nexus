@@ -14,6 +14,7 @@ import type {
   DataViaStatus,
   EditorOptions,
   ProviderStatus,
+  SettingsView,
 } from "@/types/api";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100").replace(
@@ -26,6 +27,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code: string,
+    /** Message par champ (réglages refusés). */
+    readonly fields: Record<string, string> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -35,7 +38,8 @@ export class ApiError extends Error {
 async function toApiError(response: Response): Promise<ApiError> {
   try {
     const body = (await response.json()) as Partial<ApiErrorBody> & { detail?: unknown };
-    if (body.error) return new ApiError(body.error.message, response.status, body.error.code);
+    if (body.error)
+      return new ApiError(body.error.message, response.status, body.error.code, body.error.fields ?? {});
     if (typeof body.detail === "string") return new ApiError(body.detail, response.status, "http");
     if (Array.isArray(body.detail)) {
       // Erreurs de validation FastAPI : « champ : message »
@@ -97,6 +101,9 @@ export const api = {
     sendJson<ConversationDetail>("PATCH", `/api/conversations/${encodeURIComponent(id)}`, { title }),
   deleteConversation: (id: string) =>
     sendJson<void>("DELETE", `/api/conversations/${encodeURIComponent(id)}`),
+  settings: (signal?: AbortSignal) => getJson<SettingsView>("/api/settings", signal),
+  updateSettings: (values: Record<string, string | null>) =>
+    sendJson<SettingsView>("PUT", "/api/settings", { values }),
 };
 
 /**

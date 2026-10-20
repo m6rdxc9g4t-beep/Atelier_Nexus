@@ -4,6 +4,7 @@ import { Layers, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
+import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { useChatStore } from "@/stores/useChatStore";
 import type { AgentInfo, AppStatus, ProviderName, ProviderStatus } from "@/types/api";
@@ -25,9 +26,11 @@ interface AppHeaderProps {
   agents: AgentInfo[];
   providers: ProviderStatus[];
   apps: AppStatus[];
+  /** Après un changement de réglages : recharger agents, moteurs et apps. */
+  onSettingsSaved: () => Promise<void> | void;
 }
 
-export function AppHeader({ agents, providers, apps }: AppHeaderProps) {
+export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeaderProps) {
   const agent = useChatStore((s) => s.agent);
   const setAgent = useChatStore((s) => s.setAgent);
   const provider = useChatStore((s) => s.provider);
@@ -105,6 +108,7 @@ export function AppHeader({ agents, providers, apps }: AppHeaderProps) {
             <span className="text-muted-foreground">{artifactCount}</span>
           </Button>
         )}
+        <SettingsDialog onSaved={onSettingsSaved} />
         <ThemeMenu />
       </div>
     </header>

@@ -39,12 +39,12 @@ export function Workspace() {
   const blocked = error
     ? error
     : chosen && !chosen.configured
-      ? `${chosen.name === "anthropic" ? "Claude" : "Ollama"} n'est pas configuré : choisissez un autre moteur ou complétez backend/.env.`
+      ? `${chosen.name === "anthropic" ? "Claude" : "Ollama"} n'est pas configuré : choisissez un autre moteur ou ouvrez les Réglages (roue dentée en haut à droite).`
       : null;
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader agents={agents} providers={providers} apps={apps} />
+      <AppHeader agents={agents} providers={providers} apps={apps} onSettingsSaved={reload} />
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-card lg:block">
           <AgentSidebar
