@@ -1,0 +1,36 @@
+{
+ "items": [
+  {
+   "account_balance_cents": null,
+   "account_id": null,
+   "account_name": null,
+   "created_at": "2026-10-20 09:46:53",
+   "current_amount_cents": 60000,
+   "deadline": "2027-06-30",
+   "id": 2,
+   "monthly_needed_cents": 11250,
+   "months_left": 8,
+   "name": "Vacances d'été",
+   "percent": 40.0,
+   "progress_cents": 60000,
+   "remaining_cents": 90000,
+   "target_amount_cents": 150000
+  },
+  {
+   "account_balance_cents": 800000,
+   "account_id": 2,
+   "account_name": "Livret A",
+   "created_at": "2026-10-20 09:46:53",
+   "current_amount_cents": 0,
+   "deadline": null,
+   "id": 1,
+   "monthly_needed_cents": null,
+   "months_left": null,
+   "name": "Fonds d'urgence",
+   "percent": 80.0,
+   "progress_cents": 800000,
+   "remaining_cents": 200000,
+   "target_amount_cents": 1000000
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+/* ==========================================================================
+   Atelier_Projets · Design System — Tokens de couleurs officiels
+   Source de vérité : CLAUDE.md §2 et README.md §2.B / §2.C
+   ⚠️ Codes hexadécimaux imposés par la spécification : ne pas modifier.
+      Contrôle automatique : npm run check
+   ========================================================================== */
+
+:root {
+  /* --- Types d'éléments (Hiérarchie & Gantt) — 7 types --------------------- */
+  --type-phase: #FF8F2B;      /* PHASE     · Phase du projet             */
+  --type-milestone: #2A9A30;  /* MILESTONE · Jalon important (◆)         */
+  --type-epic: #8250DF;       /* EPIC      · Grand ensemble fonctionnel  */
+  --type-story: #6F42C1;      /* STORY     · Récit utilisateur           */
+  --type-feature: #2A9A30;    /* FEATURE   · Fonctionnalité              */
+  --type-task: #1B66A3;       /* TASK      · Tâche classique             */
+  --type-bug: #D64545;        /* BUG       · Anomalie à corriger         */
+
+  /* --- Statuts du workflow — 8 statuts obligatoires ------------------------ */
+  --status-open: #64748B;      /* OPEN        · À faire     */
+  --status-progress: #2563EB;  /* IN_PROGRESS · En cours    */
+  --status-review: #8B5CF6;    /* IN_REVIEW   · En revue    */
+  --status-hold: #F59E0B;      /* ON_HOLD     · En attente  */
+  --status-blocked: #EA580C;   /* BLOCKED     · Bloquée     */
+  --status-resolved: #0D9488;  /* RESOLVED    · Résolue     */
+  --status-closed: #16A34A;    /* CLOSED      · Terminée    */
+  --status-rejected: #DC2626;  /* REJECTED    · Rejetée     */
+}

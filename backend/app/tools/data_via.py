@@ -228,7 +228,11 @@ def _fmt(value: Any) -> str:
     if value is None:
         return "∅"
     if isinstance(value, float):
-        return f"{value:.6g}"
+        # Jamais de notation scientifique ni de chiffres perdus : le modèle cite ces valeurs
+        if value != value or value in (float("inf"), float("-inf")):
+            return str(value)
+        text = format(round(value, 4), "f") if abs(value) >= 1 else format(value, ".10f")
+        return text.rstrip("0").rstrip(".") or "0"
     text = str(value).replace("|", "\\|").replace("\n", " ")
     return text if len(text) <= 60 else text[:57] + "…"
 

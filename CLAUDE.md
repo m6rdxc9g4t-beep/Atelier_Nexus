@@ -12,6 +12,7 @@ Tu es l'Architecte Principal et l'Orchestrateur IA de l'écosystème **Atelier**
 ### Backend (Python / FastAPI)
 * **Modularité des Agents :** Chaque nouvel agent doit hériter de la classe `BaseAgent` dans `backend/app/agents/` et déclarer explicitement ses outils (Tools) compatibles à la fois avec l'API Anthropic (Tool Use) et Ollama.
 * **Interopérabilité LLM :** Ne jamais coder en dur un appel direct à `anthropic` ou `ollama` dans la logique métier d'un agent. Toujours passer par le service `LLMRouter` (`backend/app/core/llm/router.py`) afin que l'utilisateur puisse basculer librement entre Claude et un modèle local.
+* **Boîtes à outils et garde-fous (docs/agents.md) :** un agent déclare ses `toolsets` (`app/tools/toolsets.py`). Tout outil qui modifie des données porte `requires_approval = True` et un `approval_summary()` lisible ; tout outil sur des données financières ou personnelles porte `sensitive = True` (agent verrouillé sur Ollama, sans repli vers Claude). Connecteurs : un module par application dans `app/tools/` (client `AppClient` + schémas Pydantic dans `app/schemas/`).
 * **Connexion aux Apps Atelier (ex: Data Via) :** Toutes les interactions avec *Data Via* passent par `backend/app/tools/data_via.py`. Utilise systématiquement des schémas Pydantic stricts pour valider les entrées/sorties des données.
 
 ### Frontend & Design UI (Next.js / Tailwind / Shadcn)

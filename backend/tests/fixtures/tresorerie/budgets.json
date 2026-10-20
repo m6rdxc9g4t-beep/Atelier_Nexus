@@ -1,0 +1,88 @@
+{
+ "items": [
+  {
+   "amount_limit_cents": 3000,
+   "category_color": "#fdba74",
+   "category_id": 9,
+   "category_name": "Abonnements",
+   "id": 10,
+   "month": "2026-10",
+   "percent": 93.3,
+   "remaining_cents": 202,
+   "spent_cents": 2798,
+   "status": "attention"
+  },
+  {
+   "amount_limit_cents": 38000,
+   "category_color": "#fcd34d",
+   "category_id": 4,
+   "category_name": "Courses",
+   "id": 2,
+   "month": "2026-10",
+   "percent": 72.4,
+   "remaining_cents": 10484,
+   "spent_cents": 27516,
+   "status": "ok"
+  },
+  {
+   "amount_limit_cents": 10000,
+   "category_color": "#f9a8d4",
+   "category_id": 8,
+   "category_name": "Loisirs",
+   "id": 6,
+   "month": "2026-10",
+   "percent": 0.0,
+   "remaining_cents": 10000,
+   "spent_cents": 0,
+   "status": "ok"
+  },
+  {
+   "amount_limit_cents": 12000,
+   "category_color": "#fda4af",
+   "category_id": 7,
+   "category_name": "Restaurants",
+   "id": 4,
+   "month": "2026-10",
+   "percent": 66.9,
+   "remaining_cents": 3973,
+   "spent_cents": 8027,
+   "status": "ok"
+  },
+  {
+   "amount_limit_cents": 12000,
+   "category_color": "#f0abfc",
+   "category_id": 11,
+   "category_name": "Shopping",
+   "id": 8,
+   "month": "2026-10",
+   "percent": 0.0,
+   "remaining_cents": 12000,
+   "spent_cents": 0,
+   "status": "ok"
+  }
+ ],
+ "month": "2026-10",
+ "total_limit_cents": 75000,
+ "total_percent": 51.1,
+ "total_spent_cents": 38341,
+ "unbudgeted": [
+  {
+   "category_color": "#a5b4fc",
+   "category_id": 3,
+   "category_name": "Logement",
+   "spent_cents": 95000
+  },
+  {
+   "category_color": "#c4b5fd",
+   "category_id": 6,
+   "category_name": "Énergie & Internet",
+   "spent_cents": 10254
+  },
+  {
+   "category_color": "#7dd3fc",
+   "category_id": 5,
+   "category_name": "Transport",
+   "spent_cents": 8640
+  }
+ ]
+}

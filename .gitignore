@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# Session Supabase d'Atelier Cuisine (jetons), écrite à côté du .env
+cuisine-session.json
 
 # Python
 __pycache__/
@@ -25,3 +27,7 @@ next-env.d.ts
 .DS_Store
 .idea/
 .vscode/
+
+# Bases locales (SQLite) et données de démonstration
+backend/data/
+*.db

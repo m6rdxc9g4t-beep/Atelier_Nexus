@@ -1,0 +1,157 @@
+{
+ "id": 12345,
+ "projectId": 1,
+ "storyId": 2,
+ "type": "FEATURE",
+ "status": "IN_PROGRESS",
+ "priority": "HIGH",
+ "title": "Implémenter le moteur de synchronisation Git Local / GitHub",
+ "progress": 75,
+ "position": 4,
+ "startDate": "2026-10-12",
+ "dueDate": "2026-10-21",
+ "estimate": {
+  "hours": 24,
+  "days": 3
+ },
+ "spent": {
+  "hours": 18,
+  "days": 2.25
+ },
+ "balance": {
+  "kind": "REMAINING",
+  "delta": {
+   "hours": 6,
+   "days": 0.75
+  }
+ },
+ "createdAt": "2026-10-20T09:49:49.822Z",
+ "updatedAt": "2026-10-20T09:49:49.822Z",
+ "description": "### Objectif de la Feature\nPermettre au backend de scanner les commits locaux et de lier automatiquement tout commit contenant `#ID` à la tâche correspondante.\n\n### Critères d’acceptation\n- [x] Parser les messages de commit via `simple-git`\n- [x] Extraire les patterns `feature #12345`, `fix #12345`, `task #12345`\n- [ ] Synchroniser le statut avec les Pull Requests GitHub",
+ "implementationLog": "> **16 Oct 2026 - 18h00 (3h passées) :** Lecture de l’historique avec `simple-git` (`git log --all`) et stockage des commits par projet ; les messages multi-lignes sont normalisés avant analyse.\n\n> **18 Oct 2026 - 16h30 (4.5h passées) :** Mise en place d'un hook `post-commit` couplé à une table SQLite `git_commits`. J'ai utilisé Qwen-2.5-Coder en local pour générer la Regex d'extraction multi-références. Fonctionne parfaitement en local.",
+ "project": {
+  "id": 1,
+  "name": "App E-Commerce v2",
+  "hoursPerDay": 8
+ },
+ "path": {
+  "phase": {
+   "id": 1,
+   "code": "1",
+   "title": "Socle Technique"
+  },
+  "epic": {
+   "id": 1,
+   "code": "1",
+   "title": "Architecture"
+  },
+  "story": {
+   "id": 2,
+   "code": "1.2",
+   "title": "Synchronisation Git"
+  }
+ },
+ "timeEntries": [
+  {
+   "id": 21,
+   "workItemId": 12345,
+   "spentOn": "2026-10-18",
+   "duration": {
+    "hours": 4.5,
+    "days": 0.5625
+   },
+   "comment": "Hook post-commit et regex multi-références",
+   "createdAt": "2026-10-20T09:49:49.822Z",
+   "updatedAt": "2026-10-20T09:49:49.822Z"
+  },
+  {
+   "id": 20,
+   "workItemId": 12345,
+   "spentOn": "2026-10-17",
+   "duration": {
+    "hours": 3,
+    "days": 0.375
+   },
+   "comment": "Schéma des liens commit ↔ tâche",
+   "createdAt": "2026-10-20T09:49:49.822Z",
+   "updatedAt": "2026-10-20T09:49:49.822Z"
+  },
+  {
+   "id": 19,
+   "workItemId": 12345,
+   "spentOn": "2026-10-16",
+   "duration": {
+    "hours": 3,
+    "days": 0.375
+   },
+   "comment": "Normalisation des messages multi-lignes",
+   "createdAt": "2026-10-20T09:49:49.822Z",
+   "updatedAt": "2026-10-20T09:49:49.822Z"
+  },
+  {
+   "id": 18,
+   "workItemId": 12345,
+   "spentOn": "2026-10-14",
+   "duration": {
+    "hours": 4,
+    "days": 0.5
+   },
+   "comment": "Lecture de l’historique et stockage par projet",
+   "createdAt": "2026-10-20T09:49:49.822Z",
+   "updatedAt": "2026-10-20T09:49:49.822Z"
+  },
+  {
+   "id": 17,
+   "workItemId": 12345,
+   "spentOn": "2026-10-12",
+   "duration": {
+    "hours": 3.5,
+    "days": 0.4375
+   },
+   "comment": "Analyse de simple-git et du format des logs",
+   "createdAt": "2026-10-20T09:49:49.822Z",
+   "updatedAt": "2026-10-20T09:49:49.822Z"
+  }
+ ],
+ "commits": [
+  {
+   "hash": "a8f4d21d8a8e233b3fd2309ce759bf99c72e2c28",
+   "shortHash": "a8f4d21",
+   "message": "feat: add regex parser for feature #12345 in git-engine",
+   "authorName": "Camille Martin",
+   "authorEmail": "camille.martin@example.com",
+   "committedAt": "2026-10-18T12:25:00.000Z",
+   "branch": "feature/12345-git-sync-engine",
+   "keyword": "feature"
+  },
+  {
+   "hash": "c3e91b025f43bd306af0eccd0e12d509c9d6d3c8",
+   "shortHash": "c3e91b0",
+   "message": "wip: database schema for git links feature #12345",
+   "authorName": "Camille Martin",
+   "authorEmail": "camille.martin@example.com",
+   "committedAt": "2026-10-17T13:10:00.000Z",
+   "branch": "feature/12345-git-sync-engine",
+   "keyword": "feature"
+  }
+ ],
+ "pullRequests": [
+  {
+   "number": 42,
+   "title": "Feature/12345 git sync engine",
+   "state": "OPEN",
+   "draft": false,
+   "status": "IN_REVIEW",
+   "url": "https://github.com/user/ecom/pull/42",
+   "headBranch": "feature/12345-git-sync-engine",
+   "baseBranch": "main",
+   "authorLogin": "camille-martin",
+   "openedAt": "2026-10-18T08:00:00.000Z",
+   "mergedAt": null,
+   "closedAt": null,
+   "source": "branch"
+  }
+ ],
+ "predecessors": [],
+ "successors": []
+}
