@@ -4,6 +4,7 @@ import type { WorkflowParam } from "@/types/api";
 
 import { eventTriggerFixture, eventsCatalogFixture, scheduleTriggerFixture } from "./fixtures";
 import {
+  bodyFromTrigger,
   catalogApp,
   cleanParams,
   draftFromTrigger,
@@ -13,6 +14,7 @@ import {
   filterValue,
   hasErrors,
   insertEventTemplate,
+  isTriggerApp,
   normalizeTime,
   parseSampleEvent,
   sampleEvent,
@@ -56,6 +58,15 @@ describe("brouillon ↔ corps", () => {
     const ev = emptyTriggerDraft("event", { app: "projets", types: ["t"], filters: [{ path: "data.project_id", op: "exists", value: "x" }] });
     const body = toTriggerBody(ev, params);
     expect(body.kind === "event" && body.filters[0]).toEqual({ path: "data.project_id", op: "exists" });
+  });
+
+  it("bascule actif / coupé sans rien perdre", () => {
+    const trigger = eventTriggerFixture({ params: { inconnu: "x" }, debounce_seconds: 30 });
+    const body = bodyFromTrigger(trigger, { enabled: false });
+    expect(body).toMatchObject({ enabled: false, params: { inconnu: "x" }, debounce_seconds: 30, filters: trigger.filters });
+    expect(body).not.toHaveProperty("state");
+    expect(body).not.toHaveProperty("id");
+    expect(bodyFromTrigger(scheduleTriggerFixture())).toMatchObject({ kind: "schedule", schedule: { kind: "daily", at: "08:00" } });
   });
 
   it("n'envoie que les paramètres déclarés et différents du défaut", () => {
@@ -108,6 +119,9 @@ describe("validation locale", () => {
   it("exige une app et au moins un type, connus du catalogue", () => {
     expect(Object.keys(validateTrigger(emptyTriggerDraft("event"), params)).sort()).toEqual(["app", "types"]);
     expect(validateTrigger(emptyTriggerDraft("event", { app: "projets", types: ["projets.inconnu"] }), params, projets).types).toMatch(/inconnu/);
+    // App injoignable (catalogue vide) : le serveur tranchera
+    const tab = catalogApp(eventsCatalogFixture, "tab");
+    expect(validateTrigger(emptyTriggerDraft("event", { app: "tab", types: ["tab.table.changed"] }), params, tab)).toEqual({});
   });
 
   it("contrôle les filtres", () => {
@@ -157,6 +171,11 @@ describe("gabarits et événement d'exemple", () => {
     expect(insertEventTemplate("", "{{event.subject.id}}")).toBe("{{event.subject.id}}");
     expect(insertEventTemplate("Tâche", "{{event.subject.id}}")).toBe("Tâche {{event.subject.id}}");
     expect(insertEventTemplate("Tâche ", "{{event.subject.id}}")).toBe("Tâche {{event.subject.id}}");
+  });
+
+  it("reconnaît les applications qui publient des événements", () => {
+    expect(isTriggerApp("projets")).toBe(true);
+    expect(isTriggerApp("cine")).toBe(false);
   });
 
   it("propose les champs de filtre du catalogue", () => {

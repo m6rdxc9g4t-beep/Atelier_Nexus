@@ -31,6 +31,9 @@ export const LIMITS = {
 
 export const TRIGGER_APPS: TriggerApp[] = ["viz", "projets", "tab"];
 
+/** Applications qui peuvent déclencher un workflow sur événement (contrat §1). */
+export const isTriggerApp = (app: string): app is TriggerApp => (TRIGGER_APPS as string[]).includes(app);
+
 export const FILTER_OPS: { value: EventFilterOp; label: string }[] = [
   { value: "eq", label: "est égal à" },
   { value: "ne", label: "est différent de" },
@@ -195,6 +198,29 @@ export function toTriggerBody(draft: TriggerDraft, params: WorkflowParam[]): Tri
   };
 }
 
+/**
+ * Corps d'un déclencheur enregistré, tel quel, avec quelques champs changés (interrupteur
+ * actif / coupé) : rien n'est recalculé ni retiré.
+ */
+export function bodyFromTrigger(trigger: Trigger, patch: Partial<Pick<TriggerBody, "enabled" | "label">> = {}): TriggerBody {
+  const base = {
+    label: trigger.label,
+    enabled: trigger.enabled,
+    params: { ...trigger.params },
+    max_runs_per_hour: trigger.max_runs_per_hour,
+    ...patch,
+  };
+  if (trigger.kind === "schedule") return { ...base, kind: "schedule", schedule: trigger.schedule };
+  return {
+    ...base,
+    kind: "event",
+    app: trigger.app,
+    types: [...trigger.types],
+    filters: trigger.filters.map((f) => ({ ...f })),
+    debounce_seconds: trigger.debounce_seconds,
+  };
+}
+
 /** Le déclencheur (corps) entier, pour comparer « modifié ». */
 export const triggerSignature = (draft: TriggerDraft, params: WorkflowParam[]) => JSON.stringify(toTriggerBody(draft, params));
 
@@ -255,7 +281,7 @@ export function validateTrigger(
     const types = [...new Set(draft.types)];
     if (types.length < LIMITS.types.min) errors.types = "Cochez au moins un type d'événement.";
     else if (types.length > LIMITS.types.max) errors.types = `${LIMITS.types.max} types au plus.`;
-    else if (catalogApp) {
+    else if (catalogApp && catalogApp.events.length > 0) {
       const unknown = types.filter((t) => !catalogApp.events.some((e) => e.type === t));
       if (unknown.length) errors.types = `Type(s) inconnu(s) de ${catalogApp.name} : ${unknown.join(", ")}.`;
     }
