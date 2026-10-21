@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 15 (pièces jointes)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 16 (outils Claude Code du dépôt)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -53,6 +53,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 13 | Recherche dans l'historique (titres, messages, artefacts ; un agent ou tous), sans accents ni casse → [`conversations.md`](conversations.md#recherche-étape-13) | ✅ |
 | 14 | Atelier Cuisine (app en ligne, Supabase) : menu Suite « en ligne », connecteur en lecture seule (stock, planning, courses ; budget `sensitive`), agent Cuisine → [`apps/cuisine.md`](apps/cuisine.md) | ✅ |
 | 15 | Pièces jointes dans les conversations : images, PDF, Word, Excel, CSV, texte, code (trombone, glisser-déposer, capture collée), pour Claude et Ollama → [`attachments.md`](attachments.md) | ✅ |
+| 16 | Outils Claude Code du dépôt : sous-agents (relecteur, testeur, bâtisseur de connecteurs), skills (nouvel agent, nouveau connecteur, vérifier), hooks de garde (git, fichiers protégés, formatage) → [`developpement.md`](developpement.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).

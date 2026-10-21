@@ -31,3 +31,6 @@ next-env.d.ts
 # Bases locales (SQLite) et données de démonstration
 backend/data/
 *.db
+
+# Claude Code : réglages personnels
+.claude/settings.local.json
