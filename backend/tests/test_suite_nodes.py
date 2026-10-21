@@ -319,12 +319,14 @@ async def test_events_http_and_tab_file(suite: Suite) -> None:
         viz = await nodes.events("viz", since=40, limit=10)
         tab = await nodes.events("tab", since=10)
         tab_gap = await nodes.events("tab", since=2)
+        tab_reset = await nodes.events("tab", since=99)
         latest = await nodes.events("tab", limit=1)
     finally:
         await env.aclose()
     assert [e.seq for e in viz.events] == [41, 42] and viz.next == 42
     assert [e.seq for e in tab.events] == [11, 12] and tab.next == 12 and not tab.gap
     assert tab_gap.gap and [e.seq for e in latest.events] == [12]
+    assert tab_reset.gap and tab_reset.events == []  # journal remis à zéro (§7.3)
 
 
 async def test_tab_events_fall_back_to_mcp(suite: Suite) -> None:

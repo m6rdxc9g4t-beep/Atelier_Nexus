@@ -32,7 +32,7 @@ sous les gardes existantes (`local-only`, §5.1). Aucune action du manifeste ne 
       "label": "Interroger un jeu de données",
       "description": "Une phrase en français.",
       "kind": "read | write | destructive",
-      "http": { "method": "POST", "path": "/api/query" },
+      "http": { "method": "POST", "path": "/api/atelier/query" },
       "mcp_tool": null,
       "input_schema": { "type": "object", "properties": {}, "required": [] },
       "output": { "format": "atelier-table/1 | json", "schema": { } },
@@ -144,3 +144,38 @@ Les routes existantes peuvent garder leur forme ; seules les routes `/api/atelie
 Chaque application teste : la forme du manifeste (contrat, unicité et motif des `id`, un seul transport par action, schémas valides),
 l'émission de chaque type d'événement qu'elle déclare, la persistance de `seq`, et l'idempotence de chaque action qui la déclare.
 Nexus garde une copie de cette section (`docs/apps/noeud-atelier.md`) et teste sa lecture des trois manifestes avec des doubles.
+
+### 7.7 Précisions (retours des trois implémentations)
+
+Ces règles complètent §7.1 à §7.5 ; Viz, Projets, Tab et Nexus les appliquent déjà.
+
+**Manifeste**
+- `http.path` est un chemin absolu depuis la racine de l'app (`/api/atelier/query`, `/api/datasets/{dataset_id}`) ; une action peut désigner une route existante hors `/api/atelier/` : elle garde alors ses formes d'entrée, de sortie et d'erreur (ex. `imports.atelier_tab`, corps DataFlow et réponse en camelCase).
+- Une action de lecture déclare `idempotency: "natural"` ou `"none"` (indifférent pour un workflow).
+- Toute action `write` qui **crée** (une ligne, une table, une colonne, un élément, un jeu) déclare `header` ou `field`.
+
+**Table `atelier-table/1`**
+- `name` = identifiant technique de la table (id de table Tab, nom du jeu Projets, nom normalisé du jeu Viz) ; `label` = nom affiché.
+- Un lecteur ignore les champs qu'il ne connaît pas (aucun champ ajouté ne casse un consommateur).
+
+**Événements**
+- `next` : dernier `seq` rendu ; sinon `since` s'il est fourni ; sinon le dernier `seq` connu (0 si le journal n'a jamais rien contenu).
+- `oldest` : plus ancien `seq` encore conservé ; journal vide → dernier `seq` connu + 1.
+- `gap: true` si `since < oldest - 1` (événements retirés) **ou** `since >` dernier `seq` connu (journal remis à zéro ou remplacé). Sinon `gap` vaut `false` ou est absent.
+- `types=a,b` est accepté partout (HTTP et outil MCP `atelier_events`).
+- `data` peut porter des champs en plus de ceux du tableau §7.3 ; les identifiants y sont toujours des **chaînes**. Ajouts en usage :
+  `viz.dataset.created` : `origin ∈ file | <type de connexion> | atelier-table`, plus `format` et `key` (upsert) ;
+  `viz.dataset.refresh_failed` : `status` (`error`, `skipped`, `interrupted`) ;
+  `projets.import.completed` : `unchanged` (et `subject.id` = id du projet cible, `""` si aucun) ;
+  `projets.time_entry.created` : `time_entry_id` ; `projets.milestone.reached` : `reached_at` ;
+  `tab.table.changed` : `project` = **nom** du projet Tab (Tab n'a pas d'identifiant de projet partagé).
+- Un événement émis en rafale peut être regroupé (au plus un toutes les 5 s pour un même `subject`) : c'est le cas de `viz.report.saved` (le Studio enregistre en continu).
+- Tab : `index.json` → `rows` = lignes de données (lignes de total exclues), `updated_at` ISO 8601 avec fuseau, tables triées par `table_id`.
+
+**Idempotence**
+- L'empreinte couvre la route (méthode + chemin) ou l'outil, **et** le corps canonique (ordre des clés indifférent) : même clé sur une autre route ou un autre outil → `IDEMPOTENCY_KEY_REUSED`.
+- Le rejeu rend le même statut HTTP et le même corps que la première réponse (ex. 201 à la création, 200 à la mise à jour d'un upsert).
+
+**Erreurs**
+- Codes communs ajoutés : `FORBIDDEN` (403 générique), `METHOD_NOT_ALLOWED` (405).
+- MCP (Tab) : un outil en échec renvoie `isError: true`, `structuredContent: {detail, code}` et le texte du message terminé par `[CODE]`.

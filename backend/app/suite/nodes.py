@@ -496,13 +496,16 @@ class SuiteNodes:
         page = parse_events({"events": items}, since)
         events = sorted(page.events, key=lambda e: e.seq)
         oldest = events[0].seq if events else None
+        last = events[-1].seq if events else 0
         if types:
             events = [e for e in events if e.type in types]
         if since is None:
             chosen = events[-limit:]
         else:
             chosen = [e for e in events if e.seq > since][:limit]
-        gap = since is not None and oldest is not None and since < oldest - 1
+        # §7.3 : trou si des événements ont été retirés (since < oldest - 1) ou si le journal a été
+        # remis à zéro / remplacé (since au-delà du dernier seq connu).
+        gap = since is not None and ((oldest is not None and since < oldest - 1) or since > last)
         nxt = (
             chosen[-1].seq
             if chosen
