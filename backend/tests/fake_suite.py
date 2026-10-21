@@ -111,6 +111,23 @@ VIZ_MANIFEST: dict[str, Any] = {
     ],
 }
 
+#: data_schema des événements (§7.1) : propriétés de premier niveau → chemins `data.x` des filtres
+PROJETS_EVENTS: list[dict[str, Any]] = [
+    {"type": "projets.work_item.created", "label": "Élément créé",
+     "data_schema": {"type": "object", "properties": {
+         "project_id": {"type": "string"}, "story_id": {"type": "string"},
+         "type": {"type": "string"}, "status": {"type": "string"}}}},
+    {"type": "projets.work_item.status_changed", "label": "Statut changé",
+     "data_schema": {"type": "object", "properties": {
+         "project_id": {"type": "string"}, "from": {"type": "string"},
+         "to": {"type": "string"}}}},
+    {"type": "projets.time_entry.created", "label": "Temps saisi",
+     "data_schema": {"type": "object", "properties": {
+         "project_id": {"type": "string"}, "hours": {"type": "number"},
+         "spent_on": {"type": "string"}}}},
+    {"type": "projets.work_item.deleted", "label": "Élément supprimé", "data_schema": "illisible"},
+]  # fmt: skip
+
 PROJETS_MANIFEST: dict[str, Any] = {
     "contract": "atelier-node/1",
     "app": "projets",
@@ -176,7 +193,7 @@ PROJETS_MANIFEST: dict[str, Any] = {
             "idempotency": "natural",
         },
     ],
-    "events": [{"type": "projets.work_item.created", "label": "Élément créé"}],
+    "events": PROJETS_EVENTS,
 }
 
 TAB_MANIFEST: dict[str, Any] = {
@@ -237,17 +254,45 @@ TAB_MANIFEST: dict[str, Any] = {
 
 
 def page(events: list[dict[str, Any]], request: httpx.Request) -> dict[str, Any]:
-    since = request.url.params.get("since")
+    """Réponse §7.3 / §7.7 : `since` exclusif, sans `since` les plus récents, `next` = dernier
+    seq rendu (sinon `since`, sinon le dernier connu), `gap` si des événements ont été retirés
+    ou si `since` dépasse le dernier seq connu (journal remis à zéro)."""
+    since_raw = request.url.params.get("since")
+    since = int(since_raw) if since_raw is not None else None
     limit = int(request.url.params.get("limit", "100"))
-    chosen = [e for e in events if since is None or e["seq"] > int(since)][-limit:]
+    types = [t for t in request.url.params.get("types", "").split(",") if t]
+    last = events[-1]["seq"] if events else 0
+    pool = [e for e in events if not types or e["type"] in types]
+    if since is None:
+        chosen = pool[-limit:]
+    else:
+        chosen = [e for e in pool if e["seq"] > since][:limit]
     body: dict[str, Any] = {
         "events": chosen,
-        "next": chosen[-1]["seq"] if chosen else int(since or 0),
-        "oldest": events[0]["seq"] if events else 0,
+        "next": chosen[-1]["seq"] if chosen else (since if since is not None else last),
+        "oldest": events[0]["seq"] if events else last + 1,
     }
-    if since is not None and events and int(since) < events[0]["seq"] - 1:
+    if since is not None and ((events and since < events[0]["seq"] - 1) or since > last):
         body["gap"] = True
     return body
+
+
+def event(
+    seq: int,
+    type_: str = "projets.work_item.status_changed",
+    *,
+    subject_id: str = "123",
+    label: str = "Écrire la doc",
+    **data: Any,
+) -> dict[str, Any]:
+    """Événement Projets au format §7.3 (`data` : identifiants en chaînes)."""
+    return {
+        "seq": seq,
+        "type": type_,
+        "at": f"2026-10-22T09:{seq % 60:02d}:00+02:00",
+        "subject": {"kind": "work_item", "id": subject_id, "label": label},
+        "data": data,
+    }
 
 
 class _Node:
