@@ -1,21 +1,25 @@
 "use client";
 
-import { Check, ChevronRight, History, Layers, Play, RefreshCw, Save, ShieldQuestion, X } from "lucide-react";
+import { ChevronRight, History, Layers, Play, RefreshCw, Save } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatWhen } from "@/features/chat-agent/formatWhen";
+import { OriginBadge } from "@/features/workflow-triggers/OriginBadge";
+import { originText } from "@/features/workflow-triggers/origin";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
+import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { CatalogEntry, PendingApproval, StepRun, WorkflowParam, WorkflowRun, WorkflowStepV2 } from "@/types/api";
 
+import { ApprovalCard } from "./ApprovalCard";
 import { usesLabel } from "./catalog";
 import { isRunActive } from "./graph";
 import { RUN_STATUS, duration, launchValues, newArtifacts, pollDelay, shouldPoll } from "./run";
-import { KindBadge, StepStatusIcon } from "./StepBadges";
+import { StepStatusIcon } from "./StepBadges";
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
@@ -57,13 +61,21 @@ export function RunPanel({
   const attempt = useRef(0);
   const seen = useRef(new Set<string>());
   const addArtifact = useArtifactStore((s) => s.add);
+  const bumpInbox = useWorkflowStudioStore((s) => s.bumpInbox);
   const runStatus = run?.status;
 
-  /** Toute exécution reçue : affichée sur le graphe, livrables envoyés au panneau Artefacts. */
+  /** Toute exécution reçue est affichée sur le graphe ; le badge « À valider » suit les attentes. */
   const receive = (next: WorkflowRun) => {
+    if (next.status !== run?.status || next.id !== run?.id) bumpInbox();
     onRun(next);
-    for (const artifact of newArtifacts(next, seen.current)) addArtifact(artifact, `workflow:${next.workflow_id}`, false);
   };
+
+  // Livrables envoyés au panneau Artefacts, y compris pour une exécution ouverte d'ailleurs
+  // (« Tester maintenant », boîte « À valider ») : chacun une seule fois
+  useEffect(() => {
+    if (!run) return;
+    for (const artifact of newArtifacts(run, seen.current)) addArtifact(artifact, `workflow:${run.workflow_id}`, false);
+  }, [run, addArtifact]);
 
   // Interrogation tant que le moteur avance (pas pendant une validation)
   useEffect(() => {
@@ -99,7 +111,7 @@ export function RunPanel({
       })
       .catch((err: unknown) => !ctrl.signal.aborted && setHistoryError(message(err, "Historique indisponible.")));
     return () => ctrl.abort();
-  }, [workflowId, runStatus]);
+  }, [workflowId, runStatus, run?.id]);
 
   const launch = async () => {
     setBusy(true);
@@ -203,6 +215,10 @@ export function RunPanel({
             <Badge variant={RUN_STATUS[run.status].variant}>{RUN_STATUS[run.status].label}</Badge>
             <span className="ml-auto text-[11px] text-muted-foreground">{formatWhen(run.created_at)}</span>
           </div>
+          <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+            <OriginBadge trigger={run.trigger} />
+            <span className="min-w-0 break-words">{originText(run)}</span>
+          </p>
           {run.message && <p className="text-sm">{run.message}</p>}
 
           {run.pending.map((pending) => (
@@ -239,14 +255,26 @@ export function RunPanel({
                   type="button"
                   onClick={() => void reopen(item.id)}
                   aria-current={item.id === run?.id}
+                  title={originText(item)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md border border-atelier-line px-2 py-1.5 text-left text-xs hover:bg-accent focus-visible:shadow-focus",
+                    "grid w-full grid-cols-[minmax(0,1fr)] gap-1 rounded-md border border-atelier-line px-2 py-1.5 text-left text-xs hover:bg-accent focus-visible:shadow-focus",
                     item.id === run?.id && "atelier-nav-active",
                   )}
                 >
-                  <Badge variant={RUN_STATUS[item.status].variant}>{RUN_STATUS[item.status].label}</Badge>
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">{item.message || `${item.steps.length} étape(s)`}</span>
-                  <span className="shrink-0 text-muted-foreground">{formatWhen(item.created_at)}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Badge variant={RUN_STATUS[item.status].variant}>{RUN_STATUS[item.status].label}</Badge>
+                    <OriginBadge trigger={item.trigger} />
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                      {item.trigger_event ? "" : item.message || `${item.steps.length} étape(s)`}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">{formatWhen(item.created_at)}</span>
+                  </span>
+                  {/* Événement source sur sa propre ligne : il reste lisible dans le panneau étroit */}
+                  {item.trigger_event && (
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                      {item.trigger_event.type} · {item.trigger_event.subject.label || item.trigger_event.subject.id}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
@@ -254,47 +282,6 @@ export function RunPanel({
         </section>
       )}
     </div>
-  );
-}
-
-function ApprovalCard({
-  pending,
-  label,
-  busy,
-  onDecide,
-}: {
-  pending: PendingApproval;
-  label: string;
-  busy: boolean;
-  onDecide: (pending: PendingApproval, allow: boolean) => void;
-}) {
-  return (
-    <section aria-label="Action à valider" className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border border-warning/50 bg-warning/8 p-3">
-      <header className="flex items-center gap-2 text-sm font-medium">
-        <ShieldQuestion className="size-4 shrink-0 text-warning" aria-hidden />
-        <span className="min-w-0 flex-1">{pending.summary}</span>
-        <KindBadge kind={pending.kind} />
-      </header>
-      <p className="text-xs text-muted-foreground">
-        Étape <code className="font-mono">{pending.step_id}</code> · {label}
-      </p>
-      <details className="rounded-md border border-atelier-line bg-card">
-        <summary className="cursor-pointer px-2 py-1 text-xs text-muted-foreground">Entrée résolue (valeurs réelles)</summary>
-        <pre className="max-h-48 overflow-auto border-t border-atelier-line p-2 font-mono text-[11px] whitespace-pre-wrap">
-          {JSON.stringify(pending.input, null, 2)}
-        </pre>
-      </details>
-      <div className="flex justify-end gap-1.5">
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onDecide(pending, false)}>
-          <X />
-          Refuser
-        </Button>
-        <Button type="button" size="sm" disabled={busy} onClick={() => onDecide(pending, true)}>
-          <Check />
-          Autoriser
-        </Button>
-      </div>
-    </section>
   );
 }
 
