@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AgentResult } from "@/types/api";
 
-import { addUserTurn, applyEvent, emptyConversation, failLastTurn } from "./conversation";
+import { addUserTurn, applyEvent, canSaveAsWorkflow, emptyConversation, failLastTurn } from "./conversation";
 
 const result = (over: Partial<AgentResult> = {}): AgentResult => ({
   agent: "assistant",
@@ -140,5 +140,43 @@ describe("validation humaine", () => {
     conv = applyEvent(conv, { type: "text_delta", text: "Créée." });
     expect(conv.turns).toHaveLength(2);
     expect(conv.turns[1]!.parts.map((p) => p.kind)).toEqual(["approval", "tool", "text"]);
+  });
+});
+
+describe("canSaveAsWorkflow", () => {
+  const meta = {
+    provider: "anthropic" as const,
+    model: "m",
+    usage: { input_tokens: 1, output_tokens: 1 },
+    stop_reason: "end_turn" as const,
+    iterations: 2,
+  };
+  const tool = (name: string, status: "done" | "error" | "running" = "done") => ({
+    kind: "tool" as const,
+    id: name,
+    name,
+    input: {},
+    status,
+  });
+
+  it("propose un workflow pour un tour terminé avec une action réussie", () => {
+    expect(canSaveAsWorkflow({ id: "t", role: "assistant", meta, parts: [tool("data_via_query")] })).toBe(true);
+  });
+
+  it("pas pour un tour en cours, en attente de validation, en erreur ou sans action rejouable", () => {
+    expect(canSaveAsWorkflow({ id: "t", role: "assistant", parts: [tool("data_via_query")] })).toBe(false);
+    const waiting = { ...meta, stop_reason: "awaiting_approval" as const };
+    expect(canSaveAsWorkflow({ id: "t", role: "assistant", meta: waiting, parts: [tool("data_via_query")] })).toBe(false);
+    expect(
+      canSaveAsWorkflow({ id: "t", role: "assistant", meta, error: "x", parts: [tool("data_via_query")] }),
+    ).toBe(false);
+    expect(
+      canSaveAsWorkflow({
+        id: "t",
+        role: "assistant",
+        meta,
+        parts: [tool("current_datetime"), tool("delegate_to_agent"), tool("data_via_query", "error")],
+      }),
+    ).toBe(false);
   });
 });

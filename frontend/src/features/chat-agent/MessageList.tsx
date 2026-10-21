@@ -1,15 +1,16 @@
 "use client";
 
-import { CircleAlert, PanelRight } from "lucide-react";
+import { CircleAlert, PanelRight, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 
 import { ApprovalCard } from "./ApprovalCard";
 import { MessageAttachments } from "./AttachmentView";
-import type { ChatTurn } from "./conversation";
+import { type ChatTurn, canSaveAsWorkflow } from "./conversation";
 import { Markdown } from "./Markdown";
 import { ToolCall } from "./ToolCall";
 
@@ -19,9 +20,11 @@ interface MessageListProps {
   turns: ChatTurn[];
   streaming: boolean;
   onDecide: (decisions: Record<string, boolean>) => void;
+  /** « Enregistrer en workflow » sous le dernier tour réussi qui a utilisé des outils. */
+  onSaveWorkflow?: () => void;
 }
 
-export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
+export function MessageList({ turns, streaming, onDecide, onSaveWorkflow }: MessageListProps) {
   const end = useRef<HTMLDivElement>(null);
   const select = useArtifactStore((s) => s.select);
 
@@ -114,6 +117,18 @@ export function MessageList({ turns, streaming, onDecide }: MessageListProps) {
                 )}
                 {turn.meta.stop_reason === "max_iterations" && (
                   <Badge variant="warning">Limite d&apos;étapes atteinte</Badge>
+                )}
+                {last && !streaming && onSaveWorkflow && canSaveAsWorkflow(turn) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 px-2 text-xs"
+                    title="Relancer ces actions sans modèle, avec d'autres valeurs si besoin"
+                    onClick={onSaveWorkflow}
+                  >
+                    <Workflow />
+                    Enregistrer en workflow
+                  </Button>
                 )}
               </div>
             )}

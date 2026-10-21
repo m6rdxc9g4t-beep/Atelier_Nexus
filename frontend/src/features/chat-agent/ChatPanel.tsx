@@ -1,11 +1,13 @@
 "use client";
 
 import { Lock, RotateCcw, TriangleAlert } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { emptyConversation } from "@/features/chat-agent/conversation";
+import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
+import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
 import { useChatStore } from "@/stores/useChatStore";
 import type { AgentInfo, AttachmentBlock } from "@/types/api";
 
@@ -41,6 +43,10 @@ export function ChatPanel({
   const restore = useChatStore((s) => s.restore);
   const opening = useChatStore((s) => s.opening);
   const saveError = useChatStore((s) => s.saveError);
+  const conversationId = useChatStore((s) => s.conversationIds[agentName] ?? null);
+  // Workflows : fenêtre d'enregistrement du dernier tour, et liste rechargée après un ajout
+  const [capturing, setCapturing] = useState(false);
+  const [workflowVersion, setWorkflowVersion] = useState(0);
 
   // Premier passage sur l'agent : rouvrir sa dernière conversation enregistrée
   useEffect(() => {
@@ -66,6 +72,7 @@ export function ChatPanel({
           </Badge>
         )}
         <div className="ml-auto flex items-center gap-1">
+          {agent && <WorkflowsDialog agent={agent} version={workflowVersion} />}
           <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
             <Button
@@ -127,7 +134,12 @@ export function ChatPanel({
             </div>
           </div>
         ) : (
-          <MessageList turns={conversation.turns} streaming={streaming} onDecide={decide} />
+          <MessageList
+            turns={conversation.turns}
+            streaming={streaming}
+            onDecide={decide}
+            onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
+          />
         )}
       </div>
 
@@ -140,6 +152,14 @@ export function ChatPanel({
         <p role="status" className="mx-auto w-full max-w-3xl px-4 pb-2 text-sm text-destructive">
           {blocked}
         </p>
+      )}
+      {capturing && agent && (
+        <WorkflowEditor
+          agent={agent}
+          source={{ kind: "capture", messages: conversation.history, conversationId }}
+          onOpenChange={setCapturing}
+          onSaved={() => setWorkflowVersion((v) => v + 1)}
+        />
       )}
       <Composer
         agentName={label}

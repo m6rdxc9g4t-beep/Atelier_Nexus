@@ -280,3 +280,17 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
 
   return { turns, history: detail.history };
 }
+
+/** Outils qui n'ont pas de sens sans modèle : ils ne suffisent pas à proposer un workflow. */
+const NOT_REPLAYABLE = new Set(["current_datetime", "delegate_to_agent"]);
+
+/** Le tour peut devenir un workflow : terminé, sans erreur, avec une action réussie et rejouable. */
+export function canSaveAsWorkflow(turn: ChatTurn): boolean {
+  return (
+    turn.role === "assistant" &&
+    !!turn.meta &&
+    turn.meta.stop_reason !== "awaiting_approval" &&
+    !turn.error &&
+    turn.parts.some((p) => p.kind === "tool" && p.status === "done" && !NOT_REPLAYABLE.has(p.name))
+  );
+}

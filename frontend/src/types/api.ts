@@ -323,3 +323,77 @@ export interface SettingsView {
   env_file: string;
   fields: SettingsField[];
 }
+
+// ─── Workflows rejouables (Étape 18) ─────────────────────────────
+
+export interface WorkflowStep {
+  tool: string;
+  input: Record<string, unknown>;
+  label: string;
+}
+
+export interface WorkflowParam {
+  name: string;
+  label: string;
+  default: string;
+}
+
+export interface WorkflowFields {
+  title: string;
+  description: string;
+  steps: WorkflowStep[];
+  params: WorkflowParam[];
+}
+
+export interface WorkflowCreate extends WorkflowFields {
+  agent: string;
+  source_conversation_id?: string | null;
+}
+
+export interface Workflow extends WorkflowCreate {
+  id: string;
+  run_count: number;
+  last_run_at: string | null;
+  /** stopped = une écriture refusée a arrêté le workflow */
+  last_status: "completed" | "failed" | "stopped" | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Proposition tirée du dernier tour d'une conversation (rien n'est encore enregistré). */
+export interface WorkflowDraft {
+  agent: string;
+  title: string;
+  description: string;
+  steps: WorkflowStep[];
+  skipped: { tool: string; reason: string }[];
+  /** Numéros (à partir de 1) des étapes qui modifient des données. */
+  writes: number[];
+}
+
+export type StepStatus = "ok" | "error" | "refused" | "skipped";
+
+export interface StepResult {
+  index: number;
+  tool: string;
+  label: string;
+  input: Record<string, unknown>;
+  status: StepStatus;
+  content: string;
+}
+
+export interface PendingStep {
+  index: number;
+  tool: string;
+  summary: string;
+  /** À renvoyer dans `approvals` : ne vaut que pour cette action (valeurs, version). */
+  token: string;
+}
+
+export interface WorkflowRunResult {
+  status: "completed" | "failed" | "stopped" | "awaiting_approval";
+  message: string;
+  steps: StepResult[];
+  artifacts: Artifact[];
+  pending: PendingStep[];
+}
