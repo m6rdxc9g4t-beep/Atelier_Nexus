@@ -11,6 +11,10 @@ import pytest
 
 from app.suite.nodes import clear_manifest_cache
 
+# Doubles des workflows v2 et de la carte (fixtures `suite`, `repo`, `client`), importés à la
+# demande : ils lancent l'application FastAPI.
+pytest_plugins = ["tests.workflow_fixtures"]
+
 
 @pytest.fixture(autouse=True)
 def _no_claude_code(monkeypatch: pytest.MonkeyPatch) -> None:

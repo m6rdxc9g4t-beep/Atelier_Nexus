@@ -36,7 +36,14 @@ from app.schemas.data_via import (
     QueryResponse,
     Sort,
 )
-from app.tools.base import Artifact, BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.base import (
+    Artifact,
+    BaseTool,
+    ToolContext,
+    ToolInput,
+    ToolOutput,
+    register_state_codec,
+)
 from app.tools.formatting import TableType, atelier_table, table_hint
 
 # ═══ Erreurs ══════════════════════════════════════════════════════
@@ -314,6 +321,13 @@ def validate_query(request: QueryRequest, profile: DatasetProfile) -> list[str]:
         if s.key not in keys:
             errors.append(f"Tri sur « {s.key} » impossible ; clés disponibles : {', '.join(keys)}.")
     return errors
+
+
+register_state_codec(
+    _PROFILES,
+    lambda profiles: {k: v.model_dump(mode="json") for k, v in profiles.items()},
+    lambda data: {k: DatasetProfile.model_validate(v) for k, v in data.items()},
+)
 
 
 def _require_described(ctx: ToolContext, dataset_id: str) -> DatasetProfile | None:

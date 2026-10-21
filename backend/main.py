@@ -75,6 +75,7 @@ app.include_router(attachments.router)
 app.include_router(data_via.router)
 app.include_router(settings_api.router)
 app.include_router(workflows.router)
+app.include_router(workflows.runs_router)
 
 
 class HealthResponse(BaseModel):

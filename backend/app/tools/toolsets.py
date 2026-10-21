@@ -334,13 +334,9 @@ def is_sensitive(ids: list[str]) -> bool:
     return any(get_toolset(i).sensitive for i in ids)
 
 
-async def declared_tool_names(ids: list[str]) -> set[str]:
-    """Noms de tous les outils des boîtes demandées, configurées ou non.
-
-    Les outils sont construits à blanc avec des adresses fictives : aucun appel réseau, aucune
-    lecture des réglages réels. Sert à vérifier un nom d'outil même quand l'application
-    correspondante n'est pas configurée sur cette machine."""
-    blank = Settings(
+def _blank_settings() -> Settings:
+    """Réglages fictifs : toutes les boîtes se construisent, aucune adresse réelle n'est lue."""
+    return Settings(
         _env_file=None,
         data_via_base_url="http://application.invalid/api",
         projets_base_url="http://application.invalid/api",
@@ -355,11 +351,37 @@ async def declared_tool_names(ids: list[str]) -> set[str]:
         cuisine_supabase_anon_key="invalide",
         cuisine_refresh_token="invalide",
     )
-    env = ToolEnvironment(blank)
-    names: set[str] = set()
-    try:
-        for toolset_id in ids:
-            names |= {t.name for t in get_toolset(toolset_id).build(env)}
-    finally:
-        await env.aclose()  # clients HTTP créés à blanc : jamais utilisés, toujours fermés
-    return names
+
+
+_BLANK: dict[str, list[BaseTool[Any]]] = {}
+
+
+async def blank_tools(ids: list[str]) -> list[tuple[str, BaseTool[Any]]]:
+    """(boîte, outil) de toutes les boîtes demandées, configurées ou non, pour lire leurs
+    métadonnées (nom, schéma, validation). Construits à blanc avec des adresses fictives :
+    aucun appel réseau, aucune lecture des réglages réels ; ces outils ne s'exécutent jamais.
+    Gardés en mémoire par boîte (seules les métadonnées servent, clients fermés)."""
+    missing = [i for i in ids if i not in _BLANK and i != "delegation"]
+    if missing:
+        env = ToolEnvironment(_blank_settings())
+        try:
+            for toolset_id in missing:
+                _BLANK[toolset_id] = get_toolset(toolset_id).build(env)
+        finally:
+            await env.aclose()  # clients HTTP créés à blanc : jamais utilisés, toujours fermés
+    out: list[tuple[str, BaseTool[Any]]] = []
+    for toolset_id in ids:
+        if toolset_id == "delegation":  # dépend de l'environnement (liste des agents)
+            env = ToolEnvironment(_blank_settings())
+            out += [(toolset_id, t) for t in get_toolset(toolset_id).build(env)]
+            continue
+        out += [(toolset_id, t) for t in _BLANK[toolset_id]]
+    return out
+
+
+async def declared_tool_names(ids: list[str]) -> set[str]:
+    """Noms de tous les outils des boîtes demandées, configurées ou non.
+
+    Sert à vérifier un nom d'outil même quand l'application correspondante n'est pas
+    configurée sur cette machine."""
+    return {tool.name for _, tool in await blank_tools(ids)}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -55,6 +56,31 @@ class ToolContext(BaseModel):
     extras: dict[str, Any] = Field(default_factory=dict)
     # État partagé entre les outils pendant UN tour d'agent (ex. schémas déjà consultés)
     state: dict[str, Any] = Field(default_factory=dict)
+
+
+#: Sérialisation de clés de `ToolContext.state` (objets Python) pour qu'un workflow v2 repris
+#: après une validation retrouve le contexte des étapes déjà exécutées : clé → (export, import)
+STATE_CODECS: dict[str, tuple[Callable[[Any], Any], Callable[[Any], Any]]] = {}
+
+
+def register_state_codec(key: str, dump: Callable[[Any], Any], load: Callable[[Any], Any]) -> None:
+    STATE_CODECS[key] = (dump, load)
+
+
+def dump_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Partie sérialisable du contexte partagé (clés enregistrées seulement)."""
+    return {k: STATE_CODECS[k][0](v) for k, v in state.items() if k in STATE_CODECS}
+
+
+def load_state(data: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in data.items():
+        if key in STATE_CODECS:
+            try:
+                out[key] = STATE_CODECS[key][1](value)
+            except (ValueError, TypeError):
+                continue  # contexte illisible : l'outil redemandera l'étape préalable
+    return out
 
 
 class ToolInput(BaseModel):

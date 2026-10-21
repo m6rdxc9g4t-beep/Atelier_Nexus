@@ -93,6 +93,8 @@ class Workflow(_WorkflowBase):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     id: str
+    #: Distingue v1 et v2 dans `GET /api/workflows`
+    version: Literal[1] = 1
     agent: str
     source_conversation_id: str | None = None
     run_count: int = 0
