@@ -34,3 +34,6 @@ backend/data/
 
 # Claude Code : réglages personnels
 .claude/settings.local.json
+
+# Rapports des évaluations des agents
+backend/evals/resultats/
