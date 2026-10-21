@@ -397,3 +397,274 @@ export interface WorkflowRunResult {
   artifacts: Artifact[];
   pending: PendingStep[];
 }
+
+// ─── Workflows v2 : graphe d'étapes inter-applications (docs/workflows-v2-api.md) ───
+
+/** "tool:<nom_outil>" | "node:<app>/<action_id>" */
+export type StepUses = string;
+
+export type ConditionOp = "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "contains" | "empty" | "not_empty";
+
+/** L'étape ne s'exécute que si la condition est vraie (sinon « skipped »). */
+export interface Condition {
+  /** Gabarit, ex. "{{steps.lire.data.total}}" */
+  left: string;
+  op: ConditionOp;
+  /** Absent pour empty / not_empty */
+  right?: unknown;
+}
+
+export type OnError = "stop" | "continue";
+
+export interface StepPosition {
+  x: number;
+  y: number;
+}
+
+export interface WorkflowStepV2 {
+  /** ^[a-z][a-z0-9_]{0,39}$, unique dans le workflow */
+  id: string;
+  label: string;
+  uses: StepUses;
+  /** Valeurs littérales ou gabarits {{…}} (récursif dans objets / listes) */
+  input: Record<string, unknown>;
+  /** Étapes amont (arêtes du graphe) ; DAG obligatoire */
+  needs: string[];
+  when?: Condition | null;
+  on_error: OnError;
+  /** Placement dans l'éditeur, ignoré par le moteur */
+  position?: StepPosition | null;
+}
+
+/** Corps de création, de modification et de validation d'un workflow v2. */
+export interface WorkflowV2Fields {
+  /** null = workflow de suite (toutes les boîtes configurées) */
+  agent: string | null;
+  title: string;
+  description: string;
+  steps: WorkflowStepV2[];
+  params: WorkflowParam[];
+}
+
+export interface WorkflowV2Body extends WorkflowV2Fields {
+  version: 2;
+  source_conversation_id?: string | null;
+}
+
+export interface WorkflowV2 extends WorkflowV2Fields {
+  id: string;
+  version: 2;
+  source_conversation_id: string | null;
+  run_count: number;
+  last_run_at: string | null;
+  last_status: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Workflow v1 tel que le renvoie `GET /api/workflows` (champ `version` à 1). */
+export interface WorkflowV1 extends Workflow {
+  version?: 1;
+}
+
+/** `GET /api/workflows` renvoie les deux versions ; `version` les distingue. */
+export type AnyWorkflow = WorkflowV1 | WorkflowV2;
+
+// ─── Catalogue des étapes ────────────────────────────────────────
+
+export type ActionKind = "read" | "write" | "destructive";
+export type OutputFormat = "atelier-table/1" | "json" | "text";
+export type NodeAppStatus = "ok" | "unreachable" | "no_contract" | "not_configured";
+
+export interface OutputColumnHint {
+  key: string;
+  label: string;
+  type: string;
+}
+
+export interface OutputHint {
+  columns?: OutputColumnHint[];
+  fields?: string[];
+}
+
+export interface CatalogEntry {
+  uses: StepUses;
+  source: "tool" | "node";
+  /** "viz" | "tab" | "projets" | "cine" | … | null (outil système) */
+  app: string | null;
+  label: string;
+  description: string;
+  /** Outil : requires_approval → "write" */
+  kind: ActionKind;
+  /** JSON Schema (portable_schema pour un outil) */
+  input_schema: Record<string, unknown>;
+  output_format: OutputFormat;
+  output_hint: OutputHint | null;
+  /** false si l'app n'est pas configurée / ne répond pas */
+  available: boolean;
+  unavailable_reason: string | null;
+}
+
+export interface CatalogApp {
+  app: string;
+  name: string;
+  status: NodeAppStatus;
+  color: string;
+}
+
+export interface Catalog {
+  apps: CatalogApp[];
+  entries: CatalogEntry[];
+}
+
+// ─── Validation ──────────────────────────────────────────────────
+
+export type ValidationCode =
+  | "DUPLICATE_ID"
+  | "BAD_ID"
+  | "UNKNOWN_USES"
+  | "UNAVAILABLE"
+  | "CYCLE"
+  | "UNKNOWN_NEED"
+  | "REF_NOT_ANCESTOR"
+  | "UNDECLARED_PARAM"
+  | "INPUT_INVALID"
+  | "TOO_MANY_STEPS"
+  | "NOT_REPLAYABLE"
+  // Codes inconnus (version plus récente du backend) : affichés tels quels
+  | (string & {});
+
+export interface ValidationError {
+  step_id: string | null;
+  field: string | null;
+  code: ValidationCode;
+  message: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: ValidationError[];
+  /** Ordre d'exécution topologique si `ok` */
+  order: string[];
+}
+
+// ─── Exécutions (persistées) ─────────────────────────────────────
+
+export type RunStatus = "running" | "awaiting_approval" | "completed" | "failed" | "stopped";
+export type StepRunStatus = "pending" | "ok" | "error" | "refused" | "skipped" | "awaiting_approval";
+
+export interface StepRun {
+  id: string;
+  uses: string;
+  label: string;
+  status: StepRunStatus;
+  /** Entrée résolue (null tant que non résolue) */
+  input: Record<string, unknown> | null;
+  /** Texte (≤ 4000 caractères) */
+  content: string;
+  /** Sortie structurée (tables tronquées à 1000 lignes, truncated: true) */
+  data: unknown;
+  error_code: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface PendingApproval {
+  step_id: string;
+  uses: string;
+  kind: "write" | "destructive";
+  summary: string;
+  token: string;
+  input: Record<string, unknown>;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflow_id: string;
+  status: RunStatus;
+  message: string;
+  params: Record<string, string>;
+  trigger: "manual";
+  /** Dans l'ordre d'exécution */
+  steps: StepRun[];
+  /** Même forme que le panneau Artefacts */
+  artifacts: Artifact[];
+  /** Au plus une étape à la fois */
+  pending: PendingApproval[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Table d'échange atelier-table/1 (docs/apps/noeud-atelier.md §7.2) ──
+
+export interface AtelierTable {
+  format: "atelier-table/1";
+  name: string;
+  label: string;
+  columns: { key: string; label: string; type: "string" | "number" | "date" | "datetime" | "boolean" }[];
+  rows: Record<string, unknown>[];
+  total: number | null;
+  truncated: boolean;
+}
+
+// ─── Carte de la suite ───────────────────────────────────────────
+
+export interface SuiteMapAction {
+  id: string;
+  label: string;
+  kind: ActionKind;
+  output_format: string;
+}
+
+export interface SuiteMapAgent {
+  name: string;
+  display_name: string;
+  icon: string;
+  toolsets: string[];
+  writes: boolean;
+}
+
+export interface SuiteMapApp {
+  app: string;
+  name: string;
+  color: string;
+  status: NodeAppStatus;
+  transport: "http" | "mcp" | "files" | null;
+  /** Actions du manifeste */
+  actions: SuiteMapAction[];
+  events: { type: string; label: string }[];
+  /** Outils Nexus qui touchent l'app */
+  nexus_tools: { name: string; kind: "read" | "write"; toolset: string }[];
+  agents: SuiteMapAgent[];
+}
+
+export interface SuiteFlow {
+  from: string;
+  to: string;
+  label: string;
+  via: string;
+}
+
+export interface SuiteMap {
+  apps: SuiteMapApp[];
+  flows: SuiteFlow[];
+  /** Workflows qui touchent chaque app */
+  workflows: { id: string; title: string; apps: string[] }[];
+}
+
+/** Événement d'une application (contrat atelier-node/1 §7.3). */
+export interface AtelierEvent {
+  seq: number;
+  type: string;
+  at: string;
+  subject: { kind: string; id: string; label: string };
+  data: Record<string, unknown>;
+}
+
+export interface SuiteEventsEntry {
+  app: string;
+  events: AtelierEvent[];
+  next: number;
+  gap?: boolean;
+  status: string;
+}

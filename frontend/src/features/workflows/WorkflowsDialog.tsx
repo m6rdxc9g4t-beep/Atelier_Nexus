@@ -29,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatWhen } from "@/features/chat-agent/formatWhen";
 import { toolLabel } from "@/features/chat-agent/ToolCall";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, isWorkflowV2 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { useChatStore } from "@/stores/useChatStore";
@@ -118,7 +118,7 @@ function WorkflowList({
     const controller = new AbortController();
     api
       .workflows(agent.name, controller.signal)
-      .then((items) => setState({ status: "ready", items }))
+      .then((items) => setState({ status: "ready", items: items.filter((wf): wf is Workflow => !isWorkflowV2(wf)) }))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         setState({ status: "error", message: err instanceof ApiError ? err.message : "Le serveur ne répond pas." });

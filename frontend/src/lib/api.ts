@@ -3,6 +3,8 @@
 import { readSse } from "@/lib/sse";
 import type {
   AgentEvent,
+  AnyWorkflow,
+  Catalog,
   AgentInfo,
   AgentRunRequest,
   ApiErrorBody,
@@ -18,11 +20,17 @@ import type {
   ProviderStatus,
   SearchHit,
   SettingsView,
+  SuiteEventsEntry,
+  SuiteMap,
+  ValidationResult,
   Workflow,
   WorkflowCreate,
   WorkflowDraft,
   WorkflowFields,
+  WorkflowRun,
   WorkflowRunResult,
+  WorkflowV2,
+  WorkflowV2Body,
 } from "@/types/api";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100").replace(
@@ -129,9 +137,9 @@ export const api = {
   settings: (signal?: AbortSignal) => getJson<SettingsView>("/api/settings", signal),
   updateSettings: (values: Record<string, string | null>) =>
     sendJson<SettingsView>("PUT", "/api/settings", { values }),
-  /** Workflows rejouables (Étape 18). `agent` null = tous. */
+  /** Workflows rejouables (Étape 18), v1 et v2 (champ `version`). `agent` null = tous. */
   workflows: (agent: string | null, signal?: AbortSignal) =>
-    getJson<Workflow[]>(`/api/workflows${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
+    getJson<AnyWorkflow[]>(`/api/workflows${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
   /** Propose un workflow à partir du dernier tour de la conversation (rien n'est enregistré). */
   captureWorkflow: (agent: string, messages: Message[]) =>
     sendJson<WorkflowDraft>("POST", "/api/workflows/capture", { agent, messages }),
@@ -142,7 +150,54 @@ export const api = {
   /** Lance sans modèle ; `approvals` : jeton de l'étape d'écriture (reçu dans `pending`) → autorisée. */
   runWorkflow: (id: string, params: Record<string, string>, approvals: Record<string, boolean> | null) =>
     sendJson<WorkflowRunResult>("POST", `/api/workflows/${encodeURIComponent(id)}/run`, { params, approvals }),
+
+  // ─── Workflows v2 (docs/workflows-v2-api.md) ───
+  /** Catalogue des étapes ; sans `agent` (null) : catalogue de suite. */
+  workflowCatalog: (agent: string | null, signal?: AbortSignal) =>
+    getJson<Catalog>(`/api/workflows/catalog${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
+  workflow: (id: string, signal?: AbortSignal) =>
+    getJson<AnyWorkflow>(`/api/workflows/${encodeURIComponent(id)}`, signal),
+  validateWorkflow: (body: WorkflowV2Body, signal?: AbortSignal) =>
+    getJson<ValidationResult>("/api/workflows/validate", signal, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  createWorkflowV2: (body: WorkflowV2Body) => sendJson<WorkflowV2>("POST", "/api/workflows", body),
+  updateWorkflowV2: (id: string, body: WorkflowV2Body) =>
+    sendJson<WorkflowV2>("PUT", `/api/workflows/${encodeURIComponent(id)}`, body),
+  /** v1 → v2, enregistré (ids s1..sn, chaîne linéaire de `needs`, `{{nom}}` → `{{params.nom}}`). */
+  convertWorkflow: (id: string) =>
+    sendJson<WorkflowV2>("POST", `/api/workflows/${encodeURIComponent(id)}/convert`),
+  /** Lance un workflow v2 : l'exécution est persistée et suivie par `workflowRun`. */
+  runWorkflowV2: (id: string, params: Record<string, string>) =>
+    sendJson<WorkflowRun>("POST", `/api/workflows/${encodeURIComponent(id)}/run`, { params }),
+  workflowRun: (runId: string, signal?: AbortSignal) =>
+    getJson<WorkflowRun>(`/api/workflow-runs/${encodeURIComponent(runId)}`, signal),
+  workflowRuns: (workflowId: string, limit = 20, signal?: AbortSignal) =>
+    getJson<WorkflowRun[]>(
+      `/api/workflow-runs?${new URLSearchParams({ workflow_id: workflowId, limit: String(limit) }).toString()}`,
+      signal,
+    ),
+  /** `approvals` : jeton de l'étape en attente → autorisée. */
+  resumeWorkflowRun: (runId: string, approvals: Record<string, boolean>) =>
+    sendJson<WorkflowRun>("POST", `/api/workflow-runs/${encodeURIComponent(runId)}/resume`, { approvals }),
+
+  // ─── Carte de la suite ───
+  suiteMap: (signal?: AbortSignal) => getJson<SuiteMap>("/api/suite/map", signal),
+  /** Derniers événements ; `since` n'a de sens qu'avec `app`. */
+  suiteEvents: (query: { app?: string; since?: number; limit?: number } = {}, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (query.app) params.set("app", query.app);
+    if (query.app && query.since !== undefined) params.set("since", String(query.since));
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    const qs = params.toString();
+    return getJson<SuiteEventsEntry[]>(`/api/suite/events${qs ? `?${qs}` : ""}`, signal);
+  },
 };
+
+/** `GET /api/workflows` renvoie v1 et v2 : le champ `version` les distingue. */
+export const isWorkflowV2 = (wf: AnyWorkflow): wf is WorkflowV2 => wf.version === 2;
 
 /**
  * Lance un agent en streaming et relaie chaque événement.
