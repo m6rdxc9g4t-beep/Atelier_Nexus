@@ -104,3 +104,24 @@ class AttachmentRow(Base):
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class WorkflowRow(Base):
+    """Workflow rejouable : étapes (outil + entrée) figées depuis un tour d'agent réussi."""
+
+    __tablename__ = "workflows"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    agent: Mapped[str] = mapped_column(String(41), index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    steps: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    params: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    source_conversation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    run_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, index=True
+    )

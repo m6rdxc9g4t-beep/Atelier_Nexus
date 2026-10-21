@@ -160,6 +160,8 @@ DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server   
 Qualité des réponses avec un vrai modèle (outils appelés, livrables, validations, chiffres sourcés) :
 `python -m scripts.evals --provider ollama --repeat 3` → [`evaluations.md`](evaluations.md).
 
+Un tour réussi peut devenir un **workflow** relancé sans modèle (« Enregistrer en workflow ») → [`workflows.md`](workflows.md).
+
 Vérifié le 2026-10-20 contre Atelier Projets (démo « App E-Commerce v2 »), Atelier Trésorerie (6 mois fictifs)
 et Atelier Viz (données d'exemple), dans Chromium : validation autorisée (élément réellement créé dans Projets)
 et refusée, création d'un agent personnalisé verrouillé en local, agent Finance sur Ollama, thèmes clair et sombre.
