@@ -40,7 +40,51 @@ def text(payload: object, error: bool = False) -> dict:
     return {"content": [{"type": "text", "text": body}], "isError": error}
 
 
+#: Manifeste atelier-node/1 de Tab (même contenu que tests/fake_suite.py:TAB_MANIFEST)
+MANIFEST_FILE = os.environ.get("FAKE_MANIFEST")
+EVENTS = [
+    {"seq": 7, "type": "tab.table.changed", "at": "2026-10-21T21:00:00+02:00",
+     "subject": {"kind": "table", "id": "tbl_planning_lots", "label": "Planning & Lots"},
+     "data": {"revision": 3, "rows": 3, "project": "Rénovation Urbaine 2026"}},
+    {"seq": 8, "type": "tab.table.changed", "at": "2026-10-21T21:05:00+02:00",
+     "subject": {"kind": "table", "id": "tbl_materiaux", "label": "Matériaux"},
+     "data": {"revision": 1, "rows": 2, "project": "Rénovation Urbaine 2026"}},
+]  # fmt: skip
+TABLE = {
+    "format": "atelier-table/1", "name": "tbl_planning_lots", "label": "Planning & Lots",
+    "columns": [{"key": "_ligne", "label": "Ligne", "type": "number"},
+                {"key": "task_name", "label": "Lot / Tâche", "type": "string"},
+                {"key": "cost_ht", "label": "Coût HT", "type": "number"}],
+    "rows": [{"_ligne": 1, "task_name": "Gros œuvre", "cost_ht": 45000},
+             {"_ligne": 2, "task_name": "Charpente bois", "cost_ht": 28500}],
+    "total": 2, "truncated": False,
+}  # fmt: skip
+#: Réponses déjà données par clé d'idempotence (rejouées à l'identique, §7.4)
+SEEN: dict[str, dict] = {}
+
+
 def call(name: str, args: dict) -> dict:
+    if name == "atelier_manifest":
+        if MODE == "nocontract" or not MANIFEST_FILE:
+            return text("Outil inconnu : atelier_manifest", error=True)
+        with open(MANIFEST_FILE, encoding="utf-8") as fh:
+            return text(json.load(fh))
+    if name == "atelier_events":
+        since = args.get("since")
+        events = [e for e in EVENTS if since is None or e["seq"] > since][: args.get("limit", 100)]
+        return text({"events": events, "next": events[-1]["seq"] if events else since or 0,
+                     "oldest": 7})  # fmt: skip
+    if name == "query_table":
+        if args.get("table_id") == "tbl_inconnue":
+            return text({"detail": "Table introuvable", "code": "NOT_FOUND"}, error=True)
+        return text(TABLE)
+    if name == "add_rows" and args.get("idempotency_key"):
+        key = args["idempotency_key"]
+        if key in SEEN:
+            return text(SEEN[key] | {"replayed": True})
+        SEEN[key] = {"added": [{"row": 4 + i, "id": f"rec_new{i}", "cells": dict(r)}
+                               for i, r in enumerate(args["rows"])]}  # fmt: skip
+        return text(SEEN[key])
     if name == "set_cells":
         if args["table"] == "tbl_inconnue":
             return text("Table « tbl_inconnue » introuvable", error=True)

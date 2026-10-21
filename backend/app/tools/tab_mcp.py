@@ -188,8 +188,9 @@ class TabMcpClient:
             raise AppRequestError("Réponse du serveur MCP d'Atelier Tab illisible.", app=self.app)
         return result
 
-    async def call(self, tool: str, arguments: dict[str, Any]) -> Any:
-        """Appelle un outil de Tab ; renvoie son résultat (JSON décodé si possible, sinon texte)."""
+    async def call_raw(self, tool: str, arguments: dict[str, Any]) -> tuple[bool, Any]:
+        """Appelle un outil de Tab ; renvoie (refusé ?, résultat JSON décodé si possible, sinon
+        texte). Un refus n'est pas levé : l'appelant lit le `{detail, code}` éventuel."""
         async with self._lock:
             await self._start()
             result = await self._rpc("tools/call", {"name": tool, "arguments": arguments})
@@ -199,13 +200,22 @@ class TabMcpClient:
             if isinstance(c, dict) and c.get("type") == "text"
         ]
         text = "\n".join(t for t in texts if t).strip()
-        if result.get("isError"):
-            raise AppRequestError(text or f"Atelier Tab a refusé « {tool} ».", app=self.app)
         first = texts[0] if texts else ""
         try:
-            return json.loads(first)
+            return bool(result.get("isError")), json.loads(first)
         except ValueError:
-            return text
+            return bool(result.get("isError")), text
+
+    async def call(self, tool: str, arguments: dict[str, Any]) -> Any:
+        """Appelle un outil de Tab ; renvoie son résultat (JSON décodé si possible, sinon texte)."""
+        refused, value = await self.call_raw(tool, arguments)
+        if refused:
+            if isinstance(value, dict) and isinstance(value.get("detail"), str):
+                text = value["detail"]
+            else:
+                text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+            raise AppRequestError(text or f"Atelier Tab a refusé « {tool} ».", app=self.app)
+        return value
 
     async def list_tools(self) -> list[str]:
         async with self._lock:

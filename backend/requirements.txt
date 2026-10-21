@@ -8,6 +8,7 @@ sse-starlette~=3.5
 # --- Validation & configuration ---
 pydantic~=2.14
 pydantic-settings~=2.16
+jsonschema~=4.26  # entrées des actions des nœuds de la suite (atelier-node/1)
 
 # --- LLM (toujours consommés via app/core/llm/router.py) ---
 anthropic~=1.15
