@@ -1,0 +1,37 @@
+# Agents généraux : Assistant, Orchestrateur, Rédacteur.
+
+[[case]]
+id = "assistant-date-du-jour"
+agent = "assistant"
+tags = ["general", "rapide"]
+prompt = "Quel jour sommes-nous ?"
+[case.expect]
+tools_called = ["current_datetime"]
+
+[[case]]
+id = "assistant-oriente-vers-data-analyst"
+agent = "assistant"
+tags = ["general"]
+prompt = "Je veux analyser mes ventes par région et en tirer des mesures Power BI. Par où commencer ?"
+[case.expect]
+text_contains = ["Data Analyst"]
+
+[[case]]
+id = "orchestrateur-delegue"
+agent = "orchestrateur"
+apps = ["data_via"]
+tags = ["general", "delegation"]
+prompt = "Calcule le chiffre d'affaires par région dans Atelier Viz, puis rédige un court message de félicitations pour l'équipe de la région en tête."
+rubric = "Le message félicite l'équipe de la région réellement en tête (Île-de-France) et reprend un chiffre issu de l'analyse."
+[case.expect]
+tools_called = ["delegate_to_agent"]
+text_contains = ["Ile-de-France"]
+
+[[case]]
+id = "redacteur-compte-rendu"
+agent = "redacteur"
+tags = ["redaction"]
+prompt = "Rédige le compte rendu de la réunion d'équipe de ce matin. Décisions : Ollama devient le moteur par défaut ; les workflows sont prioritaires. Actions : François teste les évaluations avant le 28/10, Léa relit la documentation."
+rubric = "Le compte rendu contient les deux décisions et les deux actions avec leur responsable et l'échéance, sans rien inventer d'autre (participants, chiffres)."
+[case.expect]
+artifacts = [{ kind = "markdown", content_contains = ["Ollama", "28/10", "Léa"] }]

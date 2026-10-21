@@ -34,3 +34,17 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
   1. Créer une branche explicite (`feat/nom-feature` ou `fix/nom-bug`).
   2. Vérifier que le typage TypeScript (Front) et Pydantic/Mypy (Back) ne retourne aucune erreur.
   3. Documenter tout nouvel endpoint ou connecteur dans `docs/`.
+
+## 5. Outils Claude Code du dépôt (`.claude/`, détail dans `docs/developpement.md`)
+* **Sous-agents** : `relecteur-nexus` (relit un changement contre ce fichier, sans rien modifier), `testeur-nexus` (lance les vérifications de la CI, rend les échecs), `batisseur-connecteur` (branche une application de la suite).
+* **Skills** : `/nouvel-agent`, `/nouveau-connecteur`, `/verifier`.
+* **Hooks** : commits et pushes refusés sur `main`, push forcé refusé ; `.env`, design system copié de la suite, migrations publiées et fixtures enregistrées protégés ; fichiers Python du backend formatés par ruff après chaque modification.
+* Avant une PR : `testeur-nexus`, puis `relecteur-nexus`.
+
+## 6. Règles apprises (une erreur corrigée = une règle ici, courte)
+* **Agent ou workflow :** si les étapes sont toujours les mêmes, préférer un workflow rejouable à un nouvel agent ; un agent sert à explorer.
+* **Tests :** jamais d'appel réseau réel ni de Claude Code (`conftest.py` neutralise `claude`) ; applications simulées par `httpx.MockTransport`.
+* **SDK Anthropic ≥ 1.x :** pas de paramètre `temperature` sur `messages.create`.
+* **Ollama :** les appels d'outils arrivent sans identifiant (le hub génère `call_…`) ; garder des schémas d'entrée simples pour les petits modèles.
+* **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
+* **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
