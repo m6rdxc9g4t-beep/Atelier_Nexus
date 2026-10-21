@@ -4,6 +4,8 @@
  * correspondance action ↔ étape de workflow. Logique pure, testée dans suiteMap.test.ts.
  */
 
+import { isTriggerApp } from "@/features/workflow-triggers/form";
+import type { EditorTarget } from "@/stores/useWorkflowStudioStore";
 import type { AtelierEvent, SuiteEventsEntry, SuiteFlow, SuiteMap, SuiteMapAction, SuiteMapApp } from "@/types/api";
 
 export interface AppColumns {
@@ -22,6 +24,26 @@ export function splitActions(app: Pick<SuiteMapApp, "actions">): AppColumns {
 
 /** Étape de workflow correspondant à une action du manifeste. */
 export const actionUses = (app: string, actionId: string) => `node:${app}/${actionId}`;
+
+export interface TriggerChoice {
+  label: string;
+  target: EditorTarget;
+}
+
+/**
+ * « + » sur un événement : nouveau workflow de suite avec un déclencheur événement prérempli, et,
+ * si un workflow enregistré a été ouvert, l'ajout du déclencheur à celui-ci. Vide si l'application
+ * ne peut pas déclencher de workflow (contrat : viz, projets, tab).
+ */
+export function triggerChoices(app: string, type: string, last: { id: string; title: string } | null): TriggerChoice[] {
+  if (!isTriggerApp(app)) return [];
+  const trigger = { app, types: [type] };
+  const choices: TriggerChoice[] = [
+    { label: "Nouveau workflow déclenché par cet événement", target: { kind: "new", agent: null, trigger } },
+  ];
+  if (last) choices.push({ label: `Ajouter à « ${last.title} »`, target: { kind: "open", id: last.id, panel: "triggers", trigger } });
+  return choices;
+}
 
 /** Flux qui partent de / arrivent à une application. */
 export function flowsOf(flows: SuiteFlow[], app: string): { outgoing: SuiteFlow[]; incoming: SuiteFlow[] } {
