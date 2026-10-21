@@ -9,6 +9,7 @@ import { emptyConversation } from "@/features/chat-agent/conversation";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
 import { useChatStore } from "@/stores/useChatStore";
+import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { AgentInfo, AttachmentBlock } from "@/types/api";
 
 import { AgentIcon } from "./agentMeta";
@@ -44,9 +45,9 @@ export function ChatPanel({
   const opening = useChatStore((s) => s.opening);
   const saveError = useChatStore((s) => s.saveError);
   const conversationId = useChatStore((s) => s.conversationIds[agentName] ?? null);
-  // Workflows : fenêtre d'enregistrement du dernier tour, et liste rechargée après un ajout
+  // Workflows : fenêtre d'enregistrement du dernier tour ; les listes se rechargent après un ajout
   const [capturing, setCapturing] = useState(false);
-  const [workflowVersion, setWorkflowVersion] = useState(0);
+  const bumpWorkflows = useWorkflowStudioStore((s) => s.bump);
 
   // Premier passage sur l'agent : rouvrir sa dernière conversation enregistrée
   useEffect(() => {
@@ -72,7 +73,7 @@ export function ChatPanel({
           </Badge>
         )}
         <div className="ml-auto flex items-center gap-1">
-          {agent && <WorkflowsDialog agent={agent} version={workflowVersion} />}
+          {agent && <WorkflowsDialog agent={agent} />}
           <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
             <Button
@@ -158,7 +159,7 @@ export function ChatPanel({
           agent={agent}
           source={{ kind: "capture", messages: conversation.history, conversationId }}
           onOpenChange={setCapturing}
-          onSaved={() => setWorkflowVersion((v) => v + 1)}
+          onSaved={bumpWorkflows}
         />
       )}
       <Composer

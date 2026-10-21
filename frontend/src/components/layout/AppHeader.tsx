@@ -1,13 +1,15 @@
 "use client";
 
-import { Layers, Lock } from "lucide-react";
+import { Layers, Lock, Waypoints } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
+import { SuiteMapButton } from "@/features/suite-map/SuiteMapDialog";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { useChatStore } from "@/stores/useChatStore";
+import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { AgentInfo, AppStatus, ProviderName, ProviderStatus } from "@/types/api";
 
 import { AppsMenu } from "./AppsMenu";
@@ -39,6 +41,7 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
   const artifactCount = useArtifactStore((s) => s.artifacts.length);
   const panelOpen = useArtifactStore((s) => s.panelOpen);
   const setPanelOpen = useArtifactStore((s) => s.setPanelOpen);
+  const openWorkflowList = useWorkflowStudioStore((s) => s.openList);
 
   const fallback = providers.find((p) => p.is_default);
   const current = agents.find((a) => a.name === agent);
@@ -68,6 +71,20 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
       </NativeSelect>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {/* Workflows de suite (toutes apps) et carte de la suite, à côté du menu des apps ;
+            masqués sur téléphone (l'éditeur en graphe demande un grand écran) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden sm:inline-flex"
+          aria-label="Workflows de suite"
+          title="Workflows de suite : enchaîner Viz, Tab, Projets… en graphe"
+          onClick={() => openWorkflowList(null)}
+        >
+          <Waypoints />
+          <span className="hidden xl:inline">Workflows</span>
+        </Button>
+        <SuiteMapButton />
         {apps.length > 0 && <AppsMenu apps={apps} />}
 
         <label htmlFor="provider-select" className="sr-only">

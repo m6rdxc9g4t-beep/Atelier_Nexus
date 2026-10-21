@@ -8,6 +8,9 @@ import { AgentEditor } from "@/features/agent-editor/AgentEditor";
 import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
 import { AgentSidebar } from "@/features/chat-agent/AgentSidebar";
 import { ChatPanel } from "@/features/chat-agent/ChatPanel";
+import { SuiteMapDialog } from "@/features/suite-map/SuiteMapDialog";
+import { WorkflowListDialog } from "@/features/workflows/WorkflowsDialog";
+import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
 import { API_URL } from "@/lib/api";
 import { useChatStore } from "@/stores/useChatStore";
@@ -78,6 +81,11 @@ export function Workspace() {
 
         <ArtifactPanel />
       </div>
+
+      {/* Workflows (liste, éditeur en graphe) et carte de la suite : une fenêtre à la fois */}
+      <WorkflowListDialog agents={agents} />
+      <SuiteMapDialog />
+      <WorkflowGraphDialog agents={agents} />
 
       {editor.open && (
         <AgentEditor
