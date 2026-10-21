@@ -148,23 +148,40 @@ export function newStepId(steps: WorkflowStepV2[], uses: string): string {
   }
 }
 
-/** Nouvelle étape (entrée vide, arrêt en cas d'erreur). */
+/**
+ * Nouvelle étape (entrée vide, arrêt en cas d'erreur). Libellé vide : le nœud affiche celui du
+ * catalogue. `after` : l'étape attend celle-ci.
+ */
 export function createStep(
   steps: WorkflowStepV2[],
   uses: string,
   position: StepPosition | null,
-  entry?: CatalogEntry | null,
+  after: string | null = null,
 ): WorkflowStepV2 {
   return {
     id: newStepId(steps, uses),
-    label: entry?.label ?? "",
+    label: "",
     uses,
     input: {},
-    needs: [],
+    needs: after && steps.some((s) => s.id === after) ? [after] : [],
     when: null,
     on_error: "stop",
     position,
   };
+}
+
+/** Position d'une étape ajoutée par clic : à droite de `after`, sinon après la dernière colonne. */
+export function nextPosition(steps: WorkflowStepV2[], after: string | null): StepPosition {
+  const anchor = after ? steps.find((s) => s.id === after)?.position : null;
+  if (anchor) {
+    const x = anchor.x + LAYOUT.columnWidth;
+    const below = steps.filter((s) => s.position && Math.abs(s.position.x - x) < LAYOUT.nodeWidth / 2);
+    const y = below.length ? Math.max(anchor.y, ...below.map((s) => s.position!.y + LAYOUT.rowHeight)) : anchor.y;
+    return { x, y };
+  }
+  const placed = steps.filter((s) => s.position);
+  if (!placed.length) return { x: 0, y: 0 };
+  return { x: Math.max(...placed.map((s) => s.position!.x)) + LAYOUT.columnWidth, y: 0 };
 }
 
 // ─── Mise en page ────────────────────────────────────────────────
@@ -273,7 +290,10 @@ export interface GraphContext {
   apps?: Map<string, { name: string; color: string }>;
   errors?: ValidationError[];
   run?: Record<string, StepRunView>;
-  selected?: string | null;
+  /** Étapes sélectionnées sur le graphe */
+  selected?: ReadonlySet<string>;
+  /** Dimensions mesurées par React Flow (sinon il masque les nœuds le temps de les remesurer) */
+  measured?: Record<string, { width: number; height: number }>;
 }
 
 export function stepNodeData(step: WorkflowStepV2, ctx: GraphContext): StepNodeData {
@@ -299,30 +319,31 @@ export function stepNodeData(step: WorkflowStepV2, ctx: GraphContext): StepNodeD
   };
 }
 
-/**
- * Étapes → nœuds. `previous` : nœuds affichés, dont on garde les dimensions mesurées et la
- * sélection (sinon React Flow masque les nœuds le temps de les remesurer).
- */
-export function stepsToNodes(steps: WorkflowStepV2[], ctx: GraphContext, previous: StepNode[] = []): StepNode[] {
-  const prev = new Map(previous.map((n) => [n.id, n]));
-  const fallback = layoutSteps(steps);
+/** Étapes → nœuds (position enregistrée, sinon mise en page en couches). */
+export function stepsToNodes(steps: WorkflowStepV2[], ctx: GraphContext): StepNode[] {
+  const fallback = steps.every((s) => s.position) ? {} : layoutSteps(steps);
   return steps.map((step) => {
-    const old = prev.get(step.id);
+    const data = stepNodeData(step, ctx);
+    const measured = ctx.measured?.[step.id];
     return {
       id: step.id,
       type: "step",
       position: step.position ?? fallback[step.id] ?? { x: 0, y: 0 },
-      data: stepNodeData(step, ctx),
-      selected: ctx.selected !== undefined ? ctx.selected === step.id : old?.selected,
-      ...(old?.measured ? { measured: old.measured } : {}),
-      ariaLabel: `Étape ${step.label || step.id}`,
+      data,
+      selected: ctx.selected?.has(step.id) ?? false,
+      ...(measured ? { measured } : {}),
+      ariaLabel: `Étape ${data.label} (${step.id})`,
     };
   });
 }
 
 export const edgeId = (source: string, target: string) => `${source}->${target}`;
 
-export function stepsToEdges(steps: WorkflowStepV2[], run?: Record<string, StepRunView>): Edge[] {
+export function stepsToEdges(
+  steps: WorkflowStepV2[],
+  run?: Record<string, StepRunView>,
+  selected?: ReadonlySet<string>,
+): Edge[] {
   const ids = new Set(steps.map((s) => s.id));
   return steps.flatMap((step) =>
     step.needs
@@ -332,7 +353,8 @@ export function stepsToEdges(steps: WorkflowStepV2[], run?: Record<string, StepR
         source,
         target: step.id,
         animated: run?.[step.id]?.status === "running",
-        ariaLabel: `${source} vers ${step.id}`,
+        selected: selected?.has(edgeId(source, step.id)) ?? false,
+        ariaLabel: `Liaison ${source} vers ${step.id}`,
       })),
   );
 }

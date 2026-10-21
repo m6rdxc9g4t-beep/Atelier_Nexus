@@ -15,6 +15,7 @@ import {
   layoutSteps,
   mergeRunState,
   newStepId,
+  nextPosition,
   removeSteps,
   renameStep,
   stepsToEdges,
@@ -82,8 +83,21 @@ describe("modifications", () => {
     expect(newStepId([], "tool:data_via_query")).toBe("data_via_query");
     expect(newStepId([], "node:x/9.Élément")).toBe("element");
     expect(newStepId([], "node:x/123")).toBe("etape");
-    const created = createStep(diamondSteps, "node:tab/rows.add", { x: 1, y: 2 }, catalog.get("node:tab/rows.add"));
-    expect(created).toMatchObject({ id: "add", label: "Ajouter des lignes", needs: [], on_error: "stop", position: { x: 1, y: 2 } });
+    const created = createStep(diamondSteps, "node:tab/rows.add", { x: 1, y: 2 });
+    expect(created).toMatchObject({ id: "add", label: "", needs: [], on_error: "stop", position: { x: 1, y: 2 } });
+    expect(createStep(diamondSteps, "node:tab/rows.add", null, "lire").needs).toEqual(["lire"]);
+    expect(createStep(diamondSteps, "node:tab/rows.add", null, "fantome").needs).toEqual([]);
+  });
+
+  it("place une étape ajoutée par clic à droite de la sélection, sans chevauchement", () => {
+    const placed = applyLayout(diamondSteps);
+    const lire = placed[0]!.position!;
+    // creer et ajouter occupent déjà la colonne suivante
+    const pos = nextPosition(placed, "lire");
+    expect(pos.x).toBe(lire.x + LAYOUT.columnWidth);
+    expect(placed.filter((s) => s.position!.x === pos.x).every((s) => s.position!.y < pos.y)).toBe(true);
+    expect(nextPosition(placed, null)).toEqual({ x: 2 * LAYOUT.columnWidth, y: 0 });
+    expect(nextPosition([], null)).toEqual({ x: 0, y: 0 });
   });
 });
 
@@ -128,7 +142,7 @@ describe("étapes ↔ nœuds et arêtes", () => {
       catalog,
       errors: [{ step_id: "b", field: null, code: "UNKNOWN_USES", message: "?" }],
       run: { a: { status: "ok", errorCode: null } },
-      selected: "b",
+      selected: new Set(["b"]),
     });
     expect(nodes[0]!.data.unavailable).toBe("Atelier Projets ne répond pas.");
     expect(nodes[0]!.data.run?.status).toBe("ok");
@@ -138,10 +152,10 @@ describe("étapes ↔ nœuds et arêtes", () => {
   });
 
   it("garde les dimensions mesurées des nœuds affichés", () => {
-    const first = stepsToNodes(diamondSteps, { catalog });
-    const measured = first.map((n) => ({ ...n, measured: { width: 240, height: 80 } }));
-    const second = stepsToNodes(diamondSteps, { catalog }, measured);
-    expect(second[0]!.measured).toEqual({ width: 240, height: 80 });
+    const nodes = stepsToNodes(diamondSteps, { catalog, measured: { lire: { width: 240, height: 80 } } });
+    expect(nodes[0]!.measured).toEqual({ width: 240, height: 80 });
+    expect(nodes[1]!.measured).toBeUndefined();
+    expect(stepsToEdges(diamondSteps, {}, new Set(["lire->creer"])).map((e) => e.selected)).toEqual([true, false, false]);
   });
 
   it("reconstruit positions et needs depuis le graphe", () => {
