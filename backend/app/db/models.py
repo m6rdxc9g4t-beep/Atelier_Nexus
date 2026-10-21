@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -143,11 +143,54 @@ class WorkflowRunRow(Base):
     message: Mapped[str] = mapped_column(Text, default="")
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     trigger: Mapped[str] = mapped_column(String(20), default="manual")
+    #: Déclencheur à l'origine de l'exécution (pas de clé étrangère : l'historique survit au
+    #: déclencheur supprimé) et événement sans ses `data`
+    trigger_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    trigger_event: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     steps: Mapped[list[Any]] = mapped_column(JSON, default=list)
     artifacts: Mapped[list[Any]] = mapped_column(JSON, default=list)
     pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
     state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class WorkflowTriggerRow(Base):
+    """Déclencheur d'un workflow v2 : horaire (`schedule`) ou événement d'une application
+    (`event`). `config` : champs propres au type ; `state` : état lu par l'interface ;
+    `internal` : données du moteur (rafale en attente, fenêtre de débit), jamais renvoyées."""
+
+    __tablename__ = "workflow_triggers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    label: Mapped[str] = mapped_column(String(120), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    #: Application observée (déclencheur événement), pour la distribution
+    app: Mapped[str | None] = mapped_column(String(20), index=True, nullable=True)
+    params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    max_runs_per_hour: Mapped[int] = mapped_column(Integer, default=12)
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    internal: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class TriggerCursorRow(Base):
+    """Curseur d'événements par application : dernier `seq` lu par Nexus (un seul lecteur)."""
+
+    __tablename__ = "trigger_cursors"
+
+    app: Mapped[str] = mapped_column(String(20), primary_key=True)
+    seq: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
     )

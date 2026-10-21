@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.triggers import TriggerEventRef
 from app.schemas.workflows import RunStatus as LastRunStatus
 from app.schemas.workflows import WorkflowParam
 from app.tools.base import Artifact
@@ -188,7 +189,10 @@ class WorkflowRun(BaseModel):
     status: RunStatus
     message: str
     params: dict[str, str]
-    trigger: Literal["manual"] = "manual"
+    #: Origine (docs/declencheurs-api.md §2) ; `trigger_event` ne porte jamais les `data`
+    trigger: Literal["manual", "schedule", "event", "test"] = "manual"
+    trigger_id: str | None = None
+    trigger_event: TriggerEventRef | None = None
     steps: list[StepRun]
     artifacts: list[Artifact]
     pending: list[PendingApproval]
