@@ -37,7 +37,14 @@ from app.schemas.projets import (
     WorkItemUpdate,
 )
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
-from app.tools.formatting import data_artifact, fmt, table_for_model
+from app.tools.formatting import (
+    TableType,
+    atelier_table,
+    data_artifact,
+    fmt,
+    table_for_model,
+    table_hint,
+)
 from app.tools.http import AppClient, AppError, safe_id
 
 
@@ -235,6 +242,87 @@ def work_item_rows(items: list[WorkItem]) -> tuple[list[str], list[list[Any]]]:
     return headers, rows
 
 
+#: Colonnes `atelier-table/1` des éléments (mêmes clés que le jeu `work-items` de Projets)
+WORK_ITEM_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "number"), ("project_id", "Projet", "number"),
+    ("story_id", "Story", "number"), ("type", "Type", "string"), ("status", "Statut", "string"),
+    ("status_label", "Statut (libellé)", "string"), ("priority", "Priorité", "string"),
+    ("title", "Titre", "string"), ("progress", "Avancement %", "number"),
+    ("estimated_hours", "Heures estimées", "number"), ("spent_hours", "Heures passées", "number"),
+    ("balance", "Écart", "string"), ("start_date", "Début", "date"), ("due_date", "Échéance", "date"),
+)  # fmt: skip
+PROJECT_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "number"), ("name", "Nom", "string"), ("slug", "Slug", "string"),
+    ("budget_hours", "Budget h", "number"), ("hours_per_day", "Heures par jour", "number"),
+    ("start_date", "Début", "date"), ("due_date", "Échéance", "date"),
+    ("github", "Dépôt GitHub", "string"),
+)  # fmt: skip
+TIMESHEET_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "number"), ("type", "Type", "string"), ("title", "Titre", "string"),
+    ("status", "Statut", "string"), ("estimated_hours", "Heures estimées", "number"),
+    ("spent_hours", "Heures passées", "number"), ("balance", "Écart", "string"),
+)  # fmt: skip
+MILESTONE_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "number"), ("title", "Titre", "string"), ("date", "Date", "date"),
+    ("reached", "Atteint", "boolean"), ("phase_id", "Phase", "number"),
+)  # fmt: skip
+
+
+def work_items_table(items: list[WorkItem], label: str) -> dict[str, Any]:
+    return atelier_table(
+        "work-items",
+        label,
+        WORK_ITEM_COLUMNS,
+        [
+            [
+                i.id,
+                i.projectId,
+                i.storyId,
+                i.type,
+                i.status,
+                STATUS_LABELS[i.status],
+                i.priority,
+                i.title,
+                i.progress,
+                hours(i.estimate),
+                i.spent.hours,
+                balance_text(i),
+                i.startDate,
+                i.dueDate,
+            ]  # fmt: skip
+            for i in items
+        ],
+    )
+
+
+def work_item_record(w: WorkItem) -> dict[str, Any]:
+    """Fiche d'un élément (clés `snake_case`) : sortie structurée des lectures et écritures."""
+    record: dict[str, Any] = {
+        "id": w.id,
+        "project_id": w.projectId,
+        "story_id": w.storyId,
+        "type": w.type,
+        "status": w.status,
+        "priority": w.priority,
+        "title": w.title,
+        "progress": w.progress,
+        "estimated_hours": hours(w.estimate),
+        "spent_hours": w.spent.hours,
+        "start_date": w.startDate.isoformat() if w.startDate else None,
+        "due_date": w.dueDate.isoformat() if w.dueDate else None,
+    }
+    if isinstance(w, WorkItemDetail):
+        record["path"] = {
+            level: {"id": ref.id, "code": ref.code, "title": ref.title}
+            for level, ref in (
+                ("phase", w.path.phase),
+                ("epic", w.path.epic),
+                ("story", w.path.story),
+            )
+        }
+    return record
+
+
 # ═══ Outils de lecture ════════════════════════════════════════════
 
 
@@ -259,11 +347,31 @@ class ListProjectsTool(_ProjetsTool[NoInput]):
         "Liste les projets d'Atelier Projets : identifiant, nom, budget, dates, dépôt GitHub."
     )
     input_model = NoInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*PROJECT_COLUMNS)
 
     async def run(self, params: NoInput, ctx: ToolContext) -> ToolOutput:
         projects = await self.client.projects()
+        data = atelier_table(
+            "projects",
+            "Projets",
+            PROJECT_COLUMNS,
+            [
+                [
+                    p.id,
+                    p.name,
+                    p.slug,
+                    hours(p.budget),
+                    p.hoursPerDay,
+                    p.startDate,
+                    p.dueDate,
+                    f"{p.github.owner}/{p.github.repo}" if p.github else None,
+                ]  # fmt: skip
+                for p in projects
+            ],
+        )
         if not projects:
-            return ToolOutput(content="Aucun projet dans Atelier Projets.")
+            return ToolOutput(content="Aucun projet dans Atelier Projets.", data=data)
         rows = [
             [
                 p.id,
@@ -279,7 +387,7 @@ class ListProjectsTool(_ProjetsTool[NoInput]):
         text, _ = table_for_model(
             ["id", "nom", "budget h", "h/jour", "début", "échéance", "github"], rows, noun="projet"
         )
-        return ToolOutput(content=text)
+        return ToolOutput(content=text, data=data)
 
 
 class DashboardTool(_ProjetsTool[ProjectInput]):
@@ -357,6 +465,8 @@ class ListWorkItemsTool(_ProjetsTool[ListWorkItemsInput]):
         "estimé, temps passé, écart au budget et échéance. Filtres : statuts, types, story, texte."
     )
     input_model = ListWorkItemsInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*WORK_ITEM_COLUMNS)
 
     async def run(self, params: ListWorkItemsInput, ctx: ToolContext) -> ToolOutput:
         items = await self.client.work_items(
@@ -366,8 +476,9 @@ class ListWorkItemsTool(_ProjetsTool[ListWorkItemsInput]):
             story_id=params.story_id,
             q=params.query,
         )
+        data = work_items_table(items, f"Éléments du projet {params.project_id}")
         if not items:
-            return ToolOutput(content="Aucun élément ne correspond.")
+            return ToolOutput(content="Aucun élément ne correspond.", data=data)
         headers, rows = work_item_rows(items)
         text, _ = table_for_model(headers, rows, noun="élément")
         artifact = data_artifact(
@@ -377,7 +488,7 @@ class ListWorkItemsTool(_ProjetsTool[ListWorkItemsInput]):
             numeric={"id", "avancement %", "estimé h", "passé h"},
             metadata={"source": "projets", "project_id": params.project_id},
         )
-        return ToolOutput(content=text, artifacts=[artifact])
+        return ToolOutput(content=text, artifacts=[artifact], data=data)
 
 
 class WorkItemInput(ToolInput):
@@ -391,6 +502,8 @@ class WorkItemTool(_ProjetsTool[WorkItemInput]):
         "d'avancement, saisies de temps, commits et pull requests liés, dépendances."
     )
     input_model = WorkItemInput
+    output_format = "json"
+    output_hint = {"fields": [c[0] for c in WORK_ITEM_COLUMNS if c[0] != "status_label"] + ["path"]}
 
     async def run(self, params: WorkItemInput, ctx: ToolContext) -> ToolOutput:
         w = await self.client.work_item(params.work_item_id)
@@ -425,7 +538,7 @@ class WorkItemTool(_ProjetsTool[WorkItemInput]):
                 "Dépend de : "
                 + ", ".join(f"#{n.id} ({STATUS_LABELS[n.status]})" for n in w.predecessors)
             )
-        return ToolOutput(content="\n".join(lines))
+        return ToolOutput(content="\n".join(lines), data=work_item_record(w))
 
 
 class TimesheetTool(_ProjetsTool[ProjectInput]):
@@ -434,6 +547,8 @@ class TimesheetTool(_ProjetsTool[ProjectInput]):
         "Feuille de temps d'un projet : estimé, passé, reste et écart par élément, avec totaux."
     )
     input_model = ProjectInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*TIMESHEET_COLUMNS)
 
     async def run(self, params: ProjectInput, ctx: ToolContext) -> ToolOutput:
         ts = await self.client.timesheet(params.project_id)
@@ -452,25 +567,50 @@ class TimesheetTool(_ProjetsTool[ProjectInput]):
             f"Feuille de temps — projet {params.project_id}", headers, rows,
             numeric={"id", "estimé h", "passé h"}, metadata={"source": "projets"},
         )  # fmt: skip
-        return ToolOutput(content=f"{summary}\n{text}", artifacts=[artifact])
+        data = atelier_table(
+            "timesheet",
+            f"Feuille de temps — projet {params.project_id}",
+            TIMESHEET_COLUMNS,
+            [
+                [
+                    r.id,
+                    r.type,
+                    r.title,
+                    r.status,
+                    hours(r.estimate),
+                    r.spent.hours,
+                    r.balance.kind if r.balance else None,
+                ]  # fmt: skip
+                for r in ts.rows
+            ],
+        )
+        return ToolOutput(content=f"{summary}\n{text}", artifacts=[artifact], data=data)
 
 
 class MilestonesTool(_ProjetsTool[ProjectInput]):
     name = "projets_milestones"
     description = "Jalons d'un projet avec date et état (atteint ou non)."
     input_model = ProjectInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*MILESTONE_COLUMNS)
 
     async def run(self, params: ProjectInput, ctx: ToolContext) -> ToolOutput:
         ms = await self.client.milestones(params.project_id)
+        data = atelier_table(
+            "milestones",
+            f"Jalons — projet {params.project_id}",
+            MILESTONE_COLUMNS,
+            [[m.id, m.title, m.date, m.reached, m.phaseId] for m in ms],
+        )
         if not ms:
-            return ToolOutput(content="Aucun jalon.")
+            return ToolOutput(content="Aucun jalon.", data=data)
         today = date.today()
         lines = [
             f"- {m.date.isoformat()} « {m.title} » : "
             + ("atteint" if m.reached else ("en retard" if m.date < today else "à venir"))
             for m in ms
         ]
-        return ToolOutput(content="\n".join(lines))
+        return ToolOutput(content="\n".join(lines), data=data)
 
 
 # ═══ Outils d'écriture (validation requise) ═══════════════════════
@@ -493,6 +633,7 @@ class CreateWorkItemTool(_ProjetsTool[CreateWorkItemInput]):
     description = "Crée une FEATURE, TASK ou BUG dans une story. Action soumise à la validation de l'utilisateur."
     input_model = CreateWorkItemInput
     requires_approval = True
+    output_format = "json"
 
     def approval_summary(self, params: CreateWorkItemInput) -> str:
         est = f", {params.estimated_hours:g} h estimées" if params.estimated_hours else ""
@@ -509,7 +650,8 @@ class CreateWorkItemTool(_ProjetsTool[CreateWorkItemInput]):
         )
         created = await self.client.create_work_item(params.story_id, body)
         return ToolOutput(
-            content=f"Élément #{created.id} « {created.title} » créé ({STATUS_LABELS[created.status]})."
+            content=f"Élément #{created.id} « {created.title} » créé ({STATUS_LABELS[created.status]}).",
+            data=work_item_record(created),
         )
 
 
@@ -529,6 +671,7 @@ class UpdateWorkItemTool(_ProjetsTool[UpdateWorkItemInput]):
     )
     input_model = UpdateWorkItemInput
     requires_approval = True
+    output_format = "json"
 
     def approval_summary(self, params: UpdateWorkItemInput) -> str:
         changes = []
@@ -558,7 +701,8 @@ class UpdateWorkItemTool(_ProjetsTool[UpdateWorkItemInput]):
             return ToolOutput(content="Aucun changement demandé.", is_error=True)
         updated = await self.client.update_work_item(params.work_item_id, body)
         return ToolOutput(
-            content=f"#{updated.id} mis à jour : {STATUS_LABELS[updated.status]}, {updated.progress} %."
+            content=f"#{updated.id} mis à jour : {STATUS_LABELS[updated.status]}, {updated.progress} %.",
+            data=work_item_record(updated),
         )
 
 
@@ -574,6 +718,7 @@ class AddTimeEntryTool(_ProjetsTool[AddTimeEntryInput]):
     description = "Saisit du temps passé sur un élément. Action soumise à validation."
     input_model = AddTimeEntryInput
     requires_approval = True
+    output_format = "json"
 
     def approval_summary(self, params: AddTimeEntryInput) -> str:
         day = params.spent_on.isoformat() if params.spent_on else "aujourd'hui"
@@ -585,7 +730,14 @@ class AddTimeEntryTool(_ProjetsTool[AddTimeEntryInput]):
             TimeEntryCreate(hours=params.hours, spentOn=params.spent_on, comment=params.comment),
         )
         return ToolOutput(
-            content=f"{entry.duration.hours:g} h saisies le {entry.spentOn.isoformat()} sur #{entry.workItemId}."
+            content=f"{entry.duration.hours:g} h saisies le {entry.spentOn.isoformat()} sur #{entry.workItemId}.",
+            data={
+                "id": entry.id,
+                "work_item_id": entry.workItemId,
+                "spent_on": entry.spentOn.isoformat(),
+                "hours": entry.duration.hours,
+                "comment": entry.comment,
+            },
         )
 
 
@@ -600,16 +752,19 @@ class AddLogEntryTool(_ProjetsTool[AddLogEntryInput]):
     description = "Ajoute une entrée horodatée au journal d'avancement d'un élément. Action soumise à validation."
     input_model = AddLogEntryInput
     requires_approval = True
+    output_format = "json"
 
     def approval_summary(self, params: AddLogEntryInput) -> str:
         preview = params.text if len(params.text) < 80 else params.text[:77] + "…"
         return f"Ajouter au journal de #{params.work_item_id} : « {preview} »"
 
     async def run(self, params: AddLogEntryInput, ctx: ToolContext) -> ToolOutput:
-        await self.client.add_log_entry(
+        updated = await self.client.add_log_entry(
             params.work_item_id, LogEntryCreate(text=params.text, hours=params.hours)
         )
-        return ToolOutput(content=f"Journal de #{params.work_item_id} complété.")
+        return ToolOutput(
+            content=f"Journal de #{params.work_item_id} complété.", data=work_item_record(updated)
+        )
 
 
 def projets_read_tools(client: ProjetsClient) -> list[BaseTool[Any]]:

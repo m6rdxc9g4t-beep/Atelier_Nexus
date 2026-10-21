@@ -37,6 +37,7 @@ from app.schemas.data_via import (
     Sort,
 )
 from app.tools.base import Artifact, BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.formatting import TableType, atelier_table, table_hint
 
 # ═══ Erreurs ══════════════════════════════════════════════════════
 
@@ -341,6 +342,15 @@ class ListDatasetsInput(ToolInput):
     pass
 
 
+_DATASET_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "string"),
+    ("name", "Nom", "string"),
+    ("rows", "Lignes", "number"),
+    ("columns", "Colonnes", "number"),
+    ("connection", "Connexion", "string"),
+)
+
+
 class ListDatasetsTool(_DataViaTool[ListDatasetsInput]):
     name = "data_via_list_datasets"
     description = (
@@ -348,17 +358,34 @@ class ListDatasetsTool(_DataViaTool[ListDatasetsInput]):
         "nom, nombre de lignes et de colonnes. Point de départ de toute analyse."
     )
     input_model = ListDatasetsInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*_DATASET_COLUMNS)
 
     async def run(self, params: ListDatasetsInput, ctx: ToolContext) -> ToolOutput:
         datasets = await self.client.list_datasets()
+        data = atelier_table(
+            "datasets",
+            "Jeux de données",
+            _DATASET_COLUMNS,
+            [
+                [
+                    d.id,
+                    d.name,
+                    d.rows,
+                    d.columns_count,
+                    d.origin.connection_name if d.origin else None,
+                ]
+                for d in datasets
+            ],
+        )
         if not datasets:
-            return ToolOutput(content="Aucun jeu de données dans Data Via.")
+            return ToolOutput(content="Aucun jeu de données dans Data Via.", data=data)
         rows = [
             [d.id, d.name, d.rows, d.columns_count, d.origin.connection_name if d.origin else "—"]
             for d in datasets
         ]
         table = markdown_table(["id", "nom", "lignes", "colonnes", "connexion"], rows)
-        return ToolOutput(content=f"{len(datasets)} jeu(x) de données :\n{table}")
+        return ToolOutput(content=f"{len(datasets)} jeu(x) de données :\n{table}", data=data)
 
 
 class DescribeDatasetInput(ToolInput):
@@ -373,6 +400,8 @@ class DescribeDatasetTool(_DataViaTool[DescribeDatasetInput]):
         "avant toute requête, formule DAX ou mesure portant sur ce jeu."
     )
     input_model = DescribeDatasetInput
+    output_format = "json"
+    output_hint = {"fields": ["id", "name", "rows", "columns", "measures"]}
 
     async def run(self, params: DescribeDatasetInput, ctx: ToolContext) -> ToolOutput:
         profile = await self.client.get_dataset(params.dataset_id)
@@ -389,7 +418,20 @@ class DescribeDatasetTool(_DataViaTool[DescribeDatasetInput]):
             language="json",
             metadata={"source": "data_via", "dataset_id": profile.id, "view": "schema"},
         )
-        return ToolOutput(content=describe_for_model(profile), artifacts=[artifact])
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "format": profile.format,
+            "rows": profile.rows,
+            "columns": [
+                {"name": c.name, "type": c.type, "nulls": c.nulls, "distinct": c.distinct}
+                for c in profile.columns
+            ],
+            "measures": [
+                {"name": m.name, "expression": m.expression} for m in profile.model.measures
+            ],
+        }
+        return ToolOutput(content=describe_for_model(profile), artifacts=[artifact], data=data)
 
 
 class QueryInput(ToolInput):
@@ -416,6 +458,7 @@ class QueryTool(_DataViaTool[QueryInput]):
         f"{MAX_ROWS_FOR_MODEL} lignes. Le schéma doit avoir été consulté avant."
     )
     input_model = QueryInput
+    output_format = "atelier-table/1"
 
     async def run(self, params: QueryInput, ctx: ToolContext) -> ToolOutput:
         profile = _require_described(ctx, params.dataset_id)
@@ -455,7 +498,15 @@ class QueryTool(_DataViaTool[QueryInput]):
             },
         )
         content = f"{summary}.\n{markdown_table(headers, [list(r) for r in shown])}"
-        return ToolOutput(content=content, artifacts=[artifact])
+        data = atelier_table(
+            "query",
+            f"Requête — {profile.name}",
+            [(c.key, c.key, c.type) for c in result.columns],
+            result.rows,
+            total=None if result.truncated else len(result.rows),
+            truncated=result.truncated,
+        )
+        return ToolOutput(content=content, artifacts=[artifact], data=data)
 
 
 class CheckExpressionInput(ToolInput):

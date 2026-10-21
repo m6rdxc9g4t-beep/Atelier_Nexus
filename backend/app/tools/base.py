@@ -42,6 +42,9 @@ class ToolOutput(BaseModel):
     is_error: bool = False
     # Livrables affichés à l'utilisateur, hors du fil de discussion
     artifacts: list[Artifact] = Field(default_factory=list)
+    # Sortie structurée (JSON : table `atelier-table/1` ou fiche) pour les workflows v2.
+    # Jamais envoyée au modèle : seul `content` l'est.
+    data: Any = None
 
 
 class ToolContext(BaseModel):
@@ -70,6 +73,10 @@ class BaseTool[InputT: ToolInput](ABC):
     requires_approval: ClassVar[bool] = False
     # Données sensibles (finances…) : l'agent qui l'utilise est verrouillé sur un modèle local
     sensitive: ClassVar[bool] = False
+    # Forme de `ToolOutput.data` annoncée au catalogue des workflows v2
+    output_format: ClassVar[Literal["atelier-table/1", "json", "text"]] = "text"
+    # Colonnes (`{key, label, type}`) ou champs attendus, quand ils sont connus d'avance
+    output_hint: ClassVar[dict[str, Any] | None] = None
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:

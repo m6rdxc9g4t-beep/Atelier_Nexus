@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any
+import re
+import unicodedata
+from collections.abc import Sequence
+from datetime import date, datetime
+from typing import Any, Literal
 
 from app.tools.base import Artifact
 
@@ -73,3 +77,78 @@ def data_artifact(
         language="json",
         metadata=metadata or {},
     )
+
+
+# ─── Table d'échange `atelier-table/1` (docs/apps/noeud-atelier.md §7.2) ──────
+
+TABLE_FORMAT = "atelier-table/1"
+TableType = Literal["string", "number", "date", "datetime", "boolean"]
+_KEY_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def snake_key(text: str) -> str:
+    """Clé `snake_case` sans accent : « Coût HT » → `cout_ht`, `sum(ca)` → `sum_ca`."""
+    plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
+    key = _KEY_CHARS.sub("_", plain).strip("_")
+    if not key:
+        return "colonne"
+    return key if key[0].isalpha() else f"c_{key}"
+
+
+def cell_value(value: Any) -> Any:
+    """Valeur JSON d'une cellule : dates en ISO 8601, vide = `null`."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if value == "":
+        return None
+    return value
+
+
+def atelier_table(
+    name: str,
+    label: str,
+    columns: Sequence[tuple[str, str, TableType]],
+    rows: Sequence[Sequence[Any]],
+    *,
+    total: int | None = None,
+    truncated: bool = False,
+) -> dict[str, Any]:
+    """Table `atelier-table/1`. `columns` : `(clé, libellé, type)` ; la clé est normalisée en
+    `snake_case` et rendue unique ; `rows` : valeurs dans l'ordre des colonnes."""
+    keys: list[str] = []
+    for key, _, _ in columns:
+        base = snake_key(key) if not key.startswith("_") else key
+        candidate, n = base, 2
+        while candidate in keys:
+            candidate, n = f"{base}_{n}", n + 1
+        keys.append(candidate)
+    return {
+        "format": TABLE_FORMAT,
+        "name": name,
+        "label": label,
+        "columns": [
+            {"key": k, "label": lbl, "type": t}
+            for k, (_, lbl, t) in zip(keys, columns, strict=True)
+        ],
+        "rows": [{k: cell_value(v) for k, v in zip(keys, row, strict=False)} for row in rows],
+        "total": len(rows) if total is None and not truncated else total,
+        "truncated": truncated,
+    }
+
+
+def is_atelier_table(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and value.get("format") == TABLE_FORMAT
+        and isinstance(value.get("columns"), list)
+        and isinstance(value.get("rows"), list)
+    )
+
+
+def table_hint(*columns: tuple[str, str, TableType]) -> dict[str, Any]:
+    """`output_hint` d'un outil qui renvoie une table aux colonnes connues d'avance."""
+    return {"columns": [{"key": k, "label": lbl, "type": t} for k, lbl, t in columns]}
