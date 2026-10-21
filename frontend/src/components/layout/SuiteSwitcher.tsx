@@ -1,19 +1,6 @@
 "use client";
 
-import {
-  BarChart3,
-  CalendarCheck,
-  Check,
-  Clapperboard,
-  CookingPot,
-  Globe,
-  GraduationCap,
-  Landmark,
-  LayoutGrid,
-  type LucideIcon,
-  Network,
-  Table2,
-} from "lucide-react";
+import { Check, Globe, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -36,16 +23,7 @@ import {
 import { openExternal } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<SuiteAppId, LucideIcon> = {
-  nexus: Network,
-  viz: BarChart3,
-  tab: Table2,
-  projets: CalendarCheck,
-  tresorerie: Landmark,
-  cine: Clapperboard,
-  savoir: GraduationCap,
-  cuisine: CookingPot,
-};
+import { AppIcon } from "./appIcons";
 
 /** Sélecteur « Suite Atelier » (SUITE.md §3) : état vérifié à l'ouverture, sans bloquer le menu. */
 export function SuiteSwitcher() {
@@ -71,7 +49,6 @@ export function SuiteSwitcher() {
       <DropdownMenuContent align="start" className="w-76">
         <DropdownMenuLabel>Suite Atelier</DropdownMenuLabel>
         {apps.map((app) => {
-          const Icon = ICONS[app.id];
           const current = app.id === CURRENT_APP;
           const st = app.healthUrl && !app.online ? (status[app.id] ?? "unknown") : null;
           const state = app.online ? ONLINE_LABEL : st ? statusLabel(st) : null;
@@ -91,7 +68,7 @@ export function SuiteSwitcher() {
                 data-atelier-app={app.id}
                 aria-hidden
               >
-                <Icon />
+                <AppIcon app={app.id} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
