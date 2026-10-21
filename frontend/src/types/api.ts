@@ -354,7 +354,8 @@ export interface Workflow extends WorkflowCreate {
   id: string;
   run_count: number;
   last_run_at: string | null;
-  last_status: "completed" | "failed" | null;
+  /** stopped = une écriture refusée a arrêté le workflow */
+  last_status: "completed" | "failed" | "stopped" | null;
   created_at: string;
   updated_at: string;
 }
@@ -385,10 +386,12 @@ export interface PendingStep {
   index: number;
   tool: string;
   summary: string;
+  /** À renvoyer dans `approvals` : ne vaut que pour cette action (valeurs, version). */
+  token: string;
 }
 
 export interface WorkflowRunResult {
-  status: "completed" | "failed" | "awaiting_approval";
+  status: "completed" | "failed" | "stopped" | "awaiting_approval";
   message: string;
   steps: StepResult[];
   artifacts: Artifact[];

@@ -9,6 +9,8 @@ import type { WorkflowFields, WorkflowParam, WorkflowRunResult, WorkflowStep } f
 const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_]{0,39})\s*\}\}/g;
 
 export interface StepDraft {
+  /** Identifiant stable dans l'éditeur (clé React, étape dépliée) */
+  key: string;
   tool: string;
   label: string;
   /** Entrée de l'outil, en JSON indenté, modifiable */
@@ -24,7 +26,10 @@ export interface WorkflowForm {
   params: WorkflowParam[];
 }
 
+let stepSeq = 0;
+
 export const stepDraft = (step: WorkflowStep, writes = false): StepDraft => ({
+  key: `etape-${stepSeq++}`,
   tool: step.tool,
   label: step.label ?? "",
   inputText: JSON.stringify(step.input, null, 2),
@@ -94,6 +99,6 @@ export const initialValues = (params: WorkflowParam[]): Record<string, string> =
 export const missingParams = (params: WorkflowParam[], values: Record<string, string>): string[] =>
   params.filter((p) => !(values[p.name] ?? "").trim() && !p.default.trim()).map((p) => p.label || p.name);
 
-/** Une décision par étape en attente, pour pouvoir relancer. */
+/** Une décision par action en attente (clé : son jeton), pour pouvoir relancer. */
 export const allDecided = (result: WorkflowRunResult, decisions: Record<string, boolean>): boolean =>
-  result.pending.every((p) => decisions[String(p.index)] !== undefined);
+  result.pending.every((p) => decisions[p.token] !== undefined);

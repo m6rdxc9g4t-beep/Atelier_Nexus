@@ -334,7 +334,7 @@ def is_sensitive(ids: list[str]) -> bool:
     return any(get_toolset(i).sensitive for i in ids)
 
 
-def declared_tool_names(ids: list[str]) -> set[str]:
+async def declared_tool_names(ids: list[str]) -> set[str]:
     """Noms de tous les outils des boîtes demandées, configurées ou non.
 
     Les outils sont construits à blanc avec des adresses fictives : aucun appel réseau, aucune
@@ -357,6 +357,9 @@ def declared_tool_names(ids: list[str]) -> set[str]:
     )
     env = ToolEnvironment(blank)
     names: set[str] = set()
-    for toolset_id in ids:
-        names |= {t.name for t in get_toolset(toolset_id).build(env)}
+    try:
+        for toolset_id in ids:
+            names |= {t.name for t in get_toolset(toolset_id).build(env)}
+    finally:
+        await env.aclose()  # clients HTTP créés à blanc : jamais utilisés, toujours fermés
     return names

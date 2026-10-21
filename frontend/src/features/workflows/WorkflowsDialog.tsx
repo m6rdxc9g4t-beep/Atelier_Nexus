@@ -111,6 +111,7 @@ function WorkflowList({
   const [state, setState] = useState<ListState>({ status: "loading" });
   const [running, setRunning] = useState<Workflow | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -126,10 +127,12 @@ function WorkflowList({
   }, [agent.name, version, refresh]);
 
   const remove = async (id: string) => {
+    setDeleteError(null);
     try {
       await api.deleteWorkflow(id);
     } catch (err) {
-      setState({ status: "error", message: err instanceof ApiError ? err.message : "Suppression impossible." });
+      // La liste reste affichée : on peut réessayer
+      setDeleteError(err instanceof ApiError ? err.message : "Suppression impossible.");
       return;
     }
     setConfirming(null);
@@ -165,65 +168,78 @@ function WorkflowList({
     );
 
   return (
-    <ul className="grid max-h-[60dvh] grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto">
-      {state.items.map((wf) => (
-        <li key={wf.id} className="rounded-md border border-atelier-border-soft bg-card p-3">
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{wf.title}</p>
-              {wf.description && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{wf.description}</p>}
-              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span>{wf.steps.length} étape(s)</span>
-                {wf.params.length > 0 && <span>· {wf.params.length} paramètre(s)</span>}
-                {wf.last_run_at ? (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
+      {deleteError && (
+        <p role="alert" className="text-sm text-destructive">
+          {deleteError}
+        </p>
+      )}
+      <ul className="grid max-h-[60dvh] grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto">
+        {state.items.map((wf) => (
+          <li key={wf.id} className="rounded-md border border-atelier-border-soft bg-card p-3">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{wf.title}</p>
+                {wf.description && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{wf.description}</p>}
+                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{wf.steps.length} étape(s)</span>
+                  {wf.params.length > 0 && <span>· {wf.params.length} paramètre(s)</span>}
+                  {wf.last_run_at ? (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>lancé {formatWhen(wf.last_run_at)}</span>
+                      {wf.last_status && (
+                        <Badge variant={LAST_STATUS[wf.last_status].variant}>{LAST_STATUS[wf.last_status].label}</Badge>
+                      )}
+                    </>
+                  ) : (
+                    <span>· jamais lancé</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {confirming === wf.id ? (
                   <>
-                    <span aria-hidden>·</span>
-                    <span>lancé {formatWhen(wf.last_run_at)}</span>
-                    <Badge variant={wf.last_status === "completed" ? "success" : "destructive"}>
-                      {wf.last_status === "completed" ? "réussi" : "échec"}
-                    </Badge>
+                    <Button size="sm" variant="destructive" onClick={() => void remove(wf.id)}>
+                      Supprimer
+                    </Button>
+                    <Button size="icon-sm" variant="ghost" aria-label="Annuler" onClick={() => setConfirming(null)}>
+                      <X />
+                    </Button>
                   </>
                 ) : (
-                  <span>· jamais lancé</span>
+                  <>
+                    <Button size="icon-sm" variant="ghost" aria-label={`Modifier ${wf.title}`} onClick={() => onEdit(wf)}>
+                      <Pencil />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Supprimer ${wf.title}`}
+                      onClick={() => setConfirming(wf.id)}
+                    >
+                      <Trash2 />
+                    </Button>
+                    <Button size="sm" onClick={() => setRunning(wf)}>
+                      <Play />
+                      Lancer
+                    </Button>
+                  </>
                 )}
-              </p>
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {confirming === wf.id ? (
-                <>
-                  <Button size="sm" variant="destructive" onClick={() => void remove(wf.id)}>
-                    Supprimer
-                  </Button>
-                  <Button size="icon-sm" variant="ghost" aria-label="Annuler" onClick={() => setConfirming(null)}>
-                    <X />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="icon-sm" variant="ghost" aria-label={`Modifier ${wf.title}`} onClick={() => onEdit(wf)}>
-                    <Pencil />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`Supprimer ${wf.title}`}
-                    onClick={() => setConfirming(wf.id)}
-                  >
-                    <Trash2 />
-                  </Button>
-                  <Button size="sm" onClick={() => setRunning(wf)}>
-                    <Play />
-                    Lancer
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
+
+const LAST_STATUS = {
+  completed: { variant: "success", label: "réussi" },
+  failed: { variant: "destructive", label: "échec" },
+  stopped: { variant: "warning", label: "arrêté (refus)" },
+} as const;
 
 const STEP_ICON = {
   ok: { Icon: CircleCheck, className: "text-success", label: "réussie" },
@@ -309,7 +325,7 @@ function RunPanel({
           </header>
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
             {result.pending.map((step) => {
-              const key = String(step.index);
+              const key = step.token;
               const choice = decisions[key];
               return (
                 <li key={key} className="flex flex-wrap items-center gap-2 rounded-md border border-atelier-line bg-card px-3 py-2">
@@ -389,17 +405,22 @@ function RunPanel({
 
 function RunResult({ result }: { result: WorkflowRunResult }) {
   const ok = result.status === "completed";
+  const stopped = result.status === "stopped";
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
       <p
         role="status"
         className={cn(
           "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
-          ok ? "border-success/30 bg-success/8" : "border-destructive/30 bg-destructive/8 text-destructive",
+          ok && "border-success/30 bg-success/8",
+          stopped && "border-warning/40 bg-warning/8",
+          !ok && !stopped && "border-destructive/30 bg-destructive/8 text-destructive",
         )}
       >
         {ok ? (
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+        ) : stopped ? (
+          <CircleSlash className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
         ) : (
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
         )}

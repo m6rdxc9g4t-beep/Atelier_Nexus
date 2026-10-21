@@ -52,11 +52,15 @@ class WorkflowParam(_Strict):
     default: str = Field(default="", max_length=500)
 
 
-class WorkflowFields(_Strict):
+class _WorkflowBase(_Strict):
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=500)
     steps: list[WorkflowStep] = Field(min_length=1, max_length=MAX_STEPS)
     params: list[WorkflowParam] = Field(default_factory=list, max_length=10)
+
+
+class WorkflowFields(_WorkflowBase):
+    """Saisie (création, modification) : les paramètres cités doivent être déclarés."""
 
     @model_validator(mode="after")
     def _params_match_steps(self) -> Self:
@@ -79,13 +83,18 @@ class WorkflowUpdate(WorkflowFields):
     pass
 
 
-RunStatus = Literal["completed", "failed"]
+#: stopped = une écriture refusée a arrêté le workflow
+RunStatus = Literal["completed", "failed", "stopped"]
 
 
-class Workflow(WorkflowCreate):
+class Workflow(_WorkflowBase):
+    """Lecture : pas de revalidation croisée, une ligne ancienne ne bloque pas la liste."""
+
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     id: str
+    agent: str
+    source_conversation_id: str | None = None
     run_count: int = 0
     last_run_at: datetime | None = None
     last_status: RunStatus | None = None
@@ -123,7 +132,7 @@ class WorkflowDraft(BaseModel):
 
 class WorkflowRunRequest(_Strict):
     params: dict[str, str] = Field(default_factory=dict)
-    #: Validation des étapes d'écriture : numéro d'étape (à partir de 1) → autorisée
+    #: Validation des étapes d'écriture : jeton reçu dans `pending` → autorisée
     approvals: dict[str, bool] | None = None
 
 
@@ -143,10 +152,12 @@ class PendingStep(BaseModel):
     index: int
     tool: str
     summary: str
+    #: À renvoyer dans `approvals` : vaut pour CETTE action (étape, outil, valeurs, version)
+    token: str
 
 
 class WorkflowRunResult(BaseModel):
-    status: Literal["completed", "failed", "awaiting_approval"]
+    status: Literal["completed", "failed", "stopped", "awaiting_approval"]
     message: str
     steps: list[StepResult] = Field(default_factory=list)
     artifacts: list[Artifact] = Field(default_factory=list)

@@ -37,6 +37,14 @@ describe("paramètres {{nom}}", () => {
   });
 });
 
+describe("étapes", () => {
+  it("ont chacune un identifiant stable", () => {
+    const a = stepDraft({ tool: "x", input: {}, label: "" });
+    const b = stepDraft({ tool: "x", input: {}, label: "" });
+    expect(a.key).not.toBe(b.key);
+  });
+});
+
 describe("toFields", () => {
   it("prépare le corps envoyé à l'API", () => {
     const parsed = toFields({
@@ -89,11 +97,12 @@ describe("lancement", () => {
       steps: [],
       artifacts: [],
       pending: [
-        { index: 2, tool: "projets_create_work_item", summary: "Créer…" },
-        { index: 4, tool: "projets_add_time_entry", summary: "Saisir…" },
+        { index: 2, tool: "projets_create_work_item", summary: "Créer…", token: "a1" },
+        { index: 4, tool: "projets_add_time_entry", summary: "Saisir…", token: "b2" },
       ],
     };
-    expect(allDecided(result, { "2": true })).toBe(false);
-    expect(allDecided(result, { "2": true, "4": false })).toBe(true);
+    expect(allDecided(result, { a1: true })).toBe(false);
+    expect(allDecided(result, { "2": true, "4": false })).toBe(false);
+    expect(allDecided(result, { a1: true, b2: false })).toBe(true);
   });
 });

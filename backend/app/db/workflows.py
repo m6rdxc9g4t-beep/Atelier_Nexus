@@ -21,10 +21,12 @@ def _to_model(row: WorkflowRow) -> Workflow:
 
 
 def _storage(exc: Exception) -> StorageError:
-    message = _storage_message(exc)
-    if "agents absente" in message:
-        message = "Table des workflows absente : lancez « alembic upgrade head » dans backend/."
-    return StorageError(message)
+    text = str(exc).lower()
+    if "no such table" in text or "does not exist" in text or "undefinedtable" in text:
+        return StorageError(
+            "Table des workflows absente : lancez « alembic upgrade head » dans backend/."
+        )
+    return StorageError(_storage_message(exc))
 
 
 class WorkflowRepository:

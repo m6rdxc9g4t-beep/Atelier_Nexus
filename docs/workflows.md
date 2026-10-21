@@ -27,10 +27,18 @@ faire sans modèle). La fenêtre indique ce qui a été écarté et pourquoi.
 
 - **Porte de contrôle avant de commencer** : chaque étape est vérifiée (outil disponible pour
   l'agent, paramètres valides pour cet outil). Un problème → rien n'est exécuté.
-- **Arrêt à la première erreur** : les étapes suivantes sont marquées « non exécutées ».
+- **Arrêt à la première erreur ou au premier refus** : les étapes suivantes sont marquées
+  « non exécutées » (elles dépendent souvent de la précédente : un commit après la création
+  d'une branche). Un refus donne le statut `stopped`.
 - **Écritures validées à chaque lancement** : une étape `requires_approval` (créer une tâche
   dans Projets, modifier Tab…) n'est jamais exécutée sans « Autoriser », exactement comme dans
   le chat ; le workflow s'arrête d'abord sur `awaiting_approval` sans rien exécuter.
+- **Une validation vaut pour l'action montrée, et elle seule** : chaque action en attente
+  porte un jeton calculé à partir du workflow (identifiant et version), du numéro d'étape, de
+  l'outil et des valeurs finales. D'autres valeurs de paramètres, une étape déplacée ou un
+  workflow modifié entre-temps donnent un autre jeton : la validation est redemandée.
+- **Jamais d'outil qui appelle un modèle** : `delegate_to_agent` est refusé à
+  l'enregistrement comme au lancement.
 - **Contexte partagé** entre les étapes : l'exploration préalable de Data Via (schéma avant
   requête) reste satisfaite, comme pendant le tour d'origine.
 - **Aucun modèle** : un workflow d'un agent « 100 % local » (Finance, Tuteur…) ne fait que des
@@ -49,7 +57,8 @@ faire sans modèle). La fenêtre indique ce qui a été écarté et pourquoi.
 Étape : `{"tool": "data_via_query", "input": {…}, "label": ""}` (30 au plus).
 Paramètre : `{"name": "jeu", "label": "Jeu de données", "default": "ventes_2026"}` (10 au plus,
 nom `^[a-z][a-z0-9_]{0,39}$`). Un `{{nom}}` cité dans une étape doit être déclaré (422 sinon).
-Un `{{nom}}` qui occupe toute une valeur est typé : `"{{limite}}"` avec `20` donne le nombre 20.
+Les paramètres sont substitués comme **texte** ; c'est l'outil qui convertit (« 20 » pour un
+champ entier devient 20), et un identifiant « 007 » reste « 007 ».
 
 Outils inconnus de l'agent refusés à l'enregistrement (422) ; un outil dont l'application n'est
 pas configurée est accepté et signalé au lancement.
@@ -58,15 +67,16 @@ Résultat d'exécution :
 
 ```json
 {
-  "status": "completed | failed | awaiting_approval",
+  "status": "completed | failed | stopped | awaiting_approval",
   "message": "2 étape(s) exécutée(s), 1 livrable(s).",
   "steps": [{"index": 1, "tool": "…", "label": "", "input": {…}, "status": "ok | error | refused | skipped", "content": "…"}],
   "artifacts": [{"kind": "data_preview", "title": "…", "content": "…", "language": null, "metadata": {}}],
-  "pending": [{"index": 2, "tool": "projets_create_work_item", "summary": "Créer la TASK « … »"}]
+  "pending": [{"index": 2, "tool": "projets_create_work_item", "summary": "Créer la TASK « … »", "token": "9f2c…"}]
 }
 ```
 
-`approvals` : numéro d'étape (à partir de 1, en texte) → `true` / `false`.
+`approvals` : jeton reçu dans `pending` → `true` / `false`. Un workflow dont l'agent a été
+supprimé répond 409 au lancement.
 
 Base : table `workflows` (migration `0005_workflows`), avec compteur de lancements et dernier
 statut. Code : `app/workflows.py` (capture et exécution), `app/schemas/workflows.py`,

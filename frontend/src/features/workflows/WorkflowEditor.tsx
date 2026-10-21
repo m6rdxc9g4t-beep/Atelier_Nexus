@@ -54,7 +54,7 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [openStep, setOpenStep] = useState<number | null>(null);
+  const [openStep, setOpenStep] = useState<string | null>(null);
   const ids = useId();
 
   // Capture : le backend propose les étapes à partir du dernier tour (rien n'est enregistré)
@@ -191,11 +191,11 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
               </p>
               <ol className="grid grid-cols-[minmax(0,1fr)] gap-2">
                 {form.steps.map((step, index) => {
-                  const expanded = openStep === index;
+                  const expanded = openStep === step.key;
                   const error = errors[`step-${index}`];
                   return (
                     <li
-                      key={`${step.tool}-${index}`}
+                      key={step.key}
                       className={cn(
                         "rounded-md border bg-card",
                         error ? "border-destructive/50" : "border-atelier-border-soft",
@@ -205,7 +205,7 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
                         <button
                           type="button"
                           aria-expanded={expanded}
-                          onClick={() => setOpenStep(expanded ? null : index)}
+                          onClick={() => setOpenStep(expanded ? null : step.key)}
                           className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
                         >
                           <ChevronRight

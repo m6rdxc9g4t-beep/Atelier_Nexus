@@ -139,7 +139,7 @@ export const api = {
   updateWorkflow: (id: string, body: WorkflowFields) =>
     sendJson<Workflow>("PUT", `/api/workflows/${encodeURIComponent(id)}`, body),
   deleteWorkflow: (id: string) => sendJson<void>("DELETE", `/api/workflows/${encodeURIComponent(id)}`),
-  /** Lance sans modèle ; `approvals` : numéro d'étape → autorisée (étapes d'écriture). */
+  /** Lance sans modèle ; `approvals` : jeton de l'étape d'écriture (reçu dans `pending`) → autorisée. */
   runWorkflow: (id: string, params: Record<string, string>, approvals: Record<string, boolean> | null) =>
     sendJson<WorkflowRunResult>("POST", `/api/workflows/${encodeURIComponent(id)}/run`, { params, approvals }),
 };

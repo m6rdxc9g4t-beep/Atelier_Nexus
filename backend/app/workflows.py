@@ -12,7 +12,8 @@ Aucun modèle n'intervient : rien ne quitte la machine, même pour un agent « 1
 
 from __future__ import annotations
 
-import re
+import hashlib
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -114,23 +115,11 @@ def capture(agent: BaseAgent, messages: Sequence[Message]) -> WorkflowDraft:
 
 # ─── Paramètres ───────────────────────────────────────────────────
 
-_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
-
-
-def _typed(text: str) -> Any:
-    """Valeur d'un paramètre qui remplace TOUTE une valeur : nombre ou booléen si c'en est un."""
-    if _NUMBER.fullmatch(text):
-        return float(text) if "." in text else int(text)
-    if text in {"true", "false"}:
-        return text == "true"
-    return text
-
 
 def substitute(value: Any, values: dict[str, str]) -> Any:
+    """Remplace les `{{nom}}` par du texte. Pas de conversion de type : l'outil s'en charge
+    (« 50 » devient 50 pour un champ entier) et un identifiant « 007 » reste « 007 »."""
     if isinstance(value, str):
-        whole = PLACEHOLDER.fullmatch(value.strip())
-        if whole:
-            return _typed(values[whole.group(1)])
         return PLACEHOLDER.sub(lambda m: values[m.group(1)], value)
     if isinstance(value, dict):
         return {k: substitute(v, values) for k, v in value.items()}
@@ -159,6 +148,14 @@ def _clip(text: str) -> str:
     return text if len(text) <= MAX_CONTENT else text[: MAX_CONTENT - 1] + "…"
 
 
+def approval_token(binding: str, index: int, tool: str, tool_input: dict[str, Any]) -> str:
+    """Jeton d'une validation : lié au workflow (identifiant + version), au numéro d'étape, à
+    l'outil et aux valeurs finales. Une autre valeur, une étape déplacée ou un workflow modifié
+    entre la demande et la décision donnent un autre jeton : l'ancienne décision ne vaut plus."""
+    payload = json.dumps([binding, index, tool, tool_input], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
+
+
 async def run_workflow(
     agent: BaseAgent,
     steps: Sequence[WorkflowStep],
@@ -166,13 +163,24 @@ async def run_workflow(
     given: dict[str, str],
     approvals: dict[str, bool] | None,
     context: ToolContext | None = None,
+    *,
+    binding: str = "",
 ) -> WorkflowRunResult:
+    """`approvals` : jeton de validation (renvoyé dans `pending`) → autorisée.
+    `binding` : identifiant et version du workflow, inclus dans chaque jeton."""
     values = resolve_params(declared, given)
     concrete = [(step, substitute(step.input, values)) for step in steps]
+    decisions = approvals or {}
 
     # 1. Porte de contrôle : tout est vérifié avant d'exécuter quoi que ce soit
     problems: list[str] = []
     for index, (step, tool_input) in enumerate(concrete, start=1):
+        if step.tool in NOT_REPLAYABLE:
+            problems.append(
+                f"Étape {index} : « {step.tool} » ne peut pas faire partie d'un workflow "
+                f"({NOT_REPLAYABLE[step.tool]})."
+            )
+            continue
         tool = agent.tools.get(step.tool)
         if tool is None:
             problems.append(
@@ -191,13 +199,21 @@ async def run_workflow(
     if problems:
         return WorkflowRunResult(status="failed", message=" ".join(problems))
 
-    # 2. Validation humaine des écritures, comme dans le chat
+    tokens = [
+        approval_token(binding, index, step.tool, tool_input)
+        for index, (step, tool_input) in enumerate(concrete, start=1)
+    ]
+
+    # 2. Validation humaine des écritures, comme dans le chat, liée aux valeurs montrées
     pending = [
         PendingStep(
-            index=index, tool=step.tool, summary=agent.tools[step.tool].summarize(tool_input)
+            index=index,
+            tool=step.tool,
+            summary=agent.tools[step.tool].summarize(tool_input),
+            token=tokens[index - 1],
         )
         for index, (step, tool_input) in enumerate(concrete, start=1)
-        if agent.tools[step.tool].requires_approval and str(index) not in (approvals or {})
+        if agent.tools[step.tool].requires_approval and tokens[index - 1] not in decisions
     ]
     if pending:
         return WorkflowRunResult(
@@ -206,42 +222,49 @@ async def run_workflow(
             pending=pending,
         )
 
-    # 3. Exécution dans l'ordre, contexte partagé ; arrêt à la première erreur
+    # 3. Exécution dans l'ordre, contexte partagé. Une erreur ou un refus arrête tout : les
+    #    étapes suivantes dépendent souvent de celle-ci (commit après création de branche…)
     ctx = context or ToolContext()
     results: list[StepResult] = []
     artifacts: list[Artifact] = []
-    failed = False
+    stop: StepResult | None = None
     for index, (step, tool_input) in enumerate(concrete, start=1):
         tool = agent.tools[step.tool]
         base = {"index": index, "tool": step.tool, "label": step.label, "input": tool_input}
-        if failed:
+        if stop is not None:
             results.append(StepResult(**base, status="skipped"))
             continue
-        if tool.requires_approval and not (approvals or {}).get(str(index), False):
-            results.append(StepResult(**base, status="refused", content="Action refusée."))
+        if tool.requires_approval and not decisions.get(tokens[index - 1], False):
+            stop = StepResult(**base, status="refused", content="Action refusée.")
+            results.append(stop)
             continue
         output = await tool.invoke(tool_input, ctx)
         artifacts.extend(output.artifacts)
-        results.append(
-            StepResult(
-                **base, status="error" if output.is_error else "ok", content=_clip(output.content)
-            )
+        result = StepResult(
+            **base, status="error" if output.is_error else "ok", content=_clip(output.content)
         )
-        failed = output.is_error
-    if failed:
-        where = next(r for r in results if r.status == "error")
+        results.append(result)
+        if output.is_error:
+            stop = result
+    if stop is not None and stop.status == "error":
         return WorkflowRunResult(
             status="failed",
-            message=f"Arrêt à l'étape {where.index} ({where.tool}) : {where.content}",
+            message=f"Arrêt à l'étape {stop.index} ({stop.tool}) : {stop.content}",
+            steps=results,
+            artifacts=artifacts,
+        )
+    if stop is not None:
+        return WorkflowRunResult(
+            status="stopped",
+            message=f"Arrêté à l'étape {stop.index} : action refusée, les étapes suivantes "
+            "n'ont pas été exécutées.",
             steps=results,
             artifacts=artifacts,
         )
     done = sum(r.status == "ok" for r in results)
-    refused = sum(r.status == "refused" for r in results)
-    message = f"{done} étape(s) exécutée(s)" + (f", {refused} refusée(s)" if refused else "")
     return WorkflowRunResult(
         status="completed",
-        message=message + f", {len(artifacts)} livrable(s).",
+        message=f"{done} étape(s) exécutée(s), {len(artifacts)} livrable(s).",
         steps=results,
         artifacts=artifacts,
     )

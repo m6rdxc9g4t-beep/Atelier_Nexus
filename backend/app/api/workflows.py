@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.agents import AgentCatalog, BaseAgent
+from app.agents import AgentCatalog, AgentNotFoundError, BaseAgent
 from app.api.deps import (
     get_catalog,
     get_env_factory,
@@ -31,7 +31,7 @@ from app.schemas.workflows import (
 from app.tools import ToolContext
 from app.tools.environment import ToolEnvironment
 from app.tools.toolsets import declared_tool_names
-from app.workflows import WorkflowError, capture, run_workflow
+from app.workflows import NOT_REPLAYABLE, WorkflowError, capture, run_workflow
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 logger = logging.getLogger(__name__)
@@ -57,10 +57,17 @@ async def _agent(
     return await catalog.build(name, llm, env)  # AgentNotFoundError → 404
 
 
-def _check_tools(agent: BaseAgent, body: WorkflowFields) -> None:
+async def _check_tools(agent: BaseAgent, body: WorkflowFields) -> None:
     """Chaque étape cite un outil de l'agent (même si son application n'est pas configurée
-    sur cette machine : la disponibilité est vérifiée au lancement)."""
-    known = set(agent.tools) | declared_tool_names(list(agent.toolsets))
+    sur cette machine : la disponibilité est vérifiée au lancement), jamais un outil qui
+    ferait appel à un modèle."""
+    banned = sorted({s.tool for s in body.steps} & set(NOT_REPLAYABLE))
+    if banned:
+        raise _unprocessable(
+            f"Outil(s) impossible(s) dans un workflow, qui s'exécute sans modèle : "
+            f"{', '.join(banned)}."
+        )
+    known = set(agent.tools) | await declared_tool_names(list(agent.toolsets))
     unknown = sorted({s.tool for s in body.steps} - known)
     if unknown:
         raise _unprocessable(
@@ -101,7 +108,7 @@ async def create_workflow(
 ) -> Workflow:
     env = make_env()
     try:
-        _check_tools(await _agent(body.agent, llm, catalog, env), body)
+        await _check_tools(await _agent(body.agent, llm, catalog, env), body)
     finally:
         await env.aclose()
     return await repo.create(body)
@@ -129,7 +136,7 @@ async def update_workflow(
         raise _not_found(workflow_id)
     env = make_env()
     try:
-        _check_tools(await _agent(current.agent, llm, catalog, env), body)
+        await _check_tools(await _agent(current.agent, llm, catalog, env), body)
     finally:
         await env.aclose()
     updated = await repo.update(workflow_id, body)
@@ -155,14 +162,22 @@ async def run(
     make_env: EnvFactoryDep,
 ) -> WorkflowRunResult:
     """Exécute les étapes avec les outils de l'agent, sans modèle. Une étape d'écriture sans
-    décision dans `approvals` renvoie `awaiting_approval` (rien n'est exécuté) : relancer avec
-    `approvals: {"<numéro d'étape>": true | false}`."""
+    décision renvoie `awaiting_approval` (rien n'est exécuté) : relancer avec
+    `approvals: {"<jeton reçu dans pending>": true | false}`. Un jeton ne vaut que pour l'action
+    montrée : autres valeurs ou workflow modifié entre-temps → nouvelle demande."""
     workflow = await repo.get(workflow_id)
     if workflow is None:
         raise _not_found(workflow_id)
     env = make_env()
     try:
-        agent = await _agent(workflow.agent, llm, catalog, env)
+        try:
+            agent = await _agent(workflow.agent, llm, catalog, env)
+        except AgentNotFoundError as exc:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"L'agent « {workflow.agent} » de ce workflow n'existe plus : supprimez le "
+                "workflow ou recréez l'agent.",
+            ) from exc
         result = await run_workflow(
             agent,
             workflow.steps,
@@ -170,6 +185,7 @@ async def run(
             body.params,
             body.approvals,
             ToolContext(extras={"workflow_id": workflow.id}),
+            binding=f"{workflow.id}:{workflow.updated_at.isoformat()}",
         )
     except WorkflowError as exc:
         raise _unprocessable(str(exc)) from exc

@@ -156,18 +156,28 @@ def test_capture_without_any_usable_call_is_refused(apps: Apps) -> None:
 # ─── Paramètres ───────────────────────────────────────────────────
 
 
-def test_substitute_types_whole_values_and_formats_partial_ones() -> None:
-    values = {"jeu": "ds_ventes", "limite": "20", "net": "true", "mois": "2026-03"}
+def test_substitute_keeps_text_and_lets_the_tool_convert() -> None:
+    values = {"jeu": "007", "limite": "20", "mois": "2026-03"}
     out = substitute(
         {
             "dataset_id": "{{ jeu }}",
             "limit": "{{limite}}",
-            "x": ["{{net}}"],
+            "x": ["{{mois}}"],
             "t": "Ventes {{mois}}",
         },
         values,
     )
-    assert out == {"dataset_id": "ds_ventes", "limit": 20, "x": [True], "t": "Ventes 2026-03"}
+    assert out == {"dataset_id": "007", "limit": "20", "x": ["2026-03"], "t": "Ventes 2026-03"}
+
+
+async def test_numeric_looking_text_parameter_stays_text(apps: Apps) -> None:
+    steps = [WorkflowStep(tool="data_via_describe_dataset", input={"dataset_id": "{{jeu}}"})]
+    result = await run_workflow(
+        agent("data_analyst", apps), steps, [WorkflowParam(name="jeu")], {"jeu": "42"}, None
+    )
+    # Le schéma est valide (texte) : c'est Data Via qui répond « introuvable »
+    assert result.status == "failed" and result.message.startswith("Arrêt à l'étape 1")
+    assert result.steps[0].input == {"dataset_id": "42"}
 
 
 def test_params_use_defaults_and_reject_unknown_or_missing() -> None:
@@ -208,7 +218,7 @@ async def test_run_replays_tools_with_shared_context_and_collects_artifacts(apps
     )
     assert result.status == "completed", result.message
     assert [s.status for s in result.steps] == ["ok", "ok"]
-    assert result.steps[1].input["limit"] == 50
+    assert result.steps[1].input["limit"] == "50"  # converti en entier par l'outil
     assert {a.kind for a in result.artifacts} == {"data_preview"}
     assert "2 étape(s) exécutée(s)" in result.message
 
@@ -236,31 +246,78 @@ async def test_unavailable_tool_is_reported(apps: Apps) -> None:
     assert result.status == "failed" and "tresorerie_dashboard" in result.message
 
 
+WRITE_STEPS = [
+    WorkflowStep(tool="projets_dashboard", input={"project_id": 1}),
+    WorkflowStep(
+        tool="projets_create_work_item",
+        input={"story_id": 2, "type": "TASK", "title": "{{titre}}", "estimated_hours": 2},
+    ),
+    WorkflowStep(tool="projets_work_item", input={"work_item_id": 12345}),
+]
+
+
 async def test_write_steps_wait_for_approval_like_in_the_chat(apps: Apps) -> None:
     chef = agent("chef_de_projet", apps)
-    steps = [
-        WorkflowStep(tool="projets_dashboard", input={"project_id": 1}),
-        WorkflowStep(
-            tool="projets_create_work_item",
-            input={"story_id": 2, "type": "TASK", "title": "{{titre}}", "estimated_hours": 2},
-        ),
-    ]
     params = [WorkflowParam(name="titre")]
     posts = lambda: [r for r in apps.projets.requests if r.method == "POST"]  # noqa: E731
-
-    waiting = await run_workflow(chef, steps, params, {"titre": "Relire la PR"}, None)
-    assert waiting.status == "awaiting_approval" and not waiting.steps and not apps.projets.requests
-    assert waiting.pending[0].index == 2
-    assert (
-        waiting.pending[0].summary == "Créer la TASK « Relire la PR » dans la story 2, 2 h estimées"
+    run = lambda given, approvals: run_workflow(  # noqa: E731
+        chef, WRITE_STEPS, params, given, approvals, binding="wf1:v1"
     )
 
-    refused = await run_workflow(chef, steps, params, {"titre": "Relire la PR"}, {"2": False})
-    assert refused.status == "completed" and [s.status for s in refused.steps] == ["ok", "refused"]
+    waiting = await run({"titre": "Relire la PR"}, None)
+    assert waiting.status == "awaiting_approval" and not waiting.steps and not apps.projets.requests
+    pending = waiting.pending[0]
+    assert pending.index == 2
+    assert pending.summary == "Créer la TASK « Relire la PR » dans la story 2, 2 h estimées"
+
+    # Refus : arrêt, les étapes suivantes ne sont pas exécutées
+    refused = await run({"titre": "Relire la PR"}, {pending.token: False})
+    assert refused.status == "stopped"
+    assert [s.status for s in refused.steps] == ["ok", "refused", "skipped"]
     assert not posts()
 
-    done = await run_workflow(chef, steps, params, {"titre": "Relire la PR"}, {"2": True})
-    assert [s.status for s in done.steps] == ["ok", "ok"] and len(posts()) == 1
+    done = await run({"titre": "Relire la PR"}, {pending.token: True})
+    assert done.status == "completed" and [s.status for s in done.steps] == ["ok", "ok", "ok"]
+    assert len(posts()) == 1
+
+
+async def test_approval_is_bound_to_the_values_and_the_version(apps: Apps) -> None:
+    chef = agent("chef_de_projet", apps)
+    params = [WorkflowParam(name="titre")]
+    shown = await run_workflow(
+        chef, WRITE_STEPS, params, {"titre": "Relire la PR"}, None, binding="wf1:v1"
+    )
+    token = shown.pending[0].token
+
+    # Autres valeurs que celles montrées : nouvelle demande, rien d'exécuté
+    other = await run_workflow(
+        chef, WRITE_STEPS, params, {"titre": "Supprimer tout"}, {token: True}, binding="wf1:v1"
+    )
+    assert other.status == "awaiting_approval" and other.pending[0].token != token
+    # Workflow modifié entre-temps (nouvelle version) : l'ancienne décision ne vaut plus
+    edited = await run_workflow(
+        chef, WRITE_STEPS, params, {"titre": "Relire la PR"}, {token: True}, binding="wf1:v2"
+    )
+    assert edited.status == "awaiting_approval"
+    # Étape déplacée : le numéro fait partie du jeton
+    moved = await run_workflow(
+        chef, [WRITE_STEPS[1]], params, {"titre": "Relire la PR"}, {token: True}, binding="wf1:v1"
+    )
+    assert moved.status == "awaiting_approval"
+    # Ancienne clé « numéro d'étape » : ignorée
+    by_index = await run_workflow(
+        chef, WRITE_STEPS, params, {"titre": "Relire la PR"}, {"2": True}, binding="wf1:v1"
+    )
+    assert by_index.status == "awaiting_approval"
+    assert not [r for r in apps.projets.requests if r.method == "POST"]
+
+
+async def test_model_calling_tools_are_refused_at_run_time(apps: Apps) -> None:
+    orchestrator = agent("orchestrateur", apps)
+    steps = [WorkflowStep(tool="delegate_to_agent", input={"agent": "rh", "task": "x"})]
+    result = await run_workflow(orchestrator, steps, [], {}, None)
+    assert result.status == "failed" and "sans modèle" not in result.message
+    assert "ne peut pas faire partie d'un workflow" in result.message
 
 
 # ─── API ──────────────────────────────────────────────────────────
@@ -332,6 +389,30 @@ def test_api_capture_then_save_list_run_update_delete(client: TestClient) -> Non
     )
     assert renamed.status_code == 200 and renamed.json()["title"] == "CA hebdo"
 
+    # Approbation par jeton à travers l'API : la réponse donne le jeton, on le renvoie
+    write = client.post(
+        "/api/workflows",
+        json={
+            "agent": "chef_de_projet",
+            "title": "Tâche",
+            "steps": [{"tool": "projets_create_work_item",
+                       "input": {"story_id": 2, "type": "TASK", "title": "{{t}}"}}],
+            "params": [{"name": "t", "label": "Titre", "default": "Relire"}],
+        },
+    ).json()  # fmt: skip
+    asked = client.post(f"/api/workflows/{write['id']}/run", json={}).json()
+    assert asked["status"] == "awaiting_approval"
+    token = asked["pending"][0]["token"]
+    ok = client.post(f"/api/workflows/{write['id']}/run", json={"approvals": {token: True}})
+    assert ok.json()["status"] == "completed"
+    # Le workflow est modifié : l'ancien jeton ne vaut plus
+    client.put(
+        f"/api/workflows/{write['id']}",
+        json={"title": "Tâche bis", "steps": write["steps"], "params": write["params"]},
+    )
+    again = client.post(f"/api/workflows/{write['id']}/run", json={"approvals": {token: True}})
+    assert again.json()["status"] == "awaiting_approval"
+
     assert client.delete(f"/api/workflows/{wf['id']}").status_code == 204
     assert client.get(f"/api/workflows/{wf['id']}").status_code == 404
     assert client.post(f"/api/workflows/{wf['id']}/run", json={}).status_code == 404
@@ -340,6 +421,13 @@ def test_api_capture_then_save_list_run_update_delete(client: TestClient) -> Non
 def test_api_rejects_unknown_tools_agents_and_empty_turns(client: TestClient) -> None:
     bad_tool = payload(steps=[{"tool": "github_commit_files", "input": {}}], params=[])
     assert client.post("/api/workflows", json=bad_tool).status_code == 422
+    delegate = payload(
+        agent="orchestrateur",
+        steps=[{"tool": "delegate_to_agent", "input": {"agent": "rh", "task": "x"}}],
+        params=[],
+    )
+    response = client.post("/api/workflows", json=delegate)
+    assert response.status_code == 422 and "sans modèle" in response.text
     assert client.post("/api/workflows", json=payload(agent="inconnu")).status_code == 404
     empty = [Message.user("Bonjour").model_dump(mode="json")]
     response = client.post("/api/workflows/capture", json={"agent": "assistant", "messages": empty})
@@ -362,3 +450,17 @@ def test_migration_creates_the_workflows_table(tmp_path: Path) -> None:
             row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
     assert "workflows" not in tables
+
+
+async def test_run_of_a_workflow_whose_agent_was_deleted_is_a_clear_conflict(
+    client: TestClient, repo: WorkflowRepository
+) -> None:
+    orphan = await repo.create(
+        WorkflowCreate(
+            agent="agent_supprime",
+            title="Orphelin",
+            steps=[WorkflowStep(tool="data_via_list_datasets", input={})],
+        )
+    )
+    response = client.post(f"/api/workflows/{orphan.id}/run", json={})
+    assert response.status_code == 409 and "n'existe plus" in response.text
