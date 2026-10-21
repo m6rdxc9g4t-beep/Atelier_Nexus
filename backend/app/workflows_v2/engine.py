@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db.workflows import WorkflowRepository
+from app.schemas.triggers import RunOrigin, TriggerEventRef
 from app.schemas.workflows_v2 import (
     PendingApproval,
     StepRun,
@@ -429,9 +430,16 @@ async def start_run(
     registry: StepRegistry,
     env: ToolEnvironment,
     repo: WorkflowRepository,
+    *,
+    trigger: RunOrigin = "manual",
+    trigger_id: str | None = None,
+    trigger_event: TriggerEventRef | None = None,
 ) -> WorkflowRun:
     """Lance une exécution (WorkflowError si un paramètre manque). Une exécution refusée par la
-    porte de contrôle est enregistrée `failed`, sans qu'aucune étape n'ait été exécutée."""
+    porte de contrôle est enregistrée `failed`, sans qu'aucune étape n'ait été exécutée.
+
+    `trigger`, `trigger_id`, `trigger_event` ne disent que l'origine : une écriture lancée par un
+    déclencheur s'arrête sur `awaiting_approval` comme en manuel."""
     values = resolve_params(workflow.params, given)
     order, _ = topo_order(workflow.steps)
     by_id = {s.id: s for s in workflow.steps}
@@ -442,6 +450,9 @@ async def start_run(
         status="running",
         message="",
         params=values,
+        trigger=trigger,
+        trigger_id=trigger_id,
+        trigger_event=trigger_event,
         steps=[
             StepRun(id=i, uses=by_id[i].uses, label=by_id[i].label) for i in order if i in by_id
         ],

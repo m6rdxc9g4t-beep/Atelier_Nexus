@@ -8,8 +8,7 @@ catalogue, validation, conversion, exécutions persistées (`/api/workflow-runs`
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
@@ -20,11 +19,11 @@ from app.api.deps import (
     get_catalog,
     get_env_factory,
     get_workflow_repository,
-    prepare_environment,
 )
 from app.core.llm import LLMRouter, get_llm_router
 from app.db.repository import StorageError
 from app.db.workflows import WorkflowRepository
+from app.schemas.triggers import InboxCount
 from app.schemas.workflows import (
     PLACEHOLDER,
     CaptureRequest,
@@ -40,6 +39,7 @@ from app.schemas.workflows import (
 from app.schemas.workflows_v2 import (
     Catalog,
     ResumeRequest,
+    RunStatus,
     ValidationResult,
     WorkflowRun,
     WorkflowStepV2,
@@ -52,8 +52,8 @@ from app.tools import ToolContext
 from app.tools.environment import ToolEnvironment
 from app.tools.toolsets import declared_tool_names
 from app.workflows import NOT_REPLAYABLE, WorkflowError, capture, run_workflow
-from app.workflows_v2.engine import resume_run, start_run
-from app.workflows_v2.steps import StepRegistry
+from app.workflows_v2.engine import resume_run
+from app.workflows_v2.launch import build_agent, launch_run, step_registry
 from app.workflows_v2.validation import blocking, validate_workflow
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -99,27 +99,9 @@ def _is_v2(body: dict[str, Any]) -> bool:
     return body.get("version") == 2
 
 
-async def _agent(
-    name: str, llm: LLMRouter, catalog: AgentCatalog, env: ToolEnvironment
-) -> BaseAgent:
-    await prepare_environment(env, llm, catalog)
-    return await catalog.build(name, llm, env)  # AgentNotFoundError → 404
-
-
-@asynccontextmanager
-async def _registry(
-    agent_name: str | None,
-    llm: LLMRouter,
-    catalog: AgentCatalog,
-    make_env: Callable[[], ToolEnvironment],
-) -> AsyncIterator[tuple[StepRegistry, ToolEnvironment]]:
-    """Étapes connues d'un workflow v2 (agent ou suite), environnement fermé à la sortie."""
-    env = make_env()
-    try:
-        agent = await _agent(agent_name, llm, catalog, env) if agent_name else None
-        yield await StepRegistry.build(env, agent), env
-    finally:
-        await env.aclose()  # ferme aussi les clients des nœuds (env.suite())
+# AgentNotFoundError → 404 (gestionnaire commun)
+_agent = build_agent
+_registry = step_registry
 
 
 async def _check_tools(agent: BaseAgent, body: WorkflowFields) -> None:
@@ -387,8 +369,9 @@ async def _run_v2(
     make_env: Callable[[], ToolEnvironment],
 ) -> WorkflowRun:
     try:
-        async with _registry(workflow.agent, llm, catalog, make_env) as (registry, env):
-            return await start_run(workflow, given, registry, env, repo)
+        return await launch_run(
+            workflow, given, llm=llm, catalog=catalog, make_env=make_env, repo=repo
+        )
     except AgentNotFoundError as exc:
         raise _agent_gone(workflow.agent or "") from exc
     except WorkflowError as exc:
@@ -399,10 +382,18 @@ async def _run_v2(
 async def list_runs(
     repo: RepoDep,
     workflow_id: Annotated[str | None, Query(max_length=36)] = None,
+    status_: Annotated[RunStatus | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[WorkflowRun]:
-    """Exécutions récentes d'abord ; filtre facultatif par workflow."""
-    return await repo.list_runs(workflow_id, limit)
+    """Exécutions récentes d'abord ; filtres facultatifs par workflow et par statut
+    (`status=awaiting_approval` : boîte « À valider », tous workflows)."""
+    return await repo.list_runs(workflow_id, limit, status_)
+
+
+@runs_router.get("/inbox-count", response_model=InboxCount)
+async def inbox_count(repo: RepoDep) -> InboxCount:
+    """Nombre d'exécutions en attente de validation (badge de l'en-tête)."""
+    return InboxCount(awaiting_approval=await repo.count_runs("awaiting_approval"))
 
 
 @runs_router.get("/{run_id}", response_model=WorkflowRun)
