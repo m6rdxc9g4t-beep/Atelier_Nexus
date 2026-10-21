@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   TriangleAlert,
   Workflow as WorkflowIcon,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -32,10 +33,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TriggersPanel } from "@/features/workflow-triggers/TriggersPanel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ApiError, api, isWorkflowV2 } from "@/lib/api";
 import { useArtifactStore } from "@/stores/useArtifactStore";
-import { type EditorTarget, useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
+import { type EditorTarget, type TriggerPreset, useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { AgentInfo, Catalog, CatalogEntry, ValidationError, WorkflowRun, WorkflowStepV2, WorkflowV2 } from "@/types/api";
 
 import { catalogIndex } from "./catalog";
@@ -200,9 +202,11 @@ function GraphEditor({ target, agents }: { target: EditorTarget; agents: AgentIn
       <ConvertPrompt
         id={loaded.id}
         title={loaded.title}
+        withTrigger={!!target.trigger}
         onConverted={(wf) => {
           bump();
-          openEditor({ kind: "open", id: wf.id });
+          // Le déclencheur prérempli suit la conversion
+          openEditor({ kind: "open", id: wf.id, ...(target.trigger ? { panel: "triggers", trigger: target.trigger } : {}) });
         }}
       />
     );
@@ -211,7 +215,9 @@ function GraphEditor({ target, agents }: { target: EditorTarget; agents: AgentIn
       initial={loaded.draft}
       savedSignature={loaded.saved}
       initialUses={target.kind === "new" ? (target.uses ?? null) : null}
-      openRun={target.kind === "open" && target.panel === "run"}
+      initialPanel={target.trigger ? "triggers" : target.kind === "open" && target.panel ? target.panel : "inspect"}
+      initialRunId={target.kind === "open" ? (target.runId ?? null) : null}
+      triggerPreset={target.trigger ?? null}
       agents={agents}
     />
   );
@@ -228,7 +234,18 @@ function Centered({ title, children }: { title: string; children: React.ReactNod
 }
 
 /** Workflow v1 : on propose la conversion (enregistrée côté serveur) avant d'ouvrir le graphe. */
-export function ConvertPrompt({ id, title, onConverted }: { id: string; title: string; onConverted: (wf: WorkflowV2) => void }) {
+export function ConvertPrompt({
+  id,
+  title,
+  withTrigger = false,
+  onConverted,
+}: {
+  id: string;
+  title: string;
+  /** Un déclencheur attend la conversion (carte de la suite) */
+  withTrigger?: boolean;
+  onConverted: (wf: WorkflowV2) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -236,6 +253,11 @@ export function ConvertPrompt({ id, title, onConverted }: { id: string; title: s
       <p className="max-w-md text-sm text-muted-foreground">
         Pour l&apos;éditer en graphe, convertissez-le : ses étapes deviennent s1, s2… reliées en chaîne, et chaque{" "}
         <code className="font-mono">{"{{nom}}"}</code> devient <code className="font-mono">{"{{params.nom}}"}</code>.
+      </p>
+      <p className="max-w-md text-sm text-muted-foreground">
+        {withTrigger
+          ? "Les déclencheurs (horaire, événement) ne s'appliquent qu'aux workflows v2 : le déclencheur demandé s'ouvrira après la conversion."
+          : "Les déclencheurs (horaire, événement) ne s'appliquent eux aussi qu'aux workflows v2."}
       </p>
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -261,19 +283,25 @@ export function ConvertPrompt({ id, title, onConverted }: { id: string; title: s
   );
 }
 
-type SidePanel = "inspect" | "run";
+type SidePanel = "inspect" | "run" | "triggers";
 
 function EditorBody({
   initial,
   savedSignature,
   initialUses,
-  openRun,
+  initialPanel,
+  initialRunId,
+  triggerPreset,
   agents,
 }: {
   initial: WorkflowDraftV2;
   savedSignature: string | null;
   initialUses: string | null;
-  openRun: boolean;
+  initialPanel: SidePanel;
+  /** Exécution à afficher dans le suivi dès l'ouverture (boîte « À valider ») */
+  initialRunId: string | null;
+  /** Déclencheur événement à préremplir (carte de la suite) */
+  triggerPreset: TriggerPreset | null;
   agents: AgentInfo[];
 }) {
   const [draft, setDraft] = useState(initial);
@@ -287,13 +315,32 @@ function EditorBody({
   const [checked, setChecked] = useState<{ ok: boolean; at: string } | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState<"validate" | "save" | null>(null);
-  const [panel, setPanel] = useState<SidePanel>(openRun ? "run" : "inspect");
+  const [panel, setPanel] = useState<SidePanel>(initialPanel);
   const [run, setRun] = useState<WorkflowRun | null>(null);
+  const [preset, setPreset] = useState<TriggerPreset | null>(triggerPreset);
+  const clearPreset = useCallback(() => setPreset(null), []);
   const flow = useReactFlow();
   const seeded = useRef(false);
   const bump = useWorkflowStudioStore((s) => s.bump);
   const setPanelOpen = useArtifactStore((s) => s.setPanelOpen);
   const closeEditor = useWorkflowStudioStore((s) => s.closeEditor);
+  const setLastWorkflow = useWorkflowStudioStore((s) => s.setLastWorkflow);
+
+  // Dernier workflow enregistré ouvert : la carte de la suite propose d'y ajouter un déclencheur
+  useEffect(() => {
+    if (draft.id) setLastWorkflow({ id: draft.id, title: draft.title.trim() || "Sans titre" });
+  }, [draft.id, draft.title, setLastWorkflow]);
+
+  // Exécution demandée à l'ouverture (boîte « À valider ») : affichée dans le suivi
+  useEffect(() => {
+    if (!initialRunId) return;
+    const ctrl = new AbortController();
+    api
+      .workflowRun(initialRunId, ctrl.signal)
+      .then(setRun)
+      .catch((err: unknown) => !ctrl.signal.aborted && setNotice({ tone: "error", text: errorText(err, "Exécution introuvable.") }));
+    return () => ctrl.abort();
+  }, [initialRunId]);
 
   // Catalogue de l'agent (ou de la suite) : rechargé si l'agent change
   useEffect(() => {
@@ -614,6 +661,14 @@ function EditorBody({
                   <Play />
                   Exécution
                 </TabsTrigger>
+                <TabsTrigger
+                  value="triggers"
+                  className="flex-1"
+                  title={draft.id ? "Lancer ce workflow à heure fixe ou sur un événement" : "Enregistrez le workflow pour lui ajouter des déclencheurs"}
+                >
+                  <Zap />
+                  Déclencheurs
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="inspect" className="overflow-x-hidden overflow-y-auto p-4">
@@ -668,6 +723,24 @@ function EditorBody({
                 onShowArtifacts={() => {
                   setPanelOpen(true);
                   closeEditor();
+                }}
+              />
+            </TabsContent>
+            {/* Toujours monté : un formulaire en cours survit au passage par un autre onglet */}
+            <TabsContent value="triggers" className="overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "triggers"}>
+              <TriggersPanel
+                workflowId={draft.id}
+                dirty={dirty}
+                params={draft.params}
+                preset={preset}
+                onPresetUsed={clearPreset}
+                onSave={async () => {
+                  if (!(await validate())) return null;
+                  return save();
+                }}
+                onRun={(next) => {
+                  setRun(next);
+                  setPanel("run");
                 }}
               />
             </TabsContent>

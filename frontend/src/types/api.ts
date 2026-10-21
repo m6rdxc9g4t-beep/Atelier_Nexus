@@ -584,7 +584,12 @@ export interface WorkflowRun {
   status: RunStatus;
   message: string;
   params: Record<string, string>;
-  trigger: "manual";
+  /** Origine du lancement (docs/declencheurs-api.md §2) */
+  trigger: RunTrigger;
+  /** Déclencheur à l'origine de l'exécution (horaire, événement, test) */
+  trigger_id?: string | null;
+  /** Événement source (jamais `data`) */
+  trigger_event?: TriggerEventRef | null;
   /** Dans l'ordre d'exécution */
   steps: StepRun[];
   /** Même forme que le panneau Artefacts */
@@ -667,4 +672,132 @@ export interface SuiteEventsEntry {
   next: number;
   gap?: boolean;
   status: string;
+}
+
+// ─── Déclencheurs de workflows (docs/declencheurs-api.md) ────────
+
+export type RunTrigger = "manual" | "schedule" | "event" | "test";
+
+/** Événement source d'une exécution, sans ses données. */
+export interface TriggerEventRef {
+  app: string;
+  seq: number;
+  type: string;
+  at: string;
+  subject: { kind: string; id: string; label: string };
+}
+
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type Schedule =
+  /** 5 à 1440 minutes */
+  | { kind: "interval"; every_minutes: number }
+  /** "HH:MM" (24 h), au moins un jour ; fuseau = settings.timezone */
+  | { kind: "daily"; at: string; days: Weekday[] };
+
+export type EventFilterOp = "eq" | "ne" | "in" | "contains" | "gt" | "gte" | "lt" | "lte" | "exists";
+
+/** Condition sur l'événement (toutes doivent être vraies). */
+export interface EventFilter {
+  /** "data.to", "subject.id", "subject.label", "type" */
+  path: string;
+  op: EventFilterOp;
+  /** Liste pour "in" ; absent pour "exists" */
+  value?: unknown;
+}
+
+/** Applications qui publient des événements (atelier-node/1 §7.3). */
+export type TriggerApp = "viz" | "projets" | "tab";
+
+export interface TriggerCounters {
+  fired: number;
+  throttled: number;
+  waiting: number;
+  filtered: number;
+  missed: number;
+  errors: number;
+}
+
+/** État tenu par le serveur (lecture seule). */
+export interface TriggerState {
+  /** Horaire : prochaine occurrence ; événement : null */
+  next_fire_at: string | null;
+  last_fired_at: string | null;
+  last_run_id: string | null;
+  last_run_status: string | null;
+  /** Événement : dernier seq traité */
+  cursor: number | null;
+  counters: TriggerCounters;
+  /** Ex. « Atelier Projets injoignable » ; effacé au premier succès */
+  last_error: string | null;
+  /** Ex. « Des événements ont été perdus (journal remis à zéro) » */
+  warning: string | null;
+}
+
+/** Champs modifiables communs (corps de création et de modification). */
+export interface TriggerBaseFields {
+  /** "" autorisé */
+  label: string;
+  enabled: boolean;
+  /** Valeurs des paramètres du workflow ; gabarits {{event.…}} permis (déclencheur événement) */
+  params: Record<string, string>;
+  /** 1 à 120, défaut 12 */
+  max_runs_per_hour: number;
+}
+
+export interface ScheduleTriggerFields extends TriggerBaseFields {
+  kind: "schedule";
+  schedule: Schedule;
+}
+
+export interface EventTriggerFields extends TriggerBaseFields {
+  kind: "event";
+  app: TriggerApp;
+  /** 1 à 10 types déclarés par le manifeste de l'app */
+  types: string[];
+  /** 0 à 10 */
+  filters: EventFilter[];
+  /** 0 à 3600, défaut 0 : une rafale donne un seul lancement (le dernier événement gagne) */
+  debounce_seconds: number;
+}
+
+/** Corps de `POST /api/workflows/{id}/triggers` et `PUT /api/triggers/{id}`. */
+export type TriggerBody = ScheduleTriggerFields | EventTriggerFields;
+
+interface TriggerServerFields {
+  /** Attribué par le serveur */
+  id: string;
+  workflow_id: string;
+  created_at: string;
+  updated_at: string;
+  state: TriggerState;
+}
+
+export type ScheduleTrigger = ScheduleTriggerFields & TriggerServerFields;
+export type EventTrigger = EventTriggerFields & TriggerServerFields;
+export type Trigger = ScheduleTrigger | EventTrigger;
+
+export interface EventsCatalogEvent {
+  type: string;
+  label: string;
+  /** Chemins proposés pour les filtres (data.to, subject.id…) */
+  fields: string[];
+}
+
+export interface EventsCatalogApp {
+  app: TriggerApp;
+  name: string;
+  color: string;
+  status: NodeAppStatus;
+  events: EventsCatalogEvent[];
+}
+
+/** `GET /api/triggers/events-catalog` */
+export interface EventsCatalog {
+  apps: EventsCatalogApp[];
+}
+
+/** `GET /api/workflow-runs/inbox-count` */
+export interface InboxCount {
+  awaiting_approval: number;
 }

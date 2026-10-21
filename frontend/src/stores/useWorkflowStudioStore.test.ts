@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useWorkflowStudioStore } from "./useWorkflowStudioStore";
 
 describe("useWorkflowStudioStore", () => {
-  beforeEach(() => useWorkflowStudioStore.setState({ editor: null, returnTo: null, editorDirty: false, editorKey: 0, listOpen: false, listAgent: null, mapOpen: false, version: 0 }));
+  beforeEach(() => useWorkflowStudioStore.setState({ editor: null, returnTo: null, editorDirty: false, editorKey: 0, listOpen: false, listAgent: null, mapOpen: false, inboxOpen: false, inboxVersion: 0, lastWorkflow: null, version: 0 }));
 
   it("ouvre l'éditeur avec une nouvelle clé à chaque fois", () => {
     const { openEditor } = useWorkflowStudioStore.getState();
@@ -54,5 +54,26 @@ describe("useWorkflowStudioStore", () => {
     useWorkflowStudioStore.getState().bump();
     useWorkflowStudioStore.getState().setMapOpen(true);
     expect(useWorkflowStudioStore.getState()).toMatchObject({ version: 1, mapOpen: true });
+  });
+
+  it("rouvre la boîte « À valider » après l'éditeur", () => {
+    const store = useWorkflowStudioStore.getState();
+    store.setInboxOpen(true);
+    expect(useWorkflowStudioStore.getState().inboxOpen).toBe(true);
+    store.openEditor({ kind: "open", id: "wf_1", panel: "run", runId: "run_1" });
+    expect(useWorkflowStudioStore.getState()).toMatchObject({ inboxOpen: false, returnTo: "inbox" });
+    useWorkflowStudioStore.getState().closeEditor();
+    expect(useWorkflowStudioStore.getState()).toMatchObject({ inboxOpen: true, mapOpen: false, listOpen: false });
+    // Une fenêtre à la fois
+    useWorkflowStudioStore.getState().setMapOpen(true);
+    expect(useWorkflowStudioStore.getState()).toMatchObject({ inboxOpen: false, mapOpen: true });
+  });
+
+  it("garde un déclencheur prérempli dans la cible de l'éditeur", () => {
+    const preset = { app: "projets" as const, types: ["projets.work_item.status_changed"] };
+    useWorkflowStudioStore.getState().openEditor({ kind: "new", agent: null, trigger: preset });
+    expect(useWorkflowStudioStore.getState().editor).toEqual({ kind: "new", agent: null, trigger: preset });
+    useWorkflowStudioStore.getState().setLastWorkflow({ id: "wf_1", title: "Doc" });
+    expect(useWorkflowStudioStore.getState().lastWorkflow).toEqual({ id: "wf_1", title: "Doc" });
   });
 });

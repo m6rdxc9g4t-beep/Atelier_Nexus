@@ -13,6 +13,7 @@ import {
   mergeEvents,
   splitActions,
   transportLabel,
+  triggerChoices,
   workflowsOf,
 } from "./suiteMap";
 
@@ -93,5 +94,20 @@ describe("fil des derniers événements", () => {
     expect(eventLabel(suiteMapFixture, "viz", "viz.dataset.refreshed")).toBe("Jeu actualisé");
     expect(eventLabel(suiteMapFixture, "viz", "viz.autre")).toBe("viz.autre");
     expect(eventLabel(null, "viz", "x")).toBe("x");
+  });
+});
+
+describe("déclencheur depuis un événement de la carte", () => {
+  it("propose un nouveau workflow, puis l'ajout au workflow ouvert", () => {
+    const trigger = { app: "projets", types: ["projets.work_item.status_changed"] };
+    expect(triggerChoices("projets", "projets.work_item.status_changed", null)).toEqual([
+      { label: "Nouveau workflow déclenché par cet événement", target: { kind: "new", agent: null, trigger } },
+    ]);
+    const choices = triggerChoices("projets", "projets.work_item.status_changed", { id: "wf_1", title: "Doc" });
+    expect(choices[1]).toEqual({ label: "Ajouter à « Doc »", target: { kind: "open", id: "wf_1", panel: "triggers", trigger } });
+  });
+
+  it("ne propose rien pour une app qui ne déclenche pas de workflow", () => {
+    expect(triggerChoices("cine", "cine.film.added", null)).toEqual([]);
   });
 });

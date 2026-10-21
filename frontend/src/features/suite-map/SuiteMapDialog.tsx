@@ -17,6 +17,13 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentIcon } from "@/features/chat-agent/agentMeta";
@@ -37,6 +44,7 @@ import {
   mergeEvents,
   splitActions,
   transportLabel,
+  triggerChoices,
   workflowsOf,
 } from "./suiteMap";
 
@@ -73,7 +81,7 @@ export function SuiteMapDialog() {
           </DialogTitle>
           <DialogDescription>
             Ce que chaque application reçoit et produit, les agents qui s&apos;en servent et les échanges entre elles.
-            Partez d&apos;une action pour créer un workflow.
+            Partez d&apos;une action pour créer un workflow, ou d&apos;un événement pour le lancer tout seul.
           </DialogDescription>
         </DialogHeader>
         {open && <SuiteMapBody />}
@@ -231,10 +239,14 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
 
       <Section icon={Bell} title="Événements" count={app.events.length}>
         {app.events.length ? (
-          <ul className="flex flex-wrap gap-1">
+          <ul className="grid gap-0.5">
             {app.events.map((ev) => (
-              <li key={ev.type} title={ev.type}>
-                <Badge variant="outline">{ev.label}</Badge>
+              <li key={ev.type} className="group flex items-center gap-1.5 rounded-sm px-1 py-0.5 hover:bg-accent">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs">{ev.label}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">{ev.type}</span>
+                </span>
+                <EventTriggerMenu app={app.app} type={ev.type} label={ev.label} />
               </li>
             ))}
           </ul>
@@ -310,6 +322,41 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
         )}
       </Section>
     </li>
+  );
+}
+
+/** « + » d'un événement : workflow déclenché par cet événement (nouveau, ou celui ouvert en dernier). */
+function EventTriggerMenu({ app, type, label }: { app: string; type: string; label: string }) {
+  const openEditor = useWorkflowStudioStore((s) => s.openEditor);
+  const last = useWorkflowStudioStore((s) => s.lastWorkflow);
+  const choices = triggerChoices(app, type, last);
+  if (choices.length === 0) return null;
+  const button = (props: React.ComponentProps<typeof Button>) => (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="size-6 opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
+      aria-label={`Lancer un workflow quand « ${label} » arrive`}
+      title="Lancer un workflow quand cet événement arrive"
+      {...props}
+    >
+      <Plus className="size-3.5" />
+    </Button>
+  );
+  // Un seul choix : pas de menu
+  if (choices.length === 1) return button({ onClick: () => openEditor(choices[0]!.target) });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{button({})}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-2rem)]">
+        <DropdownMenuLabel className="truncate">Quand « {label} » arrive</DropdownMenuLabel>
+        {choices.map((choice) => (
+          <DropdownMenuItem key={choice.label} onSelect={() => openEditor(choice.target)}>
+            <span className="min-w-0">{choice.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

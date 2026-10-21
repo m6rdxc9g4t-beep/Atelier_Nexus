@@ -40,7 +40,9 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 | `src/features/workflows/` | Workflows (Étape 18) : `WorkflowEditor` (enregistrer un tour, modifier un v1), `WorkflowsDialog` (liste commune v1 + v2 d'un agent ou de toute la suite, lancement v1, « Convertir » en v2), `form.ts` (logique pure, testée) |
 | `src/features/workflows-graph/` | Éditeur de workflows v2 en graphe (`@xyflow/react`, contrat `docs/workflows-v2-api.md`) : `WorkflowGraphEditor` (fenêtre plein écran, ≥ 1024 px), `Palette` (catalogue par application), `StepNode`, `Inspector` (étape, condition, paramètres, formulaire généré depuis `input_schema`, menu « Utiliser… »), `RunPanel` (lancement, suivi, validation, historique). Logique pure testée : `graph.ts` (étapes ↔ nœuds/arêtes, ancêtres, ordre, couches, état d'exécution), `validate.ts`, `refs.ts` / `templates.ts` (gabarits), `schemaForm.ts`, `catalog.ts`, `draft.ts`, `run.ts` ; doubles du contrat dans `fixtures.ts` |
 | `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée) |
-| `src/stores/useWorkflowStudioStore.ts` | Ouverture de la liste des workflows, de l'éditeur en graphe et de la carte (une fenêtre à la fois, retour à la précédente) |
+| `src/features/workflow-triggers/` | Déclencheurs (contrat `docs/declencheurs-api.md`) : `TriggersPanel` (onglet de l'éditeur : liste, formulaire horaire / événement, « Tester maintenant »), `InboxDialog` + `useInboxCount` (boîte « À valider » de l'en-tête), `OriginBadge`. Logique pure testée : `summary.ts` (résumés FR, jours consécutifs, pluriels, dates relatives), `form.ts` (brouillon ↔ corps, validation aux bornes du contrat, gabarits `{{event.…}}`, événement d'exemple), `origin.ts` (origine d'une exécution, badge) ; doubles dans `fixtures.ts` |
+| `src/features/workflows-graph/ApprovalCard.tsx` | Carte de validation d'une écriture (résumé, entrée résolue, Autoriser / Refuser), partagée par le suivi et « À valider » |
+| `src/stores/useWorkflowStudioStore.ts` | Ouverture de la liste des workflows, de l'éditeur en graphe, de la carte et de « À valider » (une fenêtre à la fois, retour à la précédente) ; cible d'éditeur avec panneau, exécution et déclencheur prérempli |
 
 ## 4. Workflows de suite et carte
 
@@ -56,7 +58,34 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 - **Exécution** : enregistre (et valide) si besoin, lance, interroge `GET /api/workflow-runs/{id}` tant que
   `running` (500 ms puis jusqu'à 3 s) ; `awaiting_approval` → carte Autoriser / Refuser avec l'entrée résolue
   (`resume`) ; statuts sur les nœuds ; livrables dans `useArtifactStore` (agent `workflow:<id>`) ; historique cliquable.
-- **Carte de la suite** : « + » sur une action ouvre un nouveau workflow de suite qui commence par `node:<app>/<action>`.
+- **Carte de la suite** : « + » sur une action ouvre un nouveau workflow de suite qui commence par `node:<app>/<action>` ;
+  « + » sur un événement (Viz, Projets, Tab) ouvre un nouveau workflow avec un déclencheur événement prérempli, ou
+  l'ajoute au dernier workflow ouvert dans l'éditeur.
+
+## 4 bis. Déclencheurs et « À valider »
+
+- **Onglet Déclencheurs** de l'éditeur (à côté de Workflow et Exécution) : un déclencheur lance la version
+  **enregistrée** d'un workflow v2 ; tant que le workflow n'est pas enregistré, l'onglet propose de l'enregistrer
+  (un déclencheur prérempli attend l'enregistrement) ; un v1 doit d'abord être converti.
+- **Liste** : libellé, résumé (« Chaque jour à 08:00, du lundi au vendredi » ; « Quand Projets publie *Statut changé*
+  et data.to = CLOSED »), interrupteur actif / coupé (le corps est renvoyé tel quel), prochaine occurrence, dernière
+  exécution et son suivi, compteurs, garde-fous, `last_error` et `warning` en bandeau. Relue toutes les 30 s quand
+  l'onglet est visible.
+- **Formulaire** : horaire (intervalle 5 à 1440 min, ou heure `HH:MM` en 24 h et jours, « ouvrés » / « tous ») ;
+  événement depuis `GET /api/triggers/events-catalog` (app dans sa couleur avec son état, types cochés, filtres :
+  champ proposé depuis `fields`, opérateur, valeur ; « fait partie de » = valeurs séparées par des virgules ;
+  anti-rafale 0 à 3600 s) ; paramètres du workflow (vide = défaut, seuls les paramètres modifiés sont envoyés) avec
+  « Utiliser… » qui insère `{{event.subject.id}}`, `{{event.data.<champ>}}`… ; plafond 1 à 120 par heure. Erreurs
+  locales sous chaque champ après la première tentative ; le serveur reste l'autorité (422 affiché tel quel).
+- **Tester maintenant** : un horaire part tel quel ; un événement part avec un exemple prérempli depuis le
+  catalogue (il respecte les filtres d'égalité), modifiable en JSON. Le résultat s'ouvre dans l'onglet Exécution.
+- **À valider** (en-tête) : badge `GET /api/workflow-runs/inbox-count` toutes les 20 s, suspendu quand l'onglet est
+  caché, relu après chaque décision ; fenêtre des exécutions `awaiting_approval` de tous les workflows (titre,
+  origine « Déclenché par projets.work_item.status_changed · Écrire la doc », ancienneté) avec la carte de
+  validation de l'éditeur, et « Ouvrir dans l'éditeur » (suivi de cette exécution).
+- **Historique** : chaque exécution porte son origine (Manuel, Horaire, Événement, Test) et son événement source.
+- Hypothèses au-delà du contrat : `trigger_id` / `trigger_event` lus comme facultatifs (exécutions d'avant la
+  migration) ; un type d'événement inconnu n'est signalé localement que si l'app du catalogue liste des événements.
 
 ## 5. Historique des conversations
 
@@ -78,6 +107,9 @@ cd backend && python -m scripts.demo_server
 # 3. Interface
 cd frontend && npm run dev        # http://localhost:3100 → agent « Démo Data Via »
 ```
+
+Déclencheurs et « À valider » vérifiés le 2026-10-22 dans Chromium contre un double du contrat (1440 × 900 clair et
+sombre, 390 × 844, clavier), sans erreur console.
 
 Vérifié le 2026-10-20 dans Chromium (1440 × 900 clair et sombre, 390 × 844) : liste → schéma → requête →
 publication d'un DAX → réponse, sans erreur console.
