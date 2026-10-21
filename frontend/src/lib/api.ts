@@ -14,9 +14,15 @@ import type {
   CustomAgentFields,
   DataViaStatus,
   EditorOptions,
+  Message,
   ProviderStatus,
   SearchHit,
   SettingsView,
+  Workflow,
+  WorkflowCreate,
+  WorkflowDraft,
+  WorkflowFields,
+  WorkflowRunResult,
 } from "@/types/api";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100").replace(
@@ -123,6 +129,19 @@ export const api = {
   settings: (signal?: AbortSignal) => getJson<SettingsView>("/api/settings", signal),
   updateSettings: (values: Record<string, string | null>) =>
     sendJson<SettingsView>("PUT", "/api/settings", { values }),
+  /** Workflows rejouables (Étape 18). `agent` null = tous. */
+  workflows: (agent: string | null, signal?: AbortSignal) =>
+    getJson<Workflow[]>(`/api/workflows${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
+  /** Propose un workflow à partir du dernier tour de la conversation (rien n'est enregistré). */
+  captureWorkflow: (agent: string, messages: Message[]) =>
+    sendJson<WorkflowDraft>("POST", "/api/workflows/capture", { agent, messages }),
+  createWorkflow: (body: WorkflowCreate) => sendJson<Workflow>("POST", "/api/workflows", body),
+  updateWorkflow: (id: string, body: WorkflowFields) =>
+    sendJson<Workflow>("PUT", `/api/workflows/${encodeURIComponent(id)}`, body),
+  deleteWorkflow: (id: string) => sendJson<void>("DELETE", `/api/workflows/${encodeURIComponent(id)}`),
+  /** Lance sans modèle ; `approvals` : jeton de l'étape d'écriture (reçu dans `pending`) → autorisée. */
+  runWorkflow: (id: string, params: Record<string, string>, approvals: Record<string, boolean> | null) =>
+    sendJson<WorkflowRunResult>("POST", `/api/workflows/${encodeURIComponent(id)}/run`, { params, approvals }),
 };
 
 /**

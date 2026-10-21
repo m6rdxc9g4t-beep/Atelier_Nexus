@@ -1,0 +1,76 @@
+# Agent Data Analyst / Power BI sur Atelier Viz (Data Via).
+# En mode simulé : jeu « ventes_2026.csv » (240 ventes, 5 régions, 3 produits, janvier à
+# septembre 2026, mesure « marge »). Les chiffres sont exacts : on vérifie qu'ils sont repris.
+
+[[case]]
+id = "data-liste-jeux"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "rapide"]
+prompt = "Quels jeux de données ai-je dans Atelier Viz ?"
+[case.expect]
+tools_called = ["data_via_list_datasets"]
+tools_forbidden = ["data_via_query"]
+text_contains = ["ventes_2026"]
+
+[[case]]
+id = "data-schema-avant-requete"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "regle-claude-md"]
+description = "CLAUDE.md §3.1 : le schéma est consulté avant toute requête."
+prompt = "Quel est le chiffre d'affaires total par région ?"
+rubric = "La réponse donne le chiffre d'affaires de chaque région et nomme la région en tête (Île-de-France)."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_args = [{ tool = "data_via_query", contains = ["region", "chiffre_affaires"] }]
+artifacts = [{ kind = "data_preview" }]
+text_contains = ["Ile-de-France"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-tendance-mensuelle"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees"]
+prompt = "Comment évolue le chiffre d'affaires mois par mois en 2026 ?"
+rubric = "La réponse décrit l'évolution mensuelle (mois le plus fort : mars) sans inventer de mois absents des données (rien après septembre)."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_args = [{ tool = "data_via_query", contains = ["month"] }]
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-mesure-dax"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "power-bi", "regle-claude-md"]
+description = "CLAUDE.md §3.2 : DAX avec VAR … RETURN et DIVIDE, publié en artefact."
+prompt = "Écris une mesure DAX de taux de marge (marge divisée par le chiffre d'affaires) pour mon rapport Power BI."
+rubric = "La mesure DAX est correcte, indentée, utilise VAR … RETURN et DIVIDE, et l'agent explique comment l'intégrer dans Power BI Desktop."
+[case.expect]
+tools_called = ["data_via_describe_dataset", "publish_artifact"]
+artifacts = [{ kind = "dax", content_contains = ["DIVIDE"], content_regex = "(?i)\\bVAR\\b[\\s\\S]*\\bRETURN\\b" }]
+
+[[case]]
+id = "data-colonne-absente"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "pas-d-invention"]
+description = "Il n'y a pas de colonne vendeur : l'agent le dit au lieu d'inventer."
+prompt = "Donne-moi le chiffre d'affaires par vendeur."
+rubric = "L'agent explique qu'aucune colonne ne décrit les vendeurs, n'invente aucun chiffre par vendeur et propose une alternative (par région ou par produit)."
+[case.expect]
+tools_called = ["data_via_describe_dataset"]
+text_not_contains = ["Vendeur A", "Vendeur 1"]
+text_contains_any = ["pas de colonne", "aucune colonne", "n'existe pas", "pas de champ", "aucun champ", "ne contient pas", "pas d'information", "introuvable"]
+
+[[case]]
+id = "data-verification-mesure"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees"]
+prompt = "Vérifie que l'expression DIVIDE(SUM(chiffre_affaires) - SUM(cout), SUM(chiffre_affaires)) est valide dans Atelier Viz et donne sa valeur."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_check_expression"]
+text_contains_any = ["0,53", "0.53", "53,4", "53.4", "53 %", "53%"]

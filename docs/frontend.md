@@ -37,6 +37,7 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 | `src/stores/useArtifactStore.ts` | **Store des artefacts** (règle CLAUDE.md) |
 | `src/features/artifacts/preview.ts` | Lecture des aperçus Data Via (requête / schéma), export CSV |
 | `src/hooks/useBackend.ts` | Agents, moteurs, état de Data Via (rafraîchis toutes les 30 s) |
+| `src/features/workflows/` | Workflows (Étape 18) : `WorkflowEditor` (enregistrer un tour, modifier), `WorkflowsDialog` (liste, lancement, validations), `form.ts` (logique pure, testée) |
 
 Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer.
 

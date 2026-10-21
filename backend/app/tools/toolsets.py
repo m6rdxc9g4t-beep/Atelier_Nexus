@@ -332,3 +332,34 @@ register_toolset(
 
 def is_sensitive(ids: list[str]) -> bool:
     return any(get_toolset(i).sensitive for i in ids)
+
+
+async def declared_tool_names(ids: list[str]) -> set[str]:
+    """Noms de tous les outils des boîtes demandées, configurées ou non.
+
+    Les outils sont construits à blanc avec des adresses fictives : aucun appel réseau, aucune
+    lecture des réglages réels. Sert à vérifier un nom d'outil même quand l'application
+    correspondante n'est pas configurée sur cette machine."""
+    blank = Settings(
+        _env_file=None,
+        data_via_base_url="http://application.invalid/api",
+        projets_base_url="http://application.invalid/api",
+        tresorerie_base_url="http://application.invalid/api",
+        cine_base_url="http://application.invalid/api",
+        savoir_base_url="http://application.invalid/api",
+        tab_exports_dir="/dev/null",
+        tab_mcp_command="atelier-mcp",
+        github_repo="atelier/exemple",
+        github_token="invalide",
+        cuisine_supabase_url="https://application.invalid",
+        cuisine_supabase_anon_key="invalide",
+        cuisine_refresh_token="invalide",
+    )
+    env = ToolEnvironment(blank)
+    names: set[str] = set()
+    try:
+        for toolset_id in ids:
+            names |= {t.name for t in get_toolset(toolset_id).build(env)}
+    finally:
+        await env.aclose()  # clients HTTP créés à blanc : jamais utilisés, toujours fermés
+    return names
