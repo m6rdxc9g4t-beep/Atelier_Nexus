@@ -36,3 +36,15 @@ Code : `backend/app/core/settings_editor.py` (liste blanche, lecture / écriture
 
 Fichier utilisé : `backend/.env` en développement, `~/Library/Application Support/Atelier Nexus/.env` dans
 l'application de bureau.
+
+## Réglages du fichier `.env` seulement
+
+Hors de la liste blanche de l'interface (ils changent le comportement de fond, pas une connexion) :
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `TIMEZONE` | `Europe/Paris` | Fuseau IANA des horaires quotidiens des déclencheurs (heure d'été / d'hiver par `zoneinfo`). Un nom inconnu est refusé au démarrage. |
+| `TRIGGERS_ENABLED` | `true` | Tâche de fond des déclencheurs de workflows ; `false` la coupe (les tests la coupent). |
+| `TRIGGERS_POLL_SECONDS` | `15` | Intervalle entre deux passages (1 à 3600 s) : lecture des événements, horaires échus, rafales. |
+
+Ces trois valeurs sont lues au démarrage du backend ([`workflows.md`](workflows.md#déclencheurs--étape-20)).

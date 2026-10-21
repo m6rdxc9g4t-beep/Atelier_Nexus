@@ -193,3 +193,89 @@ Sortie structurée des outils (`ToolOutput.data`, jamais envoyée au modèle) : 
 `projets_list_projects`, `projets_list_work_items`, `projets_timesheet`, `projets_milestones` ;
 fiches pour `data_via_describe_dataset`, `projets_work_item`, les écritures Projets (`{id, …}`) et
 le pont Tab → Projets (résumé de l'import).
+
+---
+
+# Déclencheurs — Étape 20
+
+Contrat d'API figé avec le frontend : [`declencheurs-api.md`](declencheurs-api.md). Un
+**déclencheur** lance un workflow v2 tout seul : à heure fixe (**horaire**) ou quand Viz, Projets ou
+Tab publie un **événement** (`atelier-node/1`, [`apps/noeud-atelier.md`](apps/noeud-atelier.md)
+§7.3 et §7.7).
+
+## 9. Règles
+
+- **Une écriture n'est jamais exécutée sans validation humaine** : lancée par un déclencheur,
+  l'exécution s'arrête sur `awaiting_approval` exactement comme en manuel (même moteur, même
+  `launch_run`) et rejoint la boîte **« À valider »** (`GET /api/workflow-runs?status=awaiting_approval`,
+  badge `GET /api/workflow-runs/inbox-count`). Un workflow sans écriture va jusqu'au bout seul.
+- **Rien en rafale** : un horaire manqué pendant que Nexus était fermé donne **une** exécution au
+  redémarrage, les autres occurrences sont comptées `missed`. Un trou d'événements (`gap: true`)
+  ne relance rien : le curseur repart du dernier `seq`, `state.warning` le dit.
+- **Débit** : au plus `max_runs_per_hour` lancements par heure glissante (`throttled` au-delà) ; une
+  seule exécution en attente de validation par déclencheur, test compris (`waiting` tant qu'elle
+  attend) ; `debounce_seconds` regroupe une rafale en un lancement (le dernier événement gagne).
+- **Séquentiel** : un même déclencheur ne lance jamais deux exécutions en parallèle (verrou en
+  mémoire, partagé par la tâche de fond, `test` et les modifications par l'API). Plusieurs
+  workflows, ou plusieurs déclencheurs d'un workflow, peuvent tourner en même temps.
+- **Données** : `trigger_event` (app, seq, type, at, subject) est gardé sur l'exécution, **jamais
+  `data`**. Les journaux ne contiennent que des identifiants (déclencheur, exécution, statut).
+  Pendant une rafale, seuls les paramètres déjà résolus et la référence de l'événement sont gardés.
+- **Un seul processus Nexus** : verrous en mémoire et curseurs non partagés ; deux backends sur la
+  même base liraient les mêmes événements deux fois. Ce n'est pas un cas visé (application locale).
+
+## 10. Horaires
+
+`{kind: "interval", every_minutes: 5..1440}` ou `{kind: "daily", at: "HH:MM", days: ["mon"…]}`,
+dans le fuseau `TIMEZONE` (défaut `Europe/Paris`, `zoneinfo`). Une heure qui n'existe pas (passage
+à l'heure d'été) est lue avec le décalage d'avant (02:30 → 03:30) ; une heure qui existe deux fois
+(passage à l'heure d'hiver) ne donne qu'une occurrence. `next_fire_at` est calculé à
+l'enregistrement et après chaque occurrence ; un intervalle garde sa cadence d'origine.
+
+## 11. Événements
+
+- **Un curseur par application** (`trigger_cursors`), persisté. Premier démarrage : curseur = dernier
+  `seq` connu, aucun historique rejoué. Chaque déclencheur garde son propre `state.cursor`, posé à
+  sa création (ou à sa réactivation) : il ne voit que les événements **postérieurs**.
+- Distribution : `types` (déclarés par le manifeste, 422 sinon ; accepté avec `last_error` si l'app
+  ne répond pas), puis `filters` (tous vrais) : `path` ∈ `type`, `seq`, `at`, `subject.id|label|kind`,
+  `data.<chemin>` ; `op` ∈ `eq ne in contains gt gte lt lte exists` (comparaison numérique si les
+  deux côtés sont des nombres, « 1 » compris ; chemin absent : seul `ne` est vrai). Les événements
+  écartés par les filtres sont comptés `filtered`.
+- Gabarits dans `params` seulement : `{{event.type}}`, `{{event.seq}}`, `{{event.at}}`,
+  `{{event.subject.id|label|kind}}`, `{{event.data.<chemin>}}`, résolus en texte (chemin absent →
+  `""`). Les étapes continuent d'utiliser `{{params.x}}`.
+- Application injoignable : `last_error` (« Atelier Projets injoignable. »), comptée une fois dans
+  `counters.errors` par panne, effacée dès qu'elle répond ; rien n'est perdu (le curseur attend).
+- `GET /api/triggers/events-catalog` : événements des manifestes ; `fields` = propriétés de premier
+  niveau du `data_schema` (`data.to`…) puis `subject.id`, `subject.label`.
+
+## 12. Tâche de fond
+
+Démarrée dans le `lifespan` de `main.py` si `TRIGGERS_ENABLED` (vrai par défaut ; coupée dans
+`tests/conftest.py`), un passage toutes les `TRIGGERS_POLL_SECONDS` (15 s). Un passage (`tick()`)
+traite les horaires échus, les événements de chaque application observée, puis les rafales arrivées
+à échéance. Une exception sur un déclencheur est comptée sur lui (`counters.errors`, `last_error`)
+et le passage continue ; une exception du passage entier est journalisée et la boucle continue. À
+l'extinction : un passage en cours a 10 s pour finir, puis il est annulé ; la tâche est attendue.
+Horloge et sommeil injectables (`TriggerService(clock=…, sleep=…)`).
+
+## 13. API
+
+| Méthode | Chemin | Rôle |
+|---|---|---|
+| GET / POST | `/api/workflows/{id}/triggers` | Liste ; création (201). Workflow v2 seulement (422) |
+| PUT / DELETE | `/api/triggers/{trigger_id}` | Modification (compteurs conservés, `next_fire_at` recalculé) ; suppression (204) |
+| POST | `/api/triggers/{trigger_id}/test` | Lance une fois maintenant (`{event?}` d'exemple), origine `test`, sans compter ni limiter |
+| GET | `/api/triggers/events-catalog` | Événements des manifestes, chemins des filtres |
+| GET | `/api/workflow-runs?status=awaiting_approval`, `/api/workflow-runs/inbox-count` | Boîte « À valider », badge |
+
+Erreurs de validation : 422, `detail` texte en français (paramètre inconnu du workflow, type non
+déclaré, horaire invalide, gabarit `{{event.…}}` hors `params` ou dans un déclencheur horaire…).
+Supprimer un workflow supprime ses déclencheurs ; les exécutions passées restent dans l'historique.
+
+Base : migration `0007_workflow_triggers` (tables `workflow_triggers`, `trigger_cursors`, colonnes
+`trigger_id`, `trigger_event` sur `workflow_runs` ; la descente remet les origines à `manual`).
+Code : `app/triggers/` (`schedule`, `matching` : fonctions pures ; `service` : passages, lancements,
+boucle), `app/schemas/triggers.py`, `app/db/triggers.py`, `app/api/triggers.py`,
+`app/workflows_v2/launch.py` (lancement partagé avec `POST /api/workflows/{id}/run`).

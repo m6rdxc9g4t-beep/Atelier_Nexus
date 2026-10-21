@@ -50,3 +50,5 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
 * **Workflows v2 / nœuds :** une étape d'écriture (`write`, `destructive`, `requires_approval`) n'est jamais exécutée sans validation de son entrée **résolue** ; jamais de journalisation des `data` des étapes ; appels aux nœuds par `app/suite/` seulement (bouclage, sans redirection).
 * **Sortie structurée :** `ToolOutput.data` sert aux workflows et n'est jamais envoyé au modèle ; ajouter `data` à un outil ne change pas son `content`.
+* **SQLite (tests, bureau) :** `ON DELETE CASCADE` n'est pas appliqué sans PRAGMA et les dates relues sont naïves : supprimer les lignes liées explicitement dans le dépôt, considérer une date naïve comme UTC.
+* **Déclencheurs :** un lancement automatique passe par `launch_run` comme un manuel (écriture → `awaiting_approval`) ; état d'un déclencheur modifié par `TriggerRepository.mutate` sous `trigger_lock`, jamais depuis une copie lue avant un `await`.
