@@ -218,5 +218,6 @@ jobs:
         if: failure()
         run: |
           trap { "::error::$($_.Exception.Message)"; exit 1 }
-          $logs = Join-Path "$env:PROFIL" 'AppData\Local\Atelier Nexus\Logs'
+          if (-not $env:PROFIL) { exit 0 }  # échec avant l'installation : rien à joindre
+          $logs = Join-Path $env:PROFIL 'AppData\Local\Atelier Nexus\Logs'
           python .github/scripts/annotations.py fichiers "$env:RUNNER_TEMP\install.log" "$logs\mise-a-jour.log" "$logs\atelier-nexus.log"

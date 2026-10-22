@@ -15,6 +15,7 @@ import time
 # Comme le vrai serveur (Node.js) : UTF-8 sur l'entrée et la sortie, quel que soit le système
 sys.stdin.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
 sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
 
 MODE = os.environ.get("FAKE_MODE", "normal")
 LOG = os.environ.get("FAKE_LOG")
