@@ -42,3 +42,25 @@ comme Atelier Projets (`desktop/lib/prepare.cjs`, modèle de référence). Aucun
 
 Tab : le serveur MCP livré dans l'app (`/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp`) garde ce chemin et lance
 la version du dépôt.
+
+### 8.4 Précisions (retours des quatre implémentations)
+
+- **Changement local** : compte tout fichier suivi modifié **et** tout fichier nouveau non ignoré par git
+  (`git status --porcelain`), pas seulement `git diff`.
+- **Version précédente** = la dernière compilation réussie, avec ses dépendances : une app qui lance `npm ci` met d'abord
+  `node_modules` de côté et le remet en place en cas d'échec. Le code qui tourne depuis les sources (backend Python de Viz et de
+  Nexus) n'a pas de version précédente : si l'installation Python échoue, l'environnement précédent est remis en place, et si
+  l'app ne peut pas démarrer, l'écran le dit.
+- **Base déjà migrée, compilation en échec** : la version précédente s'ouvre sur le nouveau schéma. Toute migration doit donc
+  rester **compatible avec la version précédente** (ajouts seulement ; un retrait se fait en deux temps, sur deux mises à jour).
+  La copie faite avant la migration permet de revenir en arrière à la main.
+- **Copie avant migration** : faite seulement quand des migrations sont en attente. Si l'utilisateur a désactivé les sauvegardes,
+  la migration se fait sans copie et le journal le dit.
+- **Réseau** : pendant l'installation seulement, vers les registres de paquets **et** les hôtes officiels des binaires que ces
+  paquets téléchargent (Electron, moteurs Prisma), sauf s'ils sont déjà en cache. Le mode « Hors ligne » d'une app ne bloque
+  pas sa mise à jour (décision de l'utilisateur) ; un échec réseau propose la version précédente.
+- **Lanceur à reconstruire** : une fois, ou si le dépôt change de place, **ou** (Tab) si la version d'Electron change dans le
+  lockfile ; l'app le signale sur son écran de démarrage.
+- **Premier lancement** : sans tampon, l'app ne sait pas si ses dépendances sont à jour ; elle fait une installation complète.
+- Nexus : quand l'environnement Python doit être refait, cette étape a lieu avant l'ouverture de la fenêtre et est signalée par
+  une notification macOS.
