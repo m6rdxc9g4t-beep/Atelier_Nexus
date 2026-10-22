@@ -56,3 +56,171 @@ jobs:
       - uses: actions/checkout@v4
       - run: cp backend/.env.example backend/.env
       - run: docker compose config --quiet
+
+  windows:
+    # docs/apps/windows.md (SUITE.md §9.5) : tests, compilation, installation dans un profil
+    # temporaire (chemin avec espace et accent), lanceur en mode « mise à jour seulement » deux
+    # fois (le second ne refait rien), ouverture réelle de l'app, désinstallation.
+    name: Windows (tests · compilation · installation)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: atelier nexus
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: atelier nexus
+      - name: Fins de ligne (§9.3) — clone propre
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          $crlf = git ls-files --eol | Select-String -Pattern 'w/crlf' | Where-Object { $_ -notmatch '\.(ps1|cmd|bat|vbs)$' }
+          if ($crlf) { $crlf; throw "Fichiers en CRLF dans le clone Windows" }
+          $status = git status --porcelain
+          if ($status) { $status; throw "Le clone Windows paraît modifié" }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: atelier nexus/backend/requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: atelier nexus/frontend/package-lock.json
+
+      - name: Backend — dépendances
+        working-directory: atelier nexus/backend
+        run: pip install -r requirements-dev.txt
+      - name: Backend — ruff
+        working-directory: atelier nexus/backend
+        run: ruff check .
+      - name: Backend — mypy
+        working-directory: atelier nexus/backend
+        run: mypy .
+      - name: Backend — pytest
+        working-directory: atelier nexus/backend
+        run: pytest --junitxml="$env:RUNNER_TEMP/pytest.xml"
+      - name: Backend — échecs de pytest en annotations
+        if: failure()
+        run: python .github/scripts/annotations.py junit "$env:RUNNER_TEMP/pytest.xml"
+
+      - name: Interface — export statique de l'app de bureau
+        working-directory: atelier nexus/frontend
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          npm ci --no-audit --no-fund
+          $env:NEXUS_EXPORT = '1'
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw "compilation" }
+          if (-not (Test-Path out/index.html)) { throw "out/index.html absent" }
+          if (Select-String -Path out/_next/static/chunks/*.js -Pattern 'localhost:8100' -List) { throw "adresse d'API absolue dans l'export" }
+
+      - name: Installation (profil temporaire, Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          # Chemin avec espace et accent (C:\Users\François\…) ; ç écrit par son code
+          $profil = Join-Path $env:RUNNER_TEMP ("Profil Fran" + [char]0x00E7 + "ois")
+          New-Item -ItemType Directory -Force "$profil\AppData\Roaming", "$profil\AppData\Local", "$profil\Menu", "$profil\Bureau" | Out-Null
+          $env:USERPROFILE = $profil
+          $env:APPDATA = "$profil\AppData\Roaming"
+          $env:LOCALAPPDATA = "$profil\AppData\Local"
+          $python = (Get-Command python).Source
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "PROFIL=$profil`n", (New-Object Text.UTF8Encoding $false))
+          $ErrorActionPreference = 'Continue'  # sortie d'erreur du script : jamais une exception ici
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install.ps1 -SansBureau -Python $python -DossierMenuDemarrer "$profil\Menu" -DossierBureau "$profil\Bureau" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP\install.log"
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 a échoué ($LASTEXITCODE)" }
+
+      - name: Installation — vérifications
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          $local = "$env:PROFIL\AppData\Local\Atelier Nexus"
+          $lnk = "$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk"  # lanceur inscrit = raccourci du menu Démarrer (§9.6)
+          foreach ($path in @($lnk, "$local\lanceur\atelier-nexus.pyw", "$local\venv\Scripts\pythonw.exe", "$local\interface\courante.txt", "$local\mise-a-jour\etat.json")) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "absent : $path" }
+          }
+          if (Test-Path -LiteralPath "$env:PROFIL\Bureau\Atelier Nexus.lnk") { throw "raccourci de Bureau malgré -SansBureau" }
+          $reg = Get-ItemProperty 'HKCU:\Software\Atelier\Apps\nexus'
+          if ($reg.Lanceur -ne $lnk -or $reg.Nom -ne 'Atelier Nexus') { throw "enregistrement inattendu : $($reg | Out-String)" }
+          $status = git status --porcelain
+          if ($status) {
+            $diff = (git diff | Select-Object -First 60) -join "`n"
+            throw "l'installation a modifié des fichiers suivis :`n$($status -join "`n")`n$diff"
+          }
+
+      - name: Lanceur — mise à jour seulement, deux fois
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          $env:USERPROFILE = $env:PROFIL
+          $env:APPDATA = "$env:PROFIL\AppData\Roaming"
+          $env:LOCALAPPDATA = "$env:PROFIL\AppData\Local"
+          $local = "$env:LOCALAPPDATA\Atelier Nexus"
+          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk")
+          function Invoke-Launcher {
+            $p = Start-Process -FilePath $shortcut.TargetPath -ArgumentList ($shortcut.Arguments + ' --preparer') -WorkingDirectory $shortcut.WorkingDirectory -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Get-Content "$local\Logs\mise-a-jour.log" -Tail 60; throw "lanceur : code $($p.ExitCode)" }
+          }
+          # Modification locale non commitée : le premier lancement recompile (§8)
+          Add-Content -LiteralPath frontend/src/app/layout.tsx -Value "// essai CI"
+          $before = Get-Content -Raw "$local\mise-a-jour\etat.json"
+          Invoke-Launcher
+          $after = Get-Content -Raw "$local\mise-a-jour\etat.json"
+          if ($after -eq $before) { throw "le premier lancement n'a pas recompilé" }
+          $log = Get-Content -Raw "$local\Logs\mise-a-jour.log"
+          $build = Get-Content -Raw "$local\interface\courante.txt"
+          Invoke-Launcher  # rien n'a changé : rien ne doit être refait
+          if ((Get-Content -Raw "$local\mise-a-jour\etat.json") -ne $after) { throw "tampon réécrit" }
+          if ((Get-Content -Raw "$local\Logs\mise-a-jour.log") -ne $log) { throw "le second lancement a refait une étape" }
+          if ((Get-Content -Raw "$local\interface\courante.txt") -ne $build) { throw "compilation remplacée" }
+          git checkout -- frontend/src/app/layout.tsx
+          Invoke-Launcher  # retour au commit : recompilé, prêt pour l'ouverture
+
+      - name: Lanceur — ouverture réelle de l'app (serveur local)
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          $env:USERPROFILE = $env:PROFIL
+          $env:APPDATA = "$env:PROFIL\AppData\Roaming"
+          $env:LOCALAPPDATA = "$env:PROFIL\AppData\Local"
+          $local = "$env:LOCALAPPDATA\Atelier Nexus"
+          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk")
+          Start-Process -FilePath $shortcut.TargetPath -ArgumentList $shortcut.Arguments -WorkingDirectory $shortcut.WorkingDirectory
+          $ok = $false
+          foreach ($i in 1..120) {
+            Start-Sleep -Seconds 1
+            try {
+              $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8100/api/health' -TimeoutSec 2 -NoProxy
+              $page = Invoke-WebRequest -Uri 'http://127.0.0.1:8100/' -TimeoutSec 5 -NoProxy -UseBasicParsing
+              if ($health.status -eq 'ok' -and $page.StatusCode -eq 200) { $ok = $true; break }
+            } catch { }
+          }
+          Get-Content "$local\Logs\atelier-nexus.log" -Tail 40
+          Get-Process pythonw -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $ok) { throw "l'app ne répond pas sur http://127.0.0.1:8100" }
+          if (-not (Test-Path -LiteralPath "$env:APPDATA\Atelier Nexus\nexus.db")) { throw "base absente de %APPDATA%" }
+
+      - name: Désinstallation (données conservées)
+        shell: powershell
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          $env:USERPROFILE = $env:PROFIL
+          $env:APPDATA = "$env:PROFIL\AppData\Roaming"
+          $env:LOCALAPPDATA = "$env:PROFIL\AppData\Local"
+          Start-Sleep -Seconds 2
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install.ps1 -Desinstaller -DossierMenuDemarrer "$env:PROFIL\Menu" -DossierBureau "$env:PROFIL\Bureau"
+          if ($LASTEXITCODE -ne 0) { throw "désinstallation : code $LASTEXITCODE" }
+          if (Test-Path 'HKCU:\Software\Atelier\Apps\nexus') { throw "enregistrement restant" }
+          if (Test-Path -LiteralPath "$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk") { throw "raccourci restant" }
+          foreach ($kept in @("$env:APPDATA\Atelier Nexus\.env", "$env:APPDATA\Atelier Nexus\nexus.db")) {
+            if (-not (Test-Path -LiteralPath $kept)) { throw "donnée supprimée : $kept" }
+          }
+      - name: Journaux de l'app en annotations
+        if: failure()
+        run: |
+          trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
+          if (-not $env:PROFIL) { exit 0 }  # échec avant l'installation : rien à joindre
+          $logs = Join-Path $env:PROFIL 'AppData\Local\Atelier Nexus\Logs'
+          python .github/scripts/annotations.py fichiers "$env:RUNNER_TEMP\install.log" "$logs\mise-a-jour.log" "$logs\atelier-nexus.log"

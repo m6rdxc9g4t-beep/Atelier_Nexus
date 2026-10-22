@@ -17,13 +17,18 @@ donnée touchée : seuls `venv/`, `interface/` et `mise-a-jour/` du dossier de l
 
 Bibliothèque standard uniquement : le lanceur exécute ce fichier avec le Python du système
 (`python -I backend/app/desktop_update.py venv`) avant que l'environnement de l'app n'existe.
+
+Multiplateforme (docs/apps/windows.md, SUITE.md §9) : dossiers par système (`platform_dirs`),
+verrou `flock` ou `msvcrt.locking`, compilation servie désignée par un lien symbolique (macOS,
+Linux) ou par le fichier `interface/courante.txt` (Windows : un lien demanderait des droits),
+fichiers verrouillés par une autre fenêtre mis de côté puis retirés au lancement suivant,
+`npm.cmd` lancé par `node.exe npm-cli.js`, aucune console visible.
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
@@ -38,6 +43,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
+
+if __package__ in (None, ""):  # script lancé par le lanceur (python -I …/desktop_update.py)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.core.processes import NO_WINDOW, windows_command  # noqa: E402
 
 APP_NAME = "Atelier Nexus"
 #: Dépendances Python installées dans l'environnement de l'app (requirements-dev.txt n'y est pas)
@@ -72,14 +81,53 @@ class UpdateError(Exception):
 # ─── Dossiers ─────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class AppDirs:
+    """Dossiers de l'app sur un système : données et réglages, fichiers locaux, journaux."""
+
+    data: Path  # .env, nexus.db, webview/ (jamais touchés par la mise à jour)
+    local: Path  # venv/, interface/, mise-a-jour/ (propres à la machine)
+    logs: Path
+
+
+def platform_dirs(
+    platform: str = sys.platform, env: Mapping[str, str] | None = None, home: Path | None = None
+) -> AppDirs:
+    """Seule source des emplacements par système (SUITE.md §9.2).
+
+    macOS : `~/Library/Application Support/Atelier Nexus` (tout) et `~/Library/Logs/Atelier Nexus`.
+    Windows : `%APPDATA%\\Atelier Nexus` (données, réglages) ; `%LOCALAPPDATA%\\Atelier Nexus`
+    (environnement Python, interface compilée, tampon : rien d'itinérant) et son `Logs`.
+    Linux : `$XDG_DATA_HOME/atelier-nexus` (tout) et son dossier `logs`.
+    """
+    env = os.environ if env is None else env
+    home = Path.home() if home is None else home
+    if platform == "darwin":
+        data = home / "Library" / "Application Support" / APP_NAME
+        return AppDirs(data=data, local=data, logs=home / "Library" / "Logs" / APP_NAME)
+    if platform == "win32":
+        roaming = Path(env.get("APPDATA") or home / "AppData" / "Roaming")
+        local = Path(env.get("LOCALAPPDATA") or home / "AppData" / "Local") / APP_NAME
+        return AppDirs(data=roaming / APP_NAME, local=local, logs=local / "Logs")
+    data = Path(env.get("XDG_DATA_HOME") or home / ".local" / "share") / "atelier-nexus"
+    return AppDirs(data=data, local=data, logs=data / "logs")
+
+
 def nexus_home() -> Path:
     """Dossier des données et réglages de l'utilisateur (`NEXUS_HOME` pour le surcharger)."""
     custom = os.environ.get("NEXUS_HOME")
     if custom:
         return Path(custom).expanduser()
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / APP_NAME
-    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "atelier-nexus"
+    return platform_dirs().data
+
+
+def nexus_local() -> Path:
+    """Dossier local de l'app : environnement Python, interface, tampon (`NEXUS_LOCAL` ; avec
+    `NEXUS_HOME` seul, ce même dossier)."""
+    custom = os.environ.get("NEXUS_LOCAL") or os.environ.get("NEXUS_HOME")
+    if custom:
+        return Path(custom).expanduser()
+    return platform_dirs().local
 
 
 def log_dir() -> Path:
@@ -88,24 +136,54 @@ def log_dir() -> Path:
     if custom:
         return Path(custom).expanduser()
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Logs" / APP_NAME
+        return platform_dirs().logs
+    if sys.platform == "win32":
+        return nexus_local() / "Logs"
     return nexus_home() / "logs"
 
 
+def utf8_output() -> None:
+    """Sorties en UTF-8 même redirigées (Windows : sinon la page de code du système ; le
+    lanceur tourne avec `-I`, qui ignore PYTHONUTF8)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            with contextlib.suppress(Exception):
+                reconfigure(encoding="utf-8", errors="replace")
+
+
 def display_path(path: Path) -> str:
-    """Chemin affiché à l'utilisateur, avec « ~ » pour son dossier personnel."""
+    """Chemin affiché à l'utilisateur : « ~ » pour son dossier personnel (complet sous Windows)."""
+    if sys.platform == "win32":
+        return str(path)
     try:
         return "~/" + str(path.relative_to(Path.home()))
     except ValueError:
         return str(path)
 
 
+def venv_python_path(venv: Path, platform: str = sys.platform, *, windowed: bool = False) -> Path:
+    """Interpréteur d'un environnement virtuel (`windowed` : `pythonw.exe` sous Windows)."""
+    if platform == "win32":
+        return venv / "Scripts" / ("pythonw.exe" if windowed else "python.exe")
+    return venv / "bin" / "python"
+
+
 @dataclass(frozen=True)
 class Layout:
-    """Emplacements du dépôt (code) et du dossier de l'app (environnement, compilation, tampon)."""
+    """Emplacements du dépôt (code) et du dossier de l'app (environnement, compilation, tampon).
+
+    `home` : données et réglages ; `local` : environnement, compilation et tampon (Windows :
+    `%LOCALAPPDATA%`), par défaut `home` comme sous macOS.
+    """
 
     repo: Path
     home: Path
+    local: Path | None = None
+
+    @property
+    def base(self) -> Path:
+        return self.local or self.home
 
     @property
     def frontend(self) -> Path:
@@ -113,11 +191,11 @@ class Layout:
 
     @property
     def venv(self) -> Path:
-        return self.home / "venv"
+        return self.base / "venv"
 
     @property
     def venv_python(self) -> Path:
-        return self.venv / "bin" / "python"
+        return venv_python_path(self.venv)
 
     @property
     def venv_stamp(self) -> Path:
@@ -126,11 +204,11 @@ class Layout:
 
     @property
     def previous_venv(self) -> Path:
-        return self.home / "venv.precedent"
+        return self.base / "venv.precedent"
 
     @property
     def state_dir(self) -> Path:
-        return self.home / "mise-a-jour"
+        return self.base / "mise-a-jour"
 
     @property
     def stamp(self) -> Path:
@@ -142,12 +220,17 @@ class Layout:
 
     @property
     def builds(self) -> Path:
-        return self.home / "interface"
+        return self.base / "interface"
 
     @property
     def current(self) -> Path:
         """Lien vers la compilation servie (remplacé de façon atomique)."""
         return self.builds / "courante"
+
+    @property
+    def current_pointer(self) -> Path:
+        """Windows : fichier contenant le nom de la compilation servie (remplacé atomiquement)."""
+        return self.builds / "courante.txt"
 
 
 # ─── État du dépôt ────────────────────────────────────────────────
@@ -171,8 +254,11 @@ def git(repo: Path, *args: str) -> str | None:
             ["git", "-C", str(repo), *args],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
             check=False,
+            creationflags=NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -197,13 +283,27 @@ class RepoState:
     requirements: str
 
 
+def local_changes(repo: Path) -> list[str]:
+    """Fichiers changés localement (SUITE.md §8.4, §9.6) : `git status --porcelain`, soit les
+    fichiers suivis modifiés **et** les fichiers nouveaux non ignorés (chemins depuis la racine)."""
+    records = (git(repo, "status", "--porcelain", "-z", "--untracked-files=all") or "").split("\0")
+    names: set[str] = set()
+    i = 0
+    while i < len(records):
+        record, i = records[i], i + 1
+        if len(record) < 4:
+            continue
+        names.add(record[3:])
+        if record[0] in "RC":  # renommage ou copie : le chemin d'origine suit
+            i += 1
+    return sorted(names)
+
+
 def repo_state(repo: Path) -> RepoState:
-    """État du dépôt : `git rev-parse HEAD` + contenu des fichiers suivis modifiés localement."""
+    """État du dépôt : `git rev-parse HEAD` + contenu des fichiers changés localement."""
     head = (git(repo, "rev-parse", "HEAD") or "sans-git").strip()
     top = Path((git(repo, "rev-parse", "--show-toplevel") or str(repo)).strip())
-    changed = sorted(
-        name for name in (git(repo, "diff", "--name-only", "-z", "HEAD") or "").split("\0") if name
-    )
+    changed = local_changes(top)
     parts = [head]
     for name in changed:
         target = top / name
@@ -251,12 +351,26 @@ def read_stamp(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+#: Compilation servie désignée par un lien symbolique ; sous Windows (lien = droits
+#: d'administrateur ou mode développeur), par le fichier `interface/courante.txt`
+USE_LINKS = sys.platform != "win32"
+
+
 def served_build(layout: Layout) -> Path | None:
     """Compilation servie (dossier réel), ou None s'il n'y en a pas encore."""
-    try:
-        target = layout.current.resolve(strict=True)
-    except OSError:
-        return None
+    if USE_LINKS:
+        try:
+            target = layout.current.resolve(strict=True)
+        except OSError:
+            return None
+    else:
+        try:
+            name = layout.current_pointer.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        if not name.startswith("build-") or any(c in name for c in "/\\:"):
+            return None
+        target = layout.builds / name
     return target if (target / "index.html").is_file() else None
 
 
@@ -301,6 +415,39 @@ def note(log: IO[str], text: str) -> None:
     log.flush()
 
 
+def _try_lock(handle: IO[bytes]) -> bool:
+    """Verrou exclusif sans attente : `flock` (macOS, Linux), `msvcrt.locking` (Windows)."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        handle.seek(0)
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    import fcntl
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def _unlock(handle: IO[bytes]) -> None:
+    if sys.platform == "win32":
+        import msvcrt
+
+        handle.seek(0)
+        with contextlib.suppress(OSError):
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 @contextlib.contextmanager
 def update_lock(
     path: Path,
@@ -310,36 +457,35 @@ def update_lock(
 ) -> Iterator[None]:
     """Une seule mise à jour à la fois (verrou du système, libéré même si le processus meurt)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as handle:
+    with path.open("a+b") as handle:
         deadline = time.monotonic() + timeout
         waited = False
-        while True:
-            try:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                if not waited:
-                    on_wait()
-                    waited = True
-                if time.monotonic() > deadline:
-                    raise UpdateError(
-                        "Une autre mise à jour d'Atelier Nexus ne se termine pas. "
-                        "Quittez les autres fenêtres de l'application, puis rouvrez-la."
-                    ) from None
-                time.sleep(poll)
+        while not _try_lock(handle):
+            if not waited:
+                on_wait()
+                waited = True
+            if time.monotonic() > deadline:
+                raise UpdateError(
+                    "Une autre mise à jour d'Atelier Nexus ne se termine pas. "
+                    "Quittez les autres fenêtres de l'application, puis rouvrez-la."
+                ) from None
+            time.sleep(poll)
         try:
             yield
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            _unlock(handle)
 
 
 def run_command(cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[str]) -> int:
-    """Exécute une commande, sortie dans le journal ; code de retour (127 : introuvable)."""
+    """Exécute une commande, sortie dans le journal ; code de retour (127 : introuvable).
+
+    Sous Windows, sans console visible, et `npm.cmd` remplacé par `node.exe npm-cli.js`.
+    """
     log.write(f"$ {' '.join(cmd)}\n")
     log.flush()
     try:
         done = subprocess.run(
-            list(cmd),
+            windows_command(cmd),
             cwd=cwd,
             env=dict(env),
             stdin=subprocess.DEVNULL,
@@ -347,6 +493,7 @@ def run_command(cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[s
             stderr=subprocess.STDOUT,
             timeout=STEP_TIMEOUT,
             check=False,
+            creationflags=NO_WINDOW,
         )
     except subprocess.TimeoutExpired:
         log.write(f"(arrêtée après {STEP_TIMEOUT} s)\n")
@@ -388,14 +535,44 @@ def login_shell_npm(timeout: float = 15.0) -> Path | None:
     return None
 
 
+def windows_npm_candidates(env: Mapping[str, str], home: Path) -> list[Path]:
+    """`npm.cmd` aux emplacements de Windows (SUITE.md §9.3) : Node.js officiel, nvm-windows,
+    Volta, fnm, Scoop, installation par utilisateur."""
+
+    def var(name: str) -> Path | None:
+        value = env.get(name) or env.get(name.upper())
+        return Path(value) if value else None
+
+    program_files = var("ProgramFiles") or Path(r"C:\Program Files")
+    local = var("LOCALAPPDATA") or home / "AppData" / "Local"
+    roaming = var("APPDATA") or home / "AppData" / "Roaming"
+    dirs = [
+        program_files / "nodejs",
+        *(p for p in [var("NVM_SYMLINK")] if p),
+        local / "Volta" / "bin",
+        *(p for p in [var("VOLTA_HOME")] if p),
+        (var("FNM_DIR") or roaming / "fnm") / "aliases" / "default",
+        local / "fnm_multishells",
+        local / "Programs" / "nodejs",
+        home / "scoop" / "apps" / "nodejs" / "current",
+        home / "scoop" / "apps" / "nodejs-lts" / "current",
+    ]
+    nvm = var("NVM_HOME")
+    if nvm and nvm.is_dir():
+        dirs += sorted(nvm.glob("v*"), key=_version_key, reverse=True)
+    return [d / name for d in dirs for name in ("npm.cmd", "npm.exe")]
+
+
 def find_npm(
     env: Mapping[str, str] | None = None,
     home: Path | None = None,
     login_shell: Callable[[], Path | None] = login_shell_npm,
     system_dirs: Sequence[Path] = (Path("/opt/homebrew/bin"), Path("/usr/local/bin")),
+    platform: str = sys.platform,
 ) -> Path | None:
     """`npm` sans dépendre du PATH du Finder : `NEXUS_NPM`, PATH, shell de connexion zsh,
-    Homebrew (`~/.homebrew`, `/opt/homebrew`, `/usr/local`), nvm, Volta."""
+    Homebrew (`~/.homebrew`, `/opt/homebrew`, `/usr/local`), nvm, Volta.
+    Windows : `NEXUS_NPM`, PATH, puis `windows_npm_candidates`."""
     env = os.environ if env is None else env
     home = Path.home() if home is None else home
     forced = env.get("NEXUS_NPM")
@@ -404,6 +581,8 @@ def find_npm(
     found = shutil.which("npm", path=env.get("PATH", ""))
     if found:
         return Path(found)
+    if platform == "win32":
+        return next((c for c in windows_npm_candidates(env, home) if c.is_file()), None)
     shell = login_shell()
     if shell:
         return shell
@@ -419,15 +598,50 @@ def find_npm(
     return None
 
 
-def npm_environment(npm: Path, base: Mapping[str, str] | None = None) -> dict[str, str]:
+def npm_environment(
+    npm: Path, base: Mapping[str, str] | None = None, platform: str = sys.platform
+) -> dict[str, str]:
     """Environnement de npm : dossier de `npm` (donc de `node`) en tête du PATH, export statique."""
     env = dict(os.environ if base is None else base)
-    env["PATH"] = os.pathsep.join([str(npm.parent), env.get("PATH", "/usr/bin:/bin")])
+    windows = platform == "win32"
+    # Windows : le nom réel peut être « Path » ; une seule entrée, sinon l'une masque l'autre
+    key = next((k for k in env if k.upper() == "PATH"), "PATH") if windows else "PATH"
+    current = env.pop(key, "" if windows else "/usr/bin:/bin")
+    env["PATH"] = (";" if windows else ":").join(p for p in [str(npm.parent), current] if p)
     env.update(NEXUS_EXPORT="1", NEXT_PUBLIC_API_URL="", NEXT_TELEMETRY_DISABLED="1")
     return env
 
 
 # ─── Mise à jour de l'interface ───────────────────────────────────
+
+
+def replace_file(src: Path, dst: Path, attempts: int = 10, delay: float = 0.2) -> None:
+    """`os.replace` ; sous Windows, réessaie tant qu'un autre processus lit le fichier."""
+    for attempt in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
+
+
+def discard(path: Path, trash: Path) -> None:
+    """Supprime un dossier ; sous Windows, un fichier ouvert par une autre fenêtre l'empêche :
+    le dossier est alors renommé dans `trash`, vidé par `purge` au lancement suivant."""
+    shutil.rmtree(path, ignore_errors=True)
+    if path.exists():
+        trash.mkdir(parents=True, exist_ok=True)
+        with contextlib.suppress(OSError):
+            path.rename(trash / f"{path.name}-{secrets.token_hex(4)}")
+
+
+def purge(trash: Path) -> None:
+    """Retire ce qui a été mis de côté par `discard` (ce qui reste verrouillé attendra)."""
+    if trash.is_dir():
+        for leftover in trash.iterdir():
+            shutil.rmtree(leftover, ignore_errors=True)
 
 
 def publish(layout: Layout, out: Path) -> Path:
@@ -438,15 +652,21 @@ def publish(layout: Layout, out: Path) -> Path:
     shutil.move(str(out), str(staging))
     final = layout.builds / name
     staging.rename(final)
-    link = layout.builds / ".courante.tmp"
-    with contextlib.suppress(FileNotFoundError):
-        link.unlink()
-    link.symlink_to(name)
-    if layout.current.is_dir() and not layout.current.is_symlink():
-        shutil.rmtree(layout.current)
-    os.replace(link, layout.current)  # un lien remplace l'autre : jamais d'état intermédiaire
+    if USE_LINKS:
+        link = layout.builds / ".courante.tmp"
+        with contextlib.suppress(FileNotFoundError):
+            link.unlink()
+        link.symlink_to(name)
+        if layout.current.is_dir() and not layout.current.is_symlink():
+            shutil.rmtree(layout.current)
+        os.replace(link, layout.current)  # un lien remplace l'autre : jamais d'état intermédiaire
+    else:
+        pointer = layout.builds / ".courante.txt.tmp"
+        pointer.write_text(name + "\n", encoding="utf-8")
+        replace_file(pointer, layout.current_pointer)  # idem : un fichier remplace l'autre
     for old in layout.builds.iterdir():
         if old.name not in {name, layout.current.name} and old.is_dir() and not old.is_symlink():
+            # Windows : une compilation encore servie par une autre fenêtre est retirée plus tard
             shutil.rmtree(old, ignore_errors=True)
     return final
 
@@ -476,10 +696,18 @@ def update_interface(
                     "Node.js (npm) est introuvable : installez-le (« brew install node » ou "
                     "https://nodejs.org), puis rouvrez Atelier Nexus."
                 )
+            # Windows : npm sans shell, `node.exe …\npm-cli.js` (SUITE.md §9.6), jamais npm.cmd
+            base = windows_command([str(npm)])
+            if sys.platform == "win32" and Path(base[0]).suffix.lower() in {".cmd", ".bat"}:
+                note(log, f"npm sans node_modules\\npm\\bin\\npm-cli.js à côté : {npm}")
+                raise UpdateError(
+                    f"npm ({npm}) ne peut pas être lancé sans shell : installez Node.js "
+                    "(winget install --id OpenJS.NodeJS.LTS -e), puis rouvrez Atelier Nexus."
+                )
             env = npm_environment(npm)
             if "npm" in steps:
                 on_status(LABELS["npm"])
-                cmd = [str(npm), "ci", "--no-audit", "--no-fund", "--loglevel=error"]
+                cmd = [*base, "ci", "--no-audit", "--no-fund", "--loglevel=error"]
                 if runner(cmd, layout.frontend, env, log) != 0:
                     note(log, "échec de npm ci")
                     raise UpdateError(
@@ -490,7 +718,7 @@ def update_interface(
             out = layout.frontend / "out"
             shutil.rmtree(out, ignore_errors=True)
             if (
-                runner([str(npm), "run", "build"], layout.frontend, env, log) != 0
+                runner([*base, "run", "build"], layout.frontend, env, log) != 0
                 or not (out / "index.html").is_file()
             ):
                 note(log, "échec de la compilation")
@@ -514,7 +742,7 @@ def update_interface(
                 + "\n",
                 encoding="utf-8",
             )
-            os.replace(tmp, layout.stamp)
+            replace_file(tmp, layout.stamp)
             note(log, f"interface à jour : {final.name}")
             return steps
 
@@ -540,19 +768,29 @@ def install_venv(
                 return False
             note(log, f"environnement Python ({base_python}) — {layout.repo}")
             wanted = requirements_hash(layout.repo)
-            shutil.rmtree(layout.previous_venv, ignore_errors=True)
+            trash = layout.base / ".a-supprimer"
+            purge(trash)
+            discard(layout.previous_venv, trash)
             if layout.venv.exists():
-                layout.venv.rename(layout.previous_venv)
+                try:
+                    layout.venv.rename(layout.previous_venv)
+                except OSError as exc:  # Windows : l'environnement sert à une fenêtre ouverte
+                    note(log, f"environnement Python en cours d'utilisation : {exc}")
+                    raise UpdateError(
+                        "Les dépendances Python d'Atelier Nexus doivent être mises à jour, mais "
+                        "l'application est déjà ouverte : fermez ses fenêtres, puis rouvrez-la."
+                    ) from exc
             env = dict(os.environ)
             python = str(layout.venv_python)
             pip = [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
             requirements = [arg for name in REQUIREMENTS for arg in ("-r", str(layout.repo / name))]
-            ok = runner([str(base_python), "-m", "venv", str(layout.venv)], layout.home, env, log)
+            layout.base.mkdir(parents=True, exist_ok=True)
+            ok = runner([str(base_python), "-m", "venv", str(layout.venv)], layout.base, env, log)
             if ok == 0:
-                ok = runner([*pip, *requirements], layout.home, env, log)
+                ok = runner([*pip, *requirements], layout.base, env, log)
             if ok != 0:
-                shutil.rmtree(layout.venv, ignore_errors=True)
-                restored = layout.previous_venv.exists()
+                discard(layout.venv, trash)
+                restored = layout.previous_venv.exists() and not layout.venv.exists()
                 if restored:
                     layout.previous_venv.rename(layout.venv)
                 note(
@@ -563,9 +801,16 @@ def install_venv(
                     "L'installation des dépendances Python a échoué (connexion Internet ?)."
                 )
             layout.venv_stamp.write_text(wanted + "\n", encoding="utf-8")
-            shutil.rmtree(layout.previous_venv, ignore_errors=True)
+            discard(layout.previous_venv, trash)
             note(log, "environnement Python à jour")
             return True
+
+
+def console_python(python: Path) -> Path:
+    """Windows : `python.exe` à côté de `pythonw.exe` (sortie des commandes dans le journal)."""
+    if python.name.lower() == "pythonw.exe" and (python.parent / "python.exe").is_file():
+        return python.parent / "python.exe"
+    return python
 
 
 # ─── Ligne de commande (lanceur) ──────────────────────────────────
@@ -579,11 +824,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args(argv)
-    layout = Layout(repo=args.repo.resolve(), home=nexus_home())
+    layout = Layout(repo=args.repo.resolve(), home=nexus_home(), local=nexus_local())
     if args.check:
         return 1 if venv_pending(layout) else 0
     try:
-        install_venv(layout, Path(sys.executable))
+        install_venv(layout, console_python(Path(sys.executable)))
     except UpdateError:  # message affiché par le lanceur, détail dans le journal
         return EXIT_VENV_RESTORED if layout.venv_python.exists() else EXIT_VENV_FAILED
     return 0

@@ -18,7 +18,8 @@ def test_prepare_home_creates_private_env_once(tmp_path: Path) -> None:
     text = env_file.read_text()
     assert "\nDATABASE_URL=" not in text  # la base du docker-compose est neutralisée
     assert "ANTHROPIC_API_KEY=" in text and "Application de bureau" in text
-    assert oct(env_file.stat().st_mode & 0o777) == "0o600"
+    if sys.platform != "win32":  # Windows : droits du profil (%APPDATA%), pas de mode Unix
+        assert oct(env_file.stat().st_mode & 0o777) == "0o600"
     env_file.write_text("ANTHROPIC_API_KEY=sk-test\n")
     desktop.prepare_home(home)
     assert env_file.read_text() == "ANTHROPIC_API_KEY=sk-test\n"  # jamais écrasé
@@ -69,7 +70,7 @@ def test_suite_links_open_installed_apps() -> None:
     assert desktop.suite_bundle_for("https://evil.example/atelier-cuisine-iota.vercel.app") is None
 
     opened: list[str] = []
-    api = desktop.DesktopApi(open_url=opened.append, open_app=lambda b: b == "fr.atelier.tab")
+    api = desktop.DesktopApi(open_url=opened.append, open_app=lambda app: app == "tab")
     assert api.open_external("http://127.0.0.1:4175") and opened == []  # app Tab ouverte
     assert api.open_external("http://127.0.0.1:4000") and opened == ["http://127.0.0.1:4000"]
     assert api.open_external("file:///etc/passwd") is False

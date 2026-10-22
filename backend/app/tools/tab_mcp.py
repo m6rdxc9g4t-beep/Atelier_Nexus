@@ -8,6 +8,12 @@ met à jour l'instantané lu par `app/tools/tab.py` : la lecture voit aussitôt 
 
 Le processus est lancé à la première écriture d'un tour d'agent et arrêté à la fin
 (`aclose`). Il ne reçoit qu'un environnement minimal : aucun secret de Nexus.
+
+Windows : la commande (`TAB_MCP_COMMAND`, réglage du `.env` jamais modifiable depuis
+l'interface) peut être un script `.cmd` ; un shim npm est lancé par `node.exe` directement
+(`windows_command`), un autre script par `cmd.exe` implicitement, ce qui est sans risque : ses
+arguments viennent du réglage, jamais des données (elles passent par l'entrée standard). Aucune
+console visible ; à l'arrêt forcé, `cmd.exe` et ses enfants sont arrêtés ensemble.
 """
 
 from __future__ import annotations
@@ -16,12 +22,13 @@ import asyncio
 import contextlib
 import json
 import os
-import shlex
+import sys
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.config import Settings
+from app.core.processes import NO_WINDOW, WINDOWS_VARS, kill_tree, split_command, windows_command
 from app.schemas.tab import MAPPING_LABELS, ColumnType
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.formatting import fmt
@@ -57,7 +64,7 @@ class TabMcpClient:
         if not settings.tab_mcp_command:
             return None
         return cls(
-            shlex.split(settings.tab_mcp_command),
+            split_command(settings.tab_mcp_command),
             data_dir=settings.tab_data_dir,
             timeout=settings.tab_mcp_timeout,
         )
@@ -65,7 +72,11 @@ class TabMcpClient:
     # ─── Processus ────────────────────────────────────────────────
 
     def _env(self) -> dict[str, str]:
-        env = {k: v for k, v in os.environ.items() if k in SAFE_ENV}
+        names = set(SAFE_ENV)
+        if sys.platform == "win32":  # SystemRoot, APPDATA… : sans elles Node.js échoue
+            names |= set(WINDOWS_VARS)
+        windows = sys.platform == "win32"
+        env = {k: v for k, v in os.environ.items() if (k.upper() if windows else k) in names}
         if self.data_dir:
             env["ATELIER_TAB_DATA"] = os.path.expanduser(self.data_dir)
         return env
@@ -84,18 +95,20 @@ class TabMcpClient:
             return self._proc
         try:
             proc = await asyncio.create_subprocess_exec(
-                *self.command,
+                *windows_command(self.command),
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
                 limit=MAX_LINE,
+                creationflags=NO_WINDOW,
             )
         except (FileNotFoundError, PermissionError) as exc:
             raise AppUnavailableError(
                 f"Serveur MCP d'Atelier Tab introuvable ({self.command[0]}). Vérifiez TAB_MCP_COMMAND "
                 "(app Mac : /Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp ; dépôt : "
-                "node dist-desktop/atelier-mcp.mjs après `npm run build:desktop`).",
+                "node dist-desktop/atelier-mcp.mjs après `npm run build:desktop` ; Windows : "
+                "docs/apps/tab.md).",
                 app=self.app,
             ) from exc
         self._proc = proc
@@ -123,7 +136,9 @@ class TabMcpClient:
             try:
                 await asyncio.wait_for(proc.wait(), timeout=2)
             except TimeoutError:
-                proc.kill()
+                kill_tree(proc.pid)  # Windows : un script .cmd laisserait node.exe derrière lui
+                with contextlib.suppress(ProcessLookupError):
+                    proc.kill()
                 await proc.wait()
         if self._stderr_task:
             self._stderr_task.cancel()

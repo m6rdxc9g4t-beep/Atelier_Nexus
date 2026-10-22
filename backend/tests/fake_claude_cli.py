@@ -10,6 +10,10 @@ import os
 import sys
 import time
 
+# Comme Claude Code : UTF-8 sur l'entrée et la sortie, quel que soit le système
+sys.stdin.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
 mode = os.environ.get("FAKE_CLAUDE_MODE", "text")
 args = sys.argv[1:]
 log = os.environ.get("FAKE_CLAUDE_LOG")
@@ -38,6 +42,7 @@ if log:
                         k: os.environ.get(k)
                         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
                     },
+                    "env_names": sorted(os.environ),
                 },
                 ensure_ascii=False,
             )

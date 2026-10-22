@@ -13,6 +13,7 @@ from app.agents.experts.general import AssistantAgent
 from app.core.config import Settings
 from app.core.llm import LLMRouter
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
+from app.core.llm.providers import claude_code_provider
 from app.core.llm.providers.claude_code_provider import (
     ClaudeCodeProvider,
     parse_arguments,
@@ -28,9 +29,14 @@ from app.core.llm.types import (
     ToolSpec,
     ToolUseBlock,
 )
+from app.core.processes import CLAUDE_WINDOWS_VARS
 from app.tools.environment import ToolEnvironment
+from tests.winexe import console_exe
 
-FAKE = str(Path(__file__).parent / "fake_claude_cli.py")
+#: Variables qu'un lanceur de Python ajoute lui-même (environnement virtuel sous Windows)
+WINDOWS_PROCESS_VARS = {"__PYVENV_LAUNCHER__"}
+
+FAKE = console_exe(str(Path(__file__).parent / "fake_claude_cli.py"))
 
 
 @pytest.fixture
@@ -38,6 +44,8 @@ def cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ClaudeCodeProvider:
     monkeypatch.setenv("FAKE_CLAUDE_LOG", str(tmp_path / "calls.jsonl"))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ne-doit-pas-servir")
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.exemple")
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///nexus.db")
+    monkeypatch.setenv("NEXUS_HOME", "/x")
     return ClaudeCodeProvider(binary=FAKE, default_model="sonnet", timeout=10)
 
 
@@ -73,6 +81,17 @@ async def test_plain_answer_and_safe_invocation(
         "ANTHROPIC_AUTH_TOKEN": None,
     }
     assert call["cwd_empty"] and "## Utilisateur\nSalut" in call["stdin"]
+    # Liste blanche (SUITE.md §5.3, Windows §9.6) : ni secret ni réglage de Nexus
+    allowed = {n.upper() for n in (*claude_code_provider.CLI_ENV, *CLAUDE_WINDOWS_VARS)}
+    allowed |= {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+    leaked = [
+        n
+        for n in call["env_names"]
+        if n.upper() not in allowed
+        and not n.upper().startswith("LC_")
+        and n.upper() not in WINDOWS_PROCESS_VARS
+    ]
+    assert leaked == [], leaked
 
 
 async def test_agent_loop_with_tools(

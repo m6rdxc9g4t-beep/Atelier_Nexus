@@ -53,8 +53,9 @@ from app.db.models import AttachmentRow, Base
 from app.db.repository import CustomAgentRepository
 from main import app
 from tests.fakes import ScriptedProvider, make_router, text_response
+from tests.winexe import console_exe
 
-FAKE_CLI = str(Path(__file__).parent / "fake_claude_cli.py")
+FAKE_CLI = console_exe(str(Path(__file__).parent / "fake_claude_cli.py"))
 ID = "0" * 31 + "1"
 
 

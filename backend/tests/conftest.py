@@ -24,6 +24,12 @@ pytest_plugins = ["tests.workflow_fixtures"]
 @pytest.fixture(autouse=True)
 def _no_claude_code(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.core.llm.router.find_claude_binary", lambda *_: None)
+    # Le faux `claude` (tests/fake_claude_cli.py) lit son mode et son journal dans
+    # l'environnement, en liste blanche : ces deux variables passent, rien d'autre
+    from app.core.llm.providers import claude_code_provider
+
+    extra = ("FAKE_CLAUDE_MODE", "FAKE_CLAUDE_LOG")
+    monkeypatch.setattr(claude_code_provider, "CLI_ENV", (*claude_code_provider.CLI_ENV, *extra))
 
 
 @pytest.fixture(autouse=True)

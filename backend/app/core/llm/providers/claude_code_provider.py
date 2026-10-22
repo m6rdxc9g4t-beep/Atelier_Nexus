@@ -19,9 +19,11 @@ l'environnement (sinon la clé serait facturée à l'usage), aucun outil de Clau
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Sequence
@@ -46,9 +48,29 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
+from app.core.processes import (
+    CLAUDE_WINDOWS_VARS,
+    NO_WINDOW,
+    is_batch,
+    kill_tree,
+    pick_environment,
+    windows_command,
+)
 
 CLI_MODELS = ["sonnet", "opus", "haiku"]
-_ENV_TO_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+#: Environnement de la CLI en liste blanche (SUITE.md §5.3 ; Windows : §9.6). Rien d'autre : ni
+#: ANTHROPIC_* (la clé serait facturée à l'usage), ni secret ou réglage de Nexus.
+CLI_ENV = (
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "LANG",
+    "TMPDIR",
+    "TZ",
+    "CLAUDE_CONFIG_DIR",
+)
 MAX_RESULT_CHARS = 40_000
 INSTRUCTION = (
     "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message, "
@@ -61,12 +83,20 @@ NOT_LOGGED_IN = (
 
 
 def find_claude_binary(configured: str | None = None) -> str | None:
-    """Emplacements usuels de Claude Code (une app lancée du Finder a un PATH minimal)."""
+    """Emplacements usuels de Claude Code (une app lancée du Finder a un PATH minimal ;
+    Windows : installation native `claude.exe`, ou `claude.cmd` de `npm install -g`)."""
     home = Path.home()
+    windows: list[str] = []
+    if sys.platform == "win32":
+        windows.append(str(home / ".local" / "bin" / "claude.exe"))
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            windows.append(str(Path(appdata) / "npm" / "claude.cmd"))
     candidates = [
         configured,
         os.environ.get("CLAUDE_PATH"),
-        shutil.which("claude"),
+        shutil.which("claude", path=_search_path()),
+        *windows,
         str(home / ".local" / "bin" / "claude"),
         str(home / ".claude" / "local" / "claude"),
         "/opt/homebrew/bin/claude",
@@ -76,12 +106,31 @@ def find_claude_binary(configured: str | None = None) -> str | None:
     return next((c for c in candidates if c and os.path.isfile(c) and os.access(c, os.X_OK)), None)
 
 
-def subscription_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in _ENV_TO_DROP}
+def subscription_env(binary: str | None = None) -> dict[str, str]:
+    """Environnement de la CLI : liste blanche (§5.3, + variables système de Windows §9.6),
+    dossier de l'exécutable en tête du PATH, trafic non essentiel coupé."""
+    names = [*CLI_ENV, *(CLAUDE_WINDOWS_VARS if sys.platform == "win32" else ())]
+    env = pick_environment(os.environ, names)
+    current = next((v for k, v in env.items() if k.upper() == "PATH"), "")
+    env = {k: v for k, v in env.items() if k.upper() != "PATH"}
     home = Path.home()
-    extra = [str(home / ".local" / "bin"), "/opt/homebrew/bin", "/usr/local/bin"]
-    env["PATH"] = os.pathsep.join([*extra, env.get("PATH", "")])
+    extra = [str(home / ".local" / "bin")]
+    if sys.platform != "win32":
+        extra += ["/opt/homebrew/bin", "/usr/local/bin"]
+    if binary:
+        extra.insert(0, str(Path(binary).parent))
+    env["PATH"] = os.pathsep.join(p for p in [*extra, current] if p)
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     return env
+
+
+def _search_path() -> str:
+    """PATH sans entrée relative ni dossier `node_modules/.bin` (§5.3)."""
+    entries = os.environ.get("PATH", "").split(os.pathsep)
+    kept = [
+        e for e in entries if os.path.isabs(e) and Path(e).parts[-2:] != ("node_modules", ".bin")
+    ]
+    return os.pathsep.join(kept)
 
 
 # ─── Conversation → texte, réponse → blocs ────────────────────────
@@ -291,16 +340,26 @@ class ClaudeCodeProvider(LLMProvider):
                 "lancez « claude » une fois dans un terminal pour vous connecter.",
                 provider=self.name,
             )
+        # Windows : `claude.cmd` (npm) passerait les arguments (prompt système, schéma) par
+        # cmd.exe, qui les réinterprète : lancé par node.exe directement, sinon refusé
+        command = windows_command([self.binary, *args])
+        if sys.platform == "win32" and is_batch(command[0]):
+            raise ProviderUnavailableError(
+                "Claude Code est installé par un script .cmd que Nexus ne lance pas (ses "
+                "arguments seraient réinterprétés par cmd.exe) : installez la version native "
+                "(https://claude.com/claude-code) ou indiquez son chemin (CLAUDE_CLI_PATH).",
+                provider=self.name,
+            )
         with tempfile.TemporaryDirectory(prefix="nexus-claude-") as workdir:
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    self.binary,
-                    *args,
+                    *command,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=subscription_env(),
+                    env=subscription_env(command[0]),
                     cwd=workdir,
+                    creationflags=NO_WINDOW,
                 )
             except OSError as exc:
                 raise ProviderUnavailableError(
@@ -311,7 +370,9 @@ class ClaudeCodeProvider(LLMProvider):
                     proc.communicate(stdin.encode() if stdin is not None else None), timeout=timeout
                 )
             except TimeoutError as exc:
-                proc.kill()
+                kill_tree(proc.pid)
+                with contextlib.suppress(ProcessLookupError):
+                    proc.kill()
                 await proc.wait()
                 raise ProviderUnavailableError(
                     f"Claude n'a pas répondu en {timeout:g} s.", provider=self.name

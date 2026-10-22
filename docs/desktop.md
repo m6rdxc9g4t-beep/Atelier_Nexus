@@ -1,4 +1,4 @@
-# Application de bureau macOS (Étapes 9 et 22)
+# Application de bureau macOS et Windows (Étapes 9, 22 et 23)
 
 « Atelier Nexus.app » s'ouvre d'un double-clic, comme les autres apps de la suite : une fenêtre native (pywebview),
 une icône dans le Dock, sans terminal ni Docker. Le backend tourne dans l'application et sert lui-même l'interface.
@@ -32,7 +32,8 @@ Contrat commun : [`apps/mise-a-jour-bureau.md`](apps/mise-a-jour-bureau.md) (`SU
    l'ancien est mis de côté puis **remis en place si l'installation échoue** : une alerte propose alors « Ouvrir quand
    même avec la version précédente » ou « Quitter ». Une notification annonce l'étape (2 à 3 min).
 2. **Interface** (`desktop.py --mise-a-jour`, fonctions pures de `app/desktop_update.py`) — état du dépôt = commit
-   courant (`git rev-parse HEAD`) + contenu des fichiers suivis modifiés localement (`git diff --name-only HEAD`) ;
+   courant (`git rev-parse HEAD`) + contenu des fichiers changés localement (`git status --porcelain` : suivis
+   modifiés **et** nouveaux non ignorés, §8.4 / §9.6) ;
    empreinte de `frontend/package-lock.json` à part. Comparés au **tampon** de la dernière mise à jour réussie :
 
    | Changement | Étapes |
@@ -82,8 +83,9 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
 - Fond de la fenêtre avant l'affichage de l'interface : celui de la charte néon (`WINDOW_BACKGROUND` dans
   `app/desktop.py`, `#fbf3f2` clair / `#120c0d` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
-- Si Atelier Tab est installé (`/Applications/Atelier_Tab.app`), l'écriture dans Tab est activée sans réglage
-  (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
+- Si Atelier Tab est installé (`/Applications/Atelier_Tab.app` ; sous Windows, s'il existe,
+  `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd`, SUITE.md §9.6),
+  l'écriture dans Tab est activée sans réglage (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
 - Pont JavaScript (`frontend/src/lib/desktop.ts` ↔ `DesktopApi`) : « Enregistrer sous » natif pour les artefacts
   (`saveFile`), liens externes dans le navigateur ; l'adresse d'une app de la suite ouvre son application si elle est
   installée (`openExternal` ; ports locaux `SUITE_BUNDLES`, apps en ligne `SUITE_ONLINE_BUNDLES` : Atelier Cuisine
@@ -93,6 +95,64 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 Sans fenêtre : `cd backend && python desktop.py --navigateur` (sans mise à jour ; ajouter `--mise-a-jour` pour la faire
 d'abord). Mise à jour seule, dans le terminal : `./scripts/macos/launcher.sh --preparer`.
 
+## Windows
+
+Contrat commun : [`apps/windows.md`](apps/windows.md) (`SUITE.md` §9). Même application (pywebview, ici sur WebView2),
+même mise à jour (`app/desktop_update.py`, multiplateforme), même écran « Mise à jour… » et même page d'échec.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1 [-SansBureau] [-Desinstaller]
+```
+
+`scripts/windows/install.ps1` (Windows PowerShell 5.1 et PowerShell 7, sans droits d'administrateur) vérifie Git,
+Node.js 22.12+, Python 3.12+ (`py -3.13`, `py -3.12`, `py -3`, puis `python` ; l'alias du Microsoft Store est écarté) et
+WebView2, fait la première mise à jour **avant** de toucher au lanceur, puis crée :
+
+| Élément | Emplacement |
+|---|---|
+| Point d'entrée (`scripts/windows/app_entry.pyw`), `repo-path`, icône | `%LOCALAPPDATA%\Atelier Nexus\lanceur\` |
+| Raccourcis | menu Démarrer `Atelier\Atelier Nexus.lnk`, Bureau (sauf `-SansBureau`) |
+| Enregistrement (§9.4, §9.6) | `HKCU\Software\Atelier\Apps\nexus` : `Lanceur` (le `.lnk` du menu Démarrer), `Nom` |
+
+**Lanceur sans console** : chaque raccourci lance `pythonw.exe -I "…\lanceur\atelier-nexus.pyw"` avec le Python du
+système trouvé à l'installation. C'est le plus simple et le plus robuste pour une app Python : `pythonw.exe` n'ouvre
+jamais de console, sans script VBScript (en voie de retrait de Windows) ni exécutable à compiler ou à signer. Le point
+d'entrée est l'équivalent de `app_entry.sh` : il lit le chemin du dépôt (`repo-path`) et exécute
+`backend/app/desktop_launcher.py` **du dépôt** (message clair si le dépôt a été déplacé). Ce lanceur fait ce que
+`launcher.sh` fait sur macOS : environnement Python de l'app (`install_venv`, petite fenêtre d'attente tkinter à la place
+de la notification macOS ; en cas d'échec, boîte « Ouvrir quand même avec la version précédente ? »), puis la fenêtre
+`venv\Scripts\pythonw.exe backend\desktop.py --mise-a-jour`, sorties dans `atelier-nexus.log`. `--preparer` : mise à jour
+seule dans la console, code de sortie 0 si l'app est prête (installation, CI). Si Python est désinstallé ou changé de
+version, relancer `install.ps1` répare.
+
+Particularités de la mise à jour sous Windows (`app/desktop_update.py`) :
+
+- **Dossiers** (`platform_dirs`, seule fonction par système) : données et réglages dans `%APPDATA%\Atelier Nexus\`
+  (`.env`, `nexus.db`, `webview\`) ; environnement, compilations et tampon dans `%LOCALAPPDATA%\Atelier Nexus\`
+  (`venv\`, `interface\`, `mise-a-jour\`) ; journaux dans `%LOCALAPPDATA%\Atelier Nexus\Logs\`. macOS inchangé.
+- **Compilation servie** : `interface\courante.txt` (nom de la compilation, remplacé atomiquement) au lieu du lien
+  symbolique, qui demanderait des droits. Une compilation encore ouverte par une autre fenêtre est retirée au lancement
+  suivant ; un environnement Python en cours d'utilisation n'est pas remplacé (message : fermer les fenêtres, rouvrir).
+- **Verrou** : `msvcrt.locking` (au lieu de `flock`), libéré si le processus meurt.
+- **npm** : `NEXUS_NPM`, `PATH`, `%ProgramFiles%\nodejs`, nvm-windows (`NVM_SYMLINK`, `NVM_HOME`), Volta, fnm, Scoop,
+  `%LOCALAPPDATA%\Programs\nodejs` ; npm est lancé sans shell : `node.exe <dossier de npm>\node_modules\npm\bin\npm-cli.js` (jamais `npm.cmd`, refusé s'il ne se résout pas).
+- **Aucune console** : tout programme lancé par l'app (git, npm, pip, Claude Code, serveur MCP de Tab) l'est avec
+  `CREATE_NO_WINDOW` (`app/core/processes.py`). Sans console, `sys.stdout` est redirigé vers `atelier-nexus.log`.
+- Fins de ligne : `.gitattributes` (LF, scripts Windows en CRLF) : un clone Windows ne paraît jamais modifié.
+- Fenêtre : icône `scripts/windows/AtelierNexus.ico` (dérivée du logo), identifiant de barre des tâches `Atelier.Nexus`,
+  fond clair ou sombre selon `AppsUseLightTheme`. Sans WebView2, l'app s'ouvre dans le navigateur.
+
+## Ouvrir une autre app de la suite (§9.4)
+
+`app/desktop_open.py` : le menu « Suite Atelier » (`openExternal`), les liens externes de la fenêtre (`webbrowser`,
+remplacé par `CleanBrowser`) et le menu Réglages (fichier `.env`, dossier des données) lancent leurs programmes avec
+un **environnement minimal** (`app/core/processes.minimal_environment` : utilisateur, dossier personnel, langue, fuseau,
+dossiers temporaires, variables système de Windows, `PATH` du système). Jamais `DATABASE_URL`, `NEXUS_*`, `PYTHON*`, ni
+clé : avant ce correctif, Atelier Projets ouvert depuis Nexus recevait la base SQLite de Nexus. macOS : `open -b`
+(identifiants `MACOS_BUNDLES`) ; Windows : lanceur lu dans `HKCU\Software\Atelier\Apps\<viz|tab|projets|…>`
+(`Lanceur`, le `.lnk` du menu Démarrer, **toujours** démarré par `explorer.exe "<Lanceur>"`, §9.6), sinon l'adresse dans le navigateur
+(`rundll32 url.dll,FileProtocolHandler`). Au lancement, Nexus ignore un `DATABASE_URL` ou un `FRONTEND_DIST` hérités.
+
 ## Vérifier
 
 ```bash
@@ -101,5 +161,9 @@ ATELIER_BUILD_ANY_OS=1 ./scripts/macos/build_app.sh /tmp/essai --no-shortcut   #
 ```
 
 Surcharges pour les tests et la simulation hors macOS : `NEXUS_REPO` (dépôt), `NEXUS_HOME` (dossier de l'app),
-`NEXUS_LOG_DIR` (journaux), `NEXUS_PYTHON` (Python de base), `NEXUS_NPM` (npm). `test_desktop_update.py` lance le vrai
+`NEXUS_LOCAL` (dossier local : venv, interface ; par défaut `NEXUS_HOME`), `NEXUS_LOG_DIR` (journaux), `NEXUS_PYTHON`
+(Python de base), `NEXUS_NPM` (npm). `test_desktop_launcher.py` et `test_windows_launcher_full_simulation` exécutent le
+lanceur Windows (`--preparer`) sur tous les systèmes ; `test_desktop_open.py` vérifie l'environnement minimal. CI : le
+travail `windows` (`.github/workflows/ci.yml`) installe l'app dans un profil temporaire (chemin avec espace et accent),
+lance deux fois le raccourci en mode « mise à jour seulement » (le second ne refait rien), ouvre l'app, la désinstalle. `test_desktop_update.py` lance le vrai
 `launcher.sh --preparer` sur un faux dépôt git avec un faux npm (environnement Python réel, dépendances vides).

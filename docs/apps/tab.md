@@ -56,7 +56,7 @@ faux serveur lancé en vrai sous-processus (`tests/fake_tab_mcp.py`).
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `TAB_MCP_COMMAND` | vide (lecture seule) | App Mac : `/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp`. Dépôt : `node <atelier-tab>/dist-desktop/atelier-mcp.mjs` après `npm run build:desktop`. |
+| `TAB_MCP_COMMAND` | vide (lecture seule) | App Mac : `/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp`. Dépôt : `node <atelier-tab>/dist-desktop/atelier-mcp.mjs` après `npm run build:desktop`. Windows : chemin entre guillemets s'il contient des espaces (`"C:\Program Files\nodejs\node.exe" "C:\…\atelier-tab\dist-desktop\atelier-mcp.mjs"`) ; l'app de bureau prend d'elle-même `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd` s'il existe (SUITE.md §9.6). Un script `.cmd` est lancé sans console ; ses arguments viennent de ce réglage, jamais des données (entrée standard). |
 | `TAB_DATA_DIR` | vide (`~/Atelier_Tab`) | Dossier de données transmis au serveur (`ATELIER_TAB_DATA`). Si vous le changez, `TAB_EXPORTS_DIR` = `<ce dossier>/exports`. |
 | `TAB_MCP_TIMEOUT` | `30` | Délai d'un appel (s) |
 

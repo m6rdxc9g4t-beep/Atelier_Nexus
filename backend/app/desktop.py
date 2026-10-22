@@ -1,6 +1,8 @@
 """Application de bureau : le serveur Nexus et son interface dans une fenêtre native.
 
-Lancée par « Atelier Nexus.app » (scripts/macos/launcher.sh, avec --mise-a-jour), ou à la main :
+Lancée par « Atelier Nexus.app » (scripts/macos/launcher.sh, avec --mise-a-jour), par le
+raccourci « Atelier Nexus » de Windows (app/desktop_launcher.py, docs/apps/windows.md), ou à la
+main :
     python desktop.py               # fenêtre native (pywebview), sinon navigateur
     python desktop.py --navigateur  # dans le navigateur par défaut
     python desktop.py --preparer    # met l'interface à jour depuis le dépôt, sans rien ouvrir
@@ -11,13 +13,16 @@ Lancée par « Atelier Nexus.app » (scripts/macos/launcher.sh, avec --mise-a-jo
   compilation précédente.
 
 - Données et réglages dans le dossier de l'utilisateur (`NEXUS_HOME`, par défaut
-  ~/Library/Application Support/Atelier Nexus) : `.env` (créé au premier lancement à partir
-  de `.env.example`), base SQLite `nexus.db`, cache de la fenêtre. Rien dans l'application.
+  ~/Library/Application Support/Atelier Nexus, sous Windows %APPDATA%\\Atelier Nexus) : `.env`
+  (créé au premier lancement à partir de `.env.example`), base SQLite `nexus.db`, cache de la
+  fenêtre. Rien dans l'application. Une variable héritée qui désignerait d'autres données
+  (`DATABASE_URL`, `FRONTEND_DIST`) est ignorée.
 - Le serveur écoute sur 127.0.0.1 uniquement, port 8100 s'il est libre, sinon un port libre :
   l'interface est compilée avec des adresses relatives et fonctionne sur n'importe quel port.
 - Fermer la fenêtre (ou ⌘Q) arrête le serveur.
 - Pont JavaScript (`window.pywebview.api`) : « Enregistrer sous » natif pour les artefacts et
-  ouverture des liens externes (une autre app de la suite s'ouvre si elle est installée).
+  ouverture des liens externes (une autre app de la suite s'ouvre si elle est installée, avec
+  un environnement minimal : app/desktop_open.py).
 """
 
 from __future__ import annotations
@@ -38,12 +43,18 @@ import threading
 import time
 import urllib.error
 import urllib.request
-import webbrowser
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from app.desktop_open import (
+    MACOS_BUNDLES,
+    install_clean_browser,
+    open_suite_app,
+    open_url,
+)
+from app.desktop_open import reveal as open_path
 from app.desktop_update import (
     LABELS,
     LOG_NAME,
@@ -52,9 +63,11 @@ from app.desktop_update import (
     display_path,
     log_dir,
     nexus_home,
+    nexus_local,
     pending_steps,
     served_build,
     update_interface,
+    utf8_output,
 )
 
 APP_NAME = "Atelier Nexus"
@@ -63,7 +76,11 @@ PREFERRED_PORT = 8100
 WINDOW_SIZE = (1440, 900)
 MIN_SIZE = (960, 620)
 BACKEND = Path(__file__).resolve().parents[1]
-LOG_HINT = "Journal : ~/Library/Logs/Atelier Nexus/atelier-nexus.log"
+APP_LOG_NAME = "atelier-nexus.log"
+#: Icône de la fenêtre et des raccourcis sous Windows (générée depuis scripts/macos/icon.png)
+WINDOWS_ICON = BACKEND.parent / "scripts" / "windows" / "AtelierNexus.ico"
+#: Identifiant de l'app pour la barre des tâches de Windows (regroupement, épinglage)
+WINDOWS_APP_ID = "Atelier.Nexus"
 # Fond de la fenêtre avant l'affichage de l'interface : --atelier-bg de la charte néon dans
 # l'orange de Nexus (frontend/src/components/theme/theme-constants.ts, THEME_COLORS).
 WINDOW_BACKGROUND = {"light": "#fbf3f2", "dark": "#120c0d"}
@@ -118,6 +135,22 @@ def prepare_home(home: Path) -> Path:
 TAB_MCP_APP = Path("/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp")
 
 
+def tab_mcp_default(platform: str = sys.platform) -> Path:
+    """Serveur MCP livré avec l'app Atelier Tab installée, selon le système (utilisé seulement
+    s'il existe). Windows : emplacement par défaut d'une installation par utilisateur
+    (`%LOCALAPPDATA%\\Programs\\Atelier_Tab\\resources\\atelier-mcp.cmd`, SUITE.md §9.6) ;
+    sinon, réglage TAB_MCP_COMMAND du `.env`."""
+    if platform == "win32":
+        local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(local) / "Programs" / "Atelier_Tab" / "resources" / "atelier-mcp.cmd"
+    return TAB_MCP_APP
+
+
+#: Variables héritées qui désigneraient d'autres données que celles de Nexus (SUITE.md §9.4) :
+#: jamais lues au lancement de l'app de bureau (ex. la base d'Atelier Projets)
+INHERITED_DATA_VARS = ("DATABASE_URL", "FRONTEND_DIST")
+
+
 def env_value(env_file: Path, key: str) -> str | None:
     """Valeur non vide d'une clé du `.env` (lecture simple, sans interprétation)."""
     try:
@@ -131,8 +164,12 @@ def env_value(env_file: Path, key: str) -> str | None:
     return None
 
 
-def configure_environment(home: Path, dist: Path | None, tab_mcp: Path = TAB_MCP_APP) -> None:
+def configure_environment(home: Path, dist: Path | None, tab_mcp: Path | None = None) -> None:
     """Variables lues par `Settings` : à poser AVANT d'importer `main` (réglages mis en cache)."""
+    tab_mcp = tab_mcp_default() if tab_mcp is None else tab_mcp
+    for name in INHERITED_DATA_VARS:
+        if os.environ.pop(name, None) is not None:
+            log.info("Variable héritée ignorée : %s", name)
     # Atelier Tab installé : écriture par son serveur MCP sans réglage, sauf choix contraire du .env
     if (
         tab_mcp.is_file()
@@ -220,10 +257,17 @@ class ServerThread:
             self.thread.join(timeout)
 
 
+def reinstall_hint() -> str:
+    """Commande d'installation à relancer (réparation), selon le système."""
+    if sys.platform == "win32":
+        return r"powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1"
+    return "scripts/macos/build_app.sh"
+
+
 def start_server(dist: Path | None) -> tuple[str, ServerThread | None, str | None]:
     """(adresse, serveur, message d'erreur éventuel). Réglages et dossiers déjà préparés."""
     if dist is None:
-        return "", None, "Interface introuvable : relancez scripts/macos/build_app.sh."
+        return "", None, f"Interface introuvable : relancez {reinstall_hint()} depuis le dépôt."
     from main import app
 
     server = ServerThread(app, find_port())
@@ -237,47 +281,46 @@ def start_server(dist: Path | None) -> tuple[str, ServerThread | None, str | Non
 
 # ─── Pont JavaScript ──────────────────────────────────────────────
 
-#: Port de l'interface d'une app de la suite → identifiant de son application macOS
-SUITE_BUNDLES = {
-    8000: "fr.atelier-viz.app",
-    4175: "fr.atelier.tab",
-    4174: "local.atelier-projets.desktop",
-    5050: "local.atelier-tresorerie.desktop",
-    4000: "fr.ateliercine.app",
-    47321: "fr.ateliercine.app",
-    5051: "fr.ateliersavoir.app",
+#: Port de l'interface d'une app de la suite → nom court de l'app (« viz », « tab »… :
+#: clé du registre Windows et de MACOS_BUNDLES)
+SUITE_APPS = {
+    8000: "viz",
+    4175: "tab",
+    4174: "projets",
+    5050: "tresorerie",
+    4000: "cine",
+    47321: "cine",
+    5051: "savoir",
 }
-#: Apps en ligne de la suite (adresse HTTPS hébergée) → application macOS qui l'enveloppe
-SUITE_ONLINE_BUNDLES = {
-    "atelier-cuisine-iota.vercel.app": "fr.ateliercuisine.app",  # Atelier Cuisine (Tauri)
+#: Apps en ligne de la suite (adresse HTTPS hébergée) → app de bureau qui l'enveloppe
+SUITE_ONLINE_APPS = {
+    "atelier-cuisine-iota.vercel.app": "cuisine",  # Atelier Cuisine (Tauri)
 }
+#: Port → identifiant de l'application macOS (compatibilité)
+SUITE_BUNDLES = {port: MACOS_BUNDLES[app] for port, app in SUITE_APPS.items()}
+SUITE_ONLINE_BUNDLES = {host: MACOS_BUNDLES[app] for host, app in SUITE_ONLINE_APPS.items()}
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 
 
-def suite_bundle_for(url: str) -> str | None:
-    """Application de bureau à ouvrir pour une adresse de la suite (locale, ou en ligne
-    connue en HTTPS sur le port par défaut), sinon None."""
+def suite_app_for(url: str) -> str | None:
+    """App de la suite à ouvrir pour une adresse (locale, ou en ligne connue en HTTPS sur le
+    port par défaut) : son nom court, sinon None."""
     try:
         parts = urlsplit(str(url))
         port = parts.port
     except ValueError:
         return None
-    if parts.scheme == "https" and port is None and parts.hostname in SUITE_ONLINE_BUNDLES:
-        return SUITE_ONLINE_BUNDLES[parts.hostname]
+    if parts.scheme == "https" and port is None and parts.hostname in SUITE_ONLINE_APPS:
+        return SUITE_ONLINE_APPS[parts.hostname]
     if parts.scheme not in {"http", "https"} or parts.hostname not in _LOCAL_HOSTS or port is None:
         return None
-    return SUITE_BUNDLES.get(port)
+    return SUITE_APPS.get(port)
 
 
-def open_macos_app(bundle_id: str) -> bool:
-    """`open -b` ; False si l'application est absente ou hors macOS."""
-    if sys.platform != "darwin":
-        return False
-    try:
-        done = subprocess.run(["/usr/bin/open", "-b", bundle_id], capture_output=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return done.returncode == 0
+def suite_bundle_for(url: str) -> str | None:
+    """Identifiant de l'application macOS à ouvrir pour une adresse de la suite, sinon None."""
+    app = suite_app_for(url)
+    return MACOS_BUNDLES.get(app) if app else None
 
 
 class DesktopApi:
@@ -285,8 +328,8 @@ class DesktopApi:
 
     def __init__(
         self,
-        open_url: Callable[[str], Any] = webbrowser.open,
-        open_app: Callable[[str], bool] = open_macos_app,
+        open_url: Callable[[str], Any] = open_url,
+        open_app: Callable[[str], bool] = open_suite_app,
     ) -> None:
         self.window: Any = None
         self.save_dialog: Any = None  # webview.FileDialog.SAVE, renseigné au lancement
@@ -317,11 +360,12 @@ class DesktopApi:
         return {"saved": str(target)}
 
     def open_external(self, url: str) -> bool:
-        """Lien http(s) ou mailto dans le navigateur ; une app de la suite s'ouvre si installée."""
+        """Lien http(s) ou mailto dans le navigateur ; une app de la suite s'ouvre si installée
+        (environnement minimal dans les deux cas : app/desktop_open.py)."""
         if urlsplit(str(url)).scheme not in {"http", "https", "mailto"}:
             return False
-        bundle = suite_bundle_for(url)
-        if bundle and self._open_app(bundle):
+        app = suite_app_for(url)
+        if app and self._open_app(app):
             return True
         self._open_url(str(url))
         return True
@@ -344,7 +388,17 @@ class DesktopApi:
 
 
 def system_appearance() -> str:
-    """« dark » si macOS est en apparence sombre, sinon « light » (thème par défaut : Système)."""
+    """« dark » si le système est en apparence sombre (macOS, Windows), sinon « light »."""
+    if sys.platform == "win32":
+        import winreg
+
+        key = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                light, _ = winreg.QueryValueEx(handle, "AppsUseLightTheme")
+        except OSError:
+            return "light"
+        return "dark" if light == 0 else "light"
     if sys.platform != "darwin":
         return "light"
     try:
@@ -371,6 +425,10 @@ _ERROR_CSS = (
 )
 
 
+def log_hint() -> str:
+    return f"Journal : {display_path(log_dir() / APP_LOG_NAME)}"
+
+
 def error_page(message: str) -> str:
     return (
         f'<!doctype html><meta charset="utf-8"><title>{APP_NAME}</title>'
@@ -378,7 +436,7 @@ def error_page(message: str) -> str:
         f'<body><div style="max-width:34rem;padding:2rem">'
         f"<h1>{APP_NAME} ne peut pas démarrer</h1>"
         f"<p>{html.escape(message)}</p>"
-        f'<p class="hint">{LOG_HINT}</p></div>'
+        f'<p class="hint">{html.escape(log_hint())}</p></div>'
     )
 
 
@@ -489,12 +547,58 @@ def versioned_url(url: str, dist: Path | None) -> str:
 
 
 def reveal(path: Path, *, text_editor: bool = False) -> None:
-    """Ouvre un fichier dans l'éditeur de texte (`text_editor`) ou un dossier dans le Finder."""
-    if sys.platform == "darwin":
-        flags = ["-e"] if text_editor else []
-        subprocess.run(["/usr/bin/open", *flags, str(path)], check=False)
-    else:
-        webbrowser.open(path.as_uri())
+    """Ouvre un fichier dans l'éditeur de texte (`text_editor`) ou un dossier dans le Finder
+    (l'Explorateur sous Windows), avec un environnement minimal."""
+    open_path(path, text_editor=text_editor)
+
+
+#: Client Edge Update du moteur WebView2 (Evergreen) dans le registre
+_WEBVIEW2_CLIENT = r"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+
+
+def webview2_installed() -> bool:
+    """Windows : vrai si le moteur WebView2 (requis par pywebview) est installé."""
+    if sys.platform != "win32":
+        return True
+    import winreg
+
+    places = (
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\{_WEBVIEW2_CLIENT}"),
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\{_WEBVIEW2_CLIENT}"),
+        (winreg.HKEY_CURRENT_USER, rf"Software\{_WEBVIEW2_CLIENT}"),
+    )
+    for root, key in places:
+        try:
+            with winreg.OpenKey(root, key) as handle:
+                version, _ = winreg.QueryValueEx(handle, "pv")
+        except OSError:
+            continue
+        if isinstance(version, str) and version not in {"", "0.0.0.0"}:
+            return True
+    return False
+
+
+def _windows_app_identity() -> None:
+    """Windows : identifiant propre dans la barre des tâches (sinon regroupé avec Python)."""
+    if sys.platform != "win32":
+        return
+    with contextlib.suppress(Exception):
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(WINDOWS_APP_ID)
+
+
+def ensure_streams(log_file: Path) -> None:
+    """Sans console (`pythonw.exe`), `sys.stdout` / `sys.stderr` valent None : uvicorn et la
+    journalisation échoueraient. Ils sont alors dirigés vers le journal de l'app."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    stream = log_file.open("a", encoding="utf-8", buffering=1)
+    if sys.stdout is None:
+        sys.stdout = stream
+    if sys.stderr is None:
+        sys.stderr = stream
 
 
 def _name_macos_app() -> None:
@@ -546,13 +650,17 @@ def run(argv: list[str] | None = None) -> int:
         "--preparer", action="store_true", help="mettre l'interface à jour puis quitter"
     )
     args = parser.parse_args(argv)
+    ensure_streams(log_dir() / APP_LOG_NAME)
+    utf8_output()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s"
     )
+    # Liens ouverts par pywebview ou `webbrowser` : sans l'environnement de l'app (§9.4)
+    install_clean_browser()
 
     home = nexus_home()
     env_file = prepare_home(home)
-    layout = Layout(repo=BACKEND.parent, home=home)
+    layout = Layout(repo=BACKEND.parent, home=home, local=nexus_local())
     if args.preparer:
         return prepare_in_console(layout)
     steps = pending_steps(layout) if args.mise_a_jour else []
@@ -562,10 +670,17 @@ def run(argv: list[str] | None = None) -> int:
     webview: Any = None
     if not args.navigateur:
         _name_macos_app()
+        _windows_app_identity()
         try:
             import webview  # type: ignore[import-not-found,no-redef]
         except ImportError:
             log.warning("pywebview absent : navigateur utilisé.")
+        if webview is not None and sys.platform == "win32" and not webview2_installed():
+            # Sans WebView2, pywebview prendrait le moteur d'Internet Explorer : interface cassée
+            log.warning(
+                "WebView2 absent : navigateur utilisé (winget install Microsoft.EdgeWebView2Runtime)."
+            )
+            webview = None
 
     servers: list[ServerThread] = []
 
@@ -589,7 +704,7 @@ def run(argv: list[str] | None = None) -> int:
                 log.error(error)
                 print(error, file=sys.stderr)
                 return 1
-            webbrowser.open(url)
+            open_url(url)
             print(f"{APP_NAME} : {url} — Ctrl+C pour arrêter.")
             signal.signal(signal.SIGTERM, _interrupt)
             with contextlib.suppress(KeyboardInterrupt):
@@ -636,12 +751,17 @@ def run(argv: list[str] | None = None) -> int:
 
         storage = home / "webview"
         storage.mkdir(parents=True, exist_ok=True)
+        # Windows : icône de l'app sur la fenêtre et dans la barre des tâches
+        windows: dict[str, Any] = {}
+        if sys.platform == "win32" and WINDOWS_ICON.is_file():
+            windows["icon"] = str(WINDOWS_ICON)
         # Stockage persistant : thème, dernière conversation de chaque agent…
         webview.start(
             (lambda: update_in_window(window, layout, api, open_app)) if pending else None,
             private_mode=False,
             storage_path=str(storage),
             menu=_settings_menu(env_file, home),
+            **windows,
         )
         return 1 if error else 0
     finally:

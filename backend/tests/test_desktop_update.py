@@ -16,6 +16,7 @@ import pytest
 
 from app import desktop
 from app import desktop_update as du
+from tests.winexe import console_exe
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = du.RepoState(code="c1", frontend_lock="l1", requirements="r1")
@@ -64,14 +65,27 @@ def git(repo: Path, *args: str) -> None:
     )
 
 
+#: Fichiers du backend exécutés avant l'environnement de l'app (bibliothèque standard seulement)
+BACKEND_FILES = (
+    "desktop.py",
+    "app/__init__.py",
+    "app/core/__init__.py",
+    "app/core/processes.py",
+    "app/desktop.py",
+    "app/desktop_open.py",
+    "app/desktop_update.py",
+    "app/desktop_launcher.py",
+)
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     """Dépôt minimal : lanceurs et module de mise à jour réels, interface factice."""
     repo = tmp_path / "depot"
-    (repo / "backend" / "app").mkdir(parents=True)
+    (repo / "backend" / "app" / "core").mkdir(parents=True)
     (repo / "frontend" / "src").mkdir(parents=True)
     (repo / "scripts" / "macos").mkdir(parents=True)
-    for name in ("desktop.py", "app/__init__.py", "app/desktop.py", "app/desktop_update.py"):
+    for name in BACKEND_FILES:
         shutil.copy(ROOT / "backend" / name, repo / "backend" / name)
     for name in ("launcher.sh", "app_entry.sh"):
         shutil.copy(ROOT / "scripts" / "macos" / name, repo / "scripts" / "macos" / name)
@@ -79,37 +93,74 @@ def repo(tmp_path: Path) -> Path:
     (repo / "backend" / "requirements-desktop.txt").write_text("")
     (repo / "frontend" / "package-lock.json").write_text('{"v": 1}\n')
     (repo / "frontend" / "src" / "page.tsx").write_text("v1\n")
-    (repo / ".gitignore").write_text("node_modules/\nout/\n")
+    (repo / ".gitignore").write_text("node_modules/\nout/\n__pycache__/\n")
     git(repo, "init", "-q", "-b", "main")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "initial")
     return repo
 
 
-FAKE_NPM = """#!/bin/sh
+FAKE_NPM = """
 # Faux npm : journalise l'appel ; FAKE_NPM_FAIL=ci|build fait échouer l'étape
-echo "npm $*" >> "$FAKE_NPM_CALLS"
-case "$1" in
-  ci)
-    [ "$FAKE_NPM_FAIL" = ci ] && exit 1
-    mkdir -p node_modules && cp package-lock.json node_modules/.package-lock.json ;;
-  run)
-    [ "$FAKE_NPM_FAIL" = build ] && { mkdir -p out; exit 2; }
-    [ "$NEXUS_EXPORT" = 1 ] || exit 3
-    mkdir -p out && cp src/page.tsx out/index.html ;;
-esac
+import os, shutil, sys
+from pathlib import Path
+
+args = sys.argv[1:]
+with open(os.environ["FAKE_NPM_CALLS"], "a", encoding="utf-8") as calls:
+    calls.write("npm " + " ".join(args) + "\\n")
+fail = os.environ.get("FAKE_NPM_FAIL")
+if args[:1] == ["ci"]:
+    if fail == "ci":
+        sys.exit(1)
+    Path("node_modules").mkdir(exist_ok=True)
+    shutil.copy("package-lock.json", "node_modules/.package-lock.json")
+elif args[:1] == ["run"]:
+    Path("out").mkdir(exist_ok=True)
+    if fail == "build":
+        sys.exit(2)
+    if os.environ.get("NEXUS_EXPORT") != "1":
+        sys.exit(3)
+    shutil.copy("src/page.tsx", "out/index.html")
 """
+
+
+FAKE_NODE = """
+# Faux node.exe : exécute le « script JS » (ici du Python) avec les arguments qui suivent
+import runpy, sys
+
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+
+
+def make_fake_npm(folder: Path) -> Path:
+    """Faux npm : script shell (macOS, Linux) qui lance `fake_npm.py` ; sous Windows, la
+    disposition de Node.js (`npm.cmd`, `node.exe`, `node_modules\\npm\\bin\\npm-cli.js`),
+    lancée sans shell par `node.exe npm-cli.js` comme le vrai."""
+    folder.mkdir(parents=True, exist_ok=True)
+    script = folder / "fake_npm.py"
+    script.write_text(FAKE_NPM, encoding="utf-8")
+    if sys.platform == "win32":
+        cli = folder / "node_modules" / "npm" / "bin" / "npm-cli.js"
+        cli.parent.mkdir(parents=True)
+        cli.write_text(FAKE_NPM, encoding="utf-8")
+        node_script = folder / "fake_node.py"
+        node_script.write_text("#!/usr/bin/env python3\n" + FAKE_NODE, encoding="utf-8")
+        shutil.copy(console_exe(str(node_script)), folder / "node.exe")
+        path = folder / "npm.cmd"
+        path.write_text("@echo Jamais lancé : npm passe par node.exe npm-cli.js\r\nexit /b 9\r\n")
+        return path
+    path = folder / "npm"
+    path.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+    return path
 
 
 @pytest.fixture
 def npm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = tmp_path / "bin" / "npm"
-    path.parent.mkdir()
-    path.write_text(FAKE_NPM)
-    path.chmod(path.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("FAKE_NPM_CALLS", str(tmp_path / "npm-calls.txt"))
     monkeypatch.delenv("FAKE_NPM_FAIL", raising=False)
-    return path
+    return make_fake_npm(tmp_path / "bin")
 
 
 def npm_calls(tmp_path: Path) -> list[str]:
@@ -140,7 +191,16 @@ def update(layout: du.Layout, npm: Path, statuses: list[str] | None = None) -> l
 
 def test_repo_state_follows_commits_and_local_changes(repo: Path) -> None:
     first = du.repo_state(repo)
-    (repo / "notes.txt").write_text("non suivi")  # fichier non suivi : ignoré
+    (repo / "out").mkdir()
+    (repo / "out" / "index.html").write_text("ignoré")  # fichier ignoré par git : sans effet
+    assert du.repo_state(repo) == first
+    notes = repo / "frontend" / "src" / "nouveau.tsx"
+    notes.write_text("nouveau")  # fichier nouveau non ignoré : compte (§8.4, §9.6)
+    untracked = du.repo_state(repo)
+    assert untracked.code != first.code
+    notes.write_text("modifié")
+    assert du.repo_state(repo).code != untracked.code
+    notes.unlink()
     assert du.repo_state(repo) == first
 
     page = repo / "frontend" / "src" / "page.tsx"
@@ -158,6 +218,7 @@ def test_repo_state_follows_commits_and_local_changes(repo: Path) -> None:
     assert du.repo_state(repo).requirements != committed.requirements
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="sha1sum : macOS / Linux")
 def test_requirements_hash_matches_former_launcher(repo: Path) -> None:
     """Même empreinte que `cat requirements*.txt | shasum` : un venv existant est réutilisé."""
     files = [str(repo / name) for name in du.REQUIREMENTS]
@@ -180,7 +241,7 @@ def test_update_steps_only_when_needed(layout: du.Layout, npm: Path, tmp_path: P
     assert statuses == [du.LABELS["npm"], du.LABELS["build"]]
     served = du.served_build(layout)
     assert served is not None and (served / "index.html").read_text() == "v1\n"
-    assert layout.current.is_symlink()
+    assert layout.current.is_symlink() if du.USE_LINKS else layout.current_pointer.is_file()
     assert not (layout.frontend / "out").exists()  # compilation déplacée, pas copiée
     stamp = du.read_stamp(layout.stamp)
     assert stamp is not None and stamp["build"] == served.name
@@ -249,6 +310,7 @@ def test_npm_environment(tmp_path: Path) -> None:
     assert env["HOME"] == "/h"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="emplacements macOS / Linux")
 def test_find_npm(tmp_path: Path) -> None:
     def exe(path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -273,18 +335,143 @@ def test_find_npm(tmp_path: Path) -> None:
     assert du.find_npm({"NEXUS_NPM": str(brew), "PATH": ""}, home) == brew
 
 
-def test_publish_replaces_atomically(layout: du.Layout, tmp_path: Path) -> None:
+LINK_MODES = [False] if sys.platform == "win32" else [True, False]
+
+
+@pytest.mark.parametrize("links", LINK_MODES, ids=lambda v: "lien" if v else "fichier")
+def test_publish_replaces_atomically(
+    layout: du.Layout, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, links: bool
+) -> None:
+    """Lien symbolique (macOS, Linux) ou fichier `courante.txt` (Windows)."""
+    monkeypatch.setattr(du, "USE_LINKS", links)
     out = tmp_path / "out"
     out.mkdir()
     (out / "index.html").write_text("a")
     first = du.publish(layout, out)
+    assert du.served_build(layout) == first
     (layout.builds / ".tmp-build-crash").mkdir()  # reste d'une mise à jour interrompue
     out.mkdir()
     (out / "index.html").write_text("b")
     second = du.publish(layout, out)
-    assert os.readlink(layout.current) == second.name  # lien relatif
-    assert sorted(p.name for p in layout.builds.iterdir()) == sorted(["courante", second.name])
+    assert du.served_build(layout) == second
+    if links:
+        assert os.readlink(layout.current) == second.name  # lien relatif
+        kept = ["courante", second.name]
+    else:
+        assert layout.current_pointer.read_text().strip() == second.name
+        kept = ["courante.txt", second.name]
+    assert sorted(p.name for p in layout.builds.iterdir()) == sorted(kept)
     assert not first.exists()
+
+
+def test_pointer_file_is_validated(layout: du.Layout, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows : un fichier `courante.txt` abîmé ou hors du dossier n'est jamais suivi."""
+    monkeypatch.setattr(du, "USE_LINKS", False)
+    layout.builds.mkdir(parents=True)
+    (layout.builds / "build-a").mkdir()
+    (layout.builds / "build-a" / "index.html").write_text("x")
+    for bad in ("", "..\\..\\ailleurs", "build-a/../../x", "C:build-a", "autre"):
+        layout.current_pointer.write_text(bad)
+        assert du.served_build(layout) is None
+    layout.current_pointer.write_text("build-a\n")
+    assert du.served_build(layout) == layout.builds / "build-a"
+
+
+def test_discard_and_purge(tmp_path: Path) -> None:
+    trash = tmp_path / ".a-supprimer"
+    folder = tmp_path / "venv.precedent"
+    (folder / "Scripts").mkdir(parents=True)
+    du.discard(folder, trash)
+    assert not folder.exists()
+    (trash / "reste-1234").mkdir(parents=True)  # dossier qu'une fenêtre ouverte bloquait
+    du.purge(trash)
+    assert list(trash.iterdir()) == []
+
+
+# ─── Plateformes ──────────────────────────────────────────────────
+
+
+def test_platform_dirs() -> None:
+    home = Path("/Users/françois")
+    mac = du.platform_dirs("darwin", {}, home)
+    assert mac.data == home / "Library/Application Support/Atelier Nexus" == mac.local
+    assert mac.logs == home / "Library/Logs/Atelier Nexus"
+    env = {"APPDATA": r"C:\Users\François\AppData\Roaming", "LOCALAPPDATA": r"C:\L"}
+    win = du.platform_dirs("win32", env, home)
+    assert win.data == Path(env["APPDATA"]) / "Atelier Nexus"  # données itinérantes
+    assert win.local == Path(r"C:\L") / "Atelier Nexus"  # venv, interface : machine
+    assert win.logs == Path(r"C:\L") / "Atelier Nexus" / "Logs"
+    assert du.platform_dirs("win32", {}, home).local == home / "AppData/Local/Atelier Nexus"
+    linux = du.platform_dirs("linux", {"XDG_DATA_HOME": "/x"}, home)
+    assert linux.data == Path("/x/atelier-nexus") == linux.local
+    assert linux.logs == Path("/x/atelier-nexus/logs")
+
+
+def test_local_dir_overrides(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("NEXUS_LOCAL", raising=False)
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "home"))
+    assert du.nexus_local() == tmp_path / "home"  # tests, simulation : tout au même endroit
+    monkeypatch.setenv("NEXUS_LOCAL", str(tmp_path / "local"))
+    assert du.nexus_local() == tmp_path / "local"
+    layout = du.Layout(repo=tmp_path, home=tmp_path / "home", local=tmp_path / "local")
+    assert (
+        layout.venv.parent == layout.builds.parent == layout.state_dir.parent == tmp_path / "local"
+    )
+
+
+def test_venv_python_path() -> None:
+    venv = Path("venv")
+    assert du.venv_python_path(venv, "darwin") == venv / "bin" / "python"
+    assert du.venv_python_path(venv, "win32") == venv / "Scripts" / "python.exe"
+    assert du.venv_python_path(venv, "win32", windowed=True) == venv / "Scripts" / "pythonw.exe"
+    assert du.venv_python_path(venv, "linux", windowed=True) == venv / "bin" / "python"
+
+
+def test_windows_npm_search(tmp_path: Path) -> None:
+    """§9.3 : PATH, Node.js officiel, nvm-windows, Volta, fnm, installation par utilisateur."""
+    home = tmp_path / "home"
+    env = {
+        "PATH": str(tmp_path / "vide"),
+        "ProgramFiles": str(tmp_path / "Program Files"),
+        "LOCALAPPDATA": str(home / "AppData" / "Local"),
+        "APPDATA": str(home / "AppData" / "Roaming"),
+    }
+
+    def find() -> Path | None:
+        return du.find_npm(env, home, login_shell=lambda: None, platform="win32")
+
+    assert find() is None
+    candidates = du.windows_npm_candidates(env, home)
+    fnm = home / "AppData" / "Roaming" / "fnm" / "aliases" / "default" / "npm.cmd"
+    user = home / "AppData" / "Local" / "Programs" / "nodejs" / "npm.cmd"
+    official = tmp_path / "Program Files" / "nodejs" / "npm.cmd"
+    assert {fnm, user, official} <= set(candidates)
+    user.parent.mkdir(parents=True)
+    user.write_text("")
+    assert find() == user
+    official.parent.mkdir(parents=True)
+    official.write_text("")
+    assert find() == official  # Node.js officiel d'abord
+    env["NVM_HOME"] = str(tmp_path / "nvm")
+    for version in ("v18.20.0", "v22.12.0"):
+        (tmp_path / "nvm" / version).mkdir(parents=True)
+    names = [c.parent.name for c in du.windows_npm_candidates(env, home)]
+    assert names.index("v22.12.0") < names.index("v18.20.0")  # version la plus récente d'abord
+
+
+def test_npm_environment_single_path_on_windows(tmp_path: Path) -> None:
+    npm = tmp_path / "nodejs" / "npm.cmd"
+    env = du.npm_environment(npm, {"Path": r"C:\Windows", "X": "1"}, platform="win32")
+    assert "Path" not in env and env["X"] == "1"
+    assert env["PATH"] == f"{npm.parent};C:\\Windows"
+
+
+def test_console_python(tmp_path: Path) -> None:
+    pythonw = tmp_path / "pythonw.exe"
+    assert du.console_python(pythonw) == pythonw  # pas de python.exe à côté
+    (tmp_path / "python.exe").write_text("")
+    assert du.console_python(pythonw) == tmp_path / "python.exe"
+    assert du.console_python(tmp_path / "python3") == tmp_path / "python3"
 
 
 def test_lock_one_update_at_a_time(layout: du.Layout, npm: Path) -> None:
@@ -320,7 +507,7 @@ class FakeRunner:
     def __call__(self, cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[str]) -> int:
         self.calls.append(list(cmd))
         if cmd[1:3] == ["-m", "venv"]:
-            python = Path(cmd[3]) / "bin" / "python"
+            python = du.venv_python_path(Path(cmd[3]))
             python.parent.mkdir(parents=True)
             python.write_text("nouveau")
             return 0
@@ -329,8 +516,9 @@ class FakeRunner:
 
 def test_install_venv(layout: du.Layout) -> None:
     runner = FakeRunner()
-    assert du.install_venv(layout, Path("/usr/bin/python3"), runner=runner) is True
-    assert runner.calls[0] == ["/usr/bin/python3", "-m", "venv", str(layout.venv)]
+    base = Path("/usr/bin/python3")
+    assert du.install_venv(layout, base, runner=runner) is True
+    assert runner.calls[0] == [str(base), "-m", "venv", str(layout.venv)]
     assert runner.calls[1][-4:] == [
         "-r",
         str(layout.repo / "backend/requirements.txt"),
@@ -349,13 +537,13 @@ def test_install_venv(layout: du.Layout) -> None:
 
 def test_install_venv_failure_restores_previous(layout: du.Layout) -> None:
     du.install_venv(layout, Path("python"), runner=FakeRunner())
-    (layout.venv / "bin" / "python").write_text("ancien")
+    layout.venv_python.write_text("ancien")
     old_stamp = layout.venv_stamp.read_text()
     (layout.repo / "backend" / "requirements.txt").write_text("fastapi\n")
 
     with pytest.raises(du.UpdateError, match="dépendances Python"):
         du.install_venv(layout, Path("python"), runner=FakeRunner(fail_pip=True))
-    assert (layout.venv / "bin" / "python").read_text() == "ancien"  # remis en place
+    assert layout.venv_python.read_text() == "ancien"  # remis en place
     assert layout.venv_stamp.read_text() == old_stamp
     assert not layout.previous_venv.exists()
     assert du.venv_pending(layout)  # le prochain lancement réessaie
@@ -447,6 +635,10 @@ def run_script(
     )
 
 
+macos_only = pytest.mark.skipif(sys.platform == "win32", reason="lanceur macOS (bash)")
+
+
+@macos_only
 def test_app_entry_requires_the_repo(tmp_path: Path) -> None:
     app = tmp_path / "Atelier Nexus.app" / "Contents"
     (app / "MacOS").mkdir(parents=True)
@@ -468,6 +660,7 @@ def test_app_entry_requires_the_repo(tmp_path: Path) -> None:
     assert done.stdout.strip() == f"lanceur {tmp_path / 'depot'} --preparer"
 
 
+@macos_only
 def test_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None:
     """Simulation complète hors macOS : venv réel (dépendances vides), faux npm, mise à jour."""
     home, logs = tmp_path / "support", tmp_path / "logs"
@@ -503,3 +696,63 @@ def test_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None
 
     assert (home / "nexus.db").read_text() == "données"  # aucune donnée touchée
     assert du.git(repo, "rev-parse", "HEAD") == head  # jamais de git pull
+
+
+# ─── Lanceur Windows (app/desktop_launcher.py), multiplateforme ───
+
+
+def test_windows_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None:
+    """Le lanceur du raccourci Windows en mode « mise à jour seulement » (`--preparer`, comme
+    install.ps1 et la CI) : environnement Python réel (dépendances vides), faux npm, puis un
+    second lancement qui ne refait rien."""
+    home, local, logs = (
+        tmp_path / "Roaming" / "Atelier Nexus",
+        tmp_path / "Local",
+        tmp_path / "logs",
+    )
+    env = {
+        **os.environ,
+        "NEXUS_HOME": str(home),
+        "NEXUS_LOCAL": str(local),
+        "NEXUS_LOG_DIR": str(logs),
+        "NEXUS_NPM": str(npm),
+        "NEXUS_REPO": "",
+    }
+    launcher = repo / "backend" / "app" / "desktop_launcher.py"
+
+    def run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-I", str(launcher), "--preparer"],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=300,
+        )
+
+    done = run()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert du.LABELS["venv"] in done.stdout and "Interface compilée." in done.stdout
+    layout = du.Layout(repo=repo, home=home, local=local)
+    assert layout.venv_python.exists() and du.served_build(layout) is not None
+    assert not home.exists() or not (home / "venv").exists()  # venv dans le dossier local
+    assert npm_calls(tmp_path) == ["npm ci --no-audit --no-fund --loglevel=error", "npm run build"]
+    stamp = layout.stamp.read_text()
+    update_log = (logs / du.LOG_NAME).read_text(encoding="utf-8")
+
+    done = run()  # rien n'a changé : ni environnement, ni npm, ni compilation
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "Interface déjà à jour." in done.stdout and du.LABELS["venv"] not in done.stdout
+    assert npm_calls(tmp_path) == []
+    assert layout.stamp.read_text() == stamp
+    assert (logs / du.LOG_NAME).read_text(encoding="utf-8") == update_log
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="npm.cmd")
+def test_npm_cmd_without_npm_cli_is_refused(layout: du.Layout, tmp_path: Path) -> None:
+    """§9.6 : jamais de npm.cmd par cmd.exe ; sans npm-cli.js à côté, message clair."""
+    npm = tmp_path / "nodejs" / "npm.cmd"
+    npm.parent.mkdir()
+    npm.write_text("@echo off\r\n")
+    with pytest.raises(du.UpdateError, match="sans shell"):
+        du.update_interface(layout, npm_finder=lambda: npm)
