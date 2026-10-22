@@ -53,3 +53,4 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **SQLite (tests, bureau) :** `ON DELETE CASCADE` n'est pas appliqué sans PRAGMA et les dates relues sont naïves : supprimer les lignes liées explicitement dans le dépôt, considérer une date naïve comme UTC.
 * **Validation :** en `APPROVAL_MODE=every_step` (défaut, choix de l'utilisateur) toute action d'agent ou de workflow attend une validation humaine ; ne jamais ajouter d'autorisation permanente ni de bouton tout autoriser.
 * **Déclencheurs :** un lancement automatique passe par `launch_run` comme un manuel (écriture → `awaiting_approval`) ; état d'un déclencheur modifié par `TriggerRepository.mutate` sous `trigger_lock`, jamais depuis une copie lue avant un `await`.
+* **App de bureau :** lanceur sur le dépôt, mise à jour au lancement selon `docs/apps/mise-a-jour-bureau.md` (logique pure dans `app/desktop_update.py`, testée) ; jamais de `git pull` automatique ni de donnée touchée.

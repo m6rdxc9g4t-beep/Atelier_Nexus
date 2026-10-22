@@ -1,8 +1,14 @@
 """Application de bureau : le serveur Nexus et son interface dans une fenêtre native.
 
-Lancée par « Atelier Nexus.app » (scripts/macos/build_app.sh), ou à la main :
+Lancée par « Atelier Nexus.app » (scripts/macos/launcher.sh, avec --mise-a-jour), ou à la main :
     python desktop.py               # fenêtre native (pywebview), sinon navigateur
     python desktop.py --navigateur  # dans le navigateur par défaut
+    python desktop.py --preparer    # met l'interface à jour depuis le dépôt, sans rien ouvrir
+
+- Mise à jour au lancement (`--mise-a-jour`, docs/apps/mise-a-jour-bureau.md) : si le dépôt a
+  changé depuis la dernière compilation, écran « Mise à jour… » (npm ci, compilation : voir
+  app/desktop_update.py), puis l'interface. En cas d'échec, ouverture possible avec la
+  compilation précédente.
 
 - Données et réglages dans le dossier de l'utilisateur (`NEXUS_HOME`, par défaut
   ~/Library/Application Support/Atelier Nexus) : `.env` (créé au premier lancement à partir
@@ -38,6 +44,19 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from app.desktop_update import (
+    LABELS,
+    LOG_NAME,
+    Layout,
+    UpdateError,
+    display_path,
+    log_dir,
+    nexus_home,
+    pending_steps,
+    served_build,
+    update_interface,
+)
+
 APP_NAME = "Atelier Nexus"
 HOST = "127.0.0.1"
 PREFERRED_PORT = 8100
@@ -58,19 +77,14 @@ _local = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 # ─── Dossiers et réglages ─────────────────────────────────────────
 
 
-def nexus_home() -> Path:
-    """Dossier des données et réglages de l'utilisateur."""
-    custom = os.environ.get("NEXUS_HOME")
-    if custom:
-        return Path(custom).expanduser()
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / APP_NAME
-    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "atelier-nexus"
-
-
-def interface_dir() -> Path | None:
-    """Interface compilée : `NEXUS_FRONTEND_DIST`, sinon `frontend/out` à côté du backend."""
-    for candidate in (os.environ.get("NEXUS_FRONTEND_DIST"), BACKEND.parent / "frontend" / "out"):
+def interface_dir(served: Path | None = None) -> Path | None:
+    """Interface compilée : `NEXUS_FRONTEND_DIST`, sinon la compilation servie par l'app
+    (`served`, voir app/desktop_update.py), sinon `frontend/out` à côté du backend."""
+    for candidate in (
+        os.environ.get("NEXUS_FRONTEND_DIST"),
+        served,
+        BACKEND.parent / "frontend" / "out",
+    ):
         if candidate and (Path(candidate) / "index.html").is_file():
             return Path(candidate)
     return None
@@ -206,9 +220,8 @@ class ServerThread:
             self.thread.join(timeout)
 
 
-def start_server() -> tuple[str, ServerThread | None, str | None]:
+def start_server(dist: Path | None) -> tuple[str, ServerThread | None, str | None]:
     """(adresse, serveur, message d'erreur éventuel). Réglages et dossiers déjà préparés."""
-    dist = interface_dir()
     if dist is None:
         return "", None, "Interface introuvable : relancez scripts/macos/build_app.sh."
     from main import app
@@ -279,6 +292,8 @@ class DesktopApi:
         self.save_dialog: Any = None  # webview.FileDialog.SAVE, renseigné au lancement
         self._open_url = open_url
         self._open_app = open_app
+        # Après une mise à jour échouée : ouvre l'app avec la compilation précédente
+        self._open_previous: Callable[[], None] | None = None
 
     def save_file(self, name: str, data_base64: str) -> dict[str, Any]:
         """Boîte « Enregistrer sous » puis écriture ; {"saved": chemin | None}."""
@@ -310,6 +325,19 @@ class DesktopApi:
             return True
         self._open_url(str(url))
         return True
+
+    def open_previous(self) -> bool:
+        """Bouton « Ouvrir quand même avec la version précédente » de la page d'échec."""
+        action, self._open_previous = self._open_previous, None  # une seule fois
+        if action is None:
+            return False
+        action()
+        return True
+
+    def quit_app(self) -> None:
+        """Bouton « Quitter » de la page d'échec."""
+        if self.window is not None:
+            self.window.destroy()
 
 
 # ─── Lancement ────────────────────────────────────────────────────
@@ -354,6 +382,103 @@ def error_page(message: str) -> str:
     )
 
 
+_SPLASH_CSS = (
+    "main{text-align:center}h1{letter-spacing:.04em;margin:18px 0 6px}"
+    ".ring{width:34px;height:34px;margin:0 auto;border-radius:50%;"
+    "border:3px solid color-mix(in srgb,var(--muted) 35%,transparent);border-top-color:var(--ink);"
+    "animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}"
+    "button{font:inherit;padding:.5rem .9rem;border-radius:8px;margin:.3rem;cursor:pointer;"
+    "border:1px solid var(--ink);background:transparent;color:var(--text)}"
+    "button.primary{background:var(--ink);color:var(--bg)}"
+)
+_UPDATE_HINT = "Première ouverture ou mise à jour du dépôt : cela peut prendre quelques minutes."
+
+
+def splash_page(status: str) -> str:
+    """Écran de démarrage « Mise à jour… » ; `setStatus(texte)` change l'étape affichée."""
+    return (
+        f'<!doctype html><html lang="fr"><meta charset="utf-8"><title>{APP_NAME}</title>'
+        f"<style>{_ERROR_CSS}{_SPLASH_CSS}</style>"
+        '<body><main><div class="ring" aria-hidden="true"></div>'
+        f"<h1>Mise à jour d'{APP_NAME}…</h1>"
+        f'<p id="status" role="status">{html.escape(status)}</p>'
+        f'<p class="hint">{html.escape(_UPDATE_HINT)}</p></main>'
+        "<script>window.setStatus=function(t){document.getElementById('status').textContent=t}"
+        "</script>"
+    )
+
+
+def update_failed_page(message: str, log_file: Path, previous: bool) -> str:
+    """Échec de la mise à jour : message, journal, « Ouvrir quand même » si une version existe."""
+    open_previous = (
+        '<button class="primary" onclick="this.disabled=true;this.textContent=\'Ouverture…\';'
+        'window.pywebview.api.open_previous()">'
+        "Ouvrir quand même avec la version précédente</button>"
+        if previous
+        else ""
+    )
+    retry = (
+        "La version précédente reste disponible ; le prochain lancement réessaiera la mise à jour."
+        if previous
+        else "Le prochain lancement réessaiera la mise à jour."
+    )
+    return (
+        f'<!doctype html><html lang="fr"><meta charset="utf-8"><title>{APP_NAME}</title>'
+        f"<style>{_ERROR_CSS}{_SPLASH_CSS}</style>"
+        '<body><div style="max-width:36rem;padding:2rem">'
+        f"<h1>La mise à jour d'{APP_NAME} a échoué</h1>"
+        f"<p>{html.escape(message)}</p>"
+        f"<p>{html.escape(retry)}</p>"
+        f'<p class="hint">Journal : {html.escape(display_path(log_file))}</p>'
+        f"<p>{open_previous}"
+        '<button onclick="window.pywebview.api.quit_app()">Quitter</button></p></div>'
+    )
+
+
+def update_in_window(
+    window: Any,
+    layout: Layout,
+    api: DesktopApi,
+    open_app: Callable[[Path | None], None],
+    update: Callable[..., list[str]] = update_interface,
+) -> bool:
+    """Fil de l'écran de démarrage : mise à jour, puis l'app ; sinon la page d'échec."""
+    with contextlib.suppress(Exception):
+        window.events.loaded.wait(10)
+
+    def status(text: str) -> None:
+        with contextlib.suppress(Exception):
+            window.evaluate_js(f"setStatus({json.dumps(text)})")
+
+    try:
+        update(layout, on_status=status)
+    except UpdateError as exc:
+        message = str(exc)
+    except Exception as exc:  # noqa: BLE001 — affiché plutôt qu'une fenêtre figée
+        log.exception("Mise à jour interrompue")
+        message = f"Erreur inattendue : {exc}"
+    else:
+        open_app(served_build(layout))
+        return True
+    log.error("Mise à jour échouée : %s", message)
+    previous = served_build(layout)
+    if previous is not None:
+        api._open_previous = lambda: open_app(previous)
+    window.load_html(update_failed_page(message, log_dir() / LOG_NAME, previous is not None))
+    return False
+
+
+def prepare_in_console(layout: Layout) -> int:
+    """Mise à jour dans le terminal (`--preparer`, mode navigateur) ; 0 si l'interface est prête."""
+    try:
+        done = update_interface(layout, on_status=lambda text: print(text, flush=True))
+    except UpdateError as exc:
+        print(f"Erreur : {exc}\nJournal : {log_dir() / LOG_NAME}", file=sys.stderr)
+        return 1
+    print("Interface compilée." if done else "Interface déjà à jour.", flush=True)
+    return 0
+
+
 def versioned_url(url: str, dist: Path | None) -> str:
     """Adresse marquée de la date de compilation : une mise à jour n'est jamais masquée par le cache."""
     try:
@@ -388,10 +513,38 @@ def _interrupt(*_: object) -> None:
     raise KeyboardInterrupt
 
 
+def _settings_menu(env_file: Path, home: Path) -> list[Any]:
+    """Menu « Réglages » de la fenêtre (vide si pywebview ne gère pas les menus)."""
+    with contextlib.suppress(Exception):
+        from webview.menu import Menu, MenuAction  # type: ignore[import-not-found]
+
+        return [
+            Menu(
+                "Réglages",
+                [
+                    MenuAction(
+                        "Ouvrir le fichier de réglages (.env)…",
+                        lambda: reveal(env_file, text_editor=True),
+                    ),
+                    MenuAction("Afficher le dossier des données", lambda: reveal(home)),
+                ],
+            )
+        ]
+    return []
+
+
 def run(argv: list[str] | None = None) -> int:
     """Point d'entrée de l'application de bureau."""
     parser = argparse.ArgumentParser(description=f"{APP_NAME} — application de bureau")
     parser.add_argument("--navigateur", action="store_true", help="ouvrir dans le navigateur")
+    parser.add_argument(
+        "--mise-a-jour",
+        action="store_true",
+        help="mettre l'interface à jour depuis le dépôt avant d'ouvrir (lanceur de l'app)",
+    )
+    parser.add_argument(
+        "--preparer", action="store_true", help="mettre l'interface à jour puis quitter"
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s"
@@ -399,10 +552,12 @@ def run(argv: list[str] | None = None) -> int:
 
     home = nexus_home()
     env_file = prepare_home(home)
-    dist = interface_dir()
+    layout = Layout(repo=BACKEND.parent, home=home)
+    if args.preparer:
+        return prepare_in_console(layout)
+    steps = pending_steps(layout) if args.mise_a_jour else []
+    pending = bool(steps)
     sys.path.insert(0, str(BACKEND))  # `main` et `app` importables hors du dossier courant
-    configure_environment(home, dist)
-    url, server, error = start_server()
 
     webview: Any = None
     if not args.navigateur:
@@ -412,8 +567,24 @@ def run(argv: list[str] | None = None) -> int:
         except ImportError:
             log.warning("pywebview absent : navigateur utilisé.")
 
+    servers: list[ServerThread] = []
+
+    def serve(dist: Path | None) -> tuple[str, str | None]:
+        """Démarre le serveur sur une compilation de l'interface : (adresse, erreur)."""
+        configure_environment(home, dist)
+        url, server, error = start_server(dist)
+        if server is not None:
+            servers.append(server)
+        return url, error
+
     try:
         if webview is None:
+            if pending and prepare_in_console(layout) != 0:
+                if served_build(layout) is None:
+                    return 1
+                print("Ouverture avec la version précédente.", file=sys.stderr)
+            dist = interface_dir(served_build(layout))
+            url, error = serve(dist)
             if error:
                 log.error(error)
                 print(error, file=sys.stderr)
@@ -422,17 +593,27 @@ def run(argv: list[str] | None = None) -> int:
             print(f"{APP_NAME} : {url} — Ctrl+C pour arrêter.")
             signal.signal(signal.SIGTERM, _interrupt)
             with contextlib.suppress(KeyboardInterrupt):
-                while server is not None and server.thread.is_alive():
+                while servers and servers[0].thread.is_alive():
                     time.sleep(0.5)
             return 0
 
         api = DesktopApi()
         api.save_dialog = webview.FileDialog.SAVE
         webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
+        url, error, dist = "", None, None
+        if not pending:
+            dist = interface_dir(served_build(layout))
+            url, error = serve(dist)
+        if pending:
+            first_url, first_html = None, splash_page(LABELS[steps[0]])
+        elif error:
+            first_url, first_html = None, error_page(error)
+        else:
+            first_url, first_html = versioned_url(url, dist), None
         window = webview.create_window(
             APP_NAME,
-            url=None if error else versioned_url(url, dist),
-            html=error_page(error) if error else None,
+            url=first_url,
+            html=first_html,
             js_api=api,
             width=WINDOW_SIZE[0],
             height=WINDOW_SIZE[1],
@@ -443,28 +624,27 @@ def run(argv: list[str] | None = None) -> int:
             background_color=WINDOW_BACKGROUND[system_appearance()],
         )
         api.window = window
-        menu: list[Any] = []
-        with contextlib.suppress(Exception):
-            from webview.menu import Menu, MenuAction  # type: ignore[import-not-found]
 
-            menu = [
-                Menu(
-                    "Réglages",
-                    [
-                        MenuAction(
-                            "Ouvrir le fichier de réglages (.env)…",
-                            lambda: reveal(env_file, text_editor=True),
-                        ),
-                        MenuAction("Afficher le dossier des données", lambda: reveal(home)),
-                    ],
-                )
-            ]
+        def open_app(built: Path | None) -> None:
+            """Après l'écran de démarrage : serveur puis interface (ou page d'erreur)."""
+            target = interface_dir(built)
+            app_url, app_error = serve(target)
+            if app_error:
+                window.load_html(error_page(app_error))
+            else:
+                window.load_url(versioned_url(app_url, target))
+
         storage = home / "webview"
         storage.mkdir(parents=True, exist_ok=True)
         # Stockage persistant : thème, dernière conversation de chaque agent…
-        webview.start(private_mode=False, storage_path=str(storage), menu=menu)
+        webview.start(
+            (lambda: update_in_window(window, layout, api, open_app)) if pending else None,
+            private_mode=False,
+            storage_path=str(storage),
+            menu=_settings_menu(env_file, home),
+        )
         return 1 if error else 0
     finally:
-        if server is not None:
+        for server in servers:
             log.info("Arrêt du serveur.")
             server.stop()
