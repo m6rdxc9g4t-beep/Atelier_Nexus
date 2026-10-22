@@ -821,3 +821,53 @@ export interface EventsCatalog {
 export interface InboxCount {
   awaiting_approval: number;
 }
+
+// ─── Chaînes d'agents (Étape 24) ─────────────────────────────────
+
+export interface ChainStageInfo {
+  agent: string;
+  role: string;
+  instructions: string;
+  display_name: string;
+  local_only: boolean;
+}
+
+export interface ChainInfo {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  stages: ChainStageInfo[];
+}
+
+export type ChainStageStatus = "pending" | "active" | "validated" | "skipped";
+export type ChainRunStatus = "running" | "completed" | "stopped";
+
+export interface ChainStageState {
+  agent: string;
+  role: string;
+  status: ChainStageStatus;
+  conversation_id: string | null;
+  deliverable: { text: string; artifacts: Artifact[] } | null;
+  validated_at: string | null;
+}
+
+export interface ChainRun {
+  id: string;
+  chain: string;
+  request: string;
+  status: ChainRunStatus;
+  stage_index: number;
+  stages: ChainStageState[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Suite à donner : ouvrir la conversation de l'étape et y envoyer `handoff`, ou montrer `recap`. */
+export interface ChainStep {
+  run: ChainRun;
+  agent: string | null;
+  conversation_id: string | null;
+  handoff: string | null;
+  recap: Artifact | null;
+}

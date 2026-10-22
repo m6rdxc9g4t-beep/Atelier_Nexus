@@ -11,6 +11,7 @@ from app.agents import (
     DoneEvent,
     ToolResultEvent,
     describe,
+    get_agent_class,
     list_agent_classes,
 )
 from app.agents.base import REFUSED
@@ -20,6 +21,7 @@ from app.core.llm import Message, ProviderNotAllowedError, ProviderUnavailableEr
 from app.tools import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.base import Artifact
 from app.tools.environment import ToolEnvironment
+from app.tools.toolsets import declared_tool_names
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
 
 
@@ -190,7 +192,8 @@ async def test_catalog_lists_the_experts_with_categories() -> None:
     for expected in (
         "assistant", "orchestrateur", "data_analyst", "chef_de_projet", "product_owner",
         "developpeur", "finance", "comptable", "marketing", "commercial", "juridique", "rh",
-        "redacteur",
+        "redacteur", "ingenieur_donnees", "modelisateur_bi", "controleur_donnees", "architecte",
+        "testeur", "relecteur_code",
     ):  # fmt: skip
         assert expected in names
     assert names[0] == "assistant"
@@ -292,3 +295,12 @@ async def test_delegated_agents_have_no_write_or_delegate_tools() -> None:
     assert not any(t.requires_approval for t in agent.tools.values())
     orchestrator = await catalog.build("orchestrateur", make_router(), env, delegated=True)
     assert "delegate_to_agent" not in orchestrator.tools
+
+
+async def test_architect_and_reviewer_cannot_write_to_github() -> None:
+    """Conception et relecture en lecture seule : ni branche, ni commit, ni PR."""
+    for name in ("architecte", "relecteur_code"):
+        tools = await declared_tool_names(list(get_agent_class(name).toolsets))
+        assert (
+            not {"github_create_branch", "github_commit_files", "github_open_pull_request"} & tools
+        )

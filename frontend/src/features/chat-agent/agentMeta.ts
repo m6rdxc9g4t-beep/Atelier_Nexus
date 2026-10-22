@@ -1,5 +1,10 @@
 import {
   Bot,
+  Boxes,
+  Database,
+  DraftingCompass,
+  FlaskConical,
+  ScanSearch,
   Briefcase,
   CalendarCheck,
   ChartColumn,
@@ -48,6 +53,11 @@ const BY_ICON: Record<string, LucideIcon> = {
   "calendar-check": CalendarCheck,
   "table-2": Table2,
   "cooking-pot": CookingPot,
+  database: Database,
+  boxes: Boxes,
+  "drafting-compass": DraftingCompass,
+  "flask-conical": FlaskConical,
+  "scan-search": ScanSearch,
 };
 
 export function agentIcon(icon?: string | null): LucideIcon {

@@ -1,17 +1,19 @@
 "use client";
 
-import { Footprints, Lock, RotateCcw, TriangleAlert } from "lucide-react";
+import { Footprints, Lock, RotateCcw, TriangleAlert, Workflow as ChainIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ChainBar } from "@/features/chains/ChainBar";
 import { type ReviewDecision, emptyConversation } from "@/features/chat-agent/conversation";
 import { loadStepMode } from "@/lib/stepMode";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
+import { useChainStore } from "@/stores/useChainStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
-import type { AgentInfo, AttachmentBlock } from "@/types/api";
+import type { AgentInfo, AttachmentBlock, ChainInfo } from "@/types/api";
 
 import { AgentIcon } from "./agentMeta";
 import { Composer } from "./Composer";
@@ -29,8 +31,11 @@ export function ChatPanel({
   agent,
   agents,
   blocked,
+  chains = [],
 }: {
   agent: AgentInfo | undefined;
+  /** Chaînes d'agents : bandeau de la chaîne suivie, bouton de lancement */
+  chains?: ChainInfo[];
   /** Catalogue : noms affichés des agents dans les résultats de recherche */
   agents: AgentInfo[];
   blocked: string | null;
@@ -43,6 +48,7 @@ export function ChatPanel({
   const reviewStore = useChatStore((s) => s.review);
   const stepMode = useChatStore((s) => s.stepMode);
   const setStepMode = useChatStore((s) => s.setStepMode);
+  const openChains = useChainStore((s) => s.openLauncher);
   const stop = useChatStore((s) => s.stop);
   const reset = useChatStore((s) => s.reset);
   const restore = useChatStore((s) => s.restore);
@@ -99,6 +105,19 @@ export function ChatPanel({
             <span className="hidden md:inline">Pas à pas</span>
             <span className="sr-only md:hidden">{stepMode ? "activé" : "désactivé"}</span>
           </Button>
+          {chains.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={streaming}
+              onClick={() => openChains()}
+              aria-label="Chaînes d'agents"
+              title="Lancer une chaîne d'agents (Data, Dev) : vous validez le livrable de chaque agent"
+            >
+              <ChainIcon />
+              <span className="hidden md:inline">Chaînes</span>
+            </Button>
+          )}
           {agent && <WorkflowsDialog agent={agent} />}
           <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
@@ -115,6 +134,8 @@ export function ChatPanel({
           )}
         </div>
       </div>
+
+      <ChainBar chains={chains} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {opening && empty ? (

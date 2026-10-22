@@ -1,10 +1,10 @@
 "use client";
 
-import { Lock, Pencil, Plus } from "lucide-react";
+import { Lock, Pencil, Plus, Workflow as ChainIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AgentInfo } from "@/types/api";
+import type { AgentInfo, ChainInfo } from "@/types/api";
 
 import { AgentIcon } from "./agentMeta";
 
@@ -15,10 +15,22 @@ interface AgentSidebarProps {
   onSelect: (name: string) => void;
   onCreate: () => void;
   onEdit: (name: string) => void;
+  /** Chaînes d'agents (Data, Dev), en tête de liste */
+  chains?: ChainInfo[];
+  onOpenChain?: (chain: string) => void;
 }
 
 /** Agents regroupés par catégorie ; les agents personnalisés se modifient au survol. */
-export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onEdit }: AgentSidebarProps) {
+export function AgentSidebar({
+  agents,
+  active,
+  disabled,
+  onSelect,
+  onCreate,
+  onEdit,
+  chains = [],
+  onOpenChain,
+}: AgentSidebarProps) {
   const groups = new Map<string, AgentInfo[]>();
   for (const agent of agents) {
     const key = agent.category ?? "Agents";
@@ -27,6 +39,28 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
 
   return (
     <nav aria-label="Agents" className="flex min-h-full flex-col gap-5 px-3 pt-3">
+      {chains.length > 0 && onOpenChain && (
+        <section aria-label="Chaînes d'agents">
+          <h2 className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">Chaînes</h2>
+          <ul className="flex flex-col gap-0.5">
+            {chains.map((chain) => (
+              <li key={chain.id}>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onOpenChain(chain.id)}
+                  title={`${chain.description}\n${chain.stages.map((st) => st.display_name).join(" → ")}`}
+                  className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  <ChainIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{chain.title}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{chain.stages.length}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {[...groups].map(([category, list]) => (
         <section key={category} aria-label={category}>
           <h2 className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">{category}</h2>
