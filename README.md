@@ -16,6 +16,24 @@ Jamais de `git pull` automatique, aucune donnée touchée. Abonnement Claude (vi
 [`docs/claude-code.md`](docs/claude-code.md)) ou clé Claude, modèles et adresses des apps : roue dentée **Réglages** de l'interface ([`docs/settings.md`](docs/settings.md)). Données dans
 `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
 
+## Installer sur Windows
+
+Windows 10 (21H2+) ou 11, sans droits d'administrateur. **Prérequis** (le script vérifie et donne la commande
+`winget` de ce qui manque) : Git (`winget install --id Git.Git -e`), Node.js 22.12+ (`winget install --id OpenJS.NodeJS.LTS -e`),
+Python 3.12+ (`winget install --id Python.Python.3.13 -e`) ; WebView2 est déjà là sur Windows 11 (sinon
+`winget install --id Microsoft.EdgeWebView2Runtime -e`, ou l'app s'ouvre dans le navigateur). Depuis le dépôt :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1              # menu Démarrer (dossier « Atelier ») + Bureau
+powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1 -SansBureau  # sans raccourci sur le Bureau
+```
+
+La première mise à jour (environnement Python, `npm ci`, compilation) se fait dans le terminal, puis « Atelier Nexus »
+s'ouvre depuis le menu Démarrer, sans console. **Mise à jour : `git pull`, puis rouvrez l'app** (écran « Mise à jour… »).
+Relancer la commande répare l'installation ; `-Desinstaller` retire lanceur, raccourcis et enregistrement, jamais les
+données (`%APPDATA%\Atelier Nexus\` : `.env`, `nexus.db`). Journaux : `%LOCALAPPDATA%\Atelier Nexus\Logs\`.
+Détails : [`docs/desktop.md`](docs/desktop.md#windows).
+
 ## Validation de chaque action
 
 Par défaut (`APPROVAL_MODE=every_step`, Réglages → « Validation des actions » → **Chaque action**), toute action d'un agent
