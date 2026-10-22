@@ -1,6 +1,6 @@
 # Réglages depuis l'interface (Étape 11)
 
-La roue dentée de l'en-tête ouvre les **Réglages** : clé Claude, modèles, moteur par défaut et de secours, adresses
+La roue dentée de l'en-tête ouvre les **Réglages** : validation des actions, clé Claude, modèles, moteur par défaut et de secours, adresses
 des applications Atelier, dossier des instantanés de Tab, accès GitHub. Les changements s'appliquent **tout de suite**
 (rechargement à chaud du routeur LLM et des connecteurs), puis une **vérification** affiche l'état de chaque moteur et
 de chaque application (« Clé API refusée par Anthropic (401) », « Ollama injoignable », « 3 projet(s) »…).
@@ -15,9 +15,26 @@ de chaque application (« Clé API refusée par Anthropic (401) », « Ollama in
 Code : `backend/app/core/settings_editor.py` (liste blanche, lecture / écriture du `.env`, validation),
 `backend/app/api/settings.py` (routes, rechargement), `frontend/src/features/settings/` (fenêtre, brouillon testé).
 
+## Validation des actions (`APPROVAL_MODE`)
+
+Premier groupe des Réglages, en boutons radio :
+
+| Valeur | Libellé | Effet |
+|---|---|---|
+| `every_step` (**défaut**) | Chaque action (recommandé) | Toute action d'agent (appel d'outil, lecture comprise, délégation) et toute étape de workflow v1 / v2, y compris lancée par un déclencheur, attend « Autoriser » / « Refuser ». |
+| `writes_only` | Seulement les écritures | Comportement antérieur : seules les actions `requires_approval` (agents, v1) et les étapes `write` / `destructive` (v2) attendent. |
+
+- C'est un **choix de l'utilisateur** : le défaut `every_step` s'applique aussi aux installations existantes (aucune valeur dans
+  le `.env` = `every_step`). Aucune autorisation permanente, aucun « tout autoriser » : chaque action se valide une par une.
+- Agents ([`agents.md`](agents.md) §3), délégation (le sous-agent n'a alors aucun outil), workflows ([`workflows.md`](workflows.md)),
+  déclencheurs (arrêt à l'étape 1, [`declencheurs-api.md`](declencheurs-api.md) §0).
+- Pris en compte à la requête suivante. Une exécution de workflow garde le mode de son lancement, sauf passage à `every_step`
+  (le plus strict l'emporte).
+- Les évaluations (`scripts.evals`, applications simulées) tournent en `writes_only` pour suivre le raisonnement du modèle.
+
 ## Règles
 
-- **Liste blanche** (`FIELDS`) : CLAUDE_MODE, CLAUDE_CLI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
+- **Liste blanche** (`FIELDS`) : APPROVAL_MODE, CLAUDE_MODE, CLAUDE_CLI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
   LLM_DEFAULT_PROVIDER, LLM_FALLBACK_PROVIDER, DATA_VIA_BASE_URL, PROJETS_BASE_URL, PROJETS_IMPORT_TOKEN,
   TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
   CUISINE_EMAIL, CUISINE_PASSWORD, CUISINE_REFRESH_TOKEN (groupe « Atelier Cuisine »), GITHUB_TOKEN, GITHUB_REPO,

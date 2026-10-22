@@ -115,7 +115,8 @@ interface StepRun {
   error_code: string | null;
   started_at: string | null; ended_at: string | null;
 }
-interface PendingApproval { step_id: string; uses: string; kind: "write" | "destructive"; summary: string; token: string; input: Record<string, unknown> }
+interface PendingApproval { step_id: string; uses: string; kind: "read" | "write" | "destructive"; summary: string; token: string; input: Record<string, unknown> }
+// kind "read" : seulement en APPROVAL_MODE=every_step (défaut), où chaque étape attend une validation
 interface WorkflowRun {
   id: string; workflow_id: string; status: RunStatus; message: string;
   params: Record<string, string>; trigger: "manual";
@@ -127,8 +128,15 @@ interface WorkflowRun {
 ```
 
 - `POST /api/workflows/{id}/run` corps `{params}` → `WorkflowRun` (v2) — pour un v1, réponse v1 inchangée (`WorkflowRunResult`).
-- Le moteur avance étape par étape ; une étape `write`/`destructive` **s'arrête** sur `awaiting_approval` avec son entrée **résolue**
-  (valeurs réelles, issues des étapes précédentes). Jeton = sha256(run_id, step_id, uses, entrée résolue)[:32].
+- Le moteur avance étape par étape. Selon le réglage `APPROVAL_MODE` (docs/settings.md) :
+  - `every_step` (**défaut**, choix de l'utilisateur) : **chaque** étape `tool:` ou `node:`, lectures comprises, **s'arrête** sur
+    `awaiting_approval` (`kind: "read"` pour une lecture) avec son entrée **résolue**, donc après l'exécution des étapes précédentes
+    (leur résultat est dans `steps[]`) ;
+  - `writes_only` : seules les étapes `write`/`destructive` s'arrêtent ; les lectures s'exécutent seules.
+
+  Une étape dont la condition `when` est fausse (ou dont un ancêtre a été sauté) reste `skipped` **sans** validation : rien ne
+  s'exécute. Le mode est retenu au lancement ; s'il passe à `every_step` en cours d'exécution, il s'applique aux étapes suivantes.
+  Jeton = sha256(run_id, step_id, uses, entrée résolue)[:32] (inchangé).
 - `POST /api/workflow-runs/{run_id}/resume` corps `{approvals: {token: boolean}}` → `WorkflowRun` (reprend ; refus → étape `refused`, exécution `stopped`, la suite `skipped`).
 - `GET /api/workflow-runs?workflow_id=&limit=` (récents d'abord) · `GET /api/workflow-runs/{run_id}`.
 - Erreur d'une étape : `on_error: "stop"` → exécution `failed`, la suite `skipped` ; `"continue"` → on poursuit (les étapes qui la citent échouent en `REF_NOT_FOUND` si elles lisent sa `data`).
