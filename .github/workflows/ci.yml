@@ -147,7 +147,10 @@ jobs:
           $reg = Get-ItemProperty 'HKCU:\Software\Atelier\Apps\nexus'
           if ($reg.Lanceur -ne $lnk -or $reg.Nom -ne 'Atelier Nexus') { throw "enregistrement inattendu : $($reg | Out-String)" }
           $status = git status --porcelain
-          if ($status) { $status; throw "l'installation a modifié des fichiers suivis" }
+          if ($status) {
+            $diff = (git diff | Select-Object -First 60) -join "`n"
+            throw "l'installation a modifié des fichiers suivis :`n$($status -join "`n")`n$diff"
+          }
 
       - name: Lanceur — mise à jour seulement, deux fois
         run: |
