@@ -42,6 +42,7 @@ if log:
                         k: os.environ.get(k)
                         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
                     },
+                    "env_names": sorted(os.environ),
                 },
                 ensure_ascii=False,
             )

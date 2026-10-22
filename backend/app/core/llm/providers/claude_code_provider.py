@@ -48,10 +48,29 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
-from app.core.processes import NO_WINDOW, is_batch, kill_tree, windows_command
+from app.core.processes import (
+    CLAUDE_WINDOWS_VARS,
+    NO_WINDOW,
+    is_batch,
+    kill_tree,
+    pick_environment,
+    windows_command,
+)
 
 CLI_MODELS = ["sonnet", "opus", "haiku"]
-_ENV_TO_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+#: Environnement de la CLI en liste blanche (SUITE.md §5.3 ; Windows : §9.6). Rien d'autre : ni
+#: ANTHROPIC_* (la clé serait facturée à l'usage), ni secret ou réglage de Nexus.
+CLI_ENV = (
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "LANG",
+    "TMPDIR",
+    "TZ",
+    "CLAUDE_CONFIG_DIR",
+)
 MAX_RESULT_CHARS = 40_000
 INSTRUCTION = (
     "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message, "
@@ -76,7 +95,7 @@ def find_claude_binary(configured: str | None = None) -> str | None:
     candidates = [
         configured,
         os.environ.get("CLAUDE_PATH"),
-        shutil.which("claude"),
+        shutil.which("claude", path=_search_path()),
         *windows,
         str(home / ".local" / "bin" / "claude"),
         str(home / ".claude" / "local" / "claude"),
@@ -87,12 +106,31 @@ def find_claude_binary(configured: str | None = None) -> str | None:
     return next((c for c in candidates if c and os.path.isfile(c) and os.access(c, os.X_OK)), None)
 
 
-def subscription_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in _ENV_TO_DROP}
+def subscription_env(binary: str | None = None) -> dict[str, str]:
+    """Environnement de la CLI : liste blanche (§5.3, + variables système de Windows §9.6),
+    dossier de l'exécutable en tête du PATH, trafic non essentiel coupé."""
+    names = [*CLI_ENV, *(CLAUDE_WINDOWS_VARS if sys.platform == "win32" else ())]
+    env = pick_environment(os.environ, names)
+    current = next((v for k, v in env.items() if k.upper() == "PATH"), "")
+    env = {k: v for k, v in env.items() if k.upper() != "PATH"}
     home = Path.home()
-    extra = [str(home / ".local" / "bin"), "/opt/homebrew/bin", "/usr/local/bin"]
-    env["PATH"] = os.pathsep.join([*extra, env.get("PATH", "")])
+    extra = [str(home / ".local" / "bin")]
+    if sys.platform != "win32":
+        extra += ["/opt/homebrew/bin", "/usr/local/bin"]
+    if binary:
+        extra.insert(0, str(Path(binary).parent))
+    env["PATH"] = os.pathsep.join(p for p in [*extra, current] if p)
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     return env
+
+
+def _search_path() -> str:
+    """PATH sans entrée relative ni dossier `node_modules/.bin` (§5.3)."""
+    entries = os.environ.get("PATH", "").split(os.pathsep)
+    kept = [
+        e for e in entries if os.path.isabs(e) and Path(e).parts[-2:] != ("node_modules", ".bin")
+    ]
+    return os.pathsep.join(kept)
 
 
 # ─── Conversation → texte, réponse → blocs ────────────────────────
@@ -319,7 +357,7 @@ class ClaudeCodeProvider(LLMProvider):
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=subscription_env(),
+                    env=subscription_env(command[0]),
                     cwd=workdir,
                     creationflags=NO_WINDOW,
                 )

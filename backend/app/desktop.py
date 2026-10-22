@@ -138,8 +138,8 @@ TAB_MCP_APP = Path("/Applications/Atelier_Tab.app/Contents/Resources/atelier-mcp
 def tab_mcp_default(platform: str = sys.platform) -> Path:
     """Serveur MCP livré avec l'app Atelier Tab installée, selon le système (utilisé seulement
     s'il existe). Windows : emplacement par défaut d'une installation par utilisateur
-    (`%LOCALAPPDATA%\\Programs\\Atelier_Tab\\resources\\atelier-mcp.cmd`), à confirmer avec
-    l'app Windows de Tab ; sinon, réglage TAB_MCP_COMMAND du `.env`."""
+    (`%LOCALAPPDATA%\\Programs\\Atelier_Tab\\resources\\atelier-mcp.cmd`, SUITE.md §9.6) ;
+    sinon, réglage TAB_MCP_COMMAND du `.env`."""
     if platform == "win32":
         local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(local) / "Programs" / "Atelier_Tab" / "resources" / "atelier-mcp.cmd"

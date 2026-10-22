@@ -29,8 +29,13 @@ l'interface affiche toujours « Claude »). Choisi par `LLMRouter.from_settings`
   résultats au tour suivant. La boucle d'agent (`BaseAgent`) ne voit aucune différence avec l'API.
 - **Conversation** : transmise sur l'entrée standard, sous forme de texte (`## Utilisateur`, `## Assistant`,
   `## Assistant → appel de l'outil …`, `## Résultat de …`) ; résultats d'outils tronqués à 40 000 caractères.
-- **Sûreté** : `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` et `ANTHROPIC_BASE_URL` retirées de l'environnement
-  (sinon une clé serait facturée à l'usage) ; aucun outil de Claude Code (`--tools ""`), pas de MCP
+- **Sûreté** : environnement en liste blanche (SUITE.md §5.3 : `HOME`, `USER`, `LOGNAME`, `PATH` avec le dossier de
+  l'exécutable en tête, `SHELL`, `LANG`, `LC_*`, `TMPDIR`, `TZ`, `CLAUDE_CONFIG_DIR`, plus
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ; sous Windows, §9.6 : `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`, `USERNAME`,
+  `APPDATA`, `LOCALAPPDATA`, `SystemRoot`, `SystemDrive`, `windir`, `ComSpec`, `PATHEXT`, `TEMP`, `TMP`, `ProgramData`) :
+  jamais `ANTHROPIC_*` (une clé serait facturée à l'usage) ni réglage de Nexus. Sous Windows, `claude.exe` (aussi
+  cherché dans `%USERPROFILE%\.local\bin`), ou `claude.cmd` de npm résolu en `node.exe …\cli.js` (sinon refusé) :
+  jamais `cmd.exe`. PATH sans entrée relative ni `node_modules/.bin`. Aucun outil de Claude Code (`--tools ""`), pas de MCP
   (`--strict-mcp-config`), pas de commandes (`--disable-slash-commands`), pas de session conservée
   (`--no-session-persistence`), dossier de travail vide et temporaire.
 - **Erreurs** : non connecté → « tapez claude dans le Terminal… » ; limite de l'abonnement → erreur transitoire, qui
