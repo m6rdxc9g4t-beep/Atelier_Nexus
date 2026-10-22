@@ -37,6 +37,8 @@ class ToolEnvironment:
         self.router: Any = None
         self.catalog: Any = None
         self.delegation_roster: list[tuple[str, str, bool]] = []
+        #: Nom affiché des agents délégables (résumé de la carte de validation)
+        self.delegation_names: dict[str, str] = {}
 
     def transport(self, app: str) -> httpx.AsyncBaseTransport | None:
         """Transport simulé d'une application (tests) ; None = réseau réel."""

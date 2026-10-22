@@ -1,7 +1,10 @@
 """Délégation : un orchestrateur confie une sous-tâche à un agent spécialisé.
 
 Règles :
-- un seul niveau (un sous-agent ne délègue pas, et n'a pas d'outils à valider) ;
+- la délégation elle-même attend la validation de l'utilisateur (résumé : agent + tâche) ;
+- un seul niveau (un sous-agent ne délègue pas, et n'a pas d'outils à valider) ; en
+  `APPROVAL_MODE=every_step`, même ses lectures devraient être validées, ce qui ne peut pas lui
+  être présenté : il n'a alors AUCUN outil et répond à partir de la consigne seule ;
 - un agent verrouillé en local (finances) n'est appelable que si l'orchestrateur tourne
   lui-même sur le modèle local : sinon sa réponse partirait chez Claude ;
 - les artefacts produits par le sous-agent remontent dans le panneau.
@@ -33,6 +36,10 @@ class DelegateInput(ToolInput):
     )
 
 
+#: Longueur de la consigne montrée sur la carte de validation
+TASK_SHOWN = 600
+
+
 class DelegateTool(BaseTool[DelegateInput]):
     name = "delegate_to_agent"
     description = "Confie une sous-tâche à un agent spécialisé et renvoie sa réponse."
@@ -41,6 +48,21 @@ class DelegateTool(BaseTool[DelegateInput]):
     def __init__(self, env: ToolEnvironment, roster: list[tuple[str, str, bool]]) -> None:
         self.env = env
         self.roster = roster  # (nom, description, local_only)
+
+    @property
+    def without_tools(self) -> bool:
+        """Vrai en `every_step` : le sous-agent répond sans aucun outil."""
+        return bool(self.env.settings.approval_mode == "every_step")
+
+    def approval_summary(self, params: DelegateInput) -> str:
+        names: dict[str, str] = getattr(self.env, "delegation_names", {})
+        who = names.get(params.agent, params.agent)
+        task = " ".join(params.task.split())
+        task = task if len(task) <= TASK_SHOWN else task[: TASK_SHOWN - 1] + "…"
+        summary = f"Confier à « {who} » : « {task} »"
+        if self.without_tools:
+            summary += " — il répondra sans outil, à partir de cette consigne seulement"
+        return summary
 
     def spec(self) -> ToolSpec:
         lines = [
@@ -52,8 +74,15 @@ class DelegateTool(BaseTool[DelegateInput]):
             name=self.name,
             description=(
                 "Confie une sous-tâche à un agent spécialisé de la suite Atelier et renvoie sa "
-                "réponse finale (ses livrables vont directement dans le panneau Artefacts). "
-                "Une délégation par sous-tâche ; donne une consigne autonome.\nAgents disponibles :\n"
+                + (
+                    "réponse finale (texte). Le sous-agent n'a AUCUN outil (chaque action doit "
+                    "être validée par l'utilisateur) : mets dans la consigne toutes les données "
+                    "dont il a besoin."
+                    if self.without_tools
+                    else "réponse finale (ses livrables vont directement dans le panneau Artefacts)."
+                )
+                + " Une délégation par sous-tâche ; donne une consigne autonome."
+                + "\nAgents disponibles :\n"
                 + "\n".join(lines)
             ),
             input_schema=portable_schema(DelegateInput),

@@ -56,21 +56,36 @@ Une boîte **non configurée** (adresse ou jeton absent) est écartée sans cass
 
 ## 3. Garde-fous
 
-**Validation humaine.** Un outil `requires_approval` n'est jamais exécuté directement :
-1. le modèle demande l'appel → l'agent émet `approval_required` (`calls` : id, nom, paramètres, résumé lisible)
-   puis `done` avec `stop_reason = "awaiting_approval"` ;
-2. l'interface affiche « Autoriser / Refuser » ;
+**Validation humaine.** Réglage `APPROVAL_MODE` ([`settings.md`](settings.md)) : en `every_step` (**défaut**, choix de
+l'utilisateur), **aucun** appel d'outil n'est exécuté directement, lectures comprises ; en `writes_only`, seulement les
+outils `requires_approval`. Un appel à valider suit toujours le même chemin :
+1. le modèle demande l'appel → l'agent émet `approval_required` (`calls` : id, nom, paramètres, résumé lisible,
+   `kind` = `read` | `write` | `delegation`) puis `done` avec `stop_reason = "awaiting_approval"` ;
+2. l'interface affiche une carte par appel (badge « Lecture », « Écriture » ou « Délégation », résumé,
+   « Autoriser / Refuser ») ; plusieurs appels d'un même tour se décident un par un, puis partent ensemble.
+   Jamais de « tout autoriser » ;
 3. le client renvoie l'historique (terminé par le message assistant contenant les appels) avec
    `approvals: {"<id>": true|false}` ; l'agent exécute les appels autorisés, répond « refusé » pour les autres
-   et poursuit. Un appel sans décision provoque une nouvelle demande. Rien n'est stocké côté serveur.
+   et poursuit. Un appel sans décision provoque une nouvelle demande (pour lui seul), et rien n'est exécuté tant
+   qu'il en manque une. Rien n'est stocké côté serveur. Les identifiants `call_…` générés par le hub pour Ollama
+   font l'aller-retour à l'identique.
+
+Résumé d'une lecture : `BaseTool.approval_summary()` par défaut = nom lisible (`app/tools/labels.py`, mêmes
+libellés que l'interface) + paramètres principaux (« Data Via · requête : dataset_id = « ventes », limit = 50 ») ;
+un outil d'écriture le surcharge (« Créer la TASK … »). En `every_step`, le prompt système prévient le modèle que
+chaque appel est validé.
 
 **Confidentialité (« 100 % local »).** Un agent est verrouillé sur Ollama s'il le déclare (`privacy = "local_only"`)
 ou s'il utilise une boîte sensible (`tresorerie`, `savoir_*`, `cuisine_budget`). Demander Claude → 403 `provider_not_allowed` ; pas de repli
 vers Claude si Ollama tombe. L'orchestrateur ne peut déléguer à un agent local que s'il tourne lui-même sur Ollama,
 sinon la réponse partirait chez Claude.
 
-**Délégation.** Un seul niveau ; les sous-agents n'ont ni outils d'écriture ni délégation ; leurs artefacts
-remontent dans le panneau.
+**Délégation.** `delegate_to_agent` attend la validation (résumé : agent + consigne). Un seul niveau, jamais de
+délégation en chaîne. En `every_step`, le sous-agent n'a **aucun** outil : même ses lectures devraient être validées,
+et une validation ne peut pas être présentée depuis l'intérieur d'un appel d'outil. Il répond à partir de la consigne
+seule ; le résumé de la carte (« il répondra sans outil, à partir de cette consigne seulement »), la description de
+l'outil donnée à l'orchestrateur et le prompt du sous-agent le disent. En `writes_only`, le sous-agent garde ses
+lectures (ni écriture ni délégation) et ses artefacts remontent dans le panneau.
 
 **GitHub.** Liste blanche de dépôts (`GITHUB_REPO` + `GITHUB_ALLOWED_REPOS`), jamais d'écriture sur `main`, `master`
 ou la branche par défaut, branches `feat|fix|chore|docs|refactor|test/…`, chemins sans `..`, PR en brouillon par défaut.
@@ -145,6 +160,8 @@ class VeilleAgent(BaseAgent):
 ```
 
 Nouvel outil d'écriture : `requires_approval = True` et un `approval_summary()` lisible (« Créer la TASK … »).
+Nouvel outil de lecture : son libellé dans `app/tools/labels.py` (`TOOL_LABELS`) et dans `ToolCall.tsx` ; le résumé
+par défaut suffit, sauf paramètres peu parlants.
 Outil sur des données personnelles ou financières : `sensitive = True` (et `sensitive=True` sur sa boîte).
 Toute nouvelle boîte se déclare dans `app/tools/toolsets.py` (`register_toolset`).
 

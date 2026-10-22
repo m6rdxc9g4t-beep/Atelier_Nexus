@@ -30,9 +30,12 @@ faire sans modèle). La fenêtre indique ce qui a été écarté et pourquoi.
 - **Arrêt à la première erreur ou au premier refus** : les étapes suivantes sont marquées
   « non exécutées » (elles dépendent souvent de la précédente : un commit après la création
   d'une branche). Un refus donne le statut `stopped`.
-- **Écritures validées à chaque lancement** : une étape `requires_approval` (créer une tâche
-  dans Projets, modifier Tab…) n'est jamais exécutée sans « Autoriser », exactement comme dans
-  le chat ; le workflow s'arrête d'abord sur `awaiting_approval` sans rien exécuter.
+- **Chaque étape validée à chaque lancement** (`APPROVAL_MODE=every_step`, défaut, choix de
+  l'utilisateur — [`settings.md`](settings.md)) : aucune étape, lecture comprise, n'est exécutée
+  sans « Autoriser », exactement comme dans le chat ; le workflow s'arrête d'abord sur
+  `awaiting_approval` sans rien exécuter et présente toutes ses étapes (`pending[].kind` : `read`
+  ou `write`), à décider une par une. En `writes_only`, seules les étapes `requires_approval`
+  (créer une tâche dans Projets, modifier Tab…) attendent.
 - **Une validation vaut pour l'action montrée, et elle seule** : chaque action en attente
   porte un jeton calculé à partir du workflow (identifiant et version), du numéro d'étape, de
   l'outil et des valeurs finales. D'autres valeurs de paramètres, une étape déplacée ou un
@@ -136,13 +139,17 @@ d'une application à l'autre, sans modèle.
 
 - **Porte de contrôle** : le graphe est validé (§7) et les entrées vérifiées avec les paramètres
   avant la première étape ; un problème → exécution `failed`, « Rien n'a été exécuté ».
-- **Chaque écriture s'arrête** (`write` / `destructive` du manifeste, outil `requires_approval`) sur
-  `awaiting_approval` avec son **entrée résolue** (valeurs réelles des étapes précédentes). Jeton :
+- **Chaque étape s'arrête** (`APPROVAL_MODE=every_step`, défaut) — en `writes_only`, seulement
+  chaque écriture (`write` / `destructive` du manifeste, outil `requires_approval`) — sur
+  `awaiting_approval` avec son **entrée résolue** (valeurs réelles des étapes précédentes, déjà
+  exécutées : leur résultat est visible dans le suivi, juste au-dessus de la carte). Une étape dont
+  la condition `when` est fausse reste `skipped` sans validation (rien ne s'exécute). Jeton :
   `sha256(run_id, step_id, uses, entrée)[:32]` ; la reprise exécute exactement l'entrée montrée. Un
   jeton absent ou périmé laisse l'exécution en attente ; deux reprises simultanées n'exécutent
   qu'une fois (passage atomique `awaiting_approval → running`).
 - **Définition figée au lancement** : modifier le workflow pendant une validation ne change pas ce
-  qui sera exécuté.
+  qui sera exécuté. Le mode de validation aussi est retenu au lancement ; s'il passe à
+  `every_step` pendant l'exécution, les étapes suivantes l'appliquent (le plus strict l'emporte).
 - **Idempotence** : une action `idempotency: header` reçoit `Idempotency-Key: nexus:<run>:<step>`,
   une action `field` le champ `idempotency_key` ; relancer une reprise ne crée pas de doublon.
 - **Jamais de modèle** : `delegate_to_agent`, `current_datetime` → `NOT_REPLAYABLE`. Les outils
@@ -205,10 +212,12 @@ Tab publie un **événement** (`atelier-node/1`, [`apps/noeud-atelier.md`](apps/
 
 ## 9. Règles
 
-- **Une écriture n'est jamais exécutée sans validation humaine** : lancée par un déclencheur,
-  l'exécution s'arrête sur `awaiting_approval` exactement comme en manuel (même moteur, même
-  `launch_run`) et rejoint la boîte **« À valider »** (`GET /api/workflow-runs?status=awaiting_approval`,
-  badge `GET /api/workflow-runs/inbox-count`). Un workflow sans écriture va jusqu'au bout seul.
+- **Rien ne s'exécute sans validation humaine** : lancée par un déclencheur, l'exécution s'arrête
+  sur `awaiting_approval` exactement comme en manuel (même moteur, même `launch_run`) — dès
+  l'**étape 1** en `APPROVAL_MODE=every_step` (défaut), à la première écriture en `writes_only` — et
+  rejoint la boîte **« À valider »** (`GET /api/workflow-runs?status=awaiting_approval`, badge
+  `GET /api/workflow-runs/inbox-count`). Chaque étape suivante y revient à son tour. En
+  `writes_only` seulement, un workflow sans écriture va jusqu'au bout seul.
 - **Rien en rafale** : un horaire manqué pendant que Nexus était fermé donne **une** exécution au
   redémarrage, les autres occurrences sont comptées `missed`. Un trou d'événements (`gap: true`)
   ne relance rien : le curseur repart du dernier `seq`, `state.warning` le dit.

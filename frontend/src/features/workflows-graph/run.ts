@@ -3,7 +3,7 @@
  * livrables nouveaux à envoyer au panneau Artefacts. Logique pure, testée dans run.test.ts.
  */
 
-import type { Artifact, RunStatus, WorkflowRun } from "@/types/api";
+import type { Artifact, RunStatus, StepRun, WorkflowRun } from "@/types/api";
 
 import type { StepDisplayStatus } from "./graph";
 
@@ -63,3 +63,22 @@ export const launchValues = (
   params: { name: string; default: string }[],
   previous: Record<string, string> = {},
 ): Record<string, string> => Object.fromEntries(params.map((p) => [p.name, previous[p.name] ?? p.default]));
+
+/** Étapes dont le résultat se montre au-dessus de la validation suivante. */
+const DONE_STATUSES = new Set<StepRun["status"]>(["ok", "error"]);
+
+/**
+ * Dernière étape exécutée (réussie ou en erreur) avant l'étape en attente, dans l'ordre
+ * d'exécution : son résultat est affiché juste au-dessus de la carte de validation.
+ */
+export function previousStep(run: WorkflowRun, stepId: string): StepRun | null {
+  const index = run.steps.findIndex((s) => s.id === stepId);
+  const before = index < 0 ? [] : run.steps.slice(0, index);
+  return before.findLast((s) => DONE_STATUSES.has(s.status)) ?? null;
+}
+
+/** Texte court d'un résultat d'étape (le détail complet reste dans la liste des étapes). */
+export function resultExcerpt(step: StepRun, max = 600): string {
+  const text = step.content.trim() || (step.data === null || step.data === undefined ? "" : JSON.stringify(step.data));
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}

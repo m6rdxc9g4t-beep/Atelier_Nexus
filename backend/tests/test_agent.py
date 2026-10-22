@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 import pytest
 
@@ -13,6 +13,10 @@ from app.agents import (
 from app.core.llm import Message, ProviderUnavailableError, ToolResultBlock
 from app.tools import BaseTool, PublishArtifactTool, ToolContext, ToolInput, ToolOutput
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
+
+#: Ces tests portent sur la boucle d'outils : lectures exécutées seules (validations :
+#: test_approval_mode.py)
+WRITES_ONLY: Literal["writes_only"] = "writes_only"
 
 
 class AddInput(ToolInput):
@@ -42,7 +46,7 @@ class CalcAgent(BaseAgent):
 
 async def test_plain_answer_without_tools() -> None:
     provider = ScriptedProvider("anthropic", [text_response("Bonjour à vous")])
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     result = await agent.run([Message.user("Salut")])
     assert result.text == "Bonjour à vous"
     assert result.iterations == 1
@@ -58,7 +62,7 @@ async def test_tool_loop_executes_tool_and_returns_result() -> None:
         "anthropic",
         [tool_response("add", {"a": 2, "b": 3}), text_response("Le total est 5")],
     )
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     events = [e async for e in agent.run_stream([Message.user("2+3 ?")])]
 
     kinds = [e.type for e in events]
@@ -87,7 +91,7 @@ async def test_artifacts_are_emitted_and_collected() -> None:
             text_response("Requête publiée."),
         ],
     )
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     events = [e async for e in agent.run_stream([Message.user("Une requête")])]
     artifact_events = [e for e in events if isinstance(e, ArtifactEvent)]
     assert len(artifact_events) == 1
@@ -101,7 +105,7 @@ async def test_invalid_tool_input_is_reported_to_model() -> None:
         "anthropic",
         [tool_response("add", {"a": "deux"}), text_response("Désolé")],
     )
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     events = [e async for e in agent.run_stream([Message.user("?")])]
     result = next(e for e in events if isinstance(e, ToolResultEvent))
     assert result.is_error
@@ -110,7 +114,7 @@ async def test_invalid_tool_input_is_reported_to_model() -> None:
 
 async def test_unknown_tool_is_reported_to_model() -> None:
     provider = ScriptedProvider("anthropic", [tool_response("delete_all", {}), text_response("ok")])
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     events = [e async for e in agent.run_stream([Message.user("?")])]
     result = next(e for e in events if isinstance(e, ToolResultEvent))
     assert result.is_error and "Outil inconnu" in result.content
@@ -119,7 +123,7 @@ async def test_unknown_tool_is_reported_to_model() -> None:
 async def test_stops_after_max_iterations() -> None:
     script = [tool_response("add", {"a": 1, "b": 1}, call_id=f"c{i}") for i in range(3)]
     provider = ScriptedProvider("anthropic", list(script))
-    agent = CalcAgent(make_router(provider))
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     result = await agent.run([Message.user("boucle")])
     assert result.stop_reason == "max_iterations"
     assert result.iterations == 3
@@ -131,7 +135,7 @@ async def test_sticks_to_fallback_provider_for_whole_run() -> None:
         "ollama",
         [tool_response("add", {"a": 1, "b": 2}, provider="ollama"), text_response("3", "ollama")],
     )
-    agent = CalcAgent(make_router(anthropic, ollama, fallback="ollama"))
+    agent = CalcAgent(make_router(anthropic, ollama, fallback="ollama"), approval_mode=WRITES_ONLY)
     result = await agent.run([Message.user("1+2")], model="claude-x")
     assert result.provider == "ollama"
     # 2e itération envoyée directement à Ollama, sans le modèle Claude

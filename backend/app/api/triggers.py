@@ -250,8 +250,8 @@ async def test_trigger(
     body: Annotated[TriggerTestRequest | None, Body()] = None,
 ) -> WorkflowRun:
     """Lance une fois maintenant comme le ferait le déclencheur (origine `test`), avec un
-    événement d'exemple facultatif pour les gabarits `{{event.…}}`. Une écriture s'arrête sur
-    `awaiting_approval`, comme toujours."""
+    événement d'exemple facultatif pour les gabarits `{{event.…}}`. L'exécution s'arrête sur
+    `awaiting_approval` comme toujours (dès l'étape 1 en `APPROVAL_MODE=every_step`)."""
     try:
         run = await service.test(trigger_id, body.event if body else None)
     except WorkflowError as exc:

@@ -35,7 +35,9 @@ import { appTheme } from "@/features/workflows-graph/catalog";
 import { RUN_STATUS } from "@/features/workflows-graph/run";
 import { AppStatusDot, AppTile } from "@/features/workflows-graph/StepBadges";
 import { ApiError, api } from "@/lib/api";
+import { triggerReminder } from "@/lib/approval";
 import { cn } from "@/lib/utils";
+import { useApprovalMode } from "@/stores/useApprovalModeStore";
 import type { TriggerPreset } from "@/stores/useWorkflowStudioStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { EventsCatalog, EventsCatalogApp, RunStatus, Trigger, WorkflowParam, WorkflowRun } from "@/types/api";
@@ -75,14 +77,16 @@ import {
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const REFRESH_MS = 30_000;
 
-/** Rappel affiché partout où l'on crée ou teste un déclencheur (règle §0.1 du contrat). */
+/** Rappel affiché partout où l'on crée ou teste un déclencheur (règle §0.1 du contrat), selon
+ * le réglage APPROVAL_MODE (chaque étape, ou les écritures). */
 export function ApprovalReminder({ className }: { className?: string }) {
+  const { lead, tail } = triggerReminder(useApprovalMode());
   return (
     <p className={cn("flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/8 px-2 py-1.5 text-xs", className)}>
       <ShieldQuestion className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
       <span>
-        Les étapes qui écrivent attendront votre validation dans <strong className="font-semibold">À valider</strong> : rien
-        n&apos;est modifié sans vous.
+        {lead} <strong className="font-semibold">À valider</strong>
+        {tail}
       </span>
     </p>
   );

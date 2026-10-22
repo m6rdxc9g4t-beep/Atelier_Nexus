@@ -6,8 +6,11 @@ Les noms ci-dessous sont **figés** : le frontend code contre eux avec des doubl
 
 ## 0. Règles qui ne se négocient pas
 
-1. **Une écriture n'est jamais exécutée sans validation humaine**, même lancée par un déclencheur : l'exécution s'arrête
-   sur `awaiting_approval` (règle CLAUDE.md §6) et rejoint la boîte **« À valider »**. Un workflow sans écriture va jusqu'au bout seul.
+1. **Rien n'est exécuté sans validation humaine**, même lancé par un déclencheur (règle CLAUDE.md §6). En
+   `APPROVAL_MODE=every_step` (**défaut**, choix de l'utilisateur), l'exécution s'arrête sur `awaiting_approval` **dès l'étape 1**
+   (lectures comprises) et rejoint la boîte **« À valider »** ; chaque étape suivante y revient à son tour. En `writes_only`,
+   seules les écritures s'arrêtent et un workflow sans écriture va jusqu'au bout seul. L'interface affiche le rappel selon le
+   réglage courant (lu dans `GET /api/settings`, champ `APPROVAL_MODE`).
 2. **Jamais d'appel de modèle** (inchangé).
 3. **Rien de rattrapé en rafale** : un horaire manqué pendant que Nexus était fermé donne **au plus une** exécution au
    redémarrage (statut de l'occurrence `missed` sinon) ; un trou d'événements (`gap: true`) ne relance rien en masse : le

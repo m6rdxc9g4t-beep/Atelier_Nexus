@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ApprovalCard } from "@/features/workflows-graph/ApprovalCard";
 import { usesLabel } from "@/features/workflows-graph/catalog";
+import { previousStep } from "@/features/workflows-graph/run";
 import { ApiError, api } from "@/lib/api";
+import { decisionText, inboxTexts } from "@/lib/approval";
 import { cn } from "@/lib/utils";
+import { useApprovalMode } from "@/stores/useApprovalModeStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { PendingApproval, WorkflowRun } from "@/types/api";
 
@@ -23,6 +26,7 @@ const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ?
 export function InboxButton() {
   const count = useInboxCount();
   const setOpen = useWorkflowStudioStore((s) => s.setInboxOpen);
+  const texts = inboxTexts(useApprovalMode());
   const pending = count ?? 0;
   return (
     <Button
@@ -30,7 +34,7 @@ export function InboxButton() {
       size="sm"
       className={cn("relative", pending > 0 && "text-foreground")}
       aria-label={count === null ? "À valider" : inboxLabel(pending)}
-      title="À valider : écritures des workflows en attente de votre accord"
+      title={texts.title}
       onClick={() => setOpen(true)}
     >
       <Inbox />
@@ -50,12 +54,14 @@ export function InboxButton() {
 type Loaded = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; runs: WorkflowRun[] };
 
 /**
- * Boîte « À valider » : toutes les exécutions arrêtées sur une écriture (lancées à la main, par un
- * horaire ou un événement), avec la carte de validation de l'éditeur. Rien n'est écrit sans accord.
+ * Boîte « À valider » : toutes les exécutions arrêtées sur une validation (chaque étape en
+ * APPROVAL_MODE=every_step, les écritures sinon ; lancées à la main, par un horaire ou un
+ * événement), avec la carte de validation de l'éditeur. Rien ne s'exécute sans accord.
  */
 export function InboxDialog() {
   const open = useWorkflowStudioStore((s) => s.inboxOpen);
   const setOpen = useWorkflowStudioStore((s) => s.setInboxOpen);
+  const texts = inboxTexts(useApprovalMode());
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-2xl flex-col gap-3">
@@ -63,18 +69,15 @@ export function InboxDialog() {
           <DialogTitle className="flex items-center gap-2">
             <Inbox className="size-5 text-accent-ink" aria-hidden />À valider
           </DialogTitle>
-          <DialogDescription>
-            Les workflows s&apos;arrêtent avant chaque écriture, même lancés tout seuls. Vérifiez l&apos;entrée résolue, puis autorisez
-            ou refusez : la suite reprend aussitôt.
-          </DialogDescription>
+          <DialogDescription>{texts.description}</DialogDescription>
         </DialogHeader>
-        {open && <InboxBody />}
+        {open && <InboxBody empty={texts.empty} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function InboxBody() {
+function InboxBody({ empty }: { empty: string }) {
   const [state, setState] = useState<Loaded>({ status: "loading" });
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const [refresh, setRefresh] = useState(0);
@@ -112,14 +115,7 @@ function InboxBody() {
     setErrors((e) => Object.fromEntries(Object.entries(e).filter(([id]) => id !== run.id)));
     try {
       const next = await api.resumeWorkflowRun(run.id, { [pending.token]: allow });
-      setDone({
-        id: run.id,
-        text: allow
-          ? next.status === "awaiting_approval"
-            ? "Autorisé : une autre écriture attend votre validation."
-            : "Autorisé : le workflow a repris."
-          : "Refusé : l'exécution est arrêtée, rien n'a été écrit.",
-      });
+      setDone({ id: run.id, text: decisionText(allow, next.status === "awaiting_approval") });
       setState((s) =>
         s.status === "ready"
           ? { status: "ready", runs: inboxOrder(s.runs.map((r) => (r.id === run.id ? next : r))) }
@@ -171,8 +167,7 @@ function InboxBody() {
       {state.runs.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
           <ShieldCheck className="size-7 text-accent-ink" aria-hidden />
-          Aucune écriture n&apos;attend votre accord. Les workflows lancés par un horaire ou un événement s&apos;arrêteront ici avant
-          d&apos;écrire.
+          {empty}
         </div>
       ) : (
         <ul className="grid min-h-0 grid-cols-[minmax(0,1fr)] gap-3 overflow-y-auto pr-1">
@@ -196,15 +191,19 @@ function InboxBody() {
                     {timeAgo(run.updated_at)}
                   </time>
                 </header>
-                {run.pending.map((pending) => (
-                  <ApprovalCard
-                    key={pending.token}
-                    pending={pending}
-                    label={stepLabel(pending.step_id)}
-                    busy={busy !== null}
-                    onDecide={(p, allow) => void decide(run, p, allow)}
-                  />
-                ))}
+                {run.pending.map((pending) => {
+                  const before = previousStep(run, pending.step_id);
+                  return (
+                    <ApprovalCard
+                      key={pending.token}
+                      pending={pending}
+                      label={stepLabel(pending.step_id)}
+                      previous={before && { step: before, label: stepLabel(before.id) }}
+                      busy={busy !== null}
+                      onDecide={(p, allow) => void decide(run, p, allow)}
+                    />
+                  );
+                })}
                 {run.pending.length === 0 && (
                   <p className="text-xs text-muted-foreground">L&apos;étape en attente n&apos;est plus disponible : ouvrez le suivi.</p>
                 )}

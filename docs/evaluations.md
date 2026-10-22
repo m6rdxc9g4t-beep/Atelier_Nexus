@@ -53,7 +53,10 @@ Code de sortie : 0 si tous les cas joués réussissent tous leurs essais, 1 sino
   avec les vrais outils et leurs garde-fous (exploration préalable de Data Via, validations,
   verrou local). Rien n'est réimplémenté pour l'évaluation.
 - **Aucune écriture** : aucune validation n'est donnée ; l'agent s'arrête sur « en attente de
-  validation » et le cas vérifie justement que la validation a été demandée.
+  validation » et le cas vérifie justement que la validation a été demandée. Les applications
+  simulées tournent en `APPROVAL_MODE=writes_only` (`simulated_settings`) : les lectures simulées
+  s'exécutent pour suivre tout le raisonnement du modèle ; l'interface, elle, valide chaque action
+  par défaut ([`settings.md`](settings.md)).
 - **Confidentialité** : un agent local (Finance, Comptable, Tuteur) ne parle qu'à Ollama, et
   son juge aussi. Demander `--juge-provider anthropic` pour lui donne un avertissement, pas un appel.
 - **Reproductible** en mode simulé : jeu de ventes généré avec une graine fixe (240 ventes,

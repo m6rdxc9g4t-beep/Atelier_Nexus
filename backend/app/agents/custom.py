@@ -48,4 +48,4 @@ class ConfigurableAgent(BaseAgent):
         super().__init__(router, env, delegated=delegated)
 
     def build_system_prompt(self, ctx: ToolContext) -> str:
-        return self.system_prompt + GUARDRAILS + self.unavailable_note()
+        return self.system_prompt + GUARDRAILS + self.unavailable_note() + self.approval_note()

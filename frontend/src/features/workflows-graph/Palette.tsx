@@ -89,7 +89,7 @@ export function Palette({
         {catalog && groups.length === 0 && (
           <p className="p-2 text-sm text-muted-foreground">Aucune étape ne correspond.</p>
         )}
-        <ul className="grid gap-1.5">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           {groups.map((group) => {
             const open = filtering || !closed.has(group.key);
             const toggle = () =>
@@ -118,7 +118,7 @@ export function Palette({
                   <ChevronRight className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-90")} aria-hidden />
                 </button>
                 {open && (
-                  <ul className="mt-1 grid gap-1 pl-1">
+                  <ul className="mt-1 grid grid-cols-[minmax(0,1fr)] gap-1 pl-1">
                     {group.entries.length === 0 && (
                       <li className="px-2 py-1 text-xs text-muted-foreground">
                         {group.status === "no_contract"
@@ -156,7 +156,7 @@ function PaletteEntry({ entry, onAdd }: { entry: CatalogEntry; onAdd: (entry: Ca
       }}
       title={disabled ? (entry.unavailable_reason ?? "Indisponible") : entry.description || entry.uses}
       className={cn(
-        "group flex items-start gap-2 rounded-md border border-atelier-line bg-card px-2 py-1.5",
+        "group flex min-w-0 items-start gap-2 rounded-md border border-atelier-line bg-card px-2 py-1.5",
         disabled ? "cursor-not-allowed opacity-55" : "cursor-grab hover:border-atelier-border active:cursor-grabbing",
       )}
     >

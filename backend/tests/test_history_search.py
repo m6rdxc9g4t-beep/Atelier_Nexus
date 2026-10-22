@@ -64,14 +64,21 @@ def test_search_endpoint(client: TestClient, anthropic: ScriptedProvider) -> Non
         text_response("Publié."),
     ]
     detail = client.get(f"/api/conversations/{second}").json()
+    messages = [*detail["history"], user("Publie le budget")]
+    run = client.post(
+        "/api/agents/assistant/run", json={"messages": messages, "conversation_id": second}
+    )
+    assert run.status_code == 200 and run.json()["stop_reason"] == "awaiting_approval"
+    # Publication autorisée (APPROVAL_MODE=every_step, défaut)
     run = client.post(
         "/api/agents/assistant/run",
         json={
-            "messages": [*detail["history"], user("Publie le budget")],
+            "messages": [*messages, *run.json()["new_messages"]],
             "conversation_id": second,
+            "approvals": {"a1": True},
         },
     )
-    assert run.status_code == 200
+    assert run.status_code == 200 and run.json()["stop_reason"] == "end_turn"
 
     hits = client.get("/api/conversations/search", params={"q": "REUNION equipe"}).json()
     assert [h["id"] for h in hits] == [first]

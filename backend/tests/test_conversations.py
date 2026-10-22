@@ -80,8 +80,20 @@ def test_conversation_lifecycle(client: TestClient, anthropic: ScriptedProvider)
         events = sse(r.read().decode())
     assert [k for k, _ in events][-2:] == ["done", "saved"]
 
+    # APPROVAL_MODE=every_step (défaut) : la publication attend, la demande est enregistrée
+    waiting = client.get(f"/api/conversations/{cid}").json()
+    assert [p["kind"] for p in waiting["pending_approvals"]] == ["read"]
+    with client.stream(
+        "POST",
+        "/api/agents/assistant/stream",
+        json={"messages": waiting["history"], "conversation_id": cid, "approvals": {"p1": True}},
+    ) as r:
+        events = sse(r.read().decode())
+    assert [k for k, _ in events][-2:] == ["done", "saved"]
+
     detail = client.get(f"/api/conversations/{cid}").json()
     assert detail["title"] == "Fais-moi un plan de lancement"
+    assert detail["pending_approvals"] == []
     roles = [m["role"] for m in detail["history"]]
     assert roles == ["user", "assistant", "user", "assistant"]
     assert detail["artifacts"][0]["title"] == "Plan" and detail["artifacts"][0]["position"] == 4

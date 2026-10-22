@@ -7,11 +7,35 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+class UtcDateTime(TypeDecorator[datetime]):
+    """Horodatage toujours rendu **avec fuseau UTC**, quelle que soit la base.
+
+    PostgreSQL rend des dates avec fuseau ; SQLite (bureau, tests) les rend naïves. Une date naïve
+    sortie telle quelle dans l'API est lue par le navigateur comme une heure locale (décalage de
+    deux heures à Paris l'été). Écriture : convertie en UTC ; lecture : une date naïve est de l'UTC.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class Base(DeclarativeBase):
@@ -32,10 +56,8 @@ class CustomAgentRow(Base):
     privacy: Mapped[str] = mapped_column(String(20), default="standard")
     default_provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
     starters: Mapped[list[str]] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, onupdate=_now)
 
 
 class ConversationRow(Base):
@@ -53,9 +75,9 @@ class ConversationRow(Base):
     pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
     #: Texte normalisé pour la recherche (app/db/search.py)
     search_text: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now, index=True
+        UtcDateTime(), default=_now, onupdate=_now, index=True
     )
 
     artifacts: Mapped[list[ArtifactRow]] = relationship(
@@ -81,7 +103,7 @@ class ArtifactRow(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     #: Longueur de l'historique à la fin du tour qui a produit l'artefact
     position: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
 
     conversation: Mapped[ConversationRow] = relationship(back_populates="artifacts")
 
@@ -103,7 +125,7 @@ class AttachmentRow(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
 
 
 class WorkflowRow(Base):
@@ -121,11 +143,11 @@ class WorkflowRow(Base):
     params: Mapped[list[Any]] = mapped_column(JSON, default=list)
     source_conversation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     run_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now, index=True
+        UtcDateTime(), default=_now, onupdate=_now, index=True
     )
 
 
@@ -151,10 +173,8 @@ class WorkflowRunRow(Base):
     artifacts: Mapped[list[Any]] = mapped_column(JSON, default=list)
     pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
     state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, onupdate=_now)
 
 
 class WorkflowTriggerRow(Base):
@@ -178,10 +198,8 @@ class WorkflowTriggerRow(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     internal: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, onupdate=_now)
 
 
 class TriggerCursorRow(Base):
@@ -191,6 +209,4 @@ class TriggerCursorRow(Base):
 
     app: Mapped[str] = mapped_column(String(20), primary_key=True)
     seq: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, onupdate=_now)

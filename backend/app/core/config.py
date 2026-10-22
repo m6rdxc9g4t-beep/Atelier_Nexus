@@ -7,6 +7,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#: Validation humaine : `every_step` (défaut, choix de l'utilisateur) = toute action d'agent ou
+#: d'étape de workflow attend « Autoriser » ; `writes_only` = seulement les écritures
+ApprovalMode = Literal["every_step", "writes_only"]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -40,6 +44,9 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
     ollama_timeout: float = 300.0
+
+    # Validation des actions (docs/settings.md) : chaque action, ou seulement les écritures
+    approval_mode: ApprovalMode = "every_step"
 
     # Apps Atelier — Data Via = API d'Atelier Viz (docs/SUITE.md : port 8000)
     data_via_base_url: str | None = "http://127.0.0.1:8000/api"

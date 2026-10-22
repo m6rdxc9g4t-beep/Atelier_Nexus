@@ -178,6 +178,9 @@ async def test_daily_schedule_fires_once_then_catches_up_once_after_a_restart(
     suite: Suite,
     clock: FakeClock,
 ) -> None:
+    suite.approval_mode = (
+        "writes_only"  # sujet : le moteur des déclencheurs (every_step : plus bas)
+    )
     wf = workflow(api, READ)
     trigger = add(api, wf, daily(params={"projet": "7"}))
     state = trigger["state"]
@@ -238,6 +241,32 @@ async def test_interval_schedule_waits_while_a_write_awaits_approval(
     assert len(runs(api, wf)) == 2
 
 
+async def test_every_step_stops_a_read_at_step_one_and_fills_the_inbox(
+    api: TestClient, service: TriggerService, suite: Suite, clock: FakeClock
+) -> None:
+    """APPROVAL_MODE=every_step (défaut) : même un workflow de lecture lancé par un horaire
+    s'arrête sur sa première étape, compte dans « À valider », et n'est pas relancé tant qu'il
+    attend (au plus une exécution en attente par déclencheur)."""
+    wf = workflow(api, READ)
+    trigger = add(api, wf, {"kind": "schedule", "schedule": {"kind": "interval", "every_minutes": 5}})  # fmt: skip
+    clock.advance(minutes=5)
+    await service.tick()
+    [run] = runs(api, wf)
+    assert run["status"] == "awaiting_approval" and run["trigger"] == "schedule"
+    assert [(x["id"], x["status"]) for x in run["steps"]] == [("lire", "awaiting_approval")]
+    assert run["pending"][0]["kind"] == "read" and run["pending"][0]["input"] == {"project_id": 1}
+    assert not [r for r in suite.projets.requests if r.url.path.endswith("/work-items")]
+    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 1}
+
+    clock.advance(minutes=5)
+    await service.tick()
+    assert len(runs(api, wf)) == 1 and get(api, trigger)["state"]["counters"]["waiting"] == 1
+
+    run = approve(api, run)
+    assert run["status"] == "completed" and run["steps"][0]["status"] == "ok"
+    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 0}
+
+
 async def test_disabled_and_updated_schedules(
     api: TestClient, service: TriggerService, clock: FakeClock
 ) -> None:
@@ -285,11 +314,13 @@ async def test_event_trigger_runs_a_write_that_waits_then_resumes(
     assert state["counters"]["filtered"] == 1
 
     # Boîte « À valider » (tous workflows) et badge
+    # (APPROVAL_MODE=every_step, défaut : une lecture lancée à la main attend aussi)
     other = workflow(api, READ, title="Autre")
-    api.post(f"/api/workflows/{other}/run", json={"params": {}})
+    manual = api.post(f"/api/workflows/{other}/run", json={"params": {}}).json()
+    assert manual["status"] == "awaiting_approval" and manual["pending"][0]["kind"] == "read"
     inbox = api.get("/api/workflow-runs", params={"status": "awaiting_approval"}).json()
-    assert [r["id"] for r in inbox] == [run["id"]]
-    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 1}
+    assert {r["id"] for r in inbox} == {run["id"], manual["id"]}
+    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 2}
     assert api.get("/api/workflow-runs", params={"status": "nope"}).status_code == 422
 
     # Tant qu'elle attend : les nouveaux événements sont comptés `waiting`
@@ -301,7 +332,7 @@ async def test_event_trigger_runs_a_write_that_waits_then_resumes(
     run = approve(api, run)
     assert run["status"] == "completed" and run["trigger"] == "event"
     assert suite.projets.created[0]["title"] == "Doc #123 Écrire la doc (IN_PROGRESS)"
-    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 0}
+    assert api.get("/api/workflow-runs/inbox-count").json() == {"awaiting_approval": 1}
     suite.projets.events.append(event(10, to="IN_PROGRESS", subject_id="127", label="Tests"))
     await service.tick()
     latest = runs(api, wf)[0]
@@ -312,6 +343,9 @@ async def test_event_trigger_runs_a_write_that_waits_then_resumes(
 async def test_first_start_replays_nothing_and_new_triggers_see_only_new_events(
     api: TestClient, service: TriggerService, triggers: TriggerRepository, suite: Suite
 ) -> None:
+    suite.approval_mode = (
+        "writes_only"  # sujet : le moteur des déclencheurs (every_step : plus bas)
+    )
     wf = workflow(api, READ)
     suite.projets.mode = "down"  # créé alors que Projets ne répond pas : accepté, signalé
     clear_manifest_cache()
@@ -360,6 +394,9 @@ async def test_unreachable_app_sets_last_error_then_recovers(
 async def test_gap_warns_and_relaunches_nothing(
     api: TestClient, service: TriggerService, triggers: TriggerRepository, suite: Suite
 ) -> None:
+    suite.approval_mode = (
+        "writes_only"  # sujet : le moteur des déclencheurs (every_step : plus bas)
+    )
     wf = workflow(api, READ)
     trigger = add(api, wf, on_event(filters=[]))
     suite.projets.events.append(event(6, to="IN_PROGRESS"))
@@ -408,6 +445,9 @@ async def test_debounce_keeps_the_last_event_of_the_burst(
 async def test_throttling_by_max_runs_per_hour(
     api: TestClient, service: TriggerService, suite: Suite, clock: FakeClock
 ) -> None:
+    suite.approval_mode = (
+        "writes_only"  # sujet : le moteur des déclencheurs (every_step : plus bas)
+    )
     wf = workflow(api, READ)
     trigger = add(api, wf, on_event(max_runs_per_hour=2))
     suite.projets.events += [event(s, to="IN_PROGRESS") for s in (6, 7, 8)]
@@ -586,8 +626,15 @@ async def test_one_trigger_never_runs_twice_in_parallel(
 
 
 async def test_an_error_on_one_trigger_does_not_stop_the_pass(
-    api: TestClient, service: TriggerService, clock: FakeClock, monkeypatch: pytest.MonkeyPatch
+    api: TestClient,
+    service: TriggerService,
+    suite: Suite,
+    clock: FakeClock,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    suite.approval_mode = (
+        "writes_only"  # sujet : le moteur des déclencheurs (every_step : plus bas)
+    )
     broken_wf = workflow(api, READ, title="Cassé")
     broken = add(api, broken_wf, daily())
     healthy_wf = workflow(api, READ, title="Sain")

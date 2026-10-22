@@ -15,6 +15,7 @@ from typing import Any, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.llm.types import ToolSpec
+from app.tools.labels import default_summary, tool_label
 
 logger = logging.getLogger(__name__)
 
@@ -108,18 +109,23 @@ class BaseTool[InputT: ToolInput](ABC):
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:
         """Logique métier de l'outil. Les exceptions sont converties en erreur d'outil."""
 
+    @property
+    def label(self) -> str:
+        """Nom lisible (« Data Via · requête ») pour les cartes de validation."""
+        return tool_label(self.name, self.description)
+
     def approval_summary(self, params: InputT) -> str:
-        """Phrase montrée à l'utilisateur avant validation (à surcharger : « Créer la tâche … »)."""
-        return f"{self.name} : " + ", ".join(
-            f"{k} = {v!r}" for k, v in params.model_dump(exclude_none=True).items()
-        )
+        """Phrase montrée à l'utilisateur avant validation. Par défaut : nom lisible et
+        paramètres principaux (« Data Via · requête : dataset = « ventes », limit = 50 ») ;
+        un outil d'écriture la surcharge (« Créer la TASK … »)."""
+        return default_summary(self.label, params.model_dump(exclude_none=True))
 
     def summarize(self, raw_input: dict[str, Any]) -> str:
-        """Résumé d'un appel brut (entrée invalide : on montre l'entrée telle quelle)."""
+        """Résumé d'un appel brut (entrée invalide : on le dit, l'outil la refusera)."""
         try:
             return self.approval_summary(self.input_model.model_validate(raw_input))
         except ValidationError:
-            return f"{self.name} (paramètres invalides)"
+            return f"{self.label} (paramètres invalides)"
 
     def spec(self) -> ToolSpec:
         return ToolSpec(

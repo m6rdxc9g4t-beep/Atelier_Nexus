@@ -15,7 +15,7 @@ from app.agents import (
 )
 from app.agents.base import REFUSED
 from app.api.deps import prepare_environment
-from app.core.config import Settings
+from app.core.config import ApprovalMode, Settings
 from app.core.llm import Message, ProviderNotAllowedError, ProviderUnavailableError
 from app.tools import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.base import Artifact
@@ -173,9 +173,14 @@ def test_finance_experts_are_local_only() -> None:
 # ─── Catalogue ────────────────────────────────────────────────────
 
 
-def env_without_apps() -> ToolEnvironment:
+def env_without_apps(approval_mode: ApprovalMode = "every_step") -> ToolEnvironment:
     return ToolEnvironment(
-        Settings(_env_file=None, github_repo=None, projets_base_url="http://projets.test/api")  # type: ignore[call-arg]
+        Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            github_repo=None,
+            projets_base_url="http://projets.test/api",
+            approval_mode=approval_mode,
+        )
     )
 
 
@@ -230,7 +235,8 @@ async def test_orchestrator_delegates_and_collects_artifacts() -> None:
         ],
     )
     router = make_router(provider)
-    env = env_without_apps()
+    # Seulement les écritures : le sous-agent garde ses lectures (every_step : test_approval_mode)
+    env = env_without_apps("writes_only")
     catalog = AgentCatalog()
     await prepare_environment(env, router, catalog)
 
@@ -265,14 +271,22 @@ async def test_cloud_orchestrator_cannot_reach_local_finance_agent() -> None:
     catalog = AgentCatalog()
     await prepare_environment(env, router, catalog)
     orchestrator = await catalog.build("orchestrateur", router, env)
-    events = [e async for e in orchestrator.run_stream([Message.user("Mon solde ?")])]
+    question = [Message.user("Mon solde ?")]
+    waiting = await orchestrator.run(question)  # la délégation attend « Autoriser »
+    assert [p.kind for p in waiting.pending_approvals] == ["delegation"]
+    events = [
+        e
+        async for e in orchestrator.run_stream(
+            [*question, *waiting.new_messages], approvals={"call_1": True}
+        )
+    ]
     result = next(e for e in events if isinstance(e, ToolResultEvent))
     assert result.is_error and "ne doivent pas quitter" in result.content
 
 
 async def test_delegated_agents_have_no_write_or_delegate_tools() -> None:
     catalog = AgentCatalog()
-    env = env_without_apps()
+    env = env_without_apps("writes_only")
     agent = await catalog.build("chef_de_projet", make_router(), env, delegated=True)
     assert agent.tools
     assert not any(t.requires_approval for t in agent.tools.values())

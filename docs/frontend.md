@@ -41,7 +41,9 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 | `src/features/workflows-graph/` | Éditeur de workflows v2 en graphe (`@xyflow/react`, contrat `docs/workflows-v2-api.md`) : `WorkflowGraphEditor` (fenêtre plein écran, ≥ 1024 px), `Palette` (catalogue par application), `StepNode`, `Inspector` (étape, condition, paramètres, formulaire généré depuis `input_schema`, menu « Utiliser… »), `RunPanel` (lancement, suivi, validation, historique). Logique pure testée : `graph.ts` (étapes ↔ nœuds/arêtes, ancêtres, ordre, couches, état d'exécution), `validate.ts`, `refs.ts` / `templates.ts` (gabarits), `schemaForm.ts`, `catalog.ts`, `draft.ts`, `run.ts` ; doubles du contrat dans `fixtures.ts` |
 | `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée) |
 | `src/features/workflow-triggers/` | Déclencheurs (contrat `docs/declencheurs-api.md`) : `TriggersPanel` (onglet de l'éditeur : liste, formulaire horaire / événement, « Tester maintenant »), `InboxDialog` + `useInboxCount` (boîte « À valider » de l'en-tête), `OriginBadge`. Logique pure testée : `summary.ts` (résumés FR, jours consécutifs, pluriels, dates relatives), `form.ts` (brouillon ↔ corps, validation aux bornes du contrat, gabarits `{{event.…}}`, événement d'exemple), `origin.ts` (origine d'une exécution, badge) ; doubles dans `fixtures.ts` |
-| `src/features/workflows-graph/ApprovalCard.tsx` | Carte de validation d'une écriture (résumé, entrée résolue, Autoriser / Refuser), partagée par le suivi et « À valider » |
+| `src/features/workflows-graph/ApprovalCard.tsx` | Carte de validation d'une étape (badge Lecture / Écriture / Destructif, résumé, entrée résolue, Autoriser / Refuser), avec le résultat de l'étape précédente juste au-dessus (`previousStep`, `resultExcerpt` de `run.ts`) ; partagée par le suivi et « À valider » |
+| `src/features/chat-agent/ApprovalCard.tsx` | Validation dans le chat : une carte par appel (badge Lecture / Écriture / Délégation, résumé, Autoriser / Refuser), décisions envoyées ensemble ; jamais de « tout autoriser » |
+| `src/lib/approval.ts`, `src/stores/useApprovalModeStore.ts` | Réglage `APPROVAL_MODE` (lu dans `GET /api/settings`, suivi à l'enregistrement des Réglages, `every_step` si illisible) et textes qui en dépendent (rappel des déclencheurs, « À valider », éditeurs) ; testés |
 | `src/stores/useWorkflowStudioStore.ts` | Ouverture de la liste des workflows, de l'éditeur en graphe, de la carte et de « À valider » (une fenêtre à la fois, retour à la précédente) ; cible d'éditeur avec panneau, exécution et déclencheur prérempli |
 
 ## 4. Workflows de suite et carte
@@ -82,7 +84,8 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 - **À valider** (en-tête) : badge `GET /api/workflow-runs/inbox-count` toutes les 20 s, suspendu quand l'onglet est
   caché, relu après chaque décision ; fenêtre des exécutions `awaiting_approval` de tous les workflows (titre,
   origine « Déclenché par projets.work_item.status_changed · Écrire la doc », ancienneté) avec la carte de
-  validation de l'éditeur, et « Ouvrir dans l'éditeur » (suivi de cette exécution).
+  validation de l'éditeur (résultat de l'étape précédente au-dessus), et « Ouvrir dans l'éditeur » (suivi de cette
+  exécution). Textes selon `APPROVAL_MODE` : « avant chaque étape » (défaut) ou « avant chaque écriture ».
 - **Historique** : chaque exécution porte son origine (Manuel, Horaire, Événement, Test) et son événement source.
 - Hypothèses au-delà du contrat : `trigger_id` / `trigger_event` lus comme facultatifs (exécutions d'avant la
   migration) ; un type d'événement inconnu n'est signalé localement que si l'app du catalogue liste des événements.

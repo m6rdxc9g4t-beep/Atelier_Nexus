@@ -50,6 +50,8 @@ class Suite:
             "app.tools.tab_mcp.SAFE_ENV", ("PATH", "HOME", "FAKE_MODE", "FAKE_LOG", "FAKE_MANIFEST")
         )
         self.mcp = True
+        #: APPROVAL_MODE des environnements créés (défaut de l'application : chaque étape)
+        self.approval_mode = "every_step"
 
     def settings(self, **extra: Any) -> Settings:
         values: dict[str, Any] = {
@@ -62,6 +64,7 @@ class Suite:
             "tab_exports_dir": str(self.exports),
             "tab_mcp_command": mcp_command() if self.mcp else None,
             "github_repo": None,
+            "approval_mode": self.approval_mode,
         }
         return Settings(**(values | extra))
 

@@ -13,6 +13,13 @@ Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivan
 [`docs/claude-code.md`](docs/claude-code.md)) ou clé Claude, modèles et adresses des apps : roue dentée **Réglages** de l'interface ([`docs/settings.md`](docs/settings.md)). Données dans
 `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
 
+## Validation de chaque action
+
+Par défaut (`APPROVAL_MODE=every_step`, Réglages → « Validation des actions » → **Chaque action**), toute action d'un agent
+— lecture comprise — et toute étape d'un workflow, même lancé par un horaire ou un événement, attend votre « Autoriser » :
+vous voyez à chaque étape ce qui va s'exécuter (et le résultat de l'étape précédente) avant de décider. « Seulement les
+écritures » rétablit l'ancien comportement. Détails : [`docs/settings.md`](docs/settings.md), [`docs/agents.md`](docs/agents.md) §3.
+
 ## Atelier Cuisine (app en ligne)
 
 Atelier Cuisine apparaît dans le menu **Suite Atelier** (« en ligne », jamais sondé ; l'app Mac s'ouvre si elle est

@@ -25,6 +25,7 @@ from app.suite.apps import NODE_APPS, app_color, app_name
 from app.suite.manifest import NodeAction
 from app.suite.nodes import NodeState
 from app.tools.base import BaseTool, portable_schema
+from app.tools.labels import short_label
 from app.tools.toolsets import blank_tools, build_tools, get_toolset, toolset_ids
 from app.workflows import NOT_REPLAYABLE
 
@@ -78,12 +79,6 @@ def parse_uses(uses: str) -> tuple[str, str, str] | None:
     if m.group(1):
         return "tool", m.group(2), ""
     return "node", m.group(4), m.group(5)
-
-
-def short_label(description: str) -> str:
-    """Libellé court d'un outil : début de sa description (« Liste les projets… »)."""
-    first = re.split(r"(?<=[a-zé])\. | : |\(", description, maxsplit=1)[0].strip().rstrip(".")
-    return first if len(first) <= 70 else first[:69].rstrip() + "…"
 
 
 class StepRegistry:

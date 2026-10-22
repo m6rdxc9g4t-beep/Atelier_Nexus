@@ -85,8 +85,14 @@ async def test_agent_loop_with_tools(
         default="anthropic",
     )
     agent = AssistantAgent(router, ToolEnvironment(Settings()))
-    result = await agent.run([Message.user("Quel jour sommes-nous ?")])
-    assert result.text == "Nous sommes le 20 octobre." and result.iterations == 2
+    question = [Message.user("Quel jour sommes-nous ?")]
+    # APPROVAL_MODE=every_step (défaut) : même la lecture de la date attend « Autoriser »
+    waiting = await agent.run(question)
+    assert waiting.stop_reason == "awaiting_approval"
+    (pending,) = waiting.pending_approvals
+    assert pending.name == "current_datetime" and pending.kind == "read"
+    result = await agent.run([*question, *waiting.new_messages], approvals={pending.id: True})
+    assert result.text == "Nous sommes le 20 octobre." and result.iterations == 1
     first, second = calls(tmp_path)
     schema = json.loads(first["args"][first["args"].index("--json-schema") + 1])
     assert (

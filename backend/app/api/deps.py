@@ -66,4 +66,5 @@ async def prepare_environment(
     env.delegation_roster = [
         (a.name, a.description, a.local_only) for a in agents if "delegation" not in a.toolsets
     ]
+    env.delegation_names = {a.name: a.display_name for a in agents}
     return env

@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 
 import type { ToolCallPart } from "./conversation";
 
-/** Libellés lisibles des outils connus ; les autres gardent leur nom technique. */
+/** Libellés lisibles des outils connus ; les autres gardent leur nom technique.
+ * Mêmes noms que `backend/app/tools/labels.py` (résumés des cartes de validation). */
 const TOOL_LABELS: Record<string, string> = {
   current_datetime: "Date et heure",
   publish_artifact: "Publication d'un artefact",
@@ -58,6 +59,10 @@ const TOOL_LABELS: Record<string, string> = {
   savoir_add_chapter: "Savoir · ajout d'un chapitre",
   savoir_add_flashcards: "Savoir · ajout de cartes",
   savoir_record_reviews: "Savoir · résultats de la séance",
+  cuisine_stock: "Cuisine · stock",
+  cuisine_meal_plan: "Cuisine · planning des repas",
+  cuisine_shopping_list: "Cuisine · liste de courses",
+  cuisine_budget: "Cuisine · budget du mois",
   github_repo_overview: "GitHub · dépôt",
   github_list_files: "GitHub · fichiers",
   github_read_file: "GitHub · lecture d'un fichier",

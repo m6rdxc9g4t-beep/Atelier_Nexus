@@ -18,14 +18,15 @@ import type { CatalogEntry, PendingApproval, StepRun, WorkflowParam, WorkflowRun
 import { ApprovalCard } from "./ApprovalCard";
 import { usesLabel } from "./catalog";
 import { isRunActive } from "./graph";
-import { RUN_STATUS, duration, launchValues, newArtifacts, pollDelay, shouldPoll } from "./run";
+import { RUN_STATUS, duration, launchValues, newArtifacts, pollDelay, previousStep, shouldPoll } from "./run";
 import { StepStatusIcon } from "./StepBadges";
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
 /**
  * Lancement et suivi d'une exécution : paramètres, interrogation tant que le moteur avance,
- * carte de validation des écritures, détail des étapes, livrables et historique.
+ * carte de validation de l'étape en attente (résultat de l'étape précédente juste au-dessus),
+ * détail des étapes, livrables et historique.
  */
 export function RunPanel({
   workflowId,
@@ -221,9 +222,19 @@ export function RunPanel({
           </p>
           {run.message && <p className="text-sm">{run.message}</p>}
 
-          {run.pending.map((pending) => (
-            <ApprovalCard key={pending.token} pending={pending} label={label(pending.step_id)} busy={busy} onDecide={decide} />
-          ))}
+          {run.pending.map((pending) => {
+            const before = previousStep(run, pending.step_id);
+            return (
+              <ApprovalCard
+                key={pending.token}
+                pending={pending}
+                label={label(pending.step_id)}
+                previous={before && { step: before, label: label(before.id) }}
+                busy={busy}
+                onDecide={decide}
+              />
+            );
+          })}
 
           <ol className="grid grid-cols-[minmax(0,1fr)] gap-1">
             {run.steps.map((step) => (

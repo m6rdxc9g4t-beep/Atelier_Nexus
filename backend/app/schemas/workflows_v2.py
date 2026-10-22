@@ -175,7 +175,8 @@ class StepRun(BaseModel):
 class PendingApproval(BaseModel):
     step_id: str
     uses: str
-    kind: Literal["write", "destructive"]
+    #: `read` : seulement en `APPROVAL_MODE=every_step` (toute étape attend une validation)
+    kind: Literal["read", "write", "destructive"]
     summary: str
     token: str
     input: dict[str, Any]
