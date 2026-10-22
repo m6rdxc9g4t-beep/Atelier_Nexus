@@ -16,6 +16,7 @@ import pytest
 
 from app import desktop
 from app import desktop_update as du
+from tests.winexe import console_exe
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = du.RepoState(code="c1", frontend_lock="l1", requirements="r1")
@@ -92,7 +93,7 @@ def repo(tmp_path: Path) -> Path:
     (repo / "backend" / "requirements-desktop.txt").write_text("")
     (repo / "frontend" / "package-lock.json").write_text('{"v": 1}\n')
     (repo / "frontend" / "src" / "page.tsx").write_text("v1\n")
-    (repo / ".gitignore").write_text("node_modules/\nout/\n")
+    (repo / ".gitignore").write_text("node_modules/\nout/\n__pycache__/\n")
     git(repo, "init", "-q", "-b", "main")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "initial")
@@ -123,15 +124,31 @@ elif args[:1] == ["run"]:
 """
 
 
+FAKE_NODE = """
+# Faux node.exe : exécute le « script JS » (ici du Python) avec les arguments qui suivent
+import runpy, sys
+
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+
+
 def make_fake_npm(folder: Path) -> Path:
-    """Faux npm exécutable : script shell (macOS, Linux) ou `npm.cmd` (Windows) qui lance
-    `fake_npm.py` avec le Python des tests."""
+    """Faux npm : script shell (macOS, Linux) qui lance `fake_npm.py` ; sous Windows, la
+    disposition de Node.js (`npm.cmd`, `node.exe`, `node_modules\\npm\\bin\\npm-cli.js`),
+    lancée sans shell par `node.exe npm-cli.js` comme le vrai."""
     folder.mkdir(parents=True, exist_ok=True)
     script = folder / "fake_npm.py"
     script.write_text(FAKE_NPM, encoding="utf-8")
     if sys.platform == "win32":
+        cli = folder / "node_modules" / "npm" / "bin" / "npm-cli.js"
+        cli.parent.mkdir(parents=True)
+        cli.write_text(FAKE_NPM, encoding="utf-8")
+        node_script = folder / "fake_node.py"
+        node_script.write_text("#!/usr/bin/env python3\n" + FAKE_NODE, encoding="utf-8")
+        shutil.copy(console_exe(str(node_script)), folder / "node.exe")
         path = folder / "npm.cmd"
-        path.write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+        path.write_text("@echo Jamais lancé : npm passe par node.exe npm-cli.js\r\nexit /b 9\r\n")
         return path
     path = folder / "npm"
     path.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
@@ -174,7 +191,16 @@ def update(layout: du.Layout, npm: Path, statuses: list[str] | None = None) -> l
 
 def test_repo_state_follows_commits_and_local_changes(repo: Path) -> None:
     first = du.repo_state(repo)
-    (repo / "notes.txt").write_text("non suivi")  # fichier non suivi : ignoré
+    (repo / "out").mkdir()
+    (repo / "out" / "index.html").write_text("ignoré")  # fichier ignoré par git : sans effet
+    assert du.repo_state(repo) == first
+    notes = repo / "frontend" / "src" / "nouveau.tsx"
+    notes.write_text("nouveau")  # fichier nouveau non ignoré : compte (§8.4, §9.6)
+    untracked = du.repo_state(repo)
+    assert untracked.code != first.code
+    notes.write_text("modifié")
+    assert du.repo_state(repo).code != untracked.code
+    notes.unlink()
     assert du.repo_state(repo) == first
 
     page = repo / "frontend" / "src" / "page.tsx"
@@ -720,3 +746,13 @@ def test_windows_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path)
     assert npm_calls(tmp_path) == []
     assert layout.stamp.read_text() == stamp
     assert (logs / du.LOG_NAME).read_text(encoding="utf-8") == update_log
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="npm.cmd")
+def test_npm_cmd_without_npm_cli_is_refused(layout: du.Layout, tmp_path: Path) -> None:
+    """§9.6 : jamais de npm.cmd par cmd.exe ; sans npm-cli.js à côté, message clair."""
+    npm = tmp_path / "nodejs" / "npm.cmd"
+    npm.parent.mkdir()
+    npm.write_text("@echo off\r\n")
+    with pytest.raises(du.UpdateError, match="sans shell"):
+        du.update_interface(layout, npm_finder=lambda: npm)

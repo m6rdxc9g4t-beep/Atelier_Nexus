@@ -283,13 +283,27 @@ class RepoState:
     requirements: str
 
 
+def local_changes(repo: Path) -> list[str]:
+    """Fichiers changés localement (SUITE.md §8.4, §9.6) : `git status --porcelain`, soit les
+    fichiers suivis modifiés **et** les fichiers nouveaux non ignorés (chemins depuis la racine)."""
+    records = (git(repo, "status", "--porcelain", "-z", "--untracked-files=all") or "").split("\0")
+    names: set[str] = set()
+    i = 0
+    while i < len(records):
+        record, i = records[i], i + 1
+        if len(record) < 4:
+            continue
+        names.add(record[3:])
+        if record[0] in "RC":  # renommage ou copie : le chemin d'origine suit
+            i += 1
+    return sorted(names)
+
+
 def repo_state(repo: Path) -> RepoState:
-    """État du dépôt : `git rev-parse HEAD` + contenu des fichiers suivis modifiés localement."""
+    """État du dépôt : `git rev-parse HEAD` + contenu des fichiers changés localement."""
     head = (git(repo, "rev-parse", "HEAD") or "sans-git").strip()
     top = Path((git(repo, "rev-parse", "--show-toplevel") or str(repo)).strip())
-    changed = sorted(
-        name for name in (git(repo, "diff", "--name-only", "-z", "HEAD") or "").split("\0") if name
-    )
+    changed = local_changes(top)
     parts = [head]
     for name in changed:
         target = top / name
@@ -682,10 +696,18 @@ def update_interface(
                     "Node.js (npm) est introuvable : installez-le (« brew install node » ou "
                     "https://nodejs.org), puis rouvrez Atelier Nexus."
                 )
+            # Windows : npm sans shell, `node.exe …\npm-cli.js` (SUITE.md §9.6), jamais npm.cmd
+            base = windows_command([str(npm)])
+            if sys.platform == "win32" and Path(base[0]).suffix.lower() in {".cmd", ".bat"}:
+                note(log, f"npm sans node_modules\\npm\\bin\\npm-cli.js à côté : {npm}")
+                raise UpdateError(
+                    f"npm ({npm}) ne peut pas être lancé sans shell : installez Node.js "
+                    "(winget install --id OpenJS.NodeJS.LTS -e), puis rouvrez Atelier Nexus."
+                )
             env = npm_environment(npm)
             if "npm" in steps:
                 on_status(LABELS["npm"])
-                cmd = [str(npm), "ci", "--no-audit", "--no-fund", "--loglevel=error"]
+                cmd = [*base, "ci", "--no-audit", "--no-fund", "--loglevel=error"]
                 if runner(cmd, layout.frontend, env, log) != 0:
                     note(log, "échec de npm ci")
                     raise UpdateError(
@@ -696,7 +718,7 @@ def update_interface(
             out = layout.frontend / "out"
             shutil.rmtree(out, ignore_errors=True)
             if (
-                runner([str(npm), "run", "build"], layout.frontend, env, log) != 0
+                runner([*base, "run", "build"], layout.frontend, env, log) != 0
                 or not (out / "index.html").is_file()
             ):
                 note(log, "échec de la compilation")

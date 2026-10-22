@@ -32,7 +32,8 @@ Contrat commun : [`apps/mise-a-jour-bureau.md`](apps/mise-a-jour-bureau.md) (`SU
    l'ancien est mis de côté puis **remis en place si l'installation échoue** : une alerte propose alors « Ouvrir quand
    même avec la version précédente » ou « Quitter ». Une notification annonce l'étape (2 à 3 min).
 2. **Interface** (`desktop.py --mise-a-jour`, fonctions pures de `app/desktop_update.py`) — état du dépôt = commit
-   courant (`git rev-parse HEAD`) + contenu des fichiers suivis modifiés localement (`git diff --name-only HEAD`) ;
+   courant (`git rev-parse HEAD`) + contenu des fichiers changés localement (`git status --porcelain` : suivis
+   modifiés **et** nouveaux non ignorés, §8.4 / §9.6) ;
    empreinte de `frontend/package-lock.json` à part. Comparés au **tampon** de la dernière mise à jour réussie :
 
    | Changement | Étapes |
@@ -83,7 +84,7 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Fond de la fenêtre avant l'affichage de l'interface : celui de la charte néon (`WINDOW_BACKGROUND` dans
   `app/desktop.py`, `#fbf3f2` clair / `#120c0d` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app` ; sous Windows, s'il existe,
-  `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd`, emplacement à confirmer avec l'app Windows de Tab),
+  `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd`, SUITE.md §9.6),
   l'écriture dans Tab est activée sans réglage (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
 - Pont JavaScript (`frontend/src/lib/desktop.ts` ↔ `DesktopApi`) : « Enregistrer sous » natif pour les artefacts
   (`saveFile`), liens externes dans le navigateur ; l'adresse d'une app de la suite ouvre son application si elle est
@@ -109,9 +110,9 @@ WebView2, fait la première mise à jour **avant** de toucher au lanceur, puis c
 
 | Élément | Emplacement |
 |---|---|
-| Point d'entrée (`scripts/windows/app_entry.pyw`), `repo-path`, icône, raccourci enregistré | `%LOCALAPPDATA%\Atelier Nexus\lanceur\` |
+| Point d'entrée (`scripts/windows/app_entry.pyw`), `repo-path`, icône | `%LOCALAPPDATA%\Atelier Nexus\lanceur\` |
 | Raccourcis | menu Démarrer `Atelier\Atelier Nexus.lnk`, Bureau (sauf `-SansBureau`) |
-| Enregistrement (§9.4) | `HKCU\Software\Atelier\Apps\nexus` : `Lanceur` (le raccourci `.lnk` ci-dessus), `Nom` |
+| Enregistrement (§9.4, §9.6) | `HKCU\Software\Atelier\Apps\nexus` : `Lanceur` (le `.lnk` du menu Démarrer), `Nom` |
 
 **Lanceur sans console** : chaque raccourci lance `pythonw.exe -I "…\lanceur\atelier-nexus.pyw"` avec le Python du
 système trouvé à l'installation. C'est le plus simple et le plus robuste pour une app Python : `pythonw.exe` n'ouvre
@@ -134,7 +135,7 @@ Particularités de la mise à jour sous Windows (`app/desktop_update.py`) :
   suivant ; un environnement Python en cours d'utilisation n'est pas remplacé (message : fermer les fenêtres, rouvrir).
 - **Verrou** : `msvcrt.locking` (au lieu de `flock`), libéré si le processus meurt.
 - **npm** : `NEXUS_NPM`, `PATH`, `%ProgramFiles%\nodejs`, nvm-windows (`NVM_SYMLINK`, `NVM_HOME`), Volta, fnm, Scoop,
-  `%LOCALAPPDATA%\Programs\nodejs` ; `npm.cmd` est lancé par `node.exe npm-cli.js` (jamais par `cmd.exe`).
+  `%LOCALAPPDATA%\Programs\nodejs` ; npm est lancé sans shell : `node.exe <dossier de npm>\node_modules\npm\bin\npm-cli.js` (jamais `npm.cmd`, refusé s'il ne se résout pas).
 - **Aucune console** : tout programme lancé par l'app (git, npm, pip, Claude Code, serveur MCP de Tab) l'est avec
   `CREATE_NO_WINDOW` (`app/core/processes.py`). Sans console, `sys.stdout` est redirigé vers `atelier-nexus.log`.
 - Fins de ligne : `.gitattributes` (LF, scripts Windows en CRLF) : un clone Windows ne paraît jamais modifié.
@@ -149,7 +150,7 @@ un **environnement minimal** (`app/core/processes.minimal_environment` : utilisa
 dossiers temporaires, variables système de Windows, `PATH` du système). Jamais `DATABASE_URL`, `NEXUS_*`, `PYTHON*`, ni
 clé : avant ce correctif, Atelier Projets ouvert depuis Nexus recevait la base SQLite de Nexus. macOS : `open -b`
 (identifiants `MACOS_BUNDLES`) ; Windows : lanceur lu dans `HKCU\Software\Atelier\Apps\<viz|tab|projets|…>`
-(`Lanceur` ; `.exe` directement, `.lnk` par l'Explorateur…), sinon l'adresse dans le navigateur
+(`Lanceur`, le `.lnk` du menu Démarrer, **toujours** démarré par `explorer.exe "<Lanceur>"`, §9.6), sinon l'adresse dans le navigateur
 (`rundll32 url.dll,FileProtocolHandler`). Au lancement, Nexus ignore un `DATABASE_URL` ou un `FRONTEND_DIST` hérités.
 
 ## Vérifier
