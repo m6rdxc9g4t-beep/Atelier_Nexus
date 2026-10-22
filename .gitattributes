@@ -1,0 +1,29 @@
+# Fins de ligne (SUITE.md §9.3) : LF partout, y compris dans un clone Windows, pour qu'il ne
+# paraisse jamais « modifié » (la mise à jour automatique recompilerait à chaque lancement).
+* text=auto eol=lf
+
+# Scripts Windows : CRLF
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.vbs text eol=crlf
+
+# Binaires
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.xlsx binary
+*.docx binary
+*.pptx binary
+*.zip binary
+*.db binary
+*.sqlite binary
