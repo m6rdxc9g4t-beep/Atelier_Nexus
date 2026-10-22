@@ -46,7 +46,11 @@ export function ReviewCard({ part, disabled, onSubmit }: ReviewCardProps) {
   }
 
   return (
-    <section aria-label="Résultat à valider" className="rounded-lg border border-primary/40 bg-accent-soft p-3">
+    <section
+      aria-label="Résultat à valider"
+      aria-live="polite"
+      className="rounded-lg border border-primary/40 bg-accent-soft p-3"
+    >
       <header className="mb-2 flex items-center gap-2 text-sm font-medium">
         <Footprints className="size-4 text-accent-ink" aria-hidden />
         {count > 1 ? `Vérifiez ces ${count} résultats` : "Vérifiez ce résultat"} avant que l&apos;agent ne continue
@@ -93,7 +97,8 @@ export function ReviewCard({ part, disabled, onSubmit }: ReviewCardProps) {
           </>
         ) : (
           <>
-            <Button size="sm" disabled={disabled} onClick={() => onSubmit({ action: "continue" })}>
+            {/* Focus sur la décision attendue : au clavier, Entrée continue */}
+            <Button size="sm" autoFocus disabled={disabled} onClick={() => onSubmit({ action: "continue" })}>
               <ArrowRight />
               Continuer
             </Button>

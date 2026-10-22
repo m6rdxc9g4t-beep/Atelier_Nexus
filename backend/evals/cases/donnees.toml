@@ -74,3 +74,41 @@ prompt = "Vérifie que l'expression DIVIDE(SUM(chiffre_affaires) - SUM(cout), SU
 [case.expect]
 tools_in_order = ["data_via_describe_dataset", "data_via_check_expression"]
 text_contains_any = ["0,53", "0.53", "53,4", "53.4", "53 %", "53%"]
+
+# ─── Agents de la chaîne Data ─────────────────────────────────────
+
+[[case]]
+id = "ingenieur-rapport-qualite"
+agent = "ingenieur_donnees"
+apps = ["data_via"]
+tags = ["donnees", "chaine-data"]
+prompt = "Prépare le jeu ventes_2026 pour Power BI : qualité des données et transformations Power Query."
+rubric = "Le rapport décrit le grain, la période (janvier à septembre 2026), les colonnes et leurs types, et le script Power Query type explicitement les colonnes."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset"]
+artifacts = [{ kind = "markdown" }, { kind = "powerquery", content_contains = ["Table.TransformColumnTypes"] }]
+
+[[case]]
+id = "modelisateur-etoile"
+agent = "modelisateur_bi"
+apps = ["data_via"]
+tags = ["donnees", "chaine-data", "power-bi"]
+prompt = "Propose un modèle en étoile pour ventes_2026, avec la table Date."
+rubric = "Le modèle sépare une table de faits (ventes, au grain d'une vente) des dimensions Région, Produit et Date, avec des relations 1-N, et prévoit une table Date marquée."
+[case.expect]
+tools_called = ["data_via_describe_dataset"]
+artifacts = [{ kind = "markdown", content_contains = ["Date"] }]
+output_contains_any = ["grain", "granularite"]
+
+[[case]]
+id = "controleur-recalcule"
+agent = "controleur_donnees"
+apps = ["data_via"]
+tags = ["donnees", "chaine-data", "pas-d-invention"]
+prompt = "Un rapport affirme que la Bretagne a fait 250 000 € de chiffre d'affaires en 2026 sur ventes_2026. Vérifie."
+rubric = "Le contrôle recalcule le CA de la Bretagne, le compare aux 250 000 € annoncés et conclut « non conforme » avec l'écart chiffré."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_args = [{ tool = "data_via_query", contains = ["Bretagne"] }]
+output_contains_any = ["non conforme", "ecart"]
+grounded_numbers = "warn"

@@ -14,9 +14,15 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
 | Données | Data Analyst / Power BI (`data_analyst`) | core, data_via, tab | Exploration préalable obligatoire, DAX `VAR … RETURN`, modèle en étoile |
 | Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
+| Données | Ingénieur de données (`ingenieur_donnees`) | core, data_via, tab | Inventaire des sources, qualité chiffrée, transformations Power Query typées ; ni modèle ni DAX |
+| Données | Modélisateur BI (`modelisateur_bi`) | core, data_via | Grain, faits et dimensions, table Date, relations ; cardinalités vérifiées par requête |
+| Données | Contrôleur qualité données (`controleur_donnees`) | core, data_via | Recalcule chaque chiffre annoncé, tableau des écarts, verdict |
 | Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets | Points d'avancement, saisie de temps, statuts, plannings Tab |
 | Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write | User stories, critères d'acceptation, estimations |
 | Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read | Branches `feat/…`, commits `#ID`, PR brouillons |
+| Développement | Architecte logiciel (`architecte`) | core, github_read, projets_read | Conception avant le code : fichiers, contrats, risques, plan de tests ; lecture seule |
+| Développement | Testeur (`testeur`) | core, github_read, github_write | Tests sur la branche de travail (jamais `main`), cas limites, doublures |
+| Développement | Relecteur de code (`relecteur_code`) | core, github_read | Verdict et remarques classées sur une branche ou une PR ; lecture seule |
 | Finance | Finance (`finance`) | core, tresorerie, cuisine_budget | **100 % local** ; budget courses d'Atelier Cuisine |
 | Finance | Comptable (`comptable`) | core, tresorerie | **100 % local**, PCG / TVA, ne modifie rien |
 | Apprentissage | Tuteur (`tuteur`) | core, savoir_read, savoir_write | **100 % local** ; interrogation, cartes, notes enregistrées en une validation |
@@ -25,6 +31,8 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Métiers | Commercial (`commercial`) | core, data_via | Propositions, objections, relances |
 | Métiers | Juridique (`juridique`) | core | Droit français ; renvoie vers un avocat |
 | Métiers | Ressources humaines (`rh`) | core | Fiches de poste, entretiens, intégration |
+
+Ces agents s'enchaînent dans les **chaînes Data et Dev** ([`chaines.md`](chaines.md)).
 
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
 `common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation).

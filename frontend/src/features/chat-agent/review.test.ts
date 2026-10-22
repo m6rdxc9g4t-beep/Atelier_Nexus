@@ -121,3 +121,17 @@ describe("réouverture d'une conversation en pas à pas", () => {
     expect(conv.turns.filter((t) => t.role === "user")).toHaveLength(1);
   });
 });
+
+describe("réouverture : pas de fausse pause", () => {
+  it("un tour coupé par la limite d'étapes, terminé par des résultats, n'affiche pas de revue", () => {
+    const question: Message = { role: "user", content: [{ type: "text", text: "Q" }] };
+    const detail: ConversationDetail = {
+      id: "c", agent: "a", title: "", created_at: "", updated_at: "", message_count: 3, artifact_count: 0,
+      history: [question, call, results],
+      artifacts: [],
+      turn_meta: { "2": { provider: "anthropic", model: "m", usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: "max_iterations", iterations: 8 } },
+      pending_approvals: [],
+    };
+    expect(pendingReview(fromStored(detail, {}))).toBeNull();
+  });
+});

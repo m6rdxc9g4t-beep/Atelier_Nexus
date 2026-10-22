@@ -122,11 +122,14 @@ export function MessageList({ turns, streaming, onDecide, onReview, onSaveWorkfl
             {turn.meta && (
               <div className={cn("flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground")}>
                 <Badge variant="outline">{PROVIDER_LABEL[turn.meta.provider]}</Badge>
-                <span>{turn.meta.model}</span>
-                <span aria-hidden>·</span>
-                <span>
-                  {turn.meta.usage.input_tokens + turn.meta.usage.output_tokens} jetons
-                </span>
+                {turn.meta.model && <span>{turn.meta.model}</span>}
+                {/* Reprise sans appel au modèle (validation, revue, arrêt) : pas de « 0 jetons » */}
+                {turn.meta.usage.input_tokens + turn.meta.usage.output_tokens > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{turn.meta.usage.input_tokens + turn.meta.usage.output_tokens} jetons</span>
+                  </>
+                )}
                 {turn.meta.stop_reason === "max_tokens" && (
                   <Badge variant="warning">Réponse tronquée</Badge>
                 )}

@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 23 (mode pas à pas)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 24 (chaînes d'agents Data et Dev)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.
@@ -61,6 +61,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 21 | Validation de chaque action (choix de l'utilisateur) : `APPROVAL_MODE` = `every_step` (défaut) \| `writes_only` dans Réglages ; tout appel d'outil d'agent, toute délégation (sous-agent alors sans outil) et toute étape de workflow v1 / v2, déclencheurs compris, attend « Autoriser » ; cartes « Lecture », résultat de l'étape précédente au-dessus de la validation suivante → [`settings.md`](settings.md), [`agents.md`](agents.md) | ✅ |
 | 22 | App de bureau mise à jour au lancement après un `git pull` (contrat `SUITE.md` §8) : l'app devient un lanceur qui exécute le code du dépôt ; état du dépôt (commit + modifications locales) et empreintes (`package-lock.json`, `requirements*.txt`) comparés au tampon → environnement Python, `npm ci`, compilation seulement si nécessaire ; écran « Mise à jour… », compilation remplacée atomiquement, ouverture avec la version précédente en cas d'échec, verrou ; jamais de `git pull` ni de donnée touchée → [`desktop.md`](desktop.md#mise-à-jour-automatique-après-un-git-pull), [`apps/mise-a-jour-bureau.md`](apps/mise-a-jour-bureau.md) | ✅ |
 | 23 | Mode pas à pas (choix de l'utilisateur) : interrupteur activé par défaut, l'agent s'arrête après **chaque résultat** d'outil avant de l'interpréter ; Continuer, Corriger (consigne jointe au résultat) ou Arrêter (sans appel au modèle) ; en plus de la validation de chaque action → [`agents.md`](agents.md#3-garde-fous) | ✅ |
+| 24 | Suites d'agents Data et Dev : six nouveaux experts (Ingénieur de données, Modélisateur BI, Contrôleur qualité ; Architecte, Testeur, Relecteur de code) et chaînes ordonnées où l'utilisateur valide le livrable de chaque agent avant le suivant ; migration 0008, version 0.12.0 → [`chaines.md`](chaines.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).

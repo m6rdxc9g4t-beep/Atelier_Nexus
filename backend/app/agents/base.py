@@ -58,7 +58,7 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
-from app.tools.base import Artifact, BaseTool, ToolContext, ToolOutput
+from app.tools.base import Artifact, BaseTool, PreviousCall, ToolContext, ToolOutput
 from app.tools.toolsets import UnavailableToolset, build_tools, is_sensitive
 
 if TYPE_CHECKING:
@@ -348,6 +348,9 @@ class BaseAgent(ABC):
             )
 
         ctx = context or ToolContext()
+        # Appels réussis plus tôt dans la conversation : un outil qui dépend d'un appel antérieur
+        # (schéma Data Via consulté) le retrouve même quand chaque appel est une requête séparée
+        ctx.previous_calls = successful_calls(messages)
         provider = self.resolve_provider(provider)
         allow_fallback = not self.local_only
         history = list(messages)
@@ -564,6 +567,22 @@ class BaseAgent(ABC):
             new_messages=list(new_messages),
             pending_approvals=pending or [],
         )
+
+
+def successful_calls(messages: Sequence[Message]) -> list[PreviousCall]:
+    """Appels d'outils de l'historique dont le résultat n'est pas une erreur."""
+    ok = {
+        b.tool_use_id
+        for m in messages
+        for b in m.content
+        if isinstance(b, ToolResultBlock) and not b.is_error
+    }
+    return [
+        PreviousCall(name=b.name, input=dict(b.input))
+        for m in messages
+        for b in m.content
+        if isinstance(b, ToolUseBlock) and b.id in ok
+    ]
 
 
 def is_review_point(message: Message) -> bool:

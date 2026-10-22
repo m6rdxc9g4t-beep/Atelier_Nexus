@@ -335,6 +335,22 @@ def _require_described(ctx: ToolContext, dataset_id: str) -> DatasetProfile | No
     return profile if isinstance(profile, DatasetProfile) else None
 
 
+async def _described(
+    client: DataViaClient, ctx: ToolContext, dataset_id: str
+) -> DatasetProfile | None:
+    """Profil du jeu si son schéma a été consulté : dans cette requête (état), ou plus tôt dans
+    la conversation (chaque appel validé arrive dans une nouvelle requête) ; il est alors relu
+    auprès de Data Via, sans que le modèle ait à le redemander."""
+    profile = _require_described(ctx, dataset_id)
+    if profile is not None:
+        return profile
+    if not ctx.called_before("data_via_describe_dataset", dataset_id=dataset_id):
+        return None
+    profile = await client.get_dataset(dataset_id)
+    ctx.state.setdefault(_PROFILES, {})[profile.id] = profile
+    return profile
+
+
 _NOT_DESCRIBED = (
     "Schéma non consulté : appelle d'abord `data_via_describe_dataset` avec "
     "dataset_id « {id} » pour vérifier les colonnes et leurs types."
@@ -475,7 +491,7 @@ class QueryTool(_DataViaTool[QueryInput]):
     output_format = "atelier-table/1"
 
     async def run(self, params: QueryInput, ctx: ToolContext) -> ToolOutput:
-        profile = _require_described(ctx, params.dataset_id)
+        profile = await _described(self.client, ctx, params.dataset_id)
         if profile is None:
             return ToolOutput(content=_NOT_DESCRIBED.format(id=params.dataset_id), is_error=True)
         try:
@@ -547,7 +563,7 @@ class CheckExpressionTool(_DataViaTool[CheckExpressionInput]):
     input_model = CheckExpressionInput
 
     async def run(self, params: CheckExpressionInput, ctx: ToolContext) -> ToolOutput:
-        if _require_described(ctx, params.dataset_id) is None:
+        if await _described(self.client, ctx, params.dataset_id) is None:
             return ToolOutput(content=_NOT_DESCRIBED.format(id=params.dataset_id), is_error=True)
         check = ExpressionCheck.model_validate(
             {"kind": params.kind, "name": params.name, "expression": params.expression}

@@ -16,12 +16,14 @@ ICONS = (
     "bot", "sparkles", "network", "chart-column", "list-checks", "code", "landmark", "receipt",
     "megaphone", "pen-line", "briefcase", "scale", "users", "lightbulb", "graduation-cap",
     "clapperboard", "headset", "shield-check", "calendar-check", "table-2", "cooking-pot",
+    "database", "boxes", "drafting-compass", "flask-conical", "scan-search",
 )  # fmt: skip
 
 Icon = Literal[
     "bot", "sparkles", "network", "chart-column", "list-checks", "code", "landmark", "receipt",
     "megaphone", "pen-line", "briefcase", "scale", "users", "lightbulb", "graduation-cap",
     "clapperboard", "headset", "shield-check", "calendar-check", "table-2", "cooking-pot",
+    "database", "boxes", "drafting-compass", "flask-conical", "scan-search",
 ]  # fmt: skip
 
 
