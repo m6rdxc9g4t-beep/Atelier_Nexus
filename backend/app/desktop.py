@@ -63,9 +63,11 @@ from app.desktop_update import (
     display_path,
     log_dir,
     nexus_home,
+    nexus_local,
     pending_steps,
     served_build,
     update_interface,
+    utf8_output,
 )
 
 APP_NAME = "Atelier Nexus"
@@ -649,6 +651,7 @@ def run(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     ensure_streams(log_dir() / APP_LOG_NAME)
+    utf8_output()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s"
     )
@@ -657,7 +660,7 @@ def run(argv: list[str] | None = None) -> int:
 
     home = nexus_home()
     env_file = prepare_home(home)
-    layout = Layout(repo=BACKEND.parent, home=home)
+    layout = Layout(repo=BACKEND.parent, home=home, local=nexus_local())
     if args.preparer:
         return prepare_in_console(layout)
     steps = pending_steps(layout) if args.mise_a_jour else []
