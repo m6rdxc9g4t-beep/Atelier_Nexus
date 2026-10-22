@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -42,6 +43,9 @@ class ToolOutput(BaseModel):
     is_error: bool = False
     # Livrables affichés à l'utilisateur, hors du fil de discussion
     artifacts: list[Artifact] = Field(default_factory=list)
+    # Sortie structurée (JSON : table `atelier-table/1` ou fiche) pour les workflows v2.
+    # Jamais envoyée au modèle : seul `content` l'est.
+    data: Any = None
 
 
 class ToolContext(BaseModel):
@@ -52,6 +56,31 @@ class ToolContext(BaseModel):
     extras: dict[str, Any] = Field(default_factory=dict)
     # État partagé entre les outils pendant UN tour d'agent (ex. schémas déjà consultés)
     state: dict[str, Any] = Field(default_factory=dict)
+
+
+#: Sérialisation de clés de `ToolContext.state` (objets Python) pour qu'un workflow v2 repris
+#: après une validation retrouve le contexte des étapes déjà exécutées : clé → (export, import)
+STATE_CODECS: dict[str, tuple[Callable[[Any], Any], Callable[[Any], Any]]] = {}
+
+
+def register_state_codec(key: str, dump: Callable[[Any], Any], load: Callable[[Any], Any]) -> None:
+    STATE_CODECS[key] = (dump, load)
+
+
+def dump_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Partie sérialisable du contexte partagé (clés enregistrées seulement)."""
+    return {k: STATE_CODECS[k][0](v) for k, v in state.items() if k in STATE_CODECS}
+
+
+def load_state(data: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in data.items():
+        if key in STATE_CODECS:
+            try:
+                out[key] = STATE_CODECS[key][1](value)
+            except (ValueError, TypeError):
+                continue  # contexte illisible : l'outil redemandera l'étape préalable
+    return out
 
 
 class ToolInput(BaseModel):
@@ -70,6 +99,10 @@ class BaseTool[InputT: ToolInput](ABC):
     requires_approval: ClassVar[bool] = False
     # Données sensibles (finances…) : l'agent qui l'utilise est verrouillé sur un modèle local
     sensitive: ClassVar[bool] = False
+    # Forme de `ToolOutput.data` annoncée au catalogue des workflows v2
+    output_format: ClassVar[Literal["atelier-table/1", "json", "text"]] = "text"
+    # Colonnes (`{key, label, type}`) ou champs attendus, quand ils sont connus d'avance
+    output_hint: ClassVar[dict[str, Any] | None] = None
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:

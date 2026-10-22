@@ -1,22 +1,36 @@
-"""Accès aux workflows rejouables."""
+"""Accès aux workflows rejouables (v1 et v2) et aux exécutions des workflows v2."""
 
 from __future__ import annotations
 
+import builtins
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.models import WorkflowRow
+from app.db.models import WorkflowRow, WorkflowRunRow
 from app.db.repository import StorageError, _storage_message
 from app.schemas.workflows import RunStatus, Workflow, WorkflowCreate, WorkflowUpdate
+from app.schemas.workflows_v2 import (
+    WorkflowRun,
+    WorkflowV2,
+    WorkflowV2Create,
+    WorkflowV2Fields,
+    WorkflowV2Update,
+)
 
 MAX_LIST = 200
+MAX_RUNS = 100
+
+AnyWorkflow = Workflow | WorkflowV2
 
 
-def _to_model(row: WorkflowRow) -> Workflow:
+def _to_model(row: WorkflowRow) -> AnyWorkflow:
+    if row.version == 2:
+        return WorkflowV2.model_validate(row)
     return Workflow.model_validate(row)
 
 
@@ -26,7 +40,29 @@ def _storage(exc: Exception) -> StorageError:
         return StorageError(
             "Table des workflows absente : lancez « alembic upgrade head » dans backend/."
         )
+    if "no such column" in text or "undefinedcolumn" in text:
+        return StorageError(
+            "Base des workflows à mettre à jour : lancez « alembic upgrade head » dans backend/."
+        )
     return StorageError(_storage_message(exc))
+
+
+def run_to_model(row: WorkflowRunRow) -> WorkflowRun:
+    return WorkflowRun.model_validate(
+        {
+            "id": row.id,
+            "workflow_id": row.workflow_id,
+            "status": row.status,
+            "message": row.message,
+            "params": row.params,
+            "trigger": row.trigger,
+            "steps": row.steps,
+            "artifacts": row.artifacts,
+            "pending": row.pending,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+    )
 
 
 class WorkflowRepository:
@@ -40,8 +76,8 @@ class WorkflowRepository:
         except (SQLAlchemyError, OSError) as exc:
             raise _storage(exc) from exc
 
-    async def list(self, agent: str | None = None) -> list[Workflow]:
-        async def op(s: AsyncSession) -> list[Workflow]:
+    async def list(self, agent: str | None = None) -> list[AnyWorkflow]:
+        async def op(s: AsyncSession) -> list[AnyWorkflow]:
             query = select(WorkflowRow).order_by(WorkflowRow.updated_at.desc()).limit(MAX_LIST)
             if agent:
                 query = query.where(WorkflowRow.agent == agent)
@@ -49,16 +85,18 @@ class WorkflowRepository:
 
         return await self._run(op)
 
-    async def get(self, workflow_id: str) -> Workflow | None:
-        async def op(s: AsyncSession) -> Workflow | None:
+    async def get(self, workflow_id: str) -> AnyWorkflow | None:
+        async def op(s: AsyncSession) -> AnyWorkflow | None:
             row = await s.get(WorkflowRow, workflow_id)
             return _to_model(row) if row else None
 
         return await self._run(op)
 
-    async def create(self, data: WorkflowCreate) -> Workflow:
-        async def op(s: AsyncSession) -> Workflow:
-            row = WorkflowRow(**data.model_dump(mode="json"))
+    async def create(self, data: WorkflowCreate | WorkflowV2Create) -> AnyWorkflow:
+        async def op(s: AsyncSession) -> AnyWorkflow:
+            values = data.model_dump(mode="json")
+            values["version"] = 2 if isinstance(data, WorkflowV2Create) else 1
+            row = WorkflowRow(**values)
             s.add(row)
             await s.commit()
             await s.refresh(row)
@@ -66,13 +104,38 @@ class WorkflowRepository:
 
         return await self._run(op)
 
-    async def update(self, workflow_id: str, data: WorkflowUpdate) -> Workflow | None:
-        async def op(s: AsyncSession) -> Workflow | None:
+    async def update(
+        self, workflow_id: str, data: WorkflowUpdate | WorkflowV2Update
+    ) -> AnyWorkflow | None:
+        async def op(s: AsyncSession) -> AnyWorkflow | None:
             row = await s.get(WorkflowRow, workflow_id)
             if row is None:
                 return None
-            for key, value in data.model_dump(mode="json").items():
+            values = data.model_dump(mode="json", exclude={"source_conversation_id"})
+            values.pop("version", None)
+            for key, value in values.items():
                 setattr(row, key, value)
+            row.updated_at = datetime.now(UTC)
+            await s.commit()
+            await s.refresh(row)
+            return _to_model(row)
+
+        return await self._run(op)
+
+    async def replace_with_v2(self, workflow_id: str, data: WorkflowV2Fields) -> AnyWorkflow | None:
+        """Conversion v1 → v2 : même identifiant, compteurs conservés."""
+
+        async def op(s: AsyncSession) -> AnyWorkflow | None:
+            row = await s.get(WorkflowRow, workflow_id)
+            if row is None:
+                return None
+            row.version = 2
+            row.agent = data.agent
+            row.title = data.title
+            row.description = data.description
+            row.steps = [st.model_dump(mode="json") for st in data.steps]
+            row.params = [p.model_dump(mode="json") for p in data.params]
+            row.updated_at = datetime.now(UTC)
             await s.commit()
             await s.refresh(row)
             return _to_model(row)
@@ -103,3 +166,60 @@ class WorkflowRepository:
             await s.commit()
 
         await self._run(op)
+
+    # ─── Exécutions (v2) ──────────────────────────────────────────
+
+    async def save_run(self, run: WorkflowRun, state: dict[str, Any]) -> WorkflowRun:
+        """Crée ou met à jour une exécution (`state` : interne, jamais renvoyé)."""
+
+        async def op(s: AsyncSession) -> WorkflowRun:
+            row = await s.get(WorkflowRunRow, run.id)
+            values = run.model_dump(mode="json", exclude={"created_at", "updated_at"})
+            if row is None:
+                row = WorkflowRunRow(**values, state=state, created_at=run.created_at)
+                s.add(row)
+            else:
+                for key, value in values.items():
+                    setattr(row, key, value)
+                row.state = state
+            row.updated_at = datetime.now(UTC)
+            await s.commit()
+            await s.refresh(row)
+            return run_to_model(row)
+
+        return await self._run(op)
+
+    async def claim_run(self, run_id: str) -> bool:
+        """Passe une exécution en attente à `running`, une seule fois : deux reprises
+        simultanées n'exécutent pas deux fois l'action validée."""
+
+        async def op(s: AsyncSession) -> bool:
+            result = await s.execute(
+                update(WorkflowRunRow)
+                .where(WorkflowRunRow.id == run_id, WorkflowRunRow.status == "awaiting_approval")
+                .values(status="running", updated_at=datetime.now(UTC))
+            )
+            await s.commit()
+            return bool(getattr(result, "rowcount", 0))
+
+        return await self._run(op)
+
+    async def get_run(self, run_id: str) -> tuple[WorkflowRun, dict[str, Any]] | None:
+        async def op(s: AsyncSession) -> tuple[WorkflowRun, dict[str, Any]] | None:
+            row = await s.get(WorkflowRunRow, run_id)
+            return (run_to_model(row), dict(row.state or {})) if row else None
+
+        return await self._run(op)
+
+    async def list_runs(self, workflow_id: str | None, limit: int) -> builtins.list[WorkflowRun]:
+        async def op(s: AsyncSession) -> builtins.list[WorkflowRun]:
+            query = (
+                select(WorkflowRunRow)
+                .order_by(WorkflowRunRow.created_at.desc())
+                .limit(max(1, min(limit, MAX_RUNS)))
+            )
+            if workflow_id:
+                query = query.where(WorkflowRunRow.workflow_id == workflow_id)
+            return [run_to_model(r) for r in (await s.scalars(query)).all()]
+
+        return await self._run(op)

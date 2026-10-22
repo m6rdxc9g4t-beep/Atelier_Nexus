@@ -70,6 +70,33 @@ def idempotency_key(envelope: dict[str, Any], project_id: int | None, item_type:
     return f"nexus-{digest[:40]}"
 
 
+def import_summary(result: ImportResult) -> dict[str, Any]:
+    """Résumé structuré d'un import ou d'un aperçu (clés `snake_case`)."""
+    return {
+        "project_id": result.projectId,
+        "story_id": result.storyId,
+        "created": result.created,
+        "updated": result.updated,
+        "unchanged": result.unchanged,
+        "skipped": result.skipped,
+        "replayed": result.replayed,
+        "warnings": list(result.warnings),
+        "items": [
+            {
+                "record_id": i.recordId,
+                "row_index": i.rowIndex,
+                "work_item_id": i.workItemId,
+                "action": i.action,
+                "title": i.title,
+                "status": i.status,
+                "due_date": i.dueDate,
+                "reason": i.reason,
+            }
+            for i in result.items
+        ],
+    }
+
+
 def describe(result: ImportResult, *, preview: bool) -> str:
     verb = "ferait" if preview else "a fait"
     lines = [
@@ -143,6 +170,7 @@ class PreviewTabImportTool(_BridgeTool[TabImportInput]):
         "À appeler avant projets_import_tab_table."
     )
     input_model = TabImportInput
+    output_format = "json"
 
     async def run(self, params: TabImportInput, ctx: ToolContext) -> ToolOutput:
         envelope, name = await self.envelope(params)
@@ -161,7 +189,16 @@ class PreviewTabImportTool(_BridgeTool[TabImportInput]):
             f"({state(t.epic.exists)}), story « {t.story.title} » ({state(t.story.exists)})",
             f"- Éléments de type {t.type}",
         ]
-        return ToolOutput(content="\n".join([*head, describe(preview, preview=True)]))
+        data = import_summary(preview) | {
+            "target": {
+                "project": {"id": t.project.id, "name": t.project.name, "exists": t.project.exists},
+                "phase": {"title": t.phase.title, "exists": t.phase.exists},
+                "epic": {"title": t.epic.title, "exists": t.epic.exists},
+                "story": {"title": t.story.title, "exists": t.story.exists},
+                "type": t.type,
+            }
+        }
+        return ToolOutput(content="\n".join([*head, describe(preview, preview=True)]), data=data)
 
 
 class ImportTabTableTool(_BridgeTool[TabImportInput]):
@@ -173,6 +210,7 @@ class ImportTabTableTool(_BridgeTool[TabImportInput]):
     )
     input_model = TabImportInput
     requires_approval = True
+    output_format = "json"
 
     def approval_summary(self, params: TabImportInput) -> str:
         rows = f"{len(params.rows)} ligne(s)" if params.rows else "toutes les lignes"
@@ -198,10 +236,12 @@ class ImportTabTableTool(_BridgeTool[TabImportInput]):
         if result.replayed:
             return ToolOutput(
                 content=f"Table « {name} » déjà importée telle quelle ({where}) : rien de nouveau. "
-                "Modifiez la table dans Atelier Tab pour un nouvel import."
+                "Modifiez la table dans Atelier Tab pour un nouvel import.",
+                data=import_summary(result),
             )
         return ToolOutput(
-            content=f"Table « {name} » importée ({where}).\n" + describe(result, preview=False)
+            content=f"Table « {name} » importée ({where}).\n" + describe(result, preview=False),
+            data=import_summary(result),
         )
 
 

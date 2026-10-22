@@ -107,12 +107,14 @@ class AttachmentRow(Base):
 
 
 class WorkflowRow(Base):
-    """Workflow rejouable : étapes (outil + entrée) figées depuis un tour d'agent réussi."""
+    """Workflow rejouable. v1 : étapes (outil + entrée) figées depuis un tour d'agent réussi ;
+    v2 : graphe d'étapes outils et actions d'applications (`agent` nul = workflow de suite)."""
 
     __tablename__ = "workflows"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    agent: Mapped[str] = mapped_column(String(41), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    agent: Mapped[str | None] = mapped_column(String(41), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text, default="")
     steps: Mapped[list[Any]] = mapped_column(JSON, default=list)
@@ -124,4 +126,28 @@ class WorkflowRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, index=True
+    )
+
+
+class WorkflowRunRow(Base):
+    """Exécution d'un workflow v2 : avance étape par étape, s'arrête sur chaque écriture.
+
+    `state` (interne, jamais renvoyé par l'API) : définition figée au lancement, ordre,
+    décisions de validation, contexte partagé des outils."""
+
+    __tablename__ = "workflow_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workflow_id: Mapped[str] = mapped_column(String(36), index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    message: Mapped[str] = mapped_column(Text, default="")
+    params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    trigger: Mapped[str] = mapped_column(String(20), default="manual")
+    steps: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    artifacts: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    pending: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
     )

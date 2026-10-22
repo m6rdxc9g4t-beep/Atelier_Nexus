@@ -37,11 +37,32 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 | `src/stores/useArtifactStore.ts` | **Store des artefacts** (règle CLAUDE.md) |
 | `src/features/artifacts/preview.ts` | Lecture des aperçus Data Via (requête / schéma), export CSV |
 | `src/hooks/useBackend.ts` | Agents, moteurs, état de Data Via (rafraîchis toutes les 30 s) |
-| `src/features/workflows/` | Workflows (Étape 18) : `WorkflowEditor` (enregistrer un tour, modifier), `WorkflowsDialog` (liste, lancement, validations), `form.ts` (logique pure, testée) |
+| `src/features/workflows/` | Workflows (Étape 18) : `WorkflowEditor` (enregistrer un tour, modifier un v1), `WorkflowsDialog` (liste commune v1 + v2 d'un agent ou de toute la suite, lancement v1, « Convertir » en v2), `form.ts` (logique pure, testée) |
+| `src/features/workflows-graph/` | Éditeur de workflows v2 en graphe (`@xyflow/react`, contrat `docs/workflows-v2-api.md`) : `WorkflowGraphEditor` (fenêtre plein écran, ≥ 1024 px), `Palette` (catalogue par application), `StepNode`, `Inspector` (étape, condition, paramètres, formulaire généré depuis `input_schema`, menu « Utiliser… »), `RunPanel` (lancement, suivi, validation, historique). Logique pure testée : `graph.ts` (étapes ↔ nœuds/arêtes, ancêtres, ordre, couches, état d'exécution), `validate.ts`, `refs.ts` / `templates.ts` (gabarits), `schemaForm.ts`, `catalog.ts`, `draft.ts`, `run.ts` ; doubles du contrat dans `fixtures.ts` |
+| `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée) |
+| `src/stores/useWorkflowStudioStore.ts` | Ouverture de la liste des workflows, de l'éditeur en graphe et de la carte (une fenêtre à la fois, retour à la précédente) |
+
+## 4. Workflows de suite et carte
+
+- **Points d'entrée** : bouton **Workflows** de la conversation (workflows de l'agent) ; dans l'en-tête, **Workflows**
+  (tous, dont les workflows de suite `agent: null`) et **Carte** (à côté du menu des apps, masqués sous 640 px).
+- **Éditeur en graphe** : palette à gauche (glisser-déposer ou « + », ajouté après l'étape sélectionnée), graphe au
+  centre (poignée de sortie → poignée d'entrée = `needs` ; Suppr / Retour arrière supprime nœud ou liaison ; liaison
+  qui ferait une boucle refusée), inspecteur à droite (onglets Étape / Workflow et Exécution). Les erreurs locales
+  (cycle, identifiant, référence non ancêtre, paramètre non déclaré…) s'affichent tout de suite ; **Valider** ajoute
+  celles du serveur (`INPUT_INVALID` sur le champ concerné). « Utiliser… » ne propose que les paramètres et les étapes
+  **ancêtres** (`{{steps.id.data}}`, `.content`, `.status`, et pour une table `atelier-table/1` annoncée :
+  `.data.rows[0].<colonne>`, `.data.total`). Fermer avec des modifications non enregistrées demande confirmation.
+- **Exécution** : enregistre (et valide) si besoin, lance, interroge `GET /api/workflow-runs/{id}` tant que
+  `running` (500 ms puis jusqu'à 3 s) ; `awaiting_approval` → carte Autoriser / Refuser avec l'entrée résolue
+  (`resume`) ; statuts sur les nœuds ; livrables dans `useArtifactStore` (agent `workflow:<id>`) ; historique cliquable.
+- **Carte de la suite** : « + » sur une action ouvre un nouveau workflow de suite qui commence par `node:<app>/<action>`.
+
+## 5. Historique des conversations
 
 Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer.
 
-## 4. Vérifier
+## 6. Vérifier
 
 ```bash
 cd frontend

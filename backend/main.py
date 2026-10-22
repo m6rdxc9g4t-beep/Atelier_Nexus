@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import __version__
-from app.api import agents, apps, attachments, conversations, data_via, llm, workflows
+from app.api import agents, apps, attachments, conversations, data_via, llm, suite, workflows
 from app.api import settings as settings_api
 from app.api.deps import get_attachment_repository
 from app.api.errors import register_error_handlers
@@ -75,6 +75,8 @@ app.include_router(attachments.router)
 app.include_router(data_via.router)
 app.include_router(settings_api.router)
 app.include_router(workflows.router)
+app.include_router(workflows.runs_router)
+app.include_router(suite.router)
 
 
 class HealthResponse(BaseModel):

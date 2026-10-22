@@ -35,7 +35,15 @@ from app.schemas.tab import (
     TableInfo,
 )
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
-from app.tools.formatting import data_artifact, fmt, markdown_table, table_for_model
+from app.tools.formatting import (
+    TableType,
+    atelier_table,
+    data_artifact,
+    fmt,
+    markdown_table,
+    table_for_model,
+    table_hint,
+)
 from app.tools.http import AppError, AppNotFoundError, AppRequestError, AppUnavailableError
 
 FILE_STEM = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,199}$")
@@ -247,6 +255,75 @@ def sorted_records(records: list[Record]) -> list[Record]:
     return sorted(records, key=lambda r: r.row_index)
 
 
+#: Type Tab → type `atelier-table/1` (une formule est typée d'après ses valeurs)
+TABLE_TYPES: dict[str, TableType] = {
+    "text": "string", "select": "string", "owner": "string", "number": "number",
+    "currency": "number", "percent": "number", "date": "date", "checkbox": "boolean",
+}  # fmt: skip
+
+
+def table_type(column: Column, records: list[Record]) -> TableType:
+    if column.type != "formula":
+        return TABLE_TYPES[column.type]
+    values = [
+        cell.computed
+        for r in records
+        if (cell := r.values.get(column.col_letter)) is not None
+        and cell.computed not in (None, "")
+        and not is_error(cell)
+    ]
+    numeric = all(isinstance(v, int | float) and not isinstance(v, bool) for v in values)
+    return "number" if numeric else "string"
+
+
+def raw_value(column: Column, kind: TableType, cell: Cell | None) -> Any:
+    """Valeur calculée telle quelle (pourcentage = fraction) ; erreur de formule ou valeur
+    d'un autre type que la colonne → `null`."""
+    if cell is None or cell.computed in (None, "") or is_error(cell):
+        return None
+    value = cell.computed
+    if kind == "number":
+        return value if isinstance(value, int | float) and not isinstance(value, bool) else None
+    if kind == "boolean":
+        return value if isinstance(value, bool) else None
+    if kind == "date" and isinstance(value, str):
+        return value[:10]
+    return value if isinstance(value, str) else fmt(value)
+
+
+def envelope_table(
+    env: Envelope,
+    info: TableInfo,
+    columns: list[Column],
+    records: list[Record],
+    *,
+    total: int,
+    truncated: bool,
+) -> dict[str, Any]:
+    """Table `atelier-table/1` d'une enveloppe DataFlow (comme Viz l'aplatit, §7.2) :
+    `_ligne` et `_id` en tête, puis une colonne par entrée de `columns_schema`."""
+    kinds = [table_type(c, env.project.records) for c in columns]
+    head: list[tuple[str, str, TableType]] = [
+        ("_ligne", "Ligne", "number"),
+        ("_id", "Identifiant", "string"),
+    ]
+    return atelier_table(
+        info.id,
+        info.name,
+        head + [(c.id, c.label or c.id, k) for c, k in zip(columns, kinds, strict=True)],
+        [
+            [r.row_index, r.record_id]
+            + [
+                raw_value(c, k, r.values.get(c.col_letter))
+                for c, k in zip(columns, kinds, strict=True)
+            ]
+            for r in records
+        ],
+        total=total,
+        truncated=truncated,
+    )
+
+
 # ─── Outils ───────────────────────────────────────────────────────
 
 
@@ -261,6 +338,14 @@ class NoInput(ToolInput):
     pass
 
 
+_TABLES_COLUMNS: tuple[tuple[str, str, TableType], ...] = (
+    ("id", "Identifiant", "string"), ("workspace", "Espace", "string"),
+    ("project", "Projet", "string"), ("name", "Table", "string"),
+    ("rows", "Lignes", "number"), ("columns", "Colonnes", "number"),
+    ("exported_at", "Modifiée le", "datetime"), ("source", "Source", "string"),
+)  # fmt: skip
+
+
 class ListTablesTool(_TabTool[NoInput]):
     name = "tab_list_tables"
     description = (
@@ -268,13 +353,25 @@ class ListTablesTool(_TabTool[NoInput]):
         "de colonnes et date de la dernière modification."
     )
     input_model = NoInput
+    output_format = "atelier-table/1"
+    output_hint = table_hint(*_TABLES_COLUMNS)
 
     async def run(self, params: NoInput, ctx: ToolContext) -> ToolOutput:
         infos, too_big = await self.snapshots.tables()
+        data = atelier_table(
+            "tables",
+            "Tables d'Atelier Tab",
+            _TABLES_COLUMNS,
+            [
+                [t.id, t.workspace, t.project, t.name, t.rows, t.columns, t.exported_at, t.source]
+                for t in infos
+            ],
+        )
         if not infos:
             return ToolOutput(
                 content="Aucune table publiée par Atelier Tab pour l'instant (ouvrez l'app de bureau "
-                "et enregistrez une table)."
+                "et enregistrez une table).",
+                data=data,
             )
         rows = [
             [t.id, t.workspace, t.project, t.name, t.rows, t.columns,
@@ -286,7 +383,7 @@ class ListTablesTool(_TabTool[NoInput]):
         )
         if too_big:
             text += f"\nIgnorées car trop volumineuses : {', '.join(too_big)}."
-        return ToolOutput(content=f"{len(infos)} table(s).\n{text}")
+        return ToolOutput(content=f"{len(infos)} table(s).\n{text}", data=data)
 
 
 class ReadTableInput(ToolInput):
@@ -305,6 +402,7 @@ class ReadTableTool(_TabTool[ReadTableInput]):
         "calculées par ses formules, lignes de total. Pourcentages affichés en %."
     )
     input_model = ReadTableInput
+    output_format = "atelier-table/1"
 
     async def run(self, params: ReadTableInput, ctx: ToolContext) -> ToolOutput:
         env, info = await self.snapshots.table(params.table_id)
@@ -348,7 +446,11 @@ class ReadTableTool(_TabTool[ReadTableInput]):
         if len(rows) > len(page):
             numeric = {c.label or c.id for c in cols if c.type in ("number", "currency", "formula")}
             artifacts.append(data_artifact(f"Tab · {info.name}", headers, rows, numeric=numeric))
-        return ToolOutput(content="\n".join(lines), artifacts=artifacts)
+        window = records[params.offset : params.offset + params.limit]
+        data = envelope_table(
+            env, info, cols, window, total=len(records), truncated=len(window) < len(records)
+        )
+        return ToolOutput(content="\n".join(lines), artifacts=artifacts, data=data)
 
 
 class Measure(BaseModel):
@@ -378,6 +480,7 @@ class AggregateTool(_TabTool[AggregateInput]):
         "formule sont exclues. Préférer cet outil au calcul de tête."
     )
     input_model = AggregateInput
+    output_format = "atelier-table/1"
 
     async def run(self, params: AggregateInput, ctx: ToolContext) -> ToolOutput:
         env, info = await self.snapshots.table(params.table_id)
@@ -432,7 +535,16 @@ class AggregateTool(_TabTool[AggregateInput]):
         artifacts = (
             [data_artifact(f"Tab · {info.name} · totaux", headers, rows)] if truncated else []
         )
-        return ToolOutput(content=text, artifacts=artifacts)
+        columns: list[tuple[str, str, TableType]] = (
+            [(group.id, group.label or group.id, "string")] if group else []
+        )
+        columns.append(("lignes", "Lignes", "number"))
+        columns += [
+            (f"{agg}_{col.id}", f"{AGG_LABELS[agg].capitalize()} {col.label or col.id}", "number")
+            for col, agg in measures
+        ]
+        data = atelier_table(f"{info.id}-totaux", f"{info.name} · totaux", columns, rows)
+        return ToolOutput(content=text, artifacts=artifacts, data=data)
 
 
 class CheckInput(ToolInput):

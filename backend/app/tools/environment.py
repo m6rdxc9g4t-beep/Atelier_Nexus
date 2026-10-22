@@ -3,7 +3,7 @@ fermés à la fin (`aclose`). Les tests injectent des transports simulés par ap
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -18,6 +18,9 @@ from app.tools.savoir import SavoirClient
 from app.tools.tab import TabSnapshots
 from app.tools.tab_mcp import TabMcpClient
 from app.tools.tresorerie import TresorerieClient
+
+if TYPE_CHECKING:
+    from app.suite.nodes import SuiteNodes
 
 
 class ToolEnvironment:
@@ -34,6 +37,17 @@ class ToolEnvironment:
         self.router: Any = None
         self.catalog: Any = None
         self.delegation_roster: list[tuple[str, str, bool]] = []
+
+    def transport(self, app: str) -> httpx.AsyncBaseTransport | None:
+        """Transport simulé d'une application (tests) ; None = réseau réel."""
+        return self._transports.get(app)
+
+    def suite(self) -> SuiteNodes:
+        """Nœuds de la suite (manifestes, actions, événements) : Viz, Projets, Tab."""
+        from app.suite.nodes import SuiteNodes
+
+        client: SuiteNodes = self._get("suite", lambda: SuiteNodes(self))
+        return client
 
     def _get(self, app: str, factory: Any) -> Any:
         if app not in self._clients:
