@@ -68,10 +68,18 @@ def git(repo: Path, *args: str) -> None:
 def repo(tmp_path: Path) -> Path:
     """Dépôt minimal : lanceurs et module de mise à jour réels, interface factice."""
     repo = tmp_path / "depot"
-    (repo / "backend" / "app").mkdir(parents=True)
+    (repo / "backend" / "app" / "core").mkdir(parents=True)
     (repo / "frontend" / "src").mkdir(parents=True)
     (repo / "scripts" / "macos").mkdir(parents=True)
-    for name in ("desktop.py", "app/__init__.py", "app/desktop.py", "app/desktop_update.py"):
+    for name in (
+        "desktop.py",
+        "app/__init__.py",
+        "app/core/__init__.py",
+        "app/core/processes.py",
+        "app/desktop.py",
+        "app/desktop_open.py",
+        "app/desktop_update.py",
+    ):
         shutil.copy(ROOT / "backend" / name, repo / "backend" / name)
     for name in ("launcher.sh", "app_entry.sh"):
         shutil.copy(ROOT / "scripts" / "macos" / name, repo / "scripts" / "macos" / name)
