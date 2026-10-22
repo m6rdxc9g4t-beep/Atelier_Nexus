@@ -79,8 +79,19 @@ def test_stream_agent_emits_artifact_and_done(
         tool_response("publish_artifact", {"kind": "dax", "title": "CA", "content": "CA = 1"}),
         text_response("Mesure publiée."),
     ]
+    # APPROVAL_MODE=every_step (défaut) : la publication attend « Autoriser »
     with client.stream("POST", "/api/agents/assistant/stream", json=_body()) as response:
         assert response.status_code == 200
+        first = _sse(response.read().decode())
+    assert [kind for kind, _ in first] == ["approval_required", "done"]
+    call = first[0][1]["calls"][0]  # type: ignore[index]
+    assert call["kind"] == "read" and call["summary"].startswith("Publication d'un artefact")
+    done = first[-1][1]["result"]
+    assert done["stop_reason"] == "awaiting_approval"  # type: ignore[index]
+
+    history = _body()["messages"] + done["new_messages"]  # type: ignore[index, operator]
+    body = {"messages": history, "approvals": {call["id"]: True}}
+    with client.stream("POST", "/api/agents/assistant/stream", json=body) as response:
         events = _sse(response.read().decode())
     kinds = [kind for kind, _ in events]
     assert kinds[:3] == ["tool_call", "artifact", "tool_result"]

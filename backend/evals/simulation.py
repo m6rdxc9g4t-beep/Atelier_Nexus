@@ -395,9 +395,14 @@ class SimulatedTresorerie:
 
 
 def simulated_settings() -> Settings:
-    """Seules les applications simulées sont configurées ; les autres boîtes sont écartées."""
+    """Seules les applications simulées sont configurées ; les autres boîtes sont écartées.
+
+    Les évaluations mesurent ce que fait le MODÈLE sur des applications SIMULÉES (aucune donnée
+    réelle) : elles tournent en `writes_only` pour suivre son raisonnement jusqu'au bout ; les
+    écritures restent arrêtées sur `awaiting_approval` et sont contrôlées comme telles."""
     return Settings(
         _env_file=None,
+        approval_mode="writes_only",
         data_via_base_url="http://viz.simule/api",
         projets_base_url="http://projets.simule/api",
         tresorerie_base_url="http://tresorerie.simule/api",

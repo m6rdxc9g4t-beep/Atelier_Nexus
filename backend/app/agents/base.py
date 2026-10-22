@@ -8,9 +8,11 @@ ou Ollama.
 Garde-fous communs :
 - **Confidentialité** : un agent `local_only` (déclaré, ou parce qu'il utilise une boîte
   sensible comme Trésorerie) tourne uniquement sur Ollama, sans repli vers Claude.
-- **Validation humaine** : un outil `requires_approval` n'est jamais exécuté directement.
-  L'agent s'arrête (`stop_reason = "awaiting_approval"`), l'interface affiche
-  « Autoriser / Refuser », puis le client relance le tour avec `approvals`.
+- **Validation humaine** : en `APPROVAL_MODE=every_step` (défaut, choix de l'utilisateur),
+  AUCUN appel d'outil n'est exécuté directement, lectures comprises ; en `writes_only`,
+  seulement les outils `requires_approval`. L'agent s'arrête
+  (`stop_reason = "awaiting_approval"`), l'interface affiche « Autoriser / Refuser » pour
+  chaque appel, puis le client relance le tour avec `approvals`.
 
     @register_agent
     class MonAgent(BaseAgent):
@@ -29,6 +31,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.config import ApprovalMode
 from app.core.llm.attachments import (
     ATTACHMENTS_NOTE,
     AttachmentContent,
@@ -60,6 +63,9 @@ AgentStopReason = StopReason | Literal["max_iterations", "awaiting_approval"]
 
 REFUSED = "L'utilisateur a refusé cette action : ne la relance pas, propose une alternative."
 
+#: Nature d'un appel montrée sur la carte de validation
+CallKind = Literal["read", "write", "delegation"]
+
 # ─── Résultat & événements ────────────────────────────────────────
 
 
@@ -70,6 +76,8 @@ class PendingCall(BaseModel):
     name: str
     input: dict[str, Any]
     summary: str
+    #: « Lecture », « Écriture » ou « Délégation » sur la carte (anciens tours : écriture)
+    kind: CallKind = "write"
 
 
 class AgentResult(BaseModel):
@@ -162,17 +170,30 @@ class BaseAgent(ABC):
         *,
         tools: Sequence[BaseTool[Any]] | None = None,
         delegated: bool = False,
+        approval_mode: ApprovalMode | None = None,
     ) -> None:
         self.router = router
         self.env = env
         self.delegated = delegated
+        # Réglage APPROVAL_MODE de l'installation ; sans environnement, le plus prudent
+        self.approval_mode: ApprovalMode = approval_mode or (
+            env.settings.approval_mode if env is not None else "every_step"
+        )
         self.unavailable: list[UnavailableToolset] = []
         selected = list(tools) if tools is not None else self.default_tools()
         if delegated:
-            # Sous-agent d'un orchestrateur : pas de validation possible, pas de délégation en chaîne
-            selected = [
-                t for t in selected if not t.requires_approval and not t.name.startswith("delegate")
-            ]
+            # Sous-agent d'un orchestrateur : aucune validation ne peut lui être présentée, pas de
+            # délégation en chaîne. En `every_step`, même une lecture attend une validation : le
+            # sous-agent n'a donc AUCUN outil et répond à partir de la consigne transmise.
+            selected = (
+                []
+                if self.approval_mode == "every_step"
+                else [
+                    t
+                    for t in selected
+                    if not t.requires_approval and not t.name.startswith("delegate")
+                ]
+            )
         names = [t.name for t in selected]
         if len(names) != len(set(names)):
             raise ValueError(f"{type(self).__name__} : noms d'outils en double {names}")
@@ -188,7 +209,29 @@ class BaseAgent(ABC):
         return tools
 
     def build_system_prompt(self, ctx: ToolContext) -> str:
-        return self.system_prompt + self.unavailable_note()
+        return self.system_prompt + self.unavailable_note() + self.approval_note()
+
+    def approval_note(self) -> str:
+        """Prévient le modèle que chaque appel est validé (ou qu'il n'a pas d'outil en délégation)."""
+        if self.approval_mode != "every_step":
+            return ""
+        if self.delegated:
+            return (
+                "\n\nTu réponds à une sous-tâche confiée par un orchestrateur, sans aucun outil : "
+                "chaque action doit être validée par l'utilisateur, ce qui est impossible ici. "
+                "Réponds uniquement à partir de la consigne ; si une donnée te manque, dis "
+                "précisément laquelle au lieu de l'inventer."
+            )
+        if not self.tools:
+            return ""
+        return (
+            "\n\nChaque appel d'outil, lecture comprise, est présenté à l'utilisateur, qui "
+            "l'autorise ou le refuse avant son exécution : n'appelle que les outils utiles."
+        )
+
+    def needs_approval(self, tool: BaseTool[Any]) -> bool:
+        """Vrai si cet outil attend « Autoriser » avant de s'exécuter (réglage APPROVAL_MODE)."""
+        return tool.requires_approval or self.approval_mode == "every_step"
 
     def unavailable_note(self) -> str:
         """Prévient le modèle des boîtes écartées, pour qu'il l'explique au lieu d'improviser."""
@@ -396,7 +439,7 @@ class BaseAgent(ABC):
             tool = self.tools.get(call.name)
             if (
                 tool is not None
-                and tool.requires_approval
+                and self.needs_approval(tool)
                 and (approvals is None or call.id not in approvals)
             ):
                 waiting.append(
@@ -405,6 +448,7 @@ class BaseAgent(ABC):
                         name=call.name,
                         input=call.input,
                         summary=tool.summarize(call.input),
+                        kind=call_kind(tool),
                     )
                 )
         return waiting
@@ -419,7 +463,7 @@ class BaseAgent(ABC):
                 content=f"Outil inconnu « {call.name} ». Outils disponibles : {available}.",
                 is_error=True,
             )
-        if tool.requires_approval and not (approvals or {}).get(call.id, False):
+        if self.needs_approval(tool) and not (approvals or {}).get(call.id, False):
             return ToolOutput(content=REFUSED, is_error=True)
         return await tool.invoke(call.input, ctx)
 
@@ -447,3 +491,12 @@ class BaseAgent(ABC):
             new_messages=list(new_messages),
             pending_approvals=pending or [],
         )
+
+
+def call_kind(tool: BaseTool[Any]) -> CallKind:
+    """Nature d'un appel pour la carte : écriture, délégation à un agent, ou lecture."""
+    if tool.requires_approval:
+        return "write"
+    if tool.name == "delegate_to_agent":
+        return "delegation"
+    return "read"
