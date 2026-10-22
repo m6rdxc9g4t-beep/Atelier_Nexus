@@ -4,6 +4,7 @@
  * « Effacer » = retirer du fichier.
  */
 
+import { APPROVAL_CHOICES, APPROVAL_MODE_KEY } from "@/lib/approval";
 import type { SettingsField, SettingsGroup, SettingsView } from "@/types/api";
 
 export interface DraftField {
@@ -14,10 +15,22 @@ export interface DraftField {
 
 export type Draft = Record<string, DraftField>;
 
-export const GROUPS: SettingsGroup[] = ["Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"];
+export const GROUPS: SettingsGroup[] = ["Validation des actions", "Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"];
+
+/** Choix affichés en boutons radio (avec l'aide de chaque option) plutôt qu'en liste. */
+export const RADIO_FIELDS = new Set([APPROVAL_MODE_KEY]);
+
+/** Aide propre à chaque option d'un champ radio. */
+export const CHOICE_HELP: Record<string, string> = {
+  every_step: APPROVAL_CHOICES.every_step.help,
+  writes_only: APPROVAL_CHOICES.writes_only.help,
+};
 
 /** Phrase affichée sous le titre d'un groupe. */
 export const GROUP_NOTES: Partial<Record<SettingsGroup, string>> = {
+  "Validation des actions":
+    "Ce que les agents et les workflows (lancés à la main, par un horaire ou un événement) doivent vous faire " +
+    "valider avant d'agir. Aucune autorisation n'est jamais permanente : chaque action se valide une par une.",
   "Atelier Cuisine":
     "App en ligne (Supabase). Nexus lit le stock, les repas, les courses et le budget du foyer, en lecture seule, " +
     "avec la clé publique et le compte du foyer : seules ses données sont visibles. Le budget n'est lu que par " +
@@ -54,6 +67,8 @@ export function byGroup(view: SettingsView): [SettingsGroup, SettingsField[]][] 
 }
 
 export const CHOICE_LABELS: Record<string, string> = {
+  every_step: APPROVAL_CHOICES.every_step.label,
+  writes_only: APPROVAL_CHOICES.writes_only.label,
   "": "Aucun",
   anthropic: "Claude",
   ollama: "Ollama (local)",

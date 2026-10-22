@@ -124,11 +124,16 @@ export interface AgentInfo {
   unavailable_toolsets?: string[];
 }
 
+/** Nature d'un appel sur la carte de validation (« Lecture », « Écriture », « Délégation »). */
+export type CallKind = "read" | "write" | "delegation";
+
 export interface PendingCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
   summary: string;
+  /** Absent des tours enregistrés avant la validation de chaque action : écriture. */
+  kind?: CallKind;
 }
 
 export type StopReason =
@@ -302,7 +307,10 @@ export interface ConversationDetail extends ConversationSummary {
 // ─── Réglages (Étape 11) ─────────────────────────────────────────
 
 export type SettingsKind = "text" | "url" | "secret" | "choice" | "path";
-export type SettingsGroup = "Modèles" | "Applications Atelier" | "Atelier Cuisine" | "GitHub";
+export type SettingsGroup = "Validation des actions" | "Modèles" | "Applications Atelier" | "Atelier Cuisine" | "GitHub";
+
+/** Réglage APPROVAL_MODE : chaque action (défaut, recommandé) ou seulement les écritures. */
+export type ApprovalMode = "every_step" | "writes_only";
 
 export interface SettingsField {
   key: string;
@@ -388,6 +396,8 @@ export interface PendingStep {
   summary: string;
   /** À renvoyer dans `approvals` : ne vaut que pour cette action (valeurs, version). */
   token: string;
+  /** Lecture : seulement en APPROVAL_MODE=every_step */
+  kind?: "read" | "write";
 }
 
 export interface WorkflowRunResult {
@@ -572,7 +582,8 @@ export interface StepRun {
 export interface PendingApproval {
   step_id: string;
   uses: string;
-  kind: "write" | "destructive";
+  /** read : seulement en APPROVAL_MODE=every_step (chaque étape attend une validation) */
+  kind: ActionKind;
   summary: string;
   token: string;
   input: Record<string, unknown>;

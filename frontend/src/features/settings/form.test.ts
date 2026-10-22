@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SettingsField, SettingsView } from "@/types/api";
 
-import { GROUP_NOTES, byGroup, changes, initialDraft } from "./form";
+import { CHOICE_HELP, CHOICE_LABELS, GROUP_NOTES, RADIO_FIELDS, byGroup, changes, initialDraft } from "./form";
 
 const f = (over: Partial<SettingsField>): SettingsField => ({
   key: "K",
@@ -79,4 +79,25 @@ describe("réglages", () => {
     expect(changes(cuisine, draft)).toEqual({ CUISINE_PASSWORD: "nouveau" });
     expect(GROUP_NOTES["Atelier Cuisine"]).toContain("lecture seule");
   });
+
+  it("Validation des actions : premier groupe, choix en clair, défaut « chaque action »", () => {
+    const approval: SettingsView = {
+      env_file: "/x/.env",
+      fields: [
+        f({ key: "OLLAMA_MODEL" }),
+        f({ key: "APPROVAL_MODE", group: "Validation des actions", kind: "choice", choices: ["every_step", "writes_only"], value: "every_step" }),
+      ],
+    };
+    expect(byGroup(approval).map(([g]) => g)).toEqual(["Validation des actions", "Modèles"]);
+    expect(RADIO_FIELDS.has("APPROVAL_MODE")).toBe(true);
+    expect(CHOICE_LABELS.every_step).toBe("Chaque action (recommandé)");
+    expect(CHOICE_LABELS.writes_only).toBe("Seulement les écritures");
+    expect(CHOICE_HELP.every_step).toContain("lectures comprises");
+    expect(GROUP_NOTES["Validation des actions"]).toContain("jamais permanente");
+    const draft = initialDraft(approval);
+    expect(changes(approval, draft)).toEqual({});
+    draft.APPROVAL_MODE!.value = "writes_only";
+    expect(changes(approval, draft)).toEqual({ APPROVAL_MODE: "writes_only" });
+  });
 });
+

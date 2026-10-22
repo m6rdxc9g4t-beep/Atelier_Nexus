@@ -18,7 +18,9 @@ import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_ICONS, AgentIcon } from "@/features/chat-agent/agentMeta";
 import { ApiError, api } from "@/lib/api";
+import { approvalPromise } from "@/lib/approval";
 import { cn } from "@/lib/utils";
+import { useApprovalMode } from "@/stores/useApprovalModeStore";
 import type { EditorOptions, ProviderName } from "@/types/api";
 
 import { type AgentForm, emptyForm, forcesLocal, formFrom, slugify, toPayload, validate } from "./form";
@@ -37,6 +39,7 @@ const PROMPT_HINT =
   "des concurrents, tu classes les sujets par impact et tu proposes trois actions.";
 
 export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEditorProps) {
+  const approvalMode = useApprovalMode();
   const [options, setOptions] = useState<EditorOptions | null>(null);
   // Monté à chaque ouverture (clé dans Workspace) : l'état initial suffit à le réinitialiser
   const [form, setForm] = useState<AgentForm>(emptyForm);
@@ -124,8 +127,7 @@ export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEdito
         <DialogHeader>
           <DialogTitle>{editing ? "Modifier l'agent" : "Créer un agent"}</DialogTitle>
           <DialogDescription>
-            Un agent, c&apos;est un rôle, des consignes et des outils. Les actions qui modifient vos
-            données demanderont toujours votre validation.
+            Un agent, c&apos;est un rôle, des consignes et des outils. {approvalPromise(approvalMode)}
           </DialogDescription>
         </DialogHeader>
 

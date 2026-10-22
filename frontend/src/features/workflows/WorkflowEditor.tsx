@@ -17,7 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toolLabel } from "@/features/chat-agent/ToolCall";
 import { ApiError, api } from "@/lib/api";
+import { approvalPromise } from "@/lib/approval";
 import { cn } from "@/lib/utils";
+import { useApprovalMode } from "@/stores/useApprovalModeStore";
 import type { AgentInfo, Message, Workflow } from "@/types/api";
 
 import { type WorkflowForm, stepDraft, syncParams, toFields } from "./form";
@@ -37,6 +39,7 @@ interface WorkflowEditorProps {
 const EMPTY: WorkflowForm = { title: "", description: "", steps: [], params: [] };
 
 export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: WorkflowEditorProps) {
+  const approvalMode = useApprovalMode();
   const editing = source.kind === "edit" ? source.workflow : null;
   const writeTools = new Set(agent.tools.filter((t) => t.requires_approval).map((t) => t.name));
   const [form, setForm] = useState<WorkflowForm>(() =>
@@ -125,7 +128,7 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
           <DialogTitle>{editing ? "Modifier le workflow" : "Enregistrer en workflow"}</DialogTitle>
           <DialogDescription>
             Les mêmes outils, dans le même ordre, relancés sans modèle : résultat immédiat et sans
-            jeton. Les actions qui modifient des données demanderont toujours votre validation.
+            jeton. {approvalPromise(approvalMode)}
           </DialogDescription>
         </DialogHeader>
 

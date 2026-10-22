@@ -18,9 +18,10 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useApprovalModeStore } from "@/stores/useApprovalModeStore";
 import type { AppStatus, ProviderStatus, SettingsField, SettingsView } from "@/types/api";
 
-import { CHOICE_LABELS, type Draft, GROUP_NOTES, byGroup, changes, initialDraft } from "./form";
+import { CHOICE_HELP, CHOICE_LABELS, type Draft, GROUP_NOTES, RADIO_FIELDS, byGroup, changes, initialDraft } from "./form";
 
 /** Bouton « Réglages » et fenêtre de configuration (clé Claude, modèles, apps, Cuisine, GitHub). */
 export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | void }) {
@@ -36,8 +37,8 @@ export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | voi
         <DialogHeader>
           <DialogTitle>Réglages</DialogTitle>
           <DialogDescription>
-            Apparence, moteurs d&apos;IA, adresses des applications Atelier, compte Atelier Cuisine et
-            accès GitHub. Les changements s&apos;appliquent tout de suite.
+            Apparence, validation des actions, moteurs d&apos;IA, adresses des applications Atelier, compte
+            Atelier Cuisine et accès GitHub. Les changements s&apos;appliquent tout de suite.
           </DialogDescription>
         </DialogHeader>
         {/* Préférence propre à cet appareil (localStorage), indépendante du serveur */}
@@ -67,6 +68,7 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [check, setCheck] = useState<Check | null>(null);
+  const approvalSaved = useApprovalModeStore((s) => s.fromSettings);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -75,13 +77,14 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
       .then((view) => {
         setLoad({ status: "ready", view });
         setDraft(initialDraft(view));
+        approvalSaved(view);
       })
       .catch((err: unknown) => {
         if (!ctrl.signal.aborted)
           setLoad({ status: "error", message: err instanceof ApiError ? err.message : "Le serveur ne répond pas." });
       });
     return () => ctrl.abort();
-  }, []);
+  }, [approvalSaved]);
 
   if (load.status === "loading") return <p className="text-sm text-muted-foreground">Chargement…</p>;
   if (load.status === "error")
@@ -105,6 +108,7 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
       const next = await api.updateSettings(pending);
       setLoad({ status: "ready", view: next });
       setDraft(initialDraft(next));
+      approvalSaved(next);
       await onSaved();
       const [providers, apps] = await Promise.all([api.providers(), api.appsStatus()]);
       setCheck({ providers, apps });
@@ -181,6 +185,10 @@ function FieldRow({
   const note = locked ? "Fixé par une variable d'environnement : modifiable seulement à la source." : field.help;
   const describedBy = note || error ? `${id}-note` : undefined;
 
+  if (field.kind === "choice" && RADIO_FIELDS.has(field.key)) {
+    return <RadioRow field={field} draft={draft} locked={locked} note={locked ? note : ""} error={error} onChange={onChange} />;
+  }
+
   let control;
   if (field.kind === "choice") {
     control = (
@@ -253,6 +261,66 @@ function FieldRow({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Choix fermé présenté en boutons radio : chaque option avec son explication. */
+function RadioRow({
+  field,
+  draft,
+  locked,
+  note,
+  error,
+  onChange,
+}: {
+  field: SettingsField;
+  draft: Draft[string];
+  locked: boolean;
+  note: string;
+  error: string | undefined;
+  onChange: (patch: Partial<Draft[string]>) => void;
+}) {
+  const id = `setting-${field.key}`;
+  return (
+    <div role="radiogroup" aria-labelledby={`${id}-label`} aria-describedby={note || error ? `${id}-note` : undefined} className="grid gap-2">
+      <p id={`${id}-label`} className="text-sm">
+        {field.label}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {field.choices.map((choice) => {
+          const checked = draft.value === choice;
+          return (
+            <label
+              key={choice}
+              className={cn(
+                "flex cursor-pointer items-start gap-2 rounded-md border border-atelier-line bg-card p-3 text-sm has-focus-visible:shadow-focus",
+                checked && "atelier-nav-active",
+                locked && "cursor-not-allowed opacity-60",
+              )}
+            >
+              <input
+                type="radio"
+                name={id}
+                value={choice}
+                checked={checked}
+                disabled={locked}
+                onChange={() => onChange({ value: choice })}
+                className="mt-0.5 accent-primary"
+              />
+              <span className="grid gap-0.5">
+                <span className="font-medium">{CHOICE_LABELS[choice] ?? choice}</span>
+                {CHOICE_HELP[choice] && <span className="text-xs text-muted-foreground">{CHOICE_HELP[choice]}</span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {(error || note) && (
+        <p id={`${id}-note`} className={cn("text-xs", error ? "text-destructive" : "text-muted-foreground")}>
+          {error ?? note}
+        </p>
+      )}
     </div>
   );
 }
