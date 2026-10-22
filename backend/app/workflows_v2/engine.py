@@ -5,9 +5,12 @@
    les paramètres connus). Un problème → rien n'est exécuté.
 2. Les étapes s'exécutent dans l'ordre topologique. Pour chacune : condition `when`, résolution
    des gabarits avec les sorties réelles des étapes précédentes, validation de l'entrée.
-3. Une étape `write` ou `destructive` **s'arrête** sur `awaiting_approval` avec son entrée
-   résolue ; le jeton (sha256 de l'exécution, de l'étape, de `uses` et de l'entrée) ne vaut que
-   pour cette action. La reprise exécute exactement l'entrée montrée.
+3. En `APPROVAL_MODE=every_step` (défaut), CHAQUE étape `tool:` / `node:` **s'arrête** sur
+   `awaiting_approval` avec son entrée résolue (après l'exécution des étapes précédentes) ; en
+   `writes_only`, seulement les étapes `write` / `destructive`. Le jeton (sha256 de l'exécution,
+   de l'étape, de `uses` et de l'entrée) ne vaut que pour cette action. La reprise exécute
+   exactement l'entrée montrée. Le mode retenu au lancement est conservé ; passer en
+   `every_step` pendant l'exécution s'applique aux étapes suivantes (le plus strict l'emporte).
 4. Erreur : `on_error: stop` → exécution `failed`, la suite `skipped` ; `continue` → on poursuit.
    Refus → étape `refused`, exécution `stopped`, la suite `skipped`. Une étape dont une étape
    amont a été sautée (condition fausse) est sautée aussi.
@@ -24,6 +27,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from app.core.config import ApprovalMode
 from app.db.workflows import WorkflowRepository
 from app.schemas.triggers import RunOrigin, TriggerEventRef
 from app.schemas.workflows_v2 import (
@@ -180,6 +184,11 @@ class Engine:
             if s.status in ("ok", "error", "refused", "skipped")
         }
 
+    def approval_mode(self) -> ApprovalMode:
+        """Mode du lancement, ou `every_step` si le réglage l'est devenu depuis."""
+        modes = {self.state.get("approval_mode", "every_step"), self.env.settings.approval_mode}
+        return "every_step" if "every_step" in modes else "writes_only"
+
     def scope(self, step: WorkflowStepV2) -> Scope:
         return Scope(self.run.params, self.outcomes(), self.run.id, ancestors(self.steps, step.id))
 
@@ -309,8 +318,8 @@ class Engine:
             return self.fail(step, step_run, target.code, target.message)
         step_run.input = tool_input
 
-        # Validation humaine des écritures, liée à l'entrée résolue
-        if target.kind in ("write", "destructive"):
+        # Validation humaine (chaque étape, ou les écritures seulement), liée à l'entrée résolue
+        if target.kind in ("write", "destructive") or self.approval_mode() == "every_step":
             token = approval_token(self.run.id, step.id, step.uses, tool_input)
             decision = self.state.get("approvals", {}).get(token)
             if decision is None:
@@ -325,7 +334,7 @@ class Engine:
                     PendingApproval(
                         step_id=step.id,
                         uses=step.uses,
-                        kind="destructive" if target.kind == "destructive" else "write",
+                        kind=target.kind,
                         summary=summary,
                         token=token,
                         input=tool_input,
@@ -438,8 +447,9 @@ async def start_run(
     """Lance une exécution (WorkflowError si un paramètre manque). Une exécution refusée par la
     porte de contrôle est enregistrée `failed`, sans qu'aucune étape n'ait été exécutée.
 
-    `trigger`, `trigger_id`, `trigger_event` ne disent que l'origine : une écriture lancée par un
-    déclencheur s'arrête sur `awaiting_approval` comme en manuel."""
+    `trigger`, `trigger_id`, `trigger_event` ne disent que l'origine : une exécution lancée par un
+    déclencheur s'arrête sur `awaiting_approval` comme en manuel (dès la première étape en
+    `every_step`, à la première écriture en `writes_only`)."""
     values = resolve_params(workflow.params, given)
     order, _ = topo_order(workflow.steps)
     by_id = {s.id: s for s in workflow.steps}
@@ -461,7 +471,11 @@ async def start_run(
         created_at=now,
         updated_at=now,
     )
-    state: dict[str, Any] = {"definition": _definition(workflow), "approvals": {}}
+    state: dict[str, Any] = {
+        "definition": _definition(workflow),
+        "approvals": {},
+        "approval_mode": env.settings.approval_mode,
+    }
     problems = gate_problems(workflow, registry, values)
     if problems:
         run.status = "failed"

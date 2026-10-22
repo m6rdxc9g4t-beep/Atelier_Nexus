@@ -316,10 +316,11 @@ async def run(
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
 ) -> WorkflowRunResult | WorkflowRun:
-    """v1 : exécute les étapes avec les outils de l'agent ; une écriture sans décision renvoie
+    """v1 : exécute les étapes avec les outils de l'agent ; une étape à valider sans décision
+    (toutes en `APPROVAL_MODE=every_step`, les écritures en `writes_only`) renvoie
     `awaiting_approval` (rien n'est exécuté), relancer avec `approvals: {"<jeton>": true}`.
-    v2 : crée une exécution persistée qui avance jusqu'à la fin ou jusqu'à la première écriture
-    (`awaiting_approval`, reprise par `POST /api/workflow-runs/{id}/resume`)."""
+    v2 : crée une exécution persistée qui avance jusqu'à la fin ou jusqu'à la prochaine
+    validation (`awaiting_approval`, reprise par `POST /api/workflow-runs/{id}/resume`)."""
     workflow = await repo.get(workflow_id)
     if workflow is None:
         raise _not_found(workflow_id)

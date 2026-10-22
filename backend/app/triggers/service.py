@@ -12,8 +12,9 @@ Un **passage** (`tick()`) fait, dans l'ordre :
 
 Chaque lancement passe par les mêmes garde-fous : une seule exécution en attente de validation par
 déclencheur (`waiting`), au plus `max_runs_per_hour` (`throttled`), lancements séquentiels pour un
-même déclencheur (verrou). Le moteur d'exécution est celui de `POST /api/workflows/{id}/run` : une
-écriture s'arrête toujours sur `awaiting_approval`.
+même déclencheur (verrou). Le moteur d'exécution est celui de `POST /api/workflows/{id}/run` : en
+`APPROVAL_MODE=every_step` (défaut), l'exécution s'arrête dès la première étape sur
+`awaiting_approval` ; en `writes_only`, à la première écriture.
 
 Une erreur sur un déclencheur est comptée (`counters.errors`, `last_error`) et n'arrête ni le
 passage ni la boucle. Les `data` des événements ne sont jamais journalisées ni conservées : seuls
@@ -313,7 +314,7 @@ class TriggerService:
 
     async def test(self, trigger_id: str, sample: SampleEvent | None) -> WorkflowRun | None:
         """Lance une fois maintenant (origine `test`), sans compter ni limiter : la validation
-        des écritures, elle, s'applique comme toujours. None si le déclencheur n'existe plus.
+        (chaque étape, ou les écritures selon `APPROVAL_MODE`) s'applique comme toujours. None si le déclencheur n'existe plus.
         Lève `WorkflowError` ou `AgentNotFoundError`."""
         stored = await self.triggers.get(trigger_id)
         if stored is None:

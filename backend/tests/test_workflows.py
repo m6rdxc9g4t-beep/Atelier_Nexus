@@ -17,7 +17,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.agents import AgentCatalog, get_agent_class
 from app.api.deps import get_catalog, get_env_factory, get_workflow_repository
-from app.core.config import Settings
+from app.core.config import ApprovalMode, Settings
 from app.core.llm import get_llm_router
 from app.core.llm.types import Message, TextBlock, ToolResultBlock, ToolUseBlock
 from app.db.models import Base
@@ -33,9 +33,10 @@ from tests.test_connectors import FakeProjets
 BACKEND = Path(__file__).resolve().parents[1]
 
 
-def settings() -> Settings:
+def settings(approval_mode: ApprovalMode = "every_step") -> Settings:
     return Settings(
         _env_file=None,
+        approval_mode=approval_mode,
         data_via_base_url="http://viz.test/api",
         projets_base_url="http://projets.test/api",
         tresorerie_base_url=None,
@@ -49,9 +50,9 @@ class Apps:
         self.viz = FakeDataVia()
         self.projets = FakeProjets()
 
-    def env(self) -> ToolEnvironment:
+    def env(self, approval_mode: ApprovalMode = "every_step") -> ToolEnvironment:
         return ToolEnvironment(
-            settings(),
+            settings(approval_mode),
             transports={
                 "data_via": self.viz.transport,
                 "projets": httpx.MockTransport(self.projets),
@@ -64,8 +65,11 @@ def apps() -> Apps:
     return Apps()
 
 
-def agent(name: str, apps: Apps) -> Any:
-    return get_agent_class(name)(make_router(), apps.env())
+def agent(name: str, apps: Apps, approval_mode: ApprovalMode = "writes_only") -> Any:
+    """Agent du moteur v1. Ces tests portent sur le rejeu et la validation des ÉCRITURES : les
+    lectures s'exécutent seules (`writes_only`) ; `every_step` est testé dans
+    test_approval_mode.py et par l'API ci-dessous."""
+    return get_agent_class(name)(make_router(), apps.env(approval_mode))
 
 
 # ─── Capture ──────────────────────────────────────────────────────
@@ -356,7 +360,7 @@ def payload(**extra: Any) -> dict[str, Any]:
     }
 
 
-def test_api_capture_then_save_list_run_update_delete(client: TestClient) -> None:
+def test_api_capture_then_save_list_run_update_delete(client: TestClient, apps: Apps) -> None:
     messages = [m.model_dump(mode="json") for m in conversation()]
     draft = client.post(
         "/api/workflows/capture", json={"agent": "data_analyst", "messages": messages}
@@ -374,7 +378,16 @@ def test_api_capture_then_save_list_run_update_delete(client: TestClient) -> Non
     ] == [wf["id"]]
     assert client.get("/api/workflows", params={"agent": "rh"}).json() == []
 
-    ran = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {"jeu": DATASET_ID}})
+    params = {"jeu": DATASET_ID}
+    # APPROVAL_MODE=every_step (défaut) : chaque lecture attend sa décision
+    asked = client.post(f"/api/workflows/{wf['id']}/run", json={"params": params}).json()
+    assert asked["status"] == "awaiting_approval"
+    assert [p["kind"] for p in asked["pending"]] == ["read", "read"]
+    assert not apps.viz.requests  # rien lu avant validation
+    approvals = {p["token"]: True for p in asked["pending"]}
+    ran = client.post(
+        f"/api/workflows/{wf['id']}/run", json={"params": params, "approvals": approvals}
+    )
     assert ran.status_code == 200 and ran.json()["status"] == "completed"
     assert len(ran.json()["artifacts"]) == 2
     again = client.get(f"/api/workflows/{wf['id']}").json()

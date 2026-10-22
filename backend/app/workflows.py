@@ -3,8 +3,8 @@
 - **Capture** : les appels d'outils réussis du dernier tour d'une conversation deviennent les
   étapes d'un workflow (les appels en erreur, refusés ou non rejouables sont écartés).
 - **Exécution** : les étapes sont vérifiées toutes avant de commencer (outil disponible,
-  paramètres valides), les écritures attendent la validation de l'utilisateur comme dans le
-  chat, puis les outils s'exécutent dans l'ordre avec un contexte partagé (l'exploration
+  paramètres valides), les étapes attendent la validation de l'utilisateur comme dans le chat
+  (toutes en `APPROVAL_MODE=every_step`, défaut ; seulement les écritures en `writes_only`), puis les outils s'exécutent dans l'ordre avec un contexte partagé (l'exploration
   préalable de Data Via reste satisfaite). La première erreur arrête tout (porte de contrôle).
 
 Aucun modèle n'intervient : rien ne quitte la machine, même pour un agent « 100 % local ».
@@ -204,21 +204,27 @@ async def run_workflow(
         for index, (step, tool_input) in enumerate(concrete, start=1)
     ]
 
-    # 2. Validation humaine des écritures, comme dans le chat, liée aux valeurs montrées
+    # 2. Validation humaine (chaque étape en `every_step`, les écritures en `writes_only`),
+    #    comme dans le chat, liée aux valeurs montrées
     pending = [
         PendingStep(
             index=index,
             tool=step.tool,
             summary=agent.tools[step.tool].summarize(tool_input),
             token=tokens[index - 1],
+            kind="write" if agent.tools[step.tool].requires_approval else "read",
         )
         for index, (step, tool_input) in enumerate(concrete, start=1)
-        if agent.tools[step.tool].requires_approval and tokens[index - 1] not in decisions
+        if agent.needs_approval(agent.tools[step.tool]) and tokens[index - 1] not in decisions
     ]
     if pending:
         return WorkflowRunResult(
             status="awaiting_approval",
-            message="Ce workflow modifie des données : autorisez ou refusez chaque action.",
+            message=(
+                "Chaque étape attend votre validation : autorisez ou refusez chaque action."
+                if agent.approval_mode == "every_step"
+                else "Ce workflow modifie des données : autorisez ou refusez chaque action."
+            ),
             pending=pending,
         )
 
@@ -234,7 +240,7 @@ async def run_workflow(
         if stop is not None:
             results.append(StepResult(**base, status="skipped"))
             continue
-        if tool.requires_approval and not decisions.get(tokens[index - 1], False):
+        if agent.needs_approval(tool) and not decisions.get(tokens[index - 1], False):
             stop = StepResult(**base, status="refused", content="Action refusée.")
             results.append(stop)
             continue

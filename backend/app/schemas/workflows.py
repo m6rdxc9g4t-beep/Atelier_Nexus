@@ -156,6 +156,8 @@ class PendingStep(BaseModel):
     summary: str
     #: À renvoyer dans `approvals` : vaut pour CETTE action (étape, outil, valeurs, version)
     token: str
+    #: « Lecture » ou « Écriture » sur la carte (lectures : seulement en `every_step`)
+    kind: Literal["read", "write"] = "write"
 
 
 class WorkflowRunResult(BaseModel):

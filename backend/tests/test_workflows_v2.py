@@ -177,13 +177,30 @@ def create(client: TestClient, steps: list[dict[str, Any]], **extra: Any) -> dic
     return data
 
 
+def decide(client: TestClient, run: dict[str, Any], allow: bool = True) -> dict[str, Any]:
+    """Décision sur l'UNIQUE étape en attente (une à la fois, jeton de l'action montrée)."""
+    (pending,) = run["pending"]
+    response = client.post(
+        f"/api/workflow-runs/{run['id']}/resume", json={"approvals": {pending["token"]: allow}}
+    )
+    assert response.status_code == 200, response.text
+    data: dict[str, Any] = response.json()
+    return data
+
+
 def test_multi_app_run_stops_on_each_write_with_the_resolved_input(
     client: TestClient, suite: Suite
 ) -> None:
     wf = create(client, MULTI)
     assert wf["version"] == 2 and wf["agent"] is None
     run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
+    # APPROVAL_MODE=every_step (défaut) : la lecture de Tab attend elle aussi
     assert run["status"] == "awaiting_approval" and run["trigger"] == "manual"
+    assert run["pending"][0]["step_id"] == "lire" and run["pending"][0]["kind"] == "read"
+    assert run["pending"][0]["input"] == {"table_id": "tbl_planning_lots"}
+    assert not suite.mcp_calls()  # rien lu avant validation
+    run = decide(client, run)
+    assert run["status"] == "awaiting_approval"
     assert [(x["id"], x["status"]) for x in run["steps"]] == [
         ("lire", "ok"),
         ("creer", "awaiting_approval"),
@@ -250,10 +267,8 @@ def test_multi_app_run_stops_on_each_write_with_the_resolved_input(
 def test_refusal_stops_and_skips_the_rest(client: TestClient, suite: Suite) -> None:
     wf = create(client, MULTI)
     run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
-    token = run["pending"][0]["token"]
-    run = client.post(
-        f"/api/workflow-runs/{run['id']}/resume", json={"approvals": {token: False}}
-    ).json()
+    run = decide(client, run)  # lecture autorisée
+    run = decide(client, run, allow=False)  # création refusée
     assert run["status"] == "stopped" and "refusée" in run["message"]
     assert [x["status"] for x in run["steps"]] == ["ok", "refused", "skipped"]
     assert not suite.projets.created and not suite.viz.published
@@ -283,6 +298,7 @@ def test_destructive_node_action_waits_and_is_flagged(client: TestClient, suite:
 
 
 def test_on_error_stop_and_continue(client: TestClient, suite: Suite) -> None:
+    suite.approval_mode = "writes_only"  # sujet : le moteur ; every_step : test_approval_mode.py
     failing = s("q", "node:viz/datasets.query", {"dataset_id": "inconnu"})
     reader = s(
         "lit", "node:viz/datasets.query", {"dataset_id": "{{steps.q.data.rows[0].region}}"}, ["q"]
@@ -314,6 +330,7 @@ def test_on_error_stop_and_continue(client: TestClient, suite: Suite) -> None:
 
 
 def test_when_skips_the_step_and_its_dependents(client: TestClient, suite: Suite) -> None:
+    suite.approval_mode = "writes_only"  # sujet : le moteur ; every_step : test_approval_mode.py
     lire = s("lire", "node:tab/tables.query", {"table_id": "{{params.table}}"})
     gros = s(
         "gros",
@@ -337,6 +354,7 @@ def test_when_skips_the_step_and_its_dependents(client: TestClient, suite: Suite
 
 
 def test_tool_steps_share_context_and_bound_data(client: TestClient, suite: Suite) -> None:
+    suite.approval_mode = "writes_only"  # sujet : le moteur ; every_step : test_approval_mode.py
     steps = [
         s("schema", "tool:data_via_describe_dataset", {"dataset_id": DATASET_ID}),
         s(
@@ -365,6 +383,7 @@ def test_tool_steps_share_context_and_bound_data(client: TestClient, suite: Suit
 
 def test_resume_after_a_write_keeps_the_tool_context(client: TestClient, suite: Suite) -> None:
     """L'exploration préalable de Data Via faite avant une validation reste valable après."""
+    suite.approval_mode = "writes_only"  # une seule validation : l'écriture
     steps = [
         s("schema", "tool:data_via_describe_dataset", {"dataset_id": DATASET_ID}),
         s("creer", "node:projets/work_items.create", {"story_id": 2, "type": "TASK", "title": "x"}, ["schema"]),
@@ -381,6 +400,7 @@ def test_resume_after_a_write_keeps_the_tool_context(client: TestClient, suite: 
 
 
 def test_gate_runs_nothing_when_a_param_breaks_an_input(client: TestClient, suite: Suite) -> None:
+    suite.approval_mode = "writes_only"  # sujet : le moteur ; every_step : test_approval_mode.py
     wf = create(
         client,
         [
@@ -528,7 +548,12 @@ async def test_v1_still_works_and_converts_to_v2(
     listed = client.get("/api/workflows").json()
     assert listed[0]["version"] == 1
     v1_run = client.post(f"/api/workflows/{v1.id}/run", json={}).json()
-    assert "index" in v1_run["steps"][0]  # réponse v1 (WorkflowRunResult)
+    # Réponse v1 (WorkflowRunResult) ; APPROVAL_MODE=every_step : les deux lectures attendent
+    assert v1_run["status"] == "awaiting_approval" and "index" in v1_run["pending"][0]
+    assert [p["kind"] for p in v1_run["pending"]] == ["read", "read"]
+    approvals = {p["token"]: True for p in v1_run["pending"]}  # une décision par étape
+    v1_run = client.post(f"/api/workflows/{v1.id}/run", json={"approvals": approvals}).json()
+    assert "index" in v1_run["steps"][0] and v1_run["steps"][0]["status"] == "ok"
 
     converted = client.post(f"/api/workflows/{v1.id}/convert").json()
     assert converted["version"] == 2 and converted["id"] == v1.id
@@ -540,7 +565,8 @@ async def test_v1_still_works_and_converts_to_v2(
     assert converted["steps"][1]["input"]["dataset_id"] == "Jeu {{params.jeu}}"
     assert converted["run_count"] == 1 and converted["agent"] == "data_analyst"
     run = client.post(f"/api/workflows/{v1.id}/run", json={}).json()
-    assert run["steps"][0]["status"] == "ok" and "workflow_id" in run
+    assert "workflow_id" in run and run["pending"][0]["step_id"] == "s1"
+    assert decide(client, run)["steps"][0]["status"] == "ok"
     # Déjà en v2 : renvoyé tel quel
     assert client.post(f"/api/workflows/{v1.id}/convert").json()["steps"] == converted["steps"]
 

@@ -1,7 +1,8 @@
 """Lancement d'un workflow v2, partagé par l'API (`POST /api/workflows/{id}/run`) et les
 déclencheurs (horaire, événement, test) : même registre d'étapes, même moteur, mêmes garde-fous.
 
-Une écriture lancée par un déclencheur s'arrête sur `awaiting_approval` exactement comme en manuel :
+Une exécution lancée par un déclencheur s'arrête sur `awaiting_approval` exactement comme en manuel
+(chaque étape en `APPROVAL_MODE=every_step`, les écritures en `writes_only`) :
 rien ici ne distingue l'origine, sauf les champs `trigger`, `trigger_id`, `trigger_event` de
 l'exécution enregistrée.
 """
@@ -58,7 +59,8 @@ async def launch_run(
     trigger_id: str | None = None,
     trigger_event: TriggerEventRef | None = None,
 ) -> WorkflowRun:
-    """Crée une exécution persistée qui avance jusqu'à la fin ou jusqu'à la première écriture.
+    """Crée une exécution persistée qui avance jusqu'à la fin ou jusqu'à la première validation
+    (première étape en `every_step`, première écriture en `writes_only`).
     Lève `WorkflowError` (paramètre manquant ou inconnu) ou `AgentNotFoundError`."""
     async with step_registry(workflow.agent, llm, catalog, make_env) as (registry, env):
         return await start_run(
