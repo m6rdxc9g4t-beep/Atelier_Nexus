@@ -16,6 +16,12 @@ import type {
   CustomAgentFields,
   DataViaStatus,
   EditorOptions,
+  AtelierEvent,
+  EventsCatalog,
+  InboxCount,
+  RunStatus,
+  Trigger,
+  TriggerBody,
   Message,
   ProviderStatus,
   SearchHit,
@@ -182,6 +188,24 @@ export const api = {
   /** `approvals` : jeton de l'étape en attente → autorisée. */
   resumeWorkflowRun: (runId: string, approvals: Record<string, boolean>) =>
     sendJson<WorkflowRun>("POST", `/api/workflow-runs/${encodeURIComponent(runId)}/resume`, { approvals }),
+
+  // ─── Déclencheurs (docs/declencheurs-api.md) ───
+  triggers: (workflowId: string, signal?: AbortSignal) =>
+    getJson<Trigger[]>(`/api/workflows/${encodeURIComponent(workflowId)}/triggers`, signal),
+  createTrigger: (workflowId: string, body: TriggerBody) =>
+    sendJson<Trigger>("POST", `/api/workflows/${encodeURIComponent(workflowId)}/triggers`, body),
+  /** Même corps que la création ; les compteurs sont conservés, `next_fire_at` recalculé. */
+  updateTrigger: (triggerId: string, body: TriggerBody) =>
+    sendJson<Trigger>("PUT", `/api/triggers/${encodeURIComponent(triggerId)}`, body),
+  deleteTrigger: (triggerId: string) => sendJson<void>("DELETE", `/api/triggers/${encodeURIComponent(triggerId)}`),
+  /** Lance une fois maintenant comme le ferait le déclencheur ; `event` : événement d'exemple. */
+  testTrigger: (triggerId: string, event?: AtelierEvent) =>
+    sendJson<WorkflowRun>("POST", `/api/triggers/${encodeURIComponent(triggerId)}/test`, event ? { event } : {}),
+  eventsCatalog: (signal?: AbortSignal) => getJson<EventsCatalog>("/api/triggers/events-catalog", signal),
+  /** Exécutions d'un statut, tous workflows confondus (récents d'abord) : boîte « À valider ». */
+  workflowRunsByStatus: (status: RunStatus, signal?: AbortSignal) =>
+    getJson<WorkflowRun[]>(`/api/workflow-runs?${new URLSearchParams({ status }).toString()}`, signal),
+  inboxCount: (signal?: AbortSignal) => getJson<InboxCount>("/api/workflow-runs/inbox-count", signal),
 
   // ─── Carte de la suite ───
   suiteMap: (signal?: AbortSignal) => getJson<SuiteMap>("/api/suite/map", signal),

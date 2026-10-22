@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -54,6 +55,14 @@ class Settings(BaseSettings):
 
     # Application de bureau : interface compilée (frontend/out) servie par le backend
     frontend_dist: str | None = None
+
+    # Déclencheurs de workflows (docs/workflows.md, section Déclencheurs)
+    #: Fuseau des horaires quotidiens (nom IANA), heure d'été / d'hiver comprises
+    timezone: str = "Europe/Paris"
+    #: Tâche de fond (horaires, événements des applications) ; coupée dans les tests
+    triggers_enabled: bool = True
+    #: Intervalle entre deux passages (lecture des événements, horaires échus)
+    triggers_poll_seconds: float = Field(default=15.0, ge=1, le=3600)
 
     # Atelier Ciné (Express, 4000 ; app Mac : 47321). Atelier Savoir (Flask) écoute par défaut
     # sur 5050 comme Trésorerie : on le lance avec ATELIER_PORT=5051 (docs/apps/savoir.md).
@@ -115,6 +124,15 @@ class Settings(BaseSettings):
     def _empty_str_to_none(cls, value: object) -> object:
         # `CLE=` dans un .env doit signifier « non défini », pas chaîne vide
         return None if value == "" else value
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"Fuseau horaire inconnu : {value!r} (ex. Europe/Paris).") from exc
+        return value
 
     @property
     def github_repo_list(self) -> list[str]:

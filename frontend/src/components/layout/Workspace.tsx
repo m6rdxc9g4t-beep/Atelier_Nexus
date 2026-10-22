@@ -9,6 +9,7 @@ import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
 import { AgentSidebar } from "@/features/chat-agent/AgentSidebar";
 import { ChatPanel } from "@/features/chat-agent/ChatPanel";
 import { SuiteMapDialog } from "@/features/suite-map/SuiteMapDialog";
+import { InboxDialog } from "@/features/workflow-triggers/InboxDialog";
 import { WorkflowListDialog } from "@/features/workflows/WorkflowsDialog";
 import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
@@ -82,9 +83,10 @@ export function Workspace() {
         <ArtifactPanel />
       </div>
 
-      {/* Workflows (liste, éditeur en graphe) et carte de la suite : une fenêtre à la fois */}
+      {/* Workflows (liste, éditeur en graphe), carte de la suite, « À valider » : une fenêtre à la fois */}
       <WorkflowListDialog agents={agents} />
       <SuiteMapDialog />
+      <InboxDialog />
       <WorkflowGraphDialog agents={agents} />
 
       {editor.open && (

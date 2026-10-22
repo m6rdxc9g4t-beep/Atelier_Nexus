@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { SuiteMapButton } from "@/features/suite-map/SuiteMapDialog";
+import { InboxButton } from "@/features/workflow-triggers/InboxDialog";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
@@ -85,6 +86,8 @@ export function AppHeader({ agents, providers, apps, onSettingsSaved }: AppHeade
           <span className="hidden xl:inline">Workflows</span>
         </Button>
         <SuiteMapButton />
+        {/* Écritures des workflows en attente (lancés à la main, par un horaire ou un événement) */}
+        <InboxButton />
         {apps.length > 0 && <AppsMenu apps={apps} />}
 
         <label htmlFor="provider-select" className="sr-only">

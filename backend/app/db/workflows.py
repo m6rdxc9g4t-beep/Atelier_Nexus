@@ -7,11 +7,11 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.models import WorkflowRow, WorkflowRunRow
+from app.db.models import WorkflowRow, WorkflowRunRow, WorkflowTriggerRow
 from app.db.repository import StorageError, _storage_message
 from app.schemas.workflows import RunStatus, Workflow, WorkflowCreate, WorkflowUpdate
 from app.schemas.workflows_v2 import (
@@ -56,6 +56,8 @@ def run_to_model(row: WorkflowRunRow) -> WorkflowRun:
             "message": row.message,
             "params": row.params,
             "trigger": row.trigger,
+            "trigger_id": row.trigger_id,
+            "trigger_event": row.trigger_event,
             "steps": row.steps,
             "artifacts": row.artifacts,
             "pending": row.pending,
@@ -143,10 +145,16 @@ class WorkflowRepository:
         return await self._run(op)
 
     async def delete(self, workflow_id: str) -> bool:
+        """Supprime le workflow et ses déclencheurs (explicitement : SQLite n'applique pas les
+        clés étrangères sans PRAGMA). Les exécutions passées restent consultables."""
+
         async def op(s: AsyncSession) -> bool:
             row = await s.get(WorkflowRow, workflow_id)
             if row is None:
                 return False
+            await s.execute(
+                delete(WorkflowTriggerRow).where(WorkflowTriggerRow.workflow_id == workflow_id)
+            )
             await s.delete(row)
             await s.commit()
             return True
@@ -211,7 +219,12 @@ class WorkflowRepository:
 
         return await self._run(op)
 
-    async def list_runs(self, workflow_id: str | None, limit: int) -> builtins.list[WorkflowRun]:
+    async def list_runs(
+        self, workflow_id: str | None, limit: int, status: str | None = None
+    ) -> builtins.list[WorkflowRun]:
+        """Exécutions récentes d'abord ; filtres facultatifs par workflow et par statut (boîte
+        « À valider » : `status="awaiting_approval"`, tous workflows)."""
+
         async def op(s: AsyncSession) -> builtins.list[WorkflowRun]:
             query = (
                 select(WorkflowRunRow)
@@ -220,6 +233,45 @@ class WorkflowRepository:
             )
             if workflow_id:
                 query = query.where(WorkflowRunRow.workflow_id == workflow_id)
+            if status:
+                query = query.where(WorkflowRunRow.status == status)
             return [run_to_model(r) for r in (await s.scalars(query)).all()]
+
+        return await self._run(op)
+
+    async def count_runs(self, status: str) -> int:
+        async def op(s: AsyncSession) -> int:
+            query = select(func.count()).select_from(WorkflowRunRow)
+            return int(await s.scalar(query.where(WorkflowRunRow.status == status)) or 0)
+
+        return await self._run(op)
+
+    async def has_waiting_run(self, trigger_id: str) -> bool:
+        """Une exécution lancée par ce déclencheur (test compris) attend-elle une validation ?
+        Si oui, les nouveaux déclenchements sont ignorés : pas de doublons dans « À valider »."""
+
+        async def op(s: AsyncSession) -> bool:
+            query = (
+                select(WorkflowRunRow.id)
+                .where(
+                    WorkflowRunRow.trigger_id == trigger_id,
+                    WorkflowRunRow.status == "awaiting_approval",
+                )
+                .limit(1)
+            )
+            return (await s.scalar(query)) is not None
+
+        return await self._run(op)
+
+    async def run_statuses(self, run_ids: builtins.list[str]) -> dict[str, str]:
+        """Statut actuel de quelques exécutions (état des déclencheurs à jour après une reprise)."""
+        if not run_ids:
+            return {}
+
+        async def op(s: AsyncSession) -> dict[str, str]:
+            query = select(WorkflowRunRow.id, WorkflowRunRow.status).where(
+                WorkflowRunRow.id.in_(run_ids)
+            )
+            return {row[0]: row[1] for row in (await s.execute(query)).all()}
 
         return await self._run(op)

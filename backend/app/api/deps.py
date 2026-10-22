@@ -12,6 +12,7 @@ from app.db.attachments import AttachmentRepository
 from app.db.conversations import ConversationRepository
 from app.db.repository import CustomAgentRepository
 from app.db.session import get_sessionmaker
+from app.db.triggers import TriggerRepository
 from app.db.workflows import WorkflowRepository
 from app.tools.environment import ToolEnvironment
 
@@ -34,6 +35,11 @@ def get_attachment_repository() -> AttachmentRepository:
 @lru_cache
 def get_workflow_repository() -> WorkflowRepository:
     return WorkflowRepository(get_sessionmaker())
+
+
+@lru_cache
+def get_trigger_repository() -> TriggerRepository:
+    return TriggerRepository(get_sessionmaker())
 
 
 def get_catalog() -> AgentCatalog:

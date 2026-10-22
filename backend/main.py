@@ -12,12 +12,30 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import __version__
-from app.api import agents, apps, attachments, conversations, data_via, llm, suite, workflows
+from app.api import (
+    agents,
+    apps,
+    attachments,
+    conversations,
+    data_via,
+    llm,
+    suite,
+    triggers,
+    workflows,
+)
 from app.api import settings as settings_api
-from app.api.deps import get_attachment_repository
+from app.api.deps import (
+    get_attachment_repository,
+    get_catalog,
+    get_trigger_repository,
+    get_workflow_repository,
+    make_environment,
+)
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
+from app.core.llm import get_llm_router
 from app.db.repository import StorageError
+from app.triggers.service import TriggerDeps, TriggerService
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -48,7 +66,34 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logger.info("%d pièce(s) jointe(s) abandonnée(s) supprimée(s)", purged)
     except StorageError as exc:
         logger.debug("Nettoyage des pièces jointes ignoré : %s", exc)
-    yield
+    service = background_triggers() if settings.triggers_enabled else None
+    if service is not None:
+        service.start()
+        logger.info(
+            "Déclencheurs de workflows actifs (passage toutes les %.0f s, fuseau %s)",
+            settings.triggers_poll_seconds,
+            settings.timezone,
+        )
+    try:
+        yield
+    finally:
+        if service is not None:
+            await service.stop()  # passage en cours terminé ou annulé, tâche attendue
+
+
+def background_triggers() -> TriggerService:
+    """Moteur des déclencheurs de la tâche de fond : réglages, routeur et catalogue relus à
+    chaque passage (réglages modifiés à chaud depuis l'interface)."""
+    return TriggerService(
+        TriggerDeps(
+            triggers=get_trigger_repository(),
+            workflows=get_workflow_repository(),
+            make_env=make_environment,
+            llm=get_llm_router,
+            catalog=get_catalog,
+            settings=get_settings,
+        )
+    )
 
 
 app = FastAPI(
@@ -76,6 +121,7 @@ app.include_router(data_via.router)
 app.include_router(settings_api.router)
 app.include_router(workflows.router)
 app.include_router(workflows.runs_router)
+app.include_router(triggers.router)
 app.include_router(suite.router)
 
 

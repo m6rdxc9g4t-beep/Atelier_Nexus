@@ -86,6 +86,17 @@ class NodeAction(_Lenient):
 class EventSpec(_Lenient):
     type: str = Field(max_length=120)
     label: str = Field(default="", max_length=200)
+    #: JSON Schema de `data` (facultatif, lu avec tolérance : autre chose qu'un objet est ignoré)
+    data_schema: Any = None
+
+    @property
+    def data_fields(self) -> list[str]:
+        """Propriétés de premier niveau de `data` déclarées par le manifeste (ordre conservé)."""
+        schema = self.data_schema if isinstance(self.data_schema, dict) else {}
+        props = schema.get("properties")
+        if not isinstance(props, dict):
+            return []
+        return [str(k) for k in props if isinstance(k, str) and k][:50]
 
 
 class NodeManifest(_Lenient):
