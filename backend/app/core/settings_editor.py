@@ -24,7 +24,9 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 from app.core.config import Settings
 
 Kind = Literal["text", "url", "secret", "choice", "path"]
-Group = Literal["Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"]
+Group = Literal[
+    "Validation des actions", "Modèles", "Applications Atelier", "Atelier Cuisine", "GitHub"
+]
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,10 @@ class EditableField:
 
 
 FIELDS: tuple[EditableField, ...] = (
+    EditableField("APPROVAL_MODE", "Actions à valider", "Validation des actions", "choice",
+                  "Chaque action : toute action d'un agent ou d'une étape de workflow, lectures comprises, "
+                  "attend « Autoriser ». Seulement les écritures : les lectures s'exécutent seules.",
+                  ("every_step", "writes_only")),
     EditableField("CLAUDE_MODE", "Accès à Claude", "Modèles", "choice",
                   "Abonnement : le programme claude (Claude Code) de cet ordinateur, connecté à votre compte. "
                   "Automatique : la clé API si elle est renseignée, sinon l'abonnement.", ("auto", "cli", "api")),
