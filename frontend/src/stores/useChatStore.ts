@@ -9,10 +9,13 @@ import {
   emptyConversation,
   failLastTurn,
   fromStored,
+  type ReviewDecision,
   submitApprovals,
+  submitReview,
 } from "@/features/chat-agent/conversation";
 import { ApiError, api, streamAgent } from "@/lib/api";
 import { lastConversation, rememberConversation } from "@/lib/lastConversation";
+import { saveStepMode } from "@/lib/stepMode";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 import type { AttachmentBlock, ConversationDetail, ProviderName } from "@/types/api";
 
@@ -42,6 +45,11 @@ interface ChatState {
   send: (text: string, options?: { localOnly?: boolean; attachments?: AttachmentBlock[] }) => Promise<void>;
   /** Reprend le tour après « Autoriser / Refuser ». */
   decide: (decisions: Record<string, boolean>, options?: { localOnly?: boolean }) => Promise<void>;
+  /** Mode pas à pas : l'agent s'arrête après chaque résultat d'outil (activé par défaut). */
+  stepMode: boolean;
+  setStepMode: (on: boolean) => void;
+  /** Réponse à une pause de revue : continuer, corriger (consigne) ou arrêter. */
+  review: (decision: ReviewDecision, options?: { localOnly?: boolean }) => Promise<void>;
   stop: () => void;
   /** Repart d'une conversation vide (l'ancienne reste dans l'historique). */
   reset: () => void;
@@ -134,6 +142,22 @@ export const useChatStore = create<ChatState>((set, get) => {
       await run(agent, null, options?.localOnly ?? false);
     },
 
+    stepMode: true, // lu dans le navigateur au montage (ChatPanel), pas au rendu serveur
+    setStepMode: (on) => {
+      saveStepMode(on);
+      set({ stepMode: on });
+    },
+
+    review: async (decision, options) => {
+      const { agent, streaming } = get();
+      if (streaming) return;
+      const conv = get().conversations[agent];
+      const submitted = conv ? submitReview(conv, decision) : null;
+      if (!submitted) return;
+      mutate(agent, () => submitted.conv);
+      await run(agent, null, options?.localOnly ?? false, submitted.review);
+    },
+
     decide: async (decisions, options) => {
       const { agent, streaming } = get();
       if (streaming) return;
@@ -211,7 +235,12 @@ export const useChatStore = create<ChatState>((set, get) => {
   };
 
   /** Envoie l'historique (et les validations éventuelles), applique le flux au dernier tour. */
-  async function run(agent: string, approvals: Record<string, boolean> | null, localOnly: boolean) {
+  async function run(
+    agent: string,
+    approvals: Record<string, boolean> | null,
+    localOnly: boolean,
+    review: "continue" | "stop" | null = null,
+  ) {
     const controller = new AbortController();
     set({ streaming: true, controller });
     const provider = localOnly ? null : get().provider;
@@ -220,7 +249,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       const history = get().conversations[agent]?.history ?? [];
       for await (const event of streamAgent(
         agent,
-        { messages: history, provider, approvals, conversation_id: conversationId },
+        {
+          messages: history,
+          provider,
+          approvals,
+          conversation_id: conversationId,
+          review_results: get().stepMode,
+          review,
+        },
         controller.signal,
       )) {
         let artifactId: string | undefined;

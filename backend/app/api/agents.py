@@ -20,6 +20,7 @@ from app.agents import (
     builtin_names,
     describe,
 )
+from app.agents.base import ReviewAction, is_review_point
 from app.api.deps import (
     get_attachment_repository,
     get_catalog,
@@ -129,6 +130,16 @@ class AgentRunRequest(BaseModel):
         default=None,
         description="Décisions sur les appels en attente (id → autorisé), pour reprendre un tour.",
     )
+    review_results: bool = Field(
+        default=False,
+        description="Mode pas à pas : pause après chaque résultat d'outil, avant que le modèle "
+        "ne l'interprète (stop_reason « awaiting_review »).",
+    )
+    review: ReviewAction | None = Field(
+        default=None,
+        description="Réponse à une pause de revue : « continue », ou « stop » pour finir le tour "
+        "sans appeler le modèle. Pour corriger, joindre un texte aux résultats et continuer.",
+    )
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
@@ -138,6 +149,10 @@ class AgentRunRequest(BaseModel):
                 "« attachment » qui les cite."
             )
         last = self.messages[-1]
+        if self.review is not None and not is_review_point(last):
+            raise ValueError(
+                "« review » répond à une pause : le dernier message doit contenir les résultats revus."
+            )
         if last.role == "user":
             return self
         calls = [b for b in last.content if isinstance(b, ToolUseBlock)]
@@ -217,6 +232,8 @@ async def run_agent(
             context=ToolContext(conversation_id=body.conversation_id),
             approvals=body.approvals,
             attachments=attachments,
+            review_results=body.review_results,
+            review=body.review,
         )
     finally:
         await env.aclose()
@@ -236,7 +253,7 @@ async def stream_agent(
     files: FilesDep,
 ) -> EventSourceResponse:
     """Flux SSE. Événements : `text_delta`, `tool_call`, `tool_result`, `artifact`,
-    `approval_required`, `done` (résultat final), `saved` / `save_error` (historique) ou
+    `approval_required`, `review_required` (mode pas à pas), `done` (résultat final), `saved` / `save_error` (historique) ou
     `error`. Le champ `data` est du JSON."""
     save = await _check_conversation(body, agent_name, conversations)
     attachments = await _attachments(body, files)
@@ -256,6 +273,8 @@ async def stream_agent(
                 context=ToolContext(conversation_id=body.conversation_id),
                 approvals=body.approvals,
                 attachments=attachments,
+                review_results=body.review_results,
+                review=body.review,
             ):
                 yield {"event": event.type, "data": event.model_dump_json()}
                 if save and isinstance(event, DoneEvent):

@@ -75,6 +75,20 @@ libellés que l'interface) + paramètres principaux (« Data Via · requête : d
 un outil d'écriture le surcharge (« Créer la TASK … »). En `every_step`, le prompt système prévient le modèle que
 chaque appel est validé.
 
+**Revue de chaque résultat (« Pas à pas »).** Interrupteur dans l'en-tête de la conversation, **activé par défaut**
+(choix de l'utilisateur, retenu dans le navigateur). Il complète la validation des actions, sans la remplacer :
+1. le client envoie `review_results: true` ; après chaque exécution d'outil, l'agent émet
+   `review_required` (`call_ids`) puis `done` avec `stop_reason = "awaiting_review"` **avant** que le modèle ne lise
+   le résultat. La conversation enregistrée se termine alors par les résultats ;
+2. l'interface déplie le résultat et propose **Continuer**, **Corriger** ou **Arrêter** ;
+3. *Continuer* : le client renvoie l'historique (`review: "continue"`), le modèle lit le résultat. *Corriger* : la
+   consigne est jointe aux résultats (« Consigne de l'utilisateur après ce résultat : … ») puis le tour continue.
+   *Arrêter* : `review: "stop"`, le tour se termine **sans appel au modèle** (`stop_reason = "stopped_by_user"`).
+
+Un appel refusé ne provoque pas de pause (le modèle propose une alternative). Désactivé, l'agent enchaîne ses
+étapes ; les actions restent validées selon `APPROVAL_MODE`. Les évaluations et les workflows n'utilisent pas ce mode
+(un workflow s'arrête déjà avant chaque étape, résultat précédent affiché).
+
 **Confidentialité (« 100 % local »).** Un agent est verrouillé sur Ollama s'il le déclare (`privacy = "local_only"`)
 ou s'il utilise une boîte sensible (`tresorerie`, `savoir_*`, `cuisine_budget`). Demander Claude → 403 `provider_not_allowed` ; pas de repli
 vers Claude si Ollama tombe. L'orchestrateur ne peut déléguer à un agent local que s'il tourne lui-même sur Ollama,
