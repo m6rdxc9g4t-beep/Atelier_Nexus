@@ -1,7 +1,8 @@
 """Réglages modifiables depuis l'interface : lecture et écriture du fichier `.env`.
 
 Le `.env` lu par `Settings` est celui du dossier courant : `backend/.env` en développement,
-`~/Library/Application Support/Atelier Nexus/.env` dans l'application de bureau.
+`~/Library/Application Support/Atelier Nexus/.env` (Windows : `%APPDATA%\Atelier Nexus\.env`)
+dans l'application de bureau.
 
 - Seules les clés de `FIELDS` sont modifiables (liste blanche). Les commandes exécutées
   (`TAB_MCP_COMMAND`) et les chemins techniques restent hors de l'interface.
