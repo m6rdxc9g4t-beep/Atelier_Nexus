@@ -53,45 +53,18 @@ export function ChainBar({ chains }: { chains: ChainInfo[] }) {
       className="shrink-0 border-b border-atelier-line bg-accent-soft/60 px-4 py-2"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="flex items-center gap-2">
           <ChainIcon className="size-4 shrink-0 text-accent-ink" aria-hidden />
-          <p className="min-w-0 text-sm font-medium">
+          <p className="min-w-0 flex-1 truncate text-sm font-medium">
             {chain?.title ?? run.chain}
             <span className="font-normal text-muted-foreground">
               {" · "}
               {running ? progressLabel(run) : RUN_STATUS_LABEL[run.status]}
             </span>
           </p>
-          <ol className="flex min-w-0 flex-wrap items-center gap-1" aria-label="Étapes">
-            {run.stages.map((stage, i) => {
-              const { Icon, label, className } = STAGE_ICON[stage.status];
-              const reachable = !!stage.conversation_id && !streaming;
-              return (
-                <li key={`${stage.agent}-${i}`}>
-                  <button
-                    type="button"
-                    disabled={!reachable}
-                    aria-current={shown === i ? "step" : undefined}
-                    title={`${i + 1}. ${stage.role} — ${label}${reachable ? " (ouvrir)" : ""}`}
-                    onClick={() => void openStage(i)}
-                    className={cn(
-                      "flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs transition-colors enabled:hover:border-primary",
-                      shown === i ? "border-primary bg-card font-medium" : "border-transparent",
-                    )}
-                  >
-                    <Icon className={cn("size-3", className)} aria-hidden />
-                    <span className="tabular-nums">{i + 1}</span>
-                    <span className="hidden sm:inline">{stage.role}</span>
-                    <span className="sr-only">({label})</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
           <Button
             variant="ghost"
             size="icon-sm"
-            className="ml-auto"
             aria-label="Ne plus suivre cette chaîne"
             title="Ne plus suivre cette chaîne (elle reste dans « Chaînes »)"
             onClick={close}
@@ -99,6 +72,32 @@ export function ChainBar({ chains }: { chains: ChainInfo[] }) {
             <X />
           </Button>
         </div>
+        <ol className="flex min-w-0 flex-wrap items-center gap-1" aria-label="Étapes">
+          {run.stages.map((stage, i) => {
+            const { Icon, label, className } = STAGE_ICON[stage.status];
+            const reachable = !!stage.conversation_id && !streaming;
+            return (
+              <li key={`${stage.agent}-${i}`}>
+                <button
+                  type="button"
+                  disabled={!reachable}
+                  aria-current={shown === i ? "step" : undefined}
+                  title={`${i + 1}. ${stage.role} — ${label}${reachable ? " (ouvrir)" : ""}`}
+                  onClick={() => void openStage(i)}
+                  className={cn(
+                    "flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs transition-colors enabled:hover:border-primary",
+                    shown === i ? "border-primary bg-card font-medium" : "border-transparent",
+                  )}
+                >
+                  <Icon className={cn("size-3", className)} aria-hidden />
+                  <span className="tabular-nums">{i + 1}</span>
+                  <span className="hidden sm:inline">{stage.role}</span>
+                  <span className="sr-only">({label})</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
 
         {running && !onCurrent && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
