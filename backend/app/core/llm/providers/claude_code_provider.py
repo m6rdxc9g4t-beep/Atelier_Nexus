@@ -19,9 +19,11 @@ l'environnement (sinon la clé serait facturée à l'usage), aucun outil de Clau
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Sequence
@@ -46,6 +48,7 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
+from app.core.processes import NO_WINDOW, is_batch, kill_tree, windows_command
 
 CLI_MODELS = ["sonnet", "opus", "haiku"]
 _ENV_TO_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
@@ -61,12 +64,20 @@ NOT_LOGGED_IN = (
 
 
 def find_claude_binary(configured: str | None = None) -> str | None:
-    """Emplacements usuels de Claude Code (une app lancée du Finder a un PATH minimal)."""
+    """Emplacements usuels de Claude Code (une app lancée du Finder a un PATH minimal ;
+    Windows : installation native `claude.exe`, ou `claude.cmd` de `npm install -g`)."""
     home = Path.home()
+    windows: list[str] = []
+    if sys.platform == "win32":
+        windows.append(str(home / ".local" / "bin" / "claude.exe"))
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            windows.append(str(Path(appdata) / "npm" / "claude.cmd"))
     candidates = [
         configured,
         os.environ.get("CLAUDE_PATH"),
         shutil.which("claude"),
+        *windows,
         str(home / ".local" / "bin" / "claude"),
         str(home / ".claude" / "local" / "claude"),
         "/opt/homebrew/bin/claude",
@@ -291,16 +302,26 @@ class ClaudeCodeProvider(LLMProvider):
                 "lancez « claude » une fois dans un terminal pour vous connecter.",
                 provider=self.name,
             )
+        # Windows : `claude.cmd` (npm) passerait les arguments (prompt système, schéma) par
+        # cmd.exe, qui les réinterprète : lancé par node.exe directement, sinon refusé
+        command = windows_command([self.binary, *args])
+        if sys.platform == "win32" and is_batch(command[0]):
+            raise ProviderUnavailableError(
+                "Claude Code est installé par un script .cmd que Nexus ne lance pas (ses "
+                "arguments seraient réinterprétés par cmd.exe) : installez la version native "
+                "(https://claude.com/claude-code) ou indiquez son chemin (CLAUDE_CLI_PATH).",
+                provider=self.name,
+            )
         with tempfile.TemporaryDirectory(prefix="nexus-claude-") as workdir:
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    self.binary,
-                    *args,
+                    *command,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     env=subscription_env(),
                     cwd=workdir,
+                    creationflags=NO_WINDOW,
                 )
             except OSError as exc:
                 raise ProviderUnavailableError(
@@ -311,7 +332,9 @@ class ClaudeCodeProvider(LLMProvider):
                     proc.communicate(stdin.encode() if stdin is not None else None), timeout=timeout
                 )
             except TimeoutError as exc:
-                proc.kill()
+                kill_tree(proc.pid)
+                with contextlib.suppress(ProcessLookupError):
+                    proc.kill()
                 await proc.wait()
                 raise ProviderUnavailableError(
                     f"Claude n'a pas répondu en {timeout:g} s.", provider=self.name

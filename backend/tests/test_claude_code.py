@@ -29,8 +29,9 @@ from app.core.llm.types import (
     ToolUseBlock,
 )
 from app.tools.environment import ToolEnvironment
+from tests.winexe import console_exe
 
-FAKE = str(Path(__file__).parent / "fake_claude_cli.py")
+FAKE = console_exe(str(Path(__file__).parent / "fake_claude_cli.py"))
 
 
 @pytest.fixture
