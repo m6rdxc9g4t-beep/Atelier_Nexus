@@ -167,19 +167,15 @@ def test_open_url_and_reveal_macos(leaky_env: None, monkeypatch: pytest.MonkeyPa
 # ─── Windows : registre, navigateur, Explorateur ──────────────────
 
 
-def test_launcher_command_by_type() -> None:
+def test_launcher_always_opened_by_explorer() -> None:
+    """§9.6 : toujours `explorer.exe "<Lanceur>"`, jamais l'exécution directe du chemin."""
     root = Path("C:/Windows")
-    lnk = Path("C:/Users/François/AppData/Local/Atelier Viz/Atelier Viz.lnk")
-    assert desktop_open.launcher_command(Path("C:/a/Atelier Tab.exe"), root) == [
-        str(Path("C:/a/Atelier Tab.exe"))
-    ]
-    assert desktop_open.launcher_command(Path("C:/a/lanceur.vbs"), root) == [
-        str(root / "System32" / "wscript.exe"),
-        str(Path("C:/a/lanceur.vbs")),
-    ]
-    assert desktop_open.launcher_command(lnk, root) == [str(root / "explorer.exe"), str(lnk)]
-    ps1 = desktop_open.launcher_command(Path("C:/a/lancer.ps1"), root)
-    assert ps1[0].endswith("powershell.exe") and ps1[-2:] == ["-File", str(Path("C:/a/lancer.ps1"))]
+    for name in ("Atelier Viz.lnk", "Atelier Tab.exe", "lanceur.vbs", "lancer.cmd", "x.ps1"):
+        launcher = Path("C:/Users/François/AppData/Roaming/Microsoft/Windows/Start Menu") / name
+        assert desktop_open.launcher_command(launcher, root) == [
+            str(root / "explorer.exe"),
+            str(launcher),
+        ]
 
 
 def test_open_windows_app_reads_registry_then_browser(
@@ -210,6 +206,7 @@ def test_open_windows_app_reads_registry_then_browser(
     assert api.open_external("http://127.0.0.1:4174/") is True
     cmd, env = popen.calls[1]
     assert looked == ["projets"] and cmd[-1] == str(launcher) and cmd[0].endswith("explorer.exe")
+    assert len(cmd) == 2
     assert_clean(env)
 
     assert desktop_open.reveal(tmp_path / ".env", text_editor=True) is True

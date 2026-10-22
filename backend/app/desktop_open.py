@@ -91,30 +91,10 @@ def registry_launcher(app: str) -> Path | None:
 
 
 def launcher_command(launcher: Path, system_dir: Path | None = None) -> list[str]:
-    """Commande qui démarre un lanceur Windows selon son type, sans console visible.
-
-    `.exe` directement ; script WSH par `wscript.exe` ; `.cmd` / `.bat` directement (aucun
-    argument : rien à réinterpréter) ; PowerShell masqué ; tout le reste (raccourci `.lnk`…)
-    par l'Explorateur, qui l'ouvre avec l'environnement de la session.
-    """
-    root = system_dir or _system_dir()
-    suffix = launcher.suffix.lower()
-    if suffix in {".exe", ".cmd", ".bat"}:
-        return [str(launcher)]
-    if suffix in {".vbs", ".vbe", ".js", ".wsf"}:
-        return [str(root / "System32" / "wscript.exe"), str(launcher)]
-    if suffix == ".ps1":
-        return [
-            str(root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"),
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-File",
-            str(launcher),
-        ]
-    return [str(root / "explorer.exe"), str(launcher)]
+    """Commande qui démarre le lanceur inscrit d'une app (SUITE.md §9.6) : **toujours** par le
+    shell, `explorer.exe "<Lanceur>"` (le `.lnk` du menu Démarrer). L'Explorateur démarre l'app
+    avec l'environnement de la session ; jamais d'exécution directe du chemin."""
+    return [str((system_dir or _system_dir()) / "explorer.exe"), str(launcher)]
 
 
 def open_windows_app(

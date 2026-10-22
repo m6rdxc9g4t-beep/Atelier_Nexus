@@ -17,8 +17,8 @@
   3. Lanceur (%LOCALAPPDATA%\Atelier Nexus\lanceur) : point d'entrée app_entry.pyw, chemin du dépôt
      (repo-path), icône ; raccourcis menu Démarrer (dossier « Atelier ») et Bureau, qui lancent
      pythonw.exe : aucune console.
-  4. Enregistrement HKCU\Software\Atelier\Apps\nexus (Lanceur, Nom) : les autres apps de la suite
-     ouvrent Nexus par ce lanceur.
+  4. Enregistrement HKCU\Software\Atelier\Apps\nexus : Lanceur = raccourci .lnk du menu Démarrer
+     (SUITE.md §9.6), Nom ; les autres apps de la suite l'ouvrent par explorer.exe "<Lanceur>".
 
   Relancer la commande répare l'installation. Les données et réglages (%APPDATA%\Atelier Nexus :
   .env, nexus.db) ne sont jamais touchés, ni par l'installation ni par -Desinstaller.
@@ -266,9 +266,11 @@ function New-AppShortcut([string]$Path) {
   $link.Save()
   Info "Raccourci : $Path"
 }
-$launcher = Join-Path $LauncherDir $ShortcutName
+# Le raccourci du menu Démarrer est le lanceur inscrit (§9.6)
+$launcher = Join-Path $StartMenuDir $ShortcutName
 New-AppShortcut $launcher
-New-AppShortcut (Join-Path $StartMenuDir $ShortcutName)
+$oldLauncher = Join-Path $LauncherDir $ShortcutName  # ancien emplacement du lanceur inscrit
+if (Test-Path -LiteralPath $oldLauncher) { Remove-Item -LiteralPath $oldLauncher -Force }
 $desktopShortcut = Join-Path $DossierBureau $ShortcutName
 if ($SansBureau) {
   if (Test-Path -LiteralPath $desktopShortcut) { Remove-Item -LiteralPath $desktopShortcut -Force }

@@ -139,8 +139,8 @@ jobs:
         run: |
           trap { "::error::" + ($_.Exception.Message -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'); exit 1 }
           $local = "$env:PROFIL\AppData\Local\Atelier Nexus"
-          $lnk = "$local\lanceur\Atelier Nexus.lnk"
-          foreach ($path in @($lnk, "$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk", "$local\venv\Scripts\pythonw.exe", "$local\interface\courante.txt", "$local\mise-a-jour\etat.json")) {
+          $lnk = "$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk"  # lanceur inscrit = raccourci du menu Démarrer (§9.6)
+          foreach ($path in @($lnk, "$local\lanceur\atelier-nexus.pyw", "$local\venv\Scripts\pythonw.exe", "$local\interface\courante.txt", "$local\mise-a-jour\etat.json")) {
             if (-not (Test-Path -LiteralPath $path)) { throw "absent : $path" }
           }
           if (Test-Path -LiteralPath "$env:PROFIL\Bureau\Atelier Nexus.lnk") { throw "raccourci de Bureau malgré -SansBureau" }
@@ -159,7 +159,7 @@ jobs:
           $env:APPDATA = "$env:PROFIL\AppData\Roaming"
           $env:LOCALAPPDATA = "$env:PROFIL\AppData\Local"
           $local = "$env:LOCALAPPDATA\Atelier Nexus"
-          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$local\lanceur\Atelier Nexus.lnk")
+          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk")
           function Invoke-Launcher {
             $p = Start-Process -FilePath $shortcut.TargetPath -ArgumentList ($shortcut.Arguments + ' --preparer') -WorkingDirectory $shortcut.WorkingDirectory -Wait -PassThru
             if ($p.ExitCode -ne 0) { Get-Content "$local\Logs\mise-a-jour.log" -Tail 60; throw "lanceur : code $($p.ExitCode)" }
@@ -186,7 +186,7 @@ jobs:
           $env:APPDATA = "$env:PROFIL\AppData\Roaming"
           $env:LOCALAPPDATA = "$env:PROFIL\AppData\Local"
           $local = "$env:LOCALAPPDATA\Atelier Nexus"
-          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$local\lanceur\Atelier Nexus.lnk")
+          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:PROFIL\Menu\Atelier\Atelier Nexus.lnk")
           Start-Process -FilePath $shortcut.TargetPath -ArgumentList $shortcut.Arguments -WorkingDirectory $shortcut.WorkingDirectory
           $ok = $false
           foreach ($i in 1..120) {

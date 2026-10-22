@@ -30,35 +30,44 @@ NO_WINDOW: int = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "
 
 #: Variables transmises partout (le nom compte, la casse aussi hors Windows)
 PORTABLE_VARS = ("HOME", "USER", "LOGNAME", "LANG", "TZ", "TMPDIR")
-#: Windows : utilisateur, dossiers du profil et variables système sans lesquelles beaucoup de
-#: programmes échouent (SystemRoot pour le réseau, PATHEXT, ComSpec…)
+#: Windows (liste exacte de SUITE.md §9.6, noms insensibles à la casse) : utilisateur, dossiers
+#: du profil et variables système sans lesquelles beaucoup de programmes échouent
 WINDOWS_VARS = (
     "USERPROFILE",
-    "USERNAME",
-    "USERDOMAIN",
     "HOMEDRIVE",
     "HOMEPATH",
+    "USERNAME",
+    "USERDOMAIN",
     "TEMP",
     "TMP",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
     "APPDATA",
     "LOCALAPPDATA",
     "PROGRAMDATA",
-    "ALLUSERSPROFILE",
-    "PUBLIC",
-    "SYSTEMROOT",
-    "WINDIR",
-    "SYSTEMDRIVE",
-    "COMSPEC",
-    "PATHEXT",
     "PROGRAMFILES",
     "PROGRAMFILES(X86)",
     "PROGRAMW6432",
-    "COMMONPROGRAMFILES",
-    "COMMONPROGRAMFILES(X86)",
-    "COMMONPROGRAMW6432",
-    "PROCESSOR_ARCHITECTURE",
-    "NUMBER_OF_PROCESSORS",
-    "OS",
+)
+#: Windows : variables ajoutées à l'environnement de la CLI Claude (SUITE.md §9.6)
+CLAUDE_WINDOWS_VARS = (
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "USERNAME",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "TEMP",
+    "TMP",
+    "PROGRAMDATA",
 )
 #: Linux : session graphique (xdg-open)
 LINUX_SESSION_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")
@@ -172,6 +181,20 @@ def resolve_cmd_shim(script: Path, which: Callable[[str], str | None] = shutil.w
     node = folder / "node.exe"
     node_path = str(node) if node.is_file() else which("node")
     return [node_path, str(target)] if node_path else []
+
+
+def pick_environment(
+    source: Mapping[str, str], names: Sequence[str], platform: str = sys.platform
+) -> dict[str, str]:
+    """Variables de `source` dont le nom est dans `names` ou commence par `LC_` (noms
+    insensibles à la casse sous Windows)."""
+    windows = platform == "win32"
+    wanted = {n.upper() for n in names} if windows else set(names)
+    return {
+        k: v
+        for k, v in source.items()
+        if (k.upper() if windows else k) in wanted or k.upper().startswith("LC_")
+    }
 
 
 def windows_command(cmd: Sequence[str], platform: str = sys.platform) -> list[str]:
