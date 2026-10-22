@@ -103,10 +103,10 @@ jobs:
         run: mypy .
       - name: Backend — pytest
         working-directory: atelier nexus/backend
-        run: pytest --junitxml=pytest.xml
+        run: pytest --junitxml="$env:RUNNER_TEMP/pytest.xml"
       - name: Backend — échecs de pytest en annotations
         if: failure()
-        run: python .github/scripts/annotations.py junit backend/pytest.xml
+        run: python .github/scripts/annotations.py junit "$env:RUNNER_TEMP/pytest.xml"
 
       - name: Interface — export statique de l'app de bureau
         working-directory: atelier nexus/frontend
