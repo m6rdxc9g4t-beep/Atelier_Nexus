@@ -1,35 +1,81 @@
 #!/bin/bash
-# Lanceur d'« Atelier Nexus.app » (copié dans Contents/MacOS/atelier-nexus par build_app.sh).
+# Lanceur d'« Atelier Nexus.app », exécuté DEPUIS LE DÉPÔT par le point d'entrée de l'app
+# (Contents/MacOS/atelier-nexus = scripts/macos/app_entry.sh). Mise à jour au lancement selon
+# docs/apps/mise-a-jour-bureau.md : après un git pull, l'app se met à jour toute seule.
 #
 # 1. Trouve un Python 3.12+ (Homebrew, python.org, conda, uv…) : une application lancée depuis
 #    le Finder n'hérite pas du PATH du terminal, on cherche donc aux emplacements habituels.
-# 2. Première ouverture (ou dépendances modifiées) : crée l'environnement Python dans
-#    ~/Library/Application Support/Atelier Nexus/venv et installe les dépendances.
-# 3. Lance la fenêtre (backend/desktop.py). Journal : ~/Library/Logs/Atelier Nexus/.
+# 2. Environnement Python de l'app (~/Library/Application Support/Atelier Nexus/venv) : créé au
+#    premier lancement, refait quand backend/requirements*.txt changent (backend/app/
+#    desktop_update.py venv) ; en cas d'échec, l'ancien est remis en place.
+# 3. Lance la fenêtre (backend/desktop.py --mise-a-jour) : écran « Mise à jour… » si l'interface
+#    est à recompiler (npm ci, compilation), puis l'app.
+#
+# Jamais de git pull, jamais de donnée touchée. Journaux : ~/Library/Logs/Atelier Nexus/.
+# Surcharges (tests, simulation hors macOS) : NEXUS_REPO, NEXUS_HOME, NEXUS_LOG_DIR,
+# NEXUS_PYTHON (Python de base), NEXUS_NPM.
+#
+#     launcher.sh              # lancement normal (fenêtre)
+#     launcher.sh --preparer   # mise à jour seulement, dans le terminal (build_app.sh)
 
-CONTENTS="$(cd "$(dirname "$0")/.." && pwd)"
-CODE="$CONTENTS/Resources/nexus"
-SUPPORT="$HOME/Library/Application Support/Atelier Nexus"
+REPO="${NEXUS_REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
+SUPPORT="${NEXUS_HOME:-$HOME/Library/Application Support/Atelier Nexus}"
+LOG_DIR="${NEXUS_LOG_DIR:-$HOME/Library/Logs/Atelier Nexus}"
 VENV="$SUPPORT/venv"
-STAMP="$VENV/.nexus-requirements"
-LOG_DIR="$HOME/Library/Logs/Atelier Nexus"
 LOG="$LOG_DIR/atelier-nexus.log"
+UPDATE_LOG="$LOG_DIR/mise-a-jour.log"
+UPDATE="$REPO/backend/app/desktop_update.py"
+UPDATE_LOG_SHOWN="${UPDATE_LOG/#$HOME/\~}"
+# Le backend (desktop.py, desktop_update.py) lit les mêmes dossiers
+export NEXUS_HOME="$SUPPORT" NEXUS_LOG_DIR="$LOG_DIR"
 
-# Outils utiles aux agents (node pour le serveur MCP d'Atelier Tab, ollama, claude…)
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.homebrew/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+PREPARE=0
+for arg in "$@"; do [[ "$arg" == "--preparer" ]] && PREPARE=1; done
+
+# Outils utiles aux agents et à la mise à jour (node/npm, ollama, claude…)
+export PATH="$HOME/.homebrew/bin:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 mkdir -p "$LOG_DIR" "$SUPPORT"
 if [[ -f "$LOG" && $(wc -c <"$LOG") -gt 5000000 ]]; then
   mv -f "$LOG" "$LOG.1"
 fi
-echo "--- $(date '+%F %T') : lancement ($CODE)" >>"$LOG"
+echo "--- $(date '+%F %T') : lancement ($REPO)" >>"$LOG"
 
+# Messages : arguments d'osascript (jamais de script construit avec du texte) ; terminal sinon
 alert() {
-  /usr/bin/osascript -e "display alert \"Atelier Nexus\" message \"$1\" as critical" >/dev/null 2>&1 || echo "$1" >&2
+  if [[ "$PREPARE" == 1 ]] || ! /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'OSA'; then
+on run argv
+  display alert "Atelier Nexus" message (item 1 of argv) as critical
+end run
+OSA
+    echo "Atelier Nexus : $1" >&2
+  fi
 }
 notify() {
-  /usr/bin/osascript -e "display notification \"$1\" with title \"Atelier Nexus\"" >/dev/null 2>&1 || true
+  if [[ "$PREPARE" == 1 ]]; then echo "$1"; return; fi
+  /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'OSA' || true
+on run argv
+  display notification (item 1 of argv) with title "Atelier Nexus"
+end run
+OSA
 }
+# Vrai si l'utilisateur choisit d'ouvrir l'app avec la version précédente
+choose_previous() {
+  local answer
+  [[ "$PREPARE" == 1 ]] && { echo "Atelier Nexus : $1" >&2; return 1; }
+  answer="$(/usr/bin/osascript - "$1" 2>/dev/null <<'OSA'
+on run argv
+  display dialog (item 1 of argv) with title "Atelier Nexus" with icon caution buttons {"Quitter", "Ouvrir quand même avec la version précédente"} default button 2
+end run
+OSA
+)" || { echo "Atelier Nexus : $1" >&2; return 1; }
+  [[ "$answer" == *"version précédente"* ]]
+}
+
+if [[ ! -f "$UPDATE" || ! -f "$REPO/backend/desktop.py" ]]; then
+  alert "Le dépôt d'Atelier Nexus est introuvable ou incomplet ($REPO). Relancez scripts/macos/build_app.sh depuis le dépôt."
+  exit 1
+fi
 
 # Version (majeur*100 + mineur) d'un interpréteur, ou rien s'il ne répond pas
 py_version() {
@@ -37,11 +83,12 @@ py_version() {
 }
 
 find_python() {
+  if [[ -n "${NEXUS_PYTHON:-}" ]]; then echo "$NEXUS_PYTHON"; return; fi
   local best="" best_v=0 v c
   local candidates=(
+    "$HOME"/.homebrew/bin/python3.1[2-9] "$HOME"/.homebrew/bin/python3
     /opt/homebrew/bin/python3.14 /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 /opt/homebrew/bin/python3
     /usr/local/bin/python3.14 /usr/local/bin/python3.13 /usr/local/bin/python3.12 /usr/local/bin/python3
-    "$HOME"/.homebrew/bin/python3*
     /Library/Frameworks/Python.framework/Versions/3.1[2-9]/bin/python3
     "$HOME"/.local/share/uv/python/cpython-3.1[2-9]*/bin/python3
     "$HOME"/opt/anaconda3/bin/python /opt/anaconda3/bin/python "$HOME"/anaconda3/bin/python
@@ -56,52 +103,41 @@ find_python() {
     v="$(py_version "$c")"
     [[ -n "$v" && "$v" -ge 312 && "$v" -gt "$best_v" ]] && { best="$c"; best_v="$v"; }
   done
+  if [[ -z "$best" ]] && command -v uv >/dev/null; then
+    echo "Python 3.12+ introuvable : uv l'installe" >>"$UPDATE_LOG"
+    uv python install --quiet 3.13 >>"$UPDATE_LOG" 2>&1 && best="$(uv python find 3.13 2>>"$UPDATE_LOG")"
+  fi
   [[ -n "$best" ]] && echo "$best"
 }
 
-requirements_hash() {
-  cat "$CODE/backend/requirements.txt" "$CODE/backend/requirements-desktop.txt" | shasum | cut -d' ' -f1
+# ─── Environnement Python (avant la fenêtre : elle en dépend) ───
+venv_ok() {
+  [[ -x "$VENV/bin/python" ]] && "$VENV/bin/python" -I "$UPDATE" venv --check >/dev/null 2>&1
 }
 
-install_env() {
-  local py hash
-  hash="$(requirements_hash)"
-  [[ -x "$VENV/bin/python" && -f "$STAMP" && "$(cat "$STAMP")" == "$hash" ]] && return 0
-  notify "Préparation de Python pour la première ouverture (2 à 3 minutes)…"
-  rm -rf "$VENV"
+if ! venv_ok; then
   py="$(find_python)"
-  if [[ -n "$py" ]]; then
-    echo "Environnement Python : $py ($("$py" --version 2>&1))" >>"$LOG"
-    "$py" -m venv "$VENV" >>"$LOG" 2>&1 \
-      && "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade pip >>"$LOG" 2>&1 \
-      && "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check \
-        -r "$CODE/backend/requirements.txt" -r "$CODE/backend/requirements-desktop.txt" >>"$LOG" 2>&1 \
-      || return 1
-  elif command -v uv >/dev/null; then
-    echo "Python 3.12+ introuvable : uv l'installe" >>"$LOG"
-    uv venv --quiet --python 3.13 "$VENV" >>"$LOG" 2>&1 \
-      && uv pip install --quiet --python "$VENV/bin/python" \
-        -r "$CODE/backend/requirements.txt" -r "$CODE/backend/requirements-desktop.txt" >>"$LOG" 2>&1 \
-      || return 1
-  else
-    return 2
-  fi
-  echo "$hash" >"$STAMP"
-}
-
-install_env
-case $? in
-  0) ;;
-  2)
+  if [[ -z "$py" ]]; then
     alert "Python 3.12 ou plus récent est introuvable. Installez-le (python.org, ou « brew install python@3.13 » dans le Terminal), puis rouvrez Atelier Nexus."
-    exit 1 ;;
-  *)
-    rm -rf "$VENV"
-    alert "L'installation des dépendances a échoué (connexion Internet ?). Détails : ~/Library/Logs/Atelier Nexus/atelier-nexus.log"
-    exit 1 ;;
-esac
+    exit 1
+  fi
+  notify "Mise à jour : installation des dépendances Python (2 à 3 minutes)…"
+  "$py" -I "$UPDATE" venv
+  case $? in
+    0) ;;
+    3)
+      choose_previous "L'installation des dépendances Python a échoué (connexion Internet ?). L'environnement précédent est conservé ; le prochain lancement réessaiera. Journal : $UPDATE_LOG_SHOWN" \
+        || exit 1 ;;
+    *)
+      alert "L'installation des dépendances Python a échoué (connexion Internet ?). Journal : $UPDATE_LOG_SHOWN"
+      exit 1 ;;
+  esac
+fi
 
-cd "$CODE/backend" || exit 1
-export NEXUS_FRONTEND_DIST="$CODE/frontend/out"
+cd "$REPO/backend" || exit 1
+if [[ "$PREPARE" == 1 ]]; then
+  # Terminal (build_app.sh) : étapes et erreurs affichées ; détail des commandes dans le journal
+  exec "$VENV/bin/python" desktop.py --mise-a-jour "$@"
+fi
 # exec : le processus Python reste celui de l'application (une seule icône dans le Dock)
-exec "$VENV/bin/python" desktop.py "$@" >>"$LOG" 2>&1
+exec "$VENV/bin/python" desktop.py --mise-a-jour "$@" >>"$LOG" 2>&1
