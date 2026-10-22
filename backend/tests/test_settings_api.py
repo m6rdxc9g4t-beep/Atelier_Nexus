@@ -2,6 +2,7 @@
 préserve le fichier, validation, rechargement à chaud, origine contrôlée."""
 
 import os
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -66,7 +67,8 @@ def test_update_writes_env_and_reloads(client: TestClient, tmp_path: Path) -> No
     assert text.startswith("# Mon fichier, commentaires gardés\nOLLAMA_MODEL=gemma3:12b\n")
     assert "# ANTHROPIC_API_KEY=ancienne" in text and "DATABASE_URL=sqlite+aiosqlite://" in text
     assert "ANTHROPIC_API_KEY=sk-ant-nouvelle-cle-9876" in text and "GITHUB_REPO" not in text
-    assert oct(os.stat(tmp_path / ".env").st_mode & 0o777) == "0o600"
+    if sys.platform != "win32":  # Windows : droits du profil, pas de mode Unix
+        assert oct(os.stat(tmp_path / ".env").st_mode & 0o777) == "0o600"
 
     after = get_llm_router()
     assert after is not before and after.default == "anthropic"  # clé prise en compte à chaud

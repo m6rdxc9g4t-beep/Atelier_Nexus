@@ -10,6 +10,7 @@ contenu de démonstration (aucune donnée réelle du foyer).
 import base64
 import json
 import stat
+import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -361,7 +362,8 @@ async def test_session_is_kept_renewed_and_persisted_without_password(
     assert fake.grants == ["password", "refresh_token"]
 
     path = tmp_path / "cuisine-session.json"
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    if sys.platform != "win32":  # Windows : droits du profil, pas de mode Unix
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
     saved = path.read_text()
     assert "rt-2" in saved and "mot-de-passe" not in saved and "foyer@example.org" not in saved
 

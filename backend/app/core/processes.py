@@ -144,6 +144,7 @@ def minimal_environment(
 
 # ─── Windows : scripts .cmd ───────────────────────────────────────
 
+_WINDOWS_ARG = re.compile(r'"([^"]*)"|\'([^\']*)\'|(\S+)')
 _SHIM_TARGET = re.compile(r'"%~?dp0%?\\([^"%]+\.(?:js|cjs|mjs|exe))"', re.IGNORECASE)
 
 
@@ -202,8 +203,8 @@ def split_command(text: str, platform: str = sys.platform) -> list[str]:
     if Path(text.strip('"')).is_file():
         return [text.strip('"')]
     if platform == "win32":
-        parts = shlex.split(text, posix=False)
-        return [p[1:-1] if len(p) >= 2 and p[0] == p[-1] == '"' else p for p in parts]
+        # Guillemets doubles (ou simples, copiés d'une commande macOS) ; barres obliques gardées
+        return [a or b or c for a, b, c in _WINDOWS_ARG.findall(text)]
     return shlex.split(text)
 
 

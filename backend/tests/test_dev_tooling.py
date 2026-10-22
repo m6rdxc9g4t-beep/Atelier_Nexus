@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,14 +15,25 @@ CLAUDE = ROOT / ".claude"
 HOOKS = CLAUDE / "hooks"
 
 
+def hook_env(project: Path) -> dict[str, str]:
+    """Environnement réduit d'un hook ; sous Windows, git est dans le PATH de l'utilisateur et
+    Python a besoin des variables système."""
+    env = {"CLAUDE_PROJECT_DIR": str(project), "PYTHONUTF8": "1"}
+    if sys.platform != "win32":
+        return {**env, "PATH": "/usr/bin:/bin:/usr/local/bin"}
+    keep = ("PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "USERPROFILE", "TEMP", "TMP", "APPDATA")
+    return {**env, **{k: v for k, v in os.environ.items() if k.upper() in keep}}
+
+
 def run_hook(name: str, payload: dict[str, object], *, project: Path = ROOT) -> tuple[int, str]:
     result = subprocess.run(
         [sys.executable, str(HOOKS / name)],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=20,
-        env={"CLAUDE_PROJECT_DIR": str(project), "PATH": "/usr/bin:/bin:/usr/local/bin"},
+        env=hook_env(project),
     )
     return result.returncode, result.stderr
 

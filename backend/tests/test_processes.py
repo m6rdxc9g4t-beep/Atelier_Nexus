@@ -23,6 +23,12 @@ def test_split_command_posix_and_windows(tmp_path: Path) -> None:
         r"C:\Users\François\AppData\Local\Programs\nodejs\node.exe",
         r"C:\dépôt\atelier tab\dist-desktop\atelier-mcp.mjs",
     ]
+    # Guillemets simples (shlex.quote, commande copiée de macOS)
+    assert processes.split_command(r"'C:\Program Files\py.exe' 'C:\a b\x.py' -v", "win32") == [
+        r"C:\Program Files\py.exe",
+        r"C:\a b\x.py",
+        "-v",
+    ]
     assert processes.split_command(r"C:\Atelier_Tab\resources\atelier-mcp.cmd", "win32") == [
         r"C:\Atelier_Tab\resources\atelier-mcp.cmd"
     ]
