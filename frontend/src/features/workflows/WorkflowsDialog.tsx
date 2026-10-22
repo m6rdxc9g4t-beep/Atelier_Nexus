@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { formatWhen } from "@/features/chat-agent/formatWhen";
 import { toolLabel } from "@/features/chat-agent/ToolCall";
+import { KindBadge } from "@/features/workflows-graph/StepBadges";
 import { ApiError, api, isWorkflowV2 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
@@ -423,8 +424,9 @@ function RunPanel({
               return (
                 <li key={key} className="flex flex-wrap items-center gap-2 rounded-md border border-atelier-line bg-card px-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm">{step.summary}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm break-words">{step.summary}</p>
+                    <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      <KindBadge kind={step.kind ?? "write"} />
                       Étape {step.index} · {toolLabel(step.tool)}
                     </p>
                   </div>
