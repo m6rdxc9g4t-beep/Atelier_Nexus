@@ -9,7 +9,10 @@ Spécification : [`docs/CONTEXT_SPEC.md`](docs/CONTEXT_SPEC.md) · Règles de de
 ./scripts/macos/build_app.sh   # « Atelier Nexus.app » dans ~/Applications + raccourci sur le Bureau
 ```
 
-Double-cliquez : la première ouverture prépare Python (2 à 3 min), les suivantes sont immédiates. Abonnement Claude (via Claude Code, sans clé API —
+L'app est un lanceur branché sur ce dépôt : le script ne se lance qu'une fois (ou si le dépôt change de place).
+**Après un `git pull`, relancez simplement l'app** : elle se met à jour toute seule (écran « Mise à jour… » : dépendances
+si elles ont changé, recompilation de l'interface ; en cas d'échec, ouverture possible avec la version précédente).
+Jamais de `git pull` automatique, aucune donnée touchée. Abonnement Claude (via Claude Code, sans clé API —
 [`docs/claude-code.md`](docs/claude-code.md)) ou clé Claude, modèles et adresses des apps : roue dentée **Réglages** de l'interface ([`docs/settings.md`](docs/settings.md)). Données dans
 `~/Library/Application Support/Atelier Nexus/`. Détails : [`docs/desktop.md`](docs/desktop.md).
 
