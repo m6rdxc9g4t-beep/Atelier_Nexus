@@ -867,6 +867,8 @@ export interface ChainRun {
 export interface ChainStep {
   run: ChainRun;
   agent: string | null;
+  /** Agent de l'étape verrouillé sur le modèle local. */
+  local_only: boolean;
   conversation_id: string | null;
   handoff: string | null;
   recap: Artifact | null;

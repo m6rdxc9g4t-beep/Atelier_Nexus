@@ -39,7 +39,8 @@ const run: ChainRun = {
 describe("étape validable", () => {
   it("seulement une réponse terminée, sans rien en attente", () => {
     expect(stageReadiness([user, answer()], false)).toEqual({ ready: true });
-    expect(stageReadiness([user, answer({ meta: meta("max_tokens") })], false).ready).toBe(true);
+    expect(stageReadiness([user, answer({ meta: meta("max_tokens") })], false).ready).toBe(false);
+    expect(stageReadiness([user, answer()], false, "Base indisponible").ready).toBe(false);
   });
 
   it("refuse en cours, sans réponse, en erreur, en attente ou arrêtée", () => {

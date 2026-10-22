@@ -34,6 +34,7 @@ from app.chains.definitions import ChainNotFoundError, leaks_local_data
 from app.core.llm import LLMRouter, get_llm_router
 from app.db.chains import ChainRunRepository
 from app.db.conversations import ConversationRepository
+from app.db.repository import StorageError
 from app.schemas.chains import (
     ChainDefinition,
     ChainInfo,
@@ -135,6 +136,7 @@ async def start_chain(
     return ChainStep(
         run=run,
         agent=chain.stages[0].agent,
+        local_only=agents[chain.stages[0].agent].local_only,
         conversation_id=first.id,
         handoff=handoff_message(chain, run.request, run.stages, 0, names),
     )
@@ -175,8 +177,11 @@ async def advance(
     names = {n: a.display_name for n, a in agents.items()}
     nxt = index + 1
     if nxt >= len(chain.stages):
-        saved = await runs.save(run.id, status="completed", stage_index=index, stages=stages)
-        assert saved is not None
+        saved = await runs.save(
+            run.id, status="completed", stage_index=index, stages=stages, expect_index=index
+        )
+        if saved is None:
+            raise _changed()
         return ChainStep(run=saved, recap=recap_artifact(chain, run.request, stages, names))
 
     following = agents[chain.stages[nxt].agent]
@@ -190,13 +195,60 @@ async def advance(
     conversation = await conversations.create(chain.stages[nxt].agent, _title(chain, nxt))
     stages[nxt].status = "active"
     stages[nxt].conversation_id = conversation.id
-    saved = await runs.save(run.id, status="running", stage_index=nxt, stages=stages)
-    assert saved is not None
+    try:
+        saved = await runs.save(
+            run.id, status="running", stage_index=nxt, stages=stages, expect_index=index
+        )
+    except StorageError:
+        await _discard(conversations, conversation.id)
+        raise
+    if saved is None:
+        # Une autre validation (autre onglet) ou un arrêt est passé entre-temps
+        await _discard(conversations, conversation.id)
+        raise _changed()
     return ChainStep(
         run=saved,
         agent=chain.stages[nxt].agent,
+        local_only=following.local_only,
         conversation_id=conversation.id,
         handoff=handoff_message(chain, run.request, stages, nxt, names),
+    )
+
+
+def _changed() -> HTTPException:
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        "La chaîne a changé entre-temps (validée ou arrêtée ailleurs) : rechargez-la.",
+    )
+
+
+async def _discard(conversations: ConversationRepository, conversation_id: str) -> None:
+    """Conversation d'étape créée pour rien (transition refusée) : on ne la laisse pas traîner."""
+    try:
+        await conversations.delete(conversation_id)
+    except StorageError:
+        pass
+
+
+@router.get("/chain-runs/{run_id}/handoff", response_model=ChainStep)
+async def current_handoff(
+    run_id: str, runs: RunsDep, llm: LLMDep, catalog: CatalogDep, make_env: EnvFactoryDep
+) -> ChainStep:
+    """Message de relais de l'étape en cours (à renvoyer si l'envoi n'a pas abouti). Fonction
+    pure de l'exécution : identique à celui donné au passage à cette étape."""
+    run = await _run_or_404(runs, run_id)
+    if run.status != "running":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cette chaîne n'est plus en cours.")
+    chain = _chain(run.chain)
+    agents = await _agents([s.agent for s in chain.stages], llm, catalog, make_env)
+    names = {n: a.display_name for n, a in agents.items()}
+    index = run.stage_index
+    return ChainStep(
+        run=run,
+        agent=chain.stages[index].agent,
+        local_only=agents[chain.stages[index].agent].local_only,
+        conversation_id=run.stages[index].conversation_id,
+        handoff=handoff_message(chain, run.request, run.stages, index, names),
     )
 
 
@@ -222,6 +274,13 @@ async def stop_run(run_id: str, runs: RunsDep) -> ChainRun:
     for stage in stages[run.stage_index :]:
         if stage.status in ("pending", "active"):
             stage.status = "skipped"
-    saved = await runs.save(run.id, status="stopped", stage_index=run.stage_index, stages=stages)
-    assert saved is not None
+    saved = await runs.save(
+        run.id,
+        status="stopped",
+        stage_index=run.stage_index,
+        stages=stages,
+        expect_index=run.stage_index,
+    )
+    if saved is None:
+        raise _changed()
     return saved

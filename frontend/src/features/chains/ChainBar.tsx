@@ -37,6 +37,7 @@ export function ChainBar({ chains }: { chains: ChainInfo[] }) {
   const conversationId = useChatStore((s) => s.conversationIds[agent] ?? null);
   const turns = (useChatStore((s) => s.conversations[agent]) ?? emptyConversation()).turns;
   const streaming = useChatStore((s) => s.streaming);
+  const saveError = useChatStore((s) => s.saveError);
   const [confirmStop, setConfirmStop] = useState(false);
 
   if (!run) return null;
@@ -44,7 +45,7 @@ export function ChainBar({ chains }: { chains: ChainInfo[] }) {
   const shown = stageOfConversation(run, conversationId);
   const running = run.status === "running";
   const onCurrent = running && shown === run.stage_index;
-  const readiness = stageReadiness(turns, streaming);
+  const readiness = stageReadiness(turns, streaming, saveError);
 
   return (
     <section

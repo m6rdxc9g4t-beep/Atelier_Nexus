@@ -15,6 +15,7 @@ import {
 } from "@/features/chat-agent/conversation";
 import { ApiError, api, streamAgent } from "@/lib/api";
 import { lastConversation, rememberConversation } from "@/lib/lastConversation";
+import { isChainConversation } from "@/lib/chainConversations";
 import { saveStepMode } from "@/lib/stepMode";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 import type { AttachmentBlock, ConversationDetail, ProviderName } from "@/types/api";
@@ -53,8 +54,8 @@ interface ChatState {
   stop: () => void;
   /** Repart d'une conversation vide (l'ancienne reste dans l'historique). */
   reset: () => void;
-  /** Rouvre une conversation enregistrée (et passe sur son agent). */
-  open: (id: string) => Promise<void>;
+  /** Rouvre une conversation enregistrée (et passe sur son agent). Vrai si elle est affichée. */
+  open: (id: string) => Promise<boolean>;
   /** Au premier passage sur un agent : rouvre sa dernière conversation, si elle existe encore. */
   restore: (agent: string) => Promise<void>;
   rename: (id: string, title: string) => Promise<void>;
@@ -180,15 +181,17 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     open: async (id) => {
-      if (get().streaming || get().opening) return;
+      if (get().streaming || get().opening) return false;
       set({ opening: true });
       try {
         const detail = await api.conversation(id);
         restored.add(detail.agent);
         show(detail);
         set({ agent: detail.agent, saveError: null });
+        return true;
       } catch (err) {
         set({ saveError: err instanceof ApiError ? err.message : "Impossible d'ouvrir la conversation." });
+        return false;
       } finally {
         set({ opening: false });
       }
@@ -254,7 +257,8 @@ export const useChatStore = create<ChatState>((set, get) => {
           provider,
           approvals,
           conversation_id: conversationId,
-          review_results: get().stepMode,
+          // Étape d'une chaîne : chaque résultat est revu, même si l'interrupteur est coupé
+          review_results: get().stepMode || isChainConversation(conversationId),
           review,
         },
         controller.signal,

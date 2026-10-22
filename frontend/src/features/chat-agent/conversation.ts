@@ -335,7 +335,9 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
   const tail = detail.history.at(-1);
   const tailResults = tail?.role === "user" ? tail.content.filter((b) => b.type === "tool_result") : [];
   const corrected = tail?.content.some((b) => b.type === "text" && b.text.startsWith(CORRECTION_PREFIX));
-  if (tailResults.length && !corrected && last?.role === "assistant") {
+  // (seulement une vraie pause de revue : un tour coupé par la limite d'étapes n'en est pas une)
+  const tailMeta = detail.turn_meta[String(detail.history.length - 1)];
+  if (tailResults.length && !corrected && tailMeta?.stop_reason === "awaiting_review" && last?.role === "assistant") {
     last.parts.push({ kind: "review", callIds: tailResults.map((r) => (r.type === "tool_result" ? r.tool_use_id : "")) });
   }
   if (detail.pending_approvals.length && last?.role === "assistant") {

@@ -102,8 +102,8 @@ export function ChatPanel({
             }
           >
             <Footprints />
-            <span className="hidden md:inline">Pas à pas</span>
-            <span className="sr-only md:hidden">{stepMode ? "activé" : "désactivé"}</span>
+            {/* L'état est porté par aria-pressed ; le nom reste « Pas à pas » à toutes les tailles */}
+            <span className="sr-only md:not-sr-only">Pas à pas</span>
           </Button>
           {chains.length > 0 && (
             <Button

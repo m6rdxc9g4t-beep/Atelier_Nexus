@@ -171,6 +171,11 @@ def system_prompt(request: LLMRequest) -> str:
             "# Outils",
             "Tu peux appeler les outils ci-dessous. Atelier Nexus les exécute (pas toi) et te renvoie "
             "leurs résultats dans la conversation, au tour suivant.",
+            "Tu n'as AUCUN outil natif : un appel d'outil se fait UNIQUEMENT en remplissant "
+            "`tool_calls` dans l'objet JSON de ta réponse. N'essaie jamais d'appeler un outil "
+            "directement ; si une tentative directe répond « No such tool available », cela ne "
+            "veut pas dire que l'outil manque : passe par `tool_calls`. Ces outils sont "
+            "disponibles : ne dis jamais le contraire sans avoir reçu une erreur de Nexus.",
         ]
         for tool in request.tools:
             schema = json.dumps(tool.input_schema, ensure_ascii=False, separators=(",", ":"))

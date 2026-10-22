@@ -6,8 +6,8 @@
 import type { ChatTurn } from "@/features/chat-agent/conversation";
 import type { ChainInfo, ChainRun } from "@/types/api";
 
-/** Raisons d'arrêt d'une réponse terminée, donc validable comme livrable. */
-const FINISHED = new Set(["end_turn", "max_tokens"]);
+/** Raison d'arrêt d'une réponse terminée, donc validable comme livrable. */
+const FINISHED = new Set(["end_turn"]);
 
 export type StageReadiness =
   | { ready: true }
@@ -17,8 +17,10 @@ export type StageReadiness =
  * L'étape peut-elle être validée ? Il faut une réponse terminée de l'agent : ni validation
  * d'action ni revue de résultat en attente, pas d'erreur, pas d'arrêt demandé.
  */
-export function stageReadiness(turns: ChatTurn[], streaming: boolean): StageReadiness {
+export function stageReadiness(turns: ChatTurn[], streaming: boolean, saveError: string | null = null): StageReadiness {
   if (streaming) return { ready: false, reason: "L'agent travaille encore." };
+  // Le serveur valide ce qu'il a enregistré : sans enregistrement, il figerait autre chose
+  if (saveError) return { ready: false, reason: "La conversation n'est pas enregistrée : impossible de valider." };
   const last = turns.at(-1);
   if (!last || last.role !== "assistant") return { ready: false, reason: "L'agent n'a pas encore répondu." };
   if (last.error) return { ready: false, reason: "La dernière réponse a échoué : relancez ou corrigez." };
@@ -29,6 +31,8 @@ export function stageReadiness(turns: ChatTurn[], streaming: boolean): StageRead
   const stop = last.meta?.stop_reason;
   if (stop === "stopped_by_user")
     return { ready: false, reason: "Vous avez arrêté l'agent : dites-lui comment poursuivre." };
+  if (stop === "max_tokens")
+    return { ready: false, reason: "Réponse tronquée : demandez à l'agent de la terminer." };
   if (!stop || !FINISHED.has(stop)) return { ready: false, reason: "L'étape n'est pas terminée." };
   return { ready: true };
 }

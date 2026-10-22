@@ -230,3 +230,56 @@ def test_api_rejects_review_without_results(client: TestClient) -> None:
         "/api/agents/assistant/run", json={"messages": [user("Bonjour")], "review": "stop"}
     )
     assert response.status_code == 422
+
+
+# ─── Appels validés un par un : chaque appel est une nouvelle requête ─
+
+
+async def test_data_via_query_after_schema_described_in_an_earlier_request() -> None:
+    """Régression : en every_step, le schéma consulté à la requête précédente compte."""
+    from app.agents import get_agent_class
+    from app.core.config import Settings
+    from app.tools.environment import ToolEnvironment
+    from tests.fake_data_via import DATASET_ID, FakeDataVia
+
+    viz = FakeDataVia()
+
+    def env() -> ToolEnvironment:
+        settings = Settings(
+            _env_file=None, data_via_base_url="http://viz.test/api", tab_exports_dir=None,
+            approval_mode="every_step",
+        )  # fmt: skip
+        return ToolEnvironment(settings, transports={"data_via": viz.transport})
+
+    query = {
+        "dataset_id": DATASET_ID,
+        "dimensions": [{"field": "region"}],
+        "measures": [{"field": "chiffre_affaires", "agg": "sum"}],
+    }
+    anthropic = ScriptedProvider(
+        "anthropic",
+        [
+            tool_response("data_via_describe_dataset", {"dataset_id": DATASET_ID}, call_id="d"),
+            tool_response("data_via_query", query, call_id="q"),
+            text_response("Fini."),
+        ],
+    )
+    router = make_router(anthropic)
+    history = [Message.user("CA par région ?")]
+
+    async def turn(**kw: Any) -> Any:
+        # Agent et environnement neufs à chaque requête, comme l'API
+        agent = get_agent_class("data_analyst")(router, env())
+        result = done(await events(agent, history, review_results=True, **kw))
+        history.extend(result.new_messages)
+        return result
+
+    await turn()  # demande de validation du schéma
+    await turn(approvals={"d": True})  # schéma lu → pause de revue
+    await turn(review="continue")  # le modèle demande la requête → validation
+    paused = await turn(approvals={"q": True})  # requête exécutée dans une NOUVELLE requête
+    assert paused.stop_reason == "awaiting_review"
+    result_block = history[-1].content[0]
+    assert isinstance(result_block, ToolResultBlock)
+    assert not result_block.is_error, result_block.content
+    assert "Région 0" in result_block.content

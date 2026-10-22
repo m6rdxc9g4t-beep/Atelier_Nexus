@@ -157,6 +157,8 @@ export const api = {
   /** Valide le livrable de l'étape courante (409 si elle n'est pas terminée). */
   advanceChain: (runId: string) =>
     sendJson<ChainStep>("POST", `/api/chain-runs/${encodeURIComponent(runId)}/advance`),
+  /** Message de relais de l'étape en cours (à renvoyer si l'envoi n'a pas abouti). */
+  chainHandoff: (runId: string) => getJson<ChainStep>(`/api/chain-runs/${encodeURIComponent(runId)}/handoff`),
   stopChain: (runId: string) => sendJson<ChainRun>("POST", `/api/chain-runs/${encodeURIComponent(runId)}/stop`),
   chainRecap: (runId: string) => getJson<Artifact>(`/api/chain-runs/${encodeURIComponent(runId)}/recap`),
   /** Workflows rejouables (Étape 18), v1 et v2 (champ `version`). `agent` null = tous. */

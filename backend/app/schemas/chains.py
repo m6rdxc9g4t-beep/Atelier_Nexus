@@ -91,6 +91,8 @@ class ChainStep(BaseModel):
 
     run: ChainRun
     agent: str | None = None
+    #: Agent de l'étape verrouillé sur le modèle local (le client ne demande pas Claude)
+    local_only: bool = False
     conversation_id: str | None = None
     handoff: str | None = None
     recap: Artifact | None = None

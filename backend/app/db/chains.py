@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import builtins
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -79,16 +80,31 @@ class ChainRunRepository:
         status: RunStatus,
         stage_index: int,
         stages: builtins.list[StageState],
+        expect_index: int,
     ) -> ChainRun | None:
+        """Enregistre une transition SEULEMENT si la chaîne est toujours en cours à l'étape
+        `expect_index` (sinon None) : deux validations simultanées, ou une validation après un
+        arrêt, ne peuvent pas s'écraser."""
+
         async def op(s: AsyncSession) -> ChainRun | None:
-            row = await s.get(ChainRunRow, run_id)
-            if row is None:
-                return None
-            row.status = status
-            row.stage_index = stage_index
-            row.stages = [st.model_dump(mode="json") for st in stages]
+            result = await s.execute(
+                update(ChainRunRow)
+                .where(
+                    ChainRunRow.id == run_id,
+                    ChainRunRow.status == "running",
+                    ChainRunRow.stage_index == expect_index,
+                )
+                .values(
+                    status=status,
+                    stage_index=stage_index,
+                    stages=[st.model_dump(mode="json") for st in stages],
+                    updated_at=datetime.now(UTC),
+                )
+            )
             await s.commit()
-            await s.refresh(row)
-            return _to_model(row)
+            if not getattr(result, "rowcount", 0):
+                return None
+            row = await s.get(ChainRunRow, run_id, populate_existing=True)
+            return _to_model(row) if row else None
 
         return await self._run(op)

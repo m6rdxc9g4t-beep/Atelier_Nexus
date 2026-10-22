@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from app.agents.base import STOPPED
 from app.core.llm.types import TextBlock, ToolUseBlock
 from app.schemas.chains import ChainDefinition, StageDeliverable, StageState
@@ -21,9 +23,13 @@ def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+_TAGS = re.compile(r"<(/?)\s*(livrable|demande)", re.IGNORECASE)
+
+
 def _data(text: str) -> str:
-    """Contenu placé entre balises : il ne peut pas les refermer (consigne déguisée)."""
-    return text.replace("</livrable", "<\\/livrable").replace("</demande", "<\\/demande")
+    """Contenu placé entre balises : il ne peut ni les ouvrir ni les refermer (consigne
+    déguisée), quelle que soit la casse."""
+    return _TAGS.sub(lambda m: f"‹{m.group(1)}{m.group(2)}", text)
 
 
 def deliverable_from(detail: ConversationDetail) -> StageDeliverable:
@@ -39,6 +45,11 @@ def deliverable_from(detail: ConversationDetail) -> StageDeliverable:
         raise StageNotFinishedError(
             "L'étape n'est pas terminée : un résultat attend votre revue, ou l'agent n'a pas "
             "encore répondu."
+        )
+    meta = detail.turn_meta.get(str(len(detail.history) - 1))
+    if meta is not None and meta.stop_reason == "max_tokens":
+        raise StageNotFinishedError(
+            "La réponse a été tronquée : demandez à l'agent de la terminer avant de valider."
         )
     if any(isinstance(b, ToolUseBlock) for b in last.content):
         raise StageNotFinishedError(
