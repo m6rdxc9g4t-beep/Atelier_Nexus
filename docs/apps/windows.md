@@ -52,3 +52,40 @@ contenir des espaces et des accents (`C:\Users\François\…`) : toujours cités
 Chaque dépôt ajoute à sa CI un travail `windows-latest` : tests, compilation, puis `install.ps1` dans un profil temporaire
 (sans raccourci de Bureau) et un lancement du lanceur en mode « mise à jour seulement » qui doit réussir, puis un second
 lancement qui ne doit **rien** refaire (vérifie §9.3 fins de ligne).
+
+### 9.6 Précisions (retours des quatre implémentations Windows)
+
+**Lanceur inscrit et ouverture d'une autre app (§9.4)**
+- La valeur `Lanceur` de `HKCU\Software\Atelier\Apps\<app>` est le **chemin complet du raccourci `.lnk` du menu Démarrer**
+  créé par `install.ps1` (il porte l'icône et les arguments). Chaque app inscrit ce `.lnk`, rien d'autre.
+- Une app qui en ouvre une autre le fait **toujours par le shell Windows** : `explorer.exe "<Lanceur>"`, lancé avec
+  l'environnement minimal. L'Explorateur démarre l'app avec son propre environnement de session : aucune variable de l'app
+  appelante ne passe. Jamais d'exécution directe du chemin, quelle que soit son extension. Lanceur absent ou introuvable →
+  adresse de l'app (§2) dans le navigateur par défaut.
+- Environnement minimal (liste blanche, noms insensibles à la casse sous Windows) : `HOME`, `USERPROFILE`, `HOMEDRIVE`,
+  `HOMEPATH`, `USER`, `USERNAME`, `USERDOMAIN`, `LOGNAME`, `LANG`, `LC_*`, `TZ`, `TMPDIR`, `TEMP`, `TMP`, `SystemRoot`,
+  `SystemDrive`, `windir`, `ComSpec`, `PATHEXT`, `APPDATA`, `LOCALAPPDATA`, `ProgramData`, `ProgramFiles`, `ProgramFiles(x86)`,
+  `ProgramW6432`, et `PATH` = macOS : dossiers système ; Windows : PATH machine + utilisateur lu dans le registre.
+
+**CLI Claude sous Windows (complète §5.3)**
+- Environnement de la CLI : la liste blanche de §5.3 **plus**, sous Windows, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`, `USERNAME`,
+  `APPDATA`, `LOCALAPPDATA`, `SystemRoot`, `SystemDrive`, `windir`, `ComSpec`, `PATHEXT`, `TEMP`, `TMP`, `ProgramData`
+  (et `Path` sous ce nom). Toujours rien d'autre.
+- Exécutable : `claude.exe` (installateur natif ; cherché aussi dans `%USERPROFILE%\.local\bin`) ; un `claude.cmd` installé par
+  npm (`%APPDATA%\npm`) est **résolu** en `node.exe <…\@anthropic-ai\claude-code\cli.js>` et lancé ainsi ; s'il ne se résout pas,
+  il est refusé. **Jamais** de lancement par `cmd.exe` (il réinterpréterait le prompt et le schéma JSON).
+
+**Mise à jour (complète §8 et §9.3)**
+- npm est lancé **sans shell** : `node.exe <dossier de npm>\node_modules\npm\bin\npm-cli.js …` (pas `npm.cmd`).
+- Changement local = `git status --porcelain` (fichiers suivis modifiés **et** nouveaux non ignorés), dans les quatre apps.
+- Node.js : toute version ≥ 22.12. Python : Viz ≥ 3.11, Nexus ≥ 3.12.
+- Viz et Nexus : sous Windows, la réinstallation Python a lieu **avant** l'ouverture de la fenêtre (Windows ne remplace pas une
+  bibliothèque chargée), dans une petite fenêtre d'attente. Sans WebView2, l'app s'ouvre dans le navigateur.
+
+**Emplacements (complète §9.2)**
+- Serveur MCP de Tab sous Windows : `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd` (Nexus le prend par
+  défaut s'il existe).
+- Le paquet autonome PyInstaller de Viz (version figée téléchargeable, hors §8) garde ses données dans
+  `%LOCALAPPDATA%\Atelier Viz` ; l'installation depuis le dépôt garde `backend\data`.
+- Les journaux GitHub Actions bruts ne sont pas lisibles depuis les sessions de développement : la CI Windows remonte ses
+  erreurs en annotations.
