@@ -165,3 +165,17 @@ def test_plugin_paths_make_a_source_folder_importable(tmp_path: Path) -> None:
         assert state.loaded
     finally:
         sys.path[:] = [p for p in sys.path if not p.startswith(str(tmp_path))]
+
+
+async def test_agent_card_carries_readable_tool_labels() -> None:
+    """L'interface ne connaît pas les outils des extensions : le backend envoie leur libellé."""
+    from app.agents import AgentCatalog
+    from app.tools.labels import TOOL_LABELS
+    from tests.fakes import make_router
+
+    env = ToolEnvironment(Settings(_env_file=None, data_via_base_url="http://viz.test/api"))  # type: ignore[call-arg]
+    infos = {i.name: i for i in await AgentCatalog().infos(make_router(), env)}
+    tools = {t.name: t for t in infos["data_analyst"].tools}
+    assert tools["data_via_query"].label == TOOL_LABELS["data_via_query"] == "Data Via · requête"
+    assert all(t.label for i in infos.values() for t in i.tools)
+    await env.aclose()

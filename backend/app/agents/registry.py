@@ -18,6 +18,9 @@ class AgentNotFoundError(LookupError):
 
 class AgentToolInfo(BaseModel):
     name: str
+    #: Nom lisible (« Convert · conversion d'un fichier ») : `app/tools/labels.py`, complété par
+    #: les extensions ; l'interface l'utilise pour les outils qu'elle ne connaît pas
+    label: str
     description: str
     requires_approval: bool = False
     sensitive: bool = False
@@ -83,6 +86,7 @@ def describe(agent: BaseAgent) -> AgentInfo:
         tools=[
             AgentToolInfo(
                 name=t.name,
+                label=t.label,
                 description=t.description,
                 requires_approval=t.requires_approval,
                 sensitive=t.sensitive,

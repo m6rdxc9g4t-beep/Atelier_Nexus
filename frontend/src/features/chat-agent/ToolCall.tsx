@@ -75,7 +75,19 @@ const TOOL_LABELS: Record<string, string> = {
   delegate_to_agent: "Délégation à un agent",
 };
 
-export const toolLabel = (name: string) => TOOL_LABELS[name] ?? name;
+/** Libellés envoyés par le backend avec la fiche des agents (outils des extensions, nouveaux
+ * outils) : complètent la liste ci-dessus sans la remplacer. */
+const backendLabels = new Map<string, string>();
+
+export function registerToolLabels(agents: { tools: { name: string; label?: string }[] }[]): void {
+  for (const agent of agents) {
+    for (const tool of agent.tools) {
+      if (tool.label && tool.label !== tool.name) backendLabels.set(tool.name, tool.label);
+    }
+  }
+}
+
+export const toolLabel = (name: string) => TOOL_LABELS[name] ?? backendLabels.get(name) ?? name;
 
 /** Appel d'outil replié : on voit qu'il a eu lieu, on déplie pour l'entrée et le résultat. */
 export function ToolCall({ part }: { part: ToolCallPart }) {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { registerToolLabels } from "@/features/chat-agent/ToolCall";
 import { ApiError, api } from "@/lib/api";
 import type { AgentInfo, AppStatus, ProviderStatus } from "@/types/api";
 
@@ -36,6 +37,7 @@ export function useBackend(): BackendState {
         api.appsStatus(ctrl.signal),
       ]);
       if (ctrl.signal.aborted) return;
+      registerToolLabels(a);
       setAgents(a);
       setProviders(p);
       setApps(d);

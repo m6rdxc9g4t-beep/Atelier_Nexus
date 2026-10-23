@@ -99,6 +99,8 @@ export interface Artifact {
 
 export interface ToolInfo {
   name: string;
+  /** Nom lisible fourni par le backend (outils des extensions compris). */
+  label?: string;
   description: string;
   requires_approval?: boolean;
   sensitive?: boolean;
