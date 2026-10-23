@@ -12,6 +12,8 @@ from typing import Any, ClassVar, Self
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from app.core.net import use_env_proxy
+
 
 class AppError(Exception):
     """Base des erreurs de connecteur ; `app` = identifiant (projets, tresorerie, github)."""
@@ -58,6 +60,7 @@ class AppClient:
             timeout=timeout,
             transport=transport,
             follow_redirects=False,
+            trust_env=use_env_proxy(self.base_url),  # app locale : jamais via le proxy système
         )
         #: En-têtes de la dernière réponse (ex. `idempotency-replayed` d'Atelier Projets)
         self.last_headers: httpx.Headers | None = None
