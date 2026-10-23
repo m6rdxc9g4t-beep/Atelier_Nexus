@@ -19,6 +19,10 @@ agrégations et vérifient des mesures, sans jamais écrire de SQL.
 En Docker, le compose remplace l'adresse par `http://host.docker.internal:8000/api` : Atelier Viz tourne sur la
 machine hôte. Vider `DATA_VIA_BASE_URL` désactive le connecteur (statut « non configuré »).
 
+> **Viz « injoignable » alors qu'il tourne.** Une adresse locale est jointe sans le proxy du système
+> (`app/core/net.py`, voir [docs/desktop.md](../desktop.md#proxy-du-système-et-apps-locales)). Si Viz n'a pas pu prendre
+> le port 8000 (déjà occupé), son app de bureau en choisit un autre : reporter son adresse dans `DATA_VIA_BASE_URL`.
+
 > **Ports.** La suite réserve 8000 (Atelier Viz) et 3000 (API d'Atelier Projets). Atelier Nexus utilise donc
 > **8100** (API) et **3100** (interface) ; son Ollama conteneurisé est publié sur **11435** pour laisser 11434 à un Ollama natif.
 

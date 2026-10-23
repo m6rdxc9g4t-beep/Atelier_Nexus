@@ -142,6 +142,19 @@ Particularités de la mise à jour sous Windows (`app/desktop_update.py`) :
 - Fenêtre : icône `scripts/windows/AtelierNexus.ico` (dérivée du logo), identifiant de barre des tâches `Atelier.Nexus`,
   fond clair ou sombre selon `AppsUseLightTheme`. Sans WebView2, l'app s'ouvre dans le navigateur.
 
+## Proxy du système et apps locales
+
+Avec un proxy réglé dans le système (réseau d'entreprise), httpx l'appliquait aussi aux adresses locales : sous
+macOS et Windows, `urllib.request.getproxies()` renvoie le proxy du système **sans ses exceptions**. Atelier Viz
+(`http://127.0.0.1:8000/api`) paraissait arrêté alors qu'il tournait, et seules les apps distantes ou sans HTTP
+(GitHub, Tab) restaient « en ligne ». Depuis `app/core/net.py` : une adresse de bouclage (`127.0.0.1`, `localhost`,
+`::1`) est toujours jointe en direct (`trust_env=False` : `AppClient`, `DataViaClient`, nœuds de la suite, Ollama) ;
+une adresse distante (GitHub, Supabase) garde le proxy de l'environnement. Test : `tests/test_net.py` (proxy du
+système simulé).
+
+Si Viz reste injoignable : son app de bureau prend le port 8000 seulement s'il est libre, sinon un port au hasard.
+L'adresse de Viz est alors à reporter dans `DATA_VIA_BASE_URL` (Réglages de Nexus), ou le port 8000 à libérer.
+
 ## Ouvrir une autre app de la suite (§9.4)
 
 `app/desktop_open.py` : le menu « Suite Atelier » (`openExternal`), les liens externes de la fenêtre (`webbrowser`,

@@ -29,6 +29,7 @@ from app.core.llm.types import (
     ToolUseBlock,
     Usage,
 )
+from app.core.net import use_env_proxy
 
 # ─── Conversions neutre ⇄ Ollama (fonctions pures, testées) ───────
 
@@ -143,7 +144,11 @@ class OllamaProvider(LLMProvider):
     ) -> None:
         super().__init__(default_model)
         self.base_url = base_url
-        self._client = client or ollama.AsyncClient(host=base_url, timeout=timeout)
+        self._client = client or ollama.AsyncClient(
+            host=base_url,
+            timeout=timeout,
+            trust_env=use_env_proxy(base_url),  # Ollama local : jamais via le proxy système
+        )
 
     @property
     def is_configured(self) -> bool:

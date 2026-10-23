@@ -21,6 +21,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import Settings
+from app.core.net import use_env_proxy
 from app.schemas.data_via import (
     DatasetProfile,
     DatasetRows,
@@ -93,6 +94,7 @@ class DataViaClient:
             timeout=timeout,
             transport=transport,
             follow_redirects=False,
+            trust_env=use_env_proxy(self.base_url),  # Viz local : jamais via le proxy système
         )
 
     @classmethod

@@ -47,6 +47,7 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **Tests :** jamais d'appel réseau réel ni de Claude Code (`conftest.py` neutralise `claude`) ; applications simulées par `httpx.MockTransport`.
 * **SDK Anthropic ≥ 1.x :** pas de paramètre `temperature` sur `messages.create`.
 * **Ollama :** les appels d'outils arrivent sans identifiant (le hub génère `call_…`) ; garder des schémas d'entrée simples pour les petits modèles.
+* **Proxy :** un client HTTP vers une app locale ne passe jamais par le proxy (`trust_env=use_env_proxy(url)`, `app/core/net.py`) ; sous macOS et Windows httpx applique sinon le proxy du système à `127.0.0.1`.
 * **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
 * **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
 * **Workflows v2 / nœuds :** une étape d'écriture (`write`, `destructive`, `requires_approval`) n'est jamais exécutée sans validation de son entrée **résolue** ; jamais de journalisation des `data` des étapes ; appels aux nœuds par `app/suite/` seulement (bouclage, sans redirection).

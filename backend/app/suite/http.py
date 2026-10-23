@@ -10,29 +10,15 @@ redirection suivie), avec les gardes du contrat `atelier-node/1` :
 
 from __future__ import annotations
 
-import ipaddress
 import json
 from typing import Any
 
 import httpx
 
+from app.core.net import is_loopback
 from app.tools.http import AppClient, AppError, AppUnavailableError
 
-LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
-
-
-def is_loopback(url: str) -> bool:
-    try:
-        host = httpx.URL(url).host
-    except (httpx.InvalidURL, TypeError):
-        return False
-    if host in LOOPBACK_NAMES:
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
 
 
 def split_base(base_url: str) -> tuple[str, str]:
