@@ -42,13 +42,30 @@ export interface ApprovalPart {
   submitted: boolean;
 }
 
+/** Mode pas à pas : résultats à revoir avant que l'agent ne continue. */
+export interface ReviewPart {
+  kind: "review";
+  /** Appels dont le résultat est à revoir */
+  callIds: string[];
+  /** Décision prise : continuer, corriger (avec consigne) ou arrêter */
+  decision?: ReviewDecision;
+}
+
+export type ReviewDecision =
+  | { action: "continue" }
+  | { action: "correct"; instruction: string }
+  | { action: "stop" };
+
+/** Préfixe de la consigne jointe aux résultats (reconnue à la réouverture). */
+export const CORRECTION_PREFIX = "Consigne de l'utilisateur après ce résultat : ";
+
 /** Fichier joint à un message de l'utilisateur. */
 export interface AttachmentPart {
   kind: "attachment";
   attachment: AttachmentBlock;
 }
 
-export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart | AttachmentPart;
+export type Part = TextPart | ToolCallPart | ArtifactRefPart | ApprovalPart | AttachmentPart | ReviewPart;
 
 export interface ChatTurn {
   id: string;
@@ -134,6 +151,12 @@ export function applyEvent(
         parts: [...turn.parts, { kind: "approval", calls: event.calls, decisions: {}, submitted: false }],
       }));
 
+    case "review_required":
+      return updateLast(conv, (turn) => ({
+        ...turn,
+        parts: [...turn.parts, { kind: "review", callIds: event.call_ids }],
+      }));
+
     case "artifact":
       if (!artifactId) return conv;
       return updateLast(conv, (turn) => ({
@@ -198,6 +221,35 @@ export function submitApprovals(
   return { conv: next, approvals };
 }
 
+/** Revue en attente (dernière partie du dernier tour), s'il y en a une. */
+export function pendingReview(conv: Conversation): ReviewPart | null {
+  const last = conv.turns.at(-1);
+  const part = last?.role === "assistant" ? last.parts.findLast((p) => p.kind === "review") : undefined;
+  return part && part.kind === "review" && !part.decision ? part : null;
+}
+
+/**
+ * Enregistre la décision de revue et prépare l'historique à renvoyer : une correction est
+ * jointe aux résultats revus (dernier message), comme une consigne que l'agent lira.
+ */
+export function submitReview(
+  conv: Conversation,
+  decision: ReviewDecision,
+): { conv: Conversation; review: "continue" | "stop" } | null {
+  const pending = pendingReview(conv);
+  const lastMessage = conv.history.at(-1);
+  if (!pending || lastMessage?.role !== "user") return null;
+  if (decision.action === "correct" && !decision.instruction.trim()) return null;
+  const marked = updateLast(conv, (turn) => ({
+    ...turn,
+    parts: turn.parts.map((p) => (p === pending ? { ...pending, decision } : p)),
+  }));
+  if (decision.action !== "correct") return { conv: marked, review: decision.action };
+  const instruction: ContentBlock = { type: "text", text: CORRECTION_PREFIX + decision.instruction.trim() };
+  const history = [...conv.history.slice(0, -1), { ...lastMessage, content: [...lastMessage.content, instruction] }];
+  return { conv: { ...marked, history }, review: "continue" };
+}
+
 /**
  * Reconstruit l'affichage d'une conversation enregistrée.
  * Un tour assistant va d'une question de l'utilisateur à la suivante ; les résultats d'outils
@@ -230,6 +282,17 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
           part.result = r.content;
         }
       }
+      // Mode pas à pas : consigne de correction jointe aux résultats revus
+      const correction = message.content.find(
+        (b) => b.type === "text" && b.text.startsWith(CORRECTION_PREFIX),
+      );
+      if (correction?.type === "text" && current) {
+        current.parts.push({
+          kind: "review",
+          callIds: results.map((r) => r.tool_use_id),
+          decision: { action: "correct", instruction: correction.text.slice(CORRECTION_PREFIX.length) },
+        });
+      }
       return;
     }
     if (!current) {
@@ -251,7 +314,8 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
   for (const turn of turns) {
     const end = lastAssistantIndex[turn.id];
     if (end === undefined) continue;
-    const meta = detail.turn_meta[String(end)];
+    // Tour en pause de revue : la méta est rangée sous l'index des résultats (end + 1)
+    const meta = detail.turn_meta[String(end)] ?? detail.turn_meta[String(end + 1)];
     if (meta) {
       const { provider, model, usage, stop_reason, iterations } = meta;
       turn.meta = { provider, model, usage, stop_reason, iterations };
@@ -267,6 +331,13 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
 
   // Validations restées en attente à la fin du dernier tour
   const last = turns.at(-1);
+  // Pause de revue à la fin : la conversation se termine par des résultats d'outils
+  const tail = detail.history.at(-1);
+  const tailResults = tail?.role === "user" ? tail.content.filter((b) => b.type === "tool_result") : [];
+  const corrected = tail?.content.some((b) => b.type === "text" && b.text.startsWith(CORRECTION_PREFIX));
+  if (tailResults.length && !corrected && last?.role === "assistant") {
+    last.parts.push({ kind: "review", callIds: tailResults.map((r) => (r.type === "tool_result" ? r.tool_use_id : "")) });
+  }
   if (detail.pending_approvals.length && last?.role === "assistant") {
     last.parts.push({ kind: "approval", calls: detail.pending_approvals, decisions: {}, submitted: false });
   }
@@ -290,6 +361,7 @@ export function canSaveAsWorkflow(turn: ChatTurn): boolean {
     turn.role === "assistant" &&
     !!turn.meta &&
     turn.meta.stop_reason !== "awaiting_approval" &&
+    turn.meta.stop_reason !== "awaiting_review" &&
     !turn.error &&
     turn.parts.some((p) => p.kind === "tool" && p.status === "done" && !NOT_REPLAYABLE.has(p.name))
   );

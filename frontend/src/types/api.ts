@@ -146,7 +146,11 @@ export type StopReason =
   | "refusal"
   | "other"
   | "max_iterations"
-  | "awaiting_approval";
+  | "awaiting_approval"
+  /** Mode pas à pas : résultat d'outil à revoir avant que le modèle ne le lise. */
+  | "awaiting_review"
+  /** Arrêté par l'utilisateur après la revue d'un résultat. */
+  | "stopped_by_user";
 
 export interface AgentResult {
   agent: string;
@@ -168,6 +172,10 @@ export interface AgentRunRequest {
   conversation_id?: string | null;
   /** Reprise après validation : id d'appel → autorisé. */
   approvals?: Record<string, boolean> | null;
+  /** Mode pas à pas : pause après chaque résultat d'outil. */
+  review_results?: boolean;
+  /** Réponse à une pause de revue (« continue » ; « stop » = fin du tour sans le modèle). */
+  review?: "continue" | "stop" | null;
 }
 
 /** Événements du flux SSE de `POST /api/agents/{name}/stream`. */
@@ -177,6 +185,7 @@ export type AgentEvent =
   | { type: "tool_result"; id: string; name: string; content: string; is_error: boolean }
   | { type: "artifact"; artifact: Artifact }
   | { type: "approval_required"; calls: PendingCall[] }
+  | { type: "review_required"; call_ids: string[] }
   | { type: "done"; result: AgentResult }
   | { type: "saved"; conversation_id: string }
   | { type: "save_error"; message: string }

@@ -1,11 +1,12 @@
 "use client";
 
-import { Lock, RotateCcw, TriangleAlert } from "lucide-react";
+import { Footprints, Lock, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { emptyConversation } from "@/features/chat-agent/conversation";
+import { type ReviewDecision, emptyConversation } from "@/features/chat-agent/conversation";
+import { loadStepMode } from "@/lib/stepMode";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
 import { useChatStore } from "@/stores/useChatStore";
@@ -39,6 +40,9 @@ export function ChatPanel({
   const streaming = useChatStore((s) => s.streaming);
   const sendText = useChatStore((s) => s.send);
   const decideStore = useChatStore((s) => s.decide);
+  const reviewStore = useChatStore((s) => s.review);
+  const stepMode = useChatStore((s) => s.stepMode);
+  const setStepMode = useChatStore((s) => s.setStepMode);
   const stop = useChatStore((s) => s.stop);
   const reset = useChatStore((s) => s.reset);
   const restore = useChatStore((s) => s.restore);
@@ -49,6 +53,11 @@ export function ChatPanel({
   const [capturing, setCapturing] = useState(false);
   const bumpWorkflows = useWorkflowStudioStore((s) => s.bump);
 
+  // Mode pas à pas retenu dans ce navigateur (lu au montage, pas au rendu serveur)
+  useEffect(() => {
+    if (!loadStepMode()) setStepMode(false);
+  }, [setStepMode]);
+
   // Premier passage sur l'agent : rouvrir sa dernière conversation enregistrée
   useEffect(() => {
     void restore(agentName);
@@ -58,6 +67,7 @@ export function ChatPanel({
   const localOnly = agent?.local_only ?? false;
   const send = (text: string, attachments: AttachmentBlock[] = []) => sendText(text, { localOnly, attachments });
   const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
+  const review = (decision: ReviewDecision) => void reviewStore(decision, { localOnly });
   const empty = conversation.turns.length === 0;
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
 
@@ -73,6 +83,22 @@ export function ChatPanel({
           </Badge>
         )}
         <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={stepMode}
+            onClick={() => setStepMode(!stepMode)}
+            className={stepMode ? "text-accent-ink" : undefined}
+            title={
+              stepMode
+                ? "Pas à pas activé : l'agent s'arrête après chaque résultat pour que vous le validiez. Cliquez pour le désactiver."
+                : "Pas à pas désactivé : l'agent enchaîne ses étapes (les actions restent validées selon les Réglages). Cliquez pour l'activer."
+            }
+          >
+            <Footprints />
+            <span className="hidden md:inline">Pas à pas</span>
+            <span className="sr-only md:hidden">{stepMode ? "activé" : "désactivé"}</span>
+          </Button>
           {agent && <WorkflowsDialog agent={agent} />}
           <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
@@ -139,6 +165,7 @@ export function ChatPanel({
             turns={conversation.turns}
             streaming={streaming}
             onDecide={decide}
+            onReview={review}
             onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
           />
         )}
