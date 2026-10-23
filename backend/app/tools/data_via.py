@@ -387,7 +387,7 @@ class ListDatasetsTool(_DataViaTool[ListDatasetsInput]):
                     d.name,
                     d.rows,
                     d.columns_count,
-                    d.origin.connection_name if d.origin else None,
+                    d.origin.label if d.origin else None,
                 ]
                 for d in datasets
             ],
@@ -395,7 +395,7 @@ class ListDatasetsTool(_DataViaTool[ListDatasetsInput]):
         if not datasets:
             return ToolOutput(content="Aucun jeu de données dans Data Via.", data=data)
         rows = [
-            [d.id, d.name, d.rows, d.columns_count, d.origin.connection_name if d.origin else "—"]
+            [d.id, d.name, d.rows, d.columns_count, d.origin.label if d.origin else "—"]
             for d in datasets
         ]
         table = markdown_table(["id", "nom", "lignes", "colonnes", "connexion"], rows)

@@ -85,12 +85,52 @@ class AppClient:
         params: Any = None,
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
+        files: dict[str, tuple[str, bytes, str]] | None = None,
+        form: dict[str, str] | None = None,
     ) -> Any:
         """Appel brut ; renvoie le JSON décodé (None pour 204).
 
         `timeout` : délai propre à cet appel (analyse de médiathèque, génération IA…).
+        `files` (+ `form`) : corps multipart, ex. un fichier joint envoyé à une application ;
+        exclusif de `json_body`.
         """
+        response = await self._send(
+            method, path, json_body=json_body, params=params, headers=headers, timeout=timeout,
+            files=files, form=form,
+        )  # fmt: skip
+        if response.status_code == 204:
+            return None
+        if not response.content:
+            return None
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise AppRequestError(f"Réponse de {self.label} illisible.", app=self.app) from exc
+
+    async def download(
+        self, path: str, *, params: Any = None, timeout: float | None = None
+    ) -> bytes:
+        """Contenu brut d'une réponse (export de fichier), mêmes erreurs que `request`."""
+        response = await self._send("GET", path, params=params, timeout=timeout)
+        return response.content
+
+    async def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: Any = None,
+        params: Any = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        files: dict[str, tuple[str, bytes, str]] | None = None,
+        form: dict[str, str] | None = None,
+    ) -> httpx.Response:
         extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
+        if files is not None:
+            extra["files"] = files
+            if form:
+                extra["data"] = form
         try:
             response = await self._http.request(
                 method, path.lstrip("/"), json=json_body, params=params, headers=headers, **extra
@@ -104,8 +144,6 @@ class AppClient:
             ) from exc
         self.last_headers = response.headers
         status = self.last_status = response.status_code
-        if status == 204:
-            return None
         if status == 404:
             raise AppNotFoundError(self._detail(response) or "Ressource introuvable.", app=self.app)
         if status >= 500:
@@ -117,12 +155,7 @@ class AppClient:
             raise AppRequestError(
                 f"{self.label} : {self._detail(response) or f'erreur {status}'}", app=self.app
             )
-        if not response.content:
-            return None
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise AppRequestError(f"Réponse de {self.label} illisible.", app=self.app) from exc
+        return response
 
     def _detail(self, response: httpx.Response) -> str | None:
         try:

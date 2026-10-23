@@ -85,11 +85,24 @@ class DatasetModel(_Response):
 
 
 class DatasetOrigin(_Response):
-    connection_id: str
-    connection_name: str
+    """Provenance d'un jeu (`AnyOrigin` d'Atelier Viz, `schemas/connection.py`) : une connexion
+    (jeu actualisable), ou `kind = "atelier-table"` pour une table publiée par un nœud de
+    workflow (`datasets.upsert_table`), sans connexion mais avec une clé externe."""
+
     kind: str
     refreshed_at: datetime
+    connection_id: str | None = None
+    connection_name: str | None = None
+    key: str | None = None
+    table_name: str | None = None
     truncated: bool = False
+
+    @property
+    def label(self) -> str:
+        """Ce qu'on montre : nom de la connexion, ou « table publiée (clé) »."""
+        if self.connection_name:
+            return self.connection_name
+        return f"table publiée ({self.key})" if self.key else self.kind
 
 
 class DatasetSummary(_Response):

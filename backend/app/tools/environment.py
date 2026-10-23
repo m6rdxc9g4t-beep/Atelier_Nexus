@@ -3,6 +3,7 @@ fermés à la fin (`aclose`). Les tests injectent des transports simulés par ap
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -11,6 +12,7 @@ from app.core.config import Settings
 from app.tools.cine import CineClient
 from app.tools.cuisine import CuisineClient
 from app.tools.data_via import DataViaClient, DataViaNotConfiguredError
+from app.tools.files import ConversationFiles
 from app.tools.github import GitHubClient
 from app.tools.http import AppNotConfiguredError
 from app.tools.projets import ProjetsClient
@@ -39,6 +41,8 @@ class ToolEnvironment:
         self.delegation_roster: list[tuple[str, str, bool]] = []
         #: Nom affiché des agents délégables (résumé de la carte de validation)
         self.delegation_names: dict[str, str] = {}
+        #: Fichiers joints à la conversation (renseigné par la couche API ; aucun sinon)
+        self.files: ConversationFiles | None = None
 
     def transport(self, app: str) -> httpx.AsyncBaseTransport | None:
         """Transport simulé d'une application (tests) ; None = réseau réel."""
@@ -55,6 +59,18 @@ class ToolEnvironment:
         if app not in self._clients:
             self._clients[app] = factory()
         return self._clients[app]
+
+    def client[T](self, app: str, factory: Callable[[], T]) -> T:
+        """Client d'une application créé à la demande, réutilisé pendant l'exécution et fermé
+        par `aclose()` (il doit exposer `async aclose()`). Point d'entrée des extensions."""
+        client: T = self._get(app, factory)
+        return client
+
+    def conversation_files(self) -> ConversationFiles:
+        """Fichiers cités par la conversation en cours (vide hors conversation : workflows…)."""
+        if self.files is None:
+            self.files = ConversationFiles(None, [])
+        return self.files
 
     def data_via(self) -> DataViaClient:
         def make() -> DataViaClient:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from app.tools.toolsets import toolset_ids
 from tests.test_suite_nodes import Suite
 from tests.test_workflows_v2 import MULTI, create
 
@@ -37,7 +38,8 @@ def test_suite_map(client: TestClient, suite: Suite) -> None:
         {"from": "viz", "to": "nexus", "label": "Lecture", "via": "HTTP"},
     ):
         assert fixed in flows
-    assert not any(f["from"] == "nexus" and f["to"] == "viz" for f in flows)  # Viz : lecture seule
+    if "data_via_write" not in toolset_ids():  # Viz : lecture seule (sans extension d'écriture)
+        assert not any(f["from"] == "nexus" and f["to"] == "viz" for f in flows)
     assert data["workflows"][0]["apps"] == ["tab", "projets", "viz"]
 
 
