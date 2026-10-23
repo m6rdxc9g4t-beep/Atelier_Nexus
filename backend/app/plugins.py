@@ -1,9 +1,13 @@
 """Extensions de Nexus : paquets Python externes qui ajoutent boîtes à outils et agents.
 
-Une extension est un module importable (installé dans l'environnement du backend, ex.
-`pip install -e ../Agent_DatAnalyst`) **nommé explicitement** dans `NEXUS_PLUGINS`
-(séparés par des virgules). Rien n'est découvert ni chargé automatiquement : installer un paquet
-ne suffit pas à lui donner la main sur Nexus.
+Une extension est un module importable **nommé explicitement** dans `NEXUS_PLUGINS` (séparés
+par des virgules). Rien n'est découvert ni chargé automatiquement : installer un paquet ne suffit
+pas à lui donner la main sur Nexus.
+
+Deux façons de la rendre importable : l'installer dans l'environnement du backend
+(`pip install -e ../Agent_DatAnalyst`), ou, pour une extension sans dépendance (cas de l'app de
+bureau, dont l'environnement est refait à partir des `requirements*.txt` du dépôt), donner son
+dossier source dans `NEXUS_PLUGIN_PATHS` (chemins absolus, séparés par des virgules).
 
 Contrat (docs/extensions.md) : le module expose `register()`, appelé une seule fois après
 l'enregistrement des agents fournis. Il y enregistre ses boîtes (`register_toolset`), ses agents
@@ -20,8 +24,10 @@ from __future__ import annotations
 import importlib
 import logging
 import re
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +53,26 @@ def parse_plugin_list(raw: str) -> list[str]:
         if name and name not in names:
             names.append(name)
     return names
+
+
+def add_plugin_paths(raw: str) -> list[str]:
+    """Ajoute au chemin Python les dossiers de `NEXUS_PLUGIN_PATHS` ; renvoie ceux retenus.
+
+    Seuls les dossiers absolus et existants sont pris (un chemin relatif dépendrait du dossier
+    de lancement) ; les autres sont signalés et ignorés. Ils passent APRÈS les chemins existants :
+    une extension ne peut pas masquer un module de Nexus ou de la bibliothèque standard.
+    """
+    added: list[str] = []
+    for item in parse_plugin_list(raw):
+        path = Path(item).expanduser()
+        if not path.is_absolute() or not path.is_dir():
+            logger.error("Chemin d'extension ignoré (absolu et existant attendu) : %s", item)
+            continue
+        resolved = str(path.resolve())
+        if resolved not in sys.path:
+            sys.path.append(resolved)
+        added.append(resolved)
+    return added
 
 
 def load_plugins(names: Iterable[str]) -> list[PluginState]:
