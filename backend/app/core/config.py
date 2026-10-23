@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     #: Session Supabase en cours (jetons renouvelés) ; vide = cuisine-session.json à côté du .env
     cuisine_session_file: str | None = None
 
+    #: Extensions chargées au démarrage (modules Python séparés par des virgules,
+    #: ex. « atelier_datanalyst ») : voir app/plugins.py et docs/extensions.md
+    nexus_plugins: str = ""
+
     # GitHub (agent Développeur) : dépôt par défaut + liste blanche, séparés par des virgules
     github_token: SecretStr | None = None
     github_repo: str | None = Field(default=None, description="owner/repo")

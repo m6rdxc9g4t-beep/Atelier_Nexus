@@ -43,6 +43,7 @@ from app.schemas.agents import (
 )
 from app.tools import ToolContext
 from app.tools.environment import ToolEnvironment
+from app.tools.files import ConversationFiles
 from app.tools.http import AppError
 from app.tools.toolsets import ToolsetInfo, describe_toolsets
 
@@ -208,6 +209,8 @@ async def run_agent(
     save = await _check_conversation(body, agent_name, conversations)
     attachments = await _attachments(body, files)
     env = make_env()
+    # Fichiers cités par la conversation : les outils peuvent les envoyer aux applications
+    env.files = ConversationFiles(files, referenced_ids(body.messages))
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
         result = await agent.run(
@@ -241,6 +244,8 @@ async def stream_agent(
     save = await _check_conversation(body, agent_name, conversations)
     attachments = await _attachments(body, files)
     env = make_env()
+    # Fichiers cités par la conversation : les outils peuvent les envoyer aux applications
+    env.files = ConversationFiles(files, referenced_ids(body.messages))
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
     except BaseException:
