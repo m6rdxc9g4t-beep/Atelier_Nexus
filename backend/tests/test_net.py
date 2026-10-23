@@ -105,6 +105,8 @@ async def test_remote_apps_keep_the_system_proxy(system_proxy: None) -> None:
 
 def test_local_ollama_is_reached_directly(system_proxy: None) -> None:
     local = OllamaProvider(base_url="http://127.0.0.1:11434", default_model="m")
+    bare = OllamaProvider(base_url="localhost:11434", default_model="m")  # forme OLLAMA_HOST
     remote = OllamaProvider(base_url="https://ollama.example.com", default_model="m")
     assert not _proxied(local._client._client, "http://127.0.0.1:11434/api/chat")
+    assert not _proxied(bare._client._client, "http://localhost:11434/api/chat")
     assert _proxied(remote._client._client, "https://ollama.example.com/api/chat")
