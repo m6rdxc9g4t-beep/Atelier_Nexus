@@ -104,3 +104,40 @@ async def test_environment_client_is_reused_and_closed() -> None:
     assert env.client("convert", Client) is first
     await env.aclose()
     assert first.closed
+
+
+# ═══ Client commun : multipart et téléchargement (utilisés par les extensions) ═══
+
+
+async def test_app_client_sends_multipart_and_downloads_bytes() -> None:
+    import httpx
+
+    from app.tools.http import AppClient, AppRequestError
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/api/upload":
+            return httpx.Response(201, json={"ok": True})
+        if request.url.path == "/api/export":
+            return httpx.Response(200, content=b"PK\x03\x04")
+        return httpx.Response(422, json={"detail": "Format inconnu"})
+
+    class Demo(AppClient):
+        app = "demo"
+        label = "Atelier Démo"
+        error_keys = ("detail",)
+
+    client = Demo("http://demo.test/api", transport=httpx.MockTransport(handler))
+    out = await client.request(
+        "POST", "upload", files={"file": ("a.csv", b"x;y\n", "text/csv")}, form={"account_id": "3"}
+    )
+    assert out == {"ok": True}
+    body = seen[-1].content
+    assert b'filename="a.csv"' in body and b'name="account_id"' in body and b"x;y" in body
+    assert await client.download("export", params={"format": "xlsx"}) == b"PK\x03\x04"
+    assert seen[-1].url.params["format"] == "xlsx"
+    with pytest.raises(AppRequestError, match="Format inconnu"):
+        await client.download("autre")
+    await client.aclose()

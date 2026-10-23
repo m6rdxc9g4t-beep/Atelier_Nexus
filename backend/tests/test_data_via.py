@@ -107,6 +107,46 @@ async def test_list_datasets_tool(client: DataViaClient) -> None:
     assert not out.is_error and DATASET_ID in out.content
 
 
+async def test_list_datasets_accepts_both_origin_shapes() -> None:
+    """Viz renvoie deux formes d'origine : connexion, ou table publiée par un nœud de workflow
+    (`kind = "atelier-table"`, sans connexion). Une seule forme reconnue faisait échouer
+    toute la liste dès qu'un workflow ou une extension avait publié une table."""
+    import httpx
+
+    from tests.fake_data_via import SUMMARY
+
+    published = {
+        **SUMMARY,
+        "id": "ds_publie",
+        "name": "tableau",
+        "origin": {
+            "kind": "atelier-table",
+            "key": "convert:41e64052a1fc",
+            "table_name": "tableau",
+            "refreshed_at": "2026-10-23T09:29:31.803572Z",
+        },
+    }
+    connected = {
+        **SUMMARY,
+        "id": "ds_sql",
+        "origin": {
+            "kind": "sql",
+            "connection_id": "c1",
+            "connection_name": "Entrepôt",
+            "refreshed_at": "2026-10-23T08:00:00Z",
+        },
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[SUMMARY, published, connected])
+
+    viz = DataViaClient("http://viz.test/api", transport=httpx.MockTransport(handler))
+    out = await tools(viz)["data_via_list_datasets"].invoke({}, ToolContext())
+    assert not out.is_error, out.content
+    assert "table publiée (convert:41e64052a1fc)" in out.content and "Entrepôt" in out.content
+    await viz.aclose()
+
+
 async def test_query_requires_schema_exploration_first(client: DataViaClient) -> None:
     ctx = ToolContext()
     t = tools(client)
