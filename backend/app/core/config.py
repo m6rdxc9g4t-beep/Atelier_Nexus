@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     #: Extensions chargées au démarrage (modules Python séparés par des virgules,
     #: ex. « atelier_datanalyst ») : voir app/plugins.py et docs/extensions.md
     nexus_plugins: str = ""
+    #: Dossiers source d'extensions sans dépendance (chemins absolus, séparés par des virgules),
+    #: ex. « /Users/moi/dev/Agent_DatAnalyst/src » : pour l'app de bureau, sans pip install
+    nexus_plugin_paths: str = ""
 
     # GitHub (agent Développeur) : dépôt par défaut + liste blanche, séparés par des virgules
     github_token: SecretStr | None = None

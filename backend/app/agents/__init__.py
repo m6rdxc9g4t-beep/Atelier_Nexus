@@ -29,9 +29,11 @@ from app.agents import experts  # noqa: E402, F401  isort: skip
 # Extensions nommées dans NEXUS_PLUGINS : après les agents fournis (ordre d'affichage)
 # (réglages lus à part : le cache de get_settings() n'est pas figé à l'import)
 from app.core.config import Settings  # noqa: E402  isort: skip
-from app.plugins import load_plugins, parse_plugin_list  # noqa: E402  isort: skip
+from app.plugins import add_plugin_paths, load_plugins, parse_plugin_list  # noqa: E402  isort: skip
 
-load_plugins(parse_plugin_list(Settings().nexus_plugins))
+_settings = Settings()
+add_plugin_paths(_settings.nexus_plugin_paths)
+load_plugins(parse_plugin_list(_settings.nexus_plugins))
 
 __all__ = [
     "AgentCatalog",

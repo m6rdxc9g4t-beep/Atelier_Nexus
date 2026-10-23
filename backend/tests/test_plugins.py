@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -141,3 +142,26 @@ async def test_app_client_sends_multipart_and_downloads_bytes() -> None:
     with pytest.raises(AppRequestError, match="Format inconnu"):
         await client.download("autre")
     await client.aclose()
+
+
+# ═══ NEXUS_PLUGIN_PATHS : extension sans dépendance, sans pip install ═══
+
+
+def test_plugin_paths_make_a_source_folder_importable(tmp_path: Path) -> None:
+    import sys
+
+    from app.plugins import add_plugin_paths
+
+    pkg = tmp_path / "src" / "extension_demo_xyz"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("CALLS = []\ndef register():\n    CALLS.append(1)\n")
+    try:
+        added = add_plugin_paths(f"{tmp_path / 'src'}, relatif/src, {tmp_path / 'absent'}")
+        assert added == [str((tmp_path / "src").resolve())]  # relatif et absent ignorés
+        assert sys.path[-1] == added[0]  # après Nexus et la bibliothèque standard
+        add_plugin_paths(str(tmp_path / "src"))
+        assert sys.path.count(added[0]) == 1
+        (state,) = load_plugins(["extension_demo_xyz"])
+        assert state.loaded
+    finally:
+        sys.path[:] = [p for p in sys.path if not p.startswith(str(tmp_path))]

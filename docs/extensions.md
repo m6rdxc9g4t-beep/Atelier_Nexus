@@ -7,11 +7,18 @@ sans modifier son code. Exemple : [Agent_DatAnalyst](https://github.com/m6rdxc9g
 
 ## Activer une extension
 
-1. L'installer dans l'environnement du backend : `pip install -e ../Agent_DatAnalyst`
-   (app de bureau : dans le même environnement que celui du lanceur).
-2. La nommer dans `backend/.env` : `NEXUS_PLUGINS=atelier_datanalyst` (plusieurs : séparées par
-   des virgules).
-3. Relancer le backend. Les agents de l'extension apparaissent après les agents fournis.
+1. La rendre importable, au choix :
+   - **app de bureau** (son environnement Python est refait à partir des `requirements*.txt` du
+     dépôt, un `pip install` y serait perdu) : `NEXUS_PLUGIN_PATHS=/chemin/absolu/vers/Agent_DatAnalyst/src`
+     — valable pour une extension sans dépendance autre que celles de Nexus ;
+   - **serveur de développement** : `pip install -e ../Agent_DatAnalyst` dans l'environnement du
+     backend (ou le même `NEXUS_PLUGIN_PATHS`).
+2. La nommer : `NEXUS_PLUGINS=atelier_datanalyst` (plusieurs : séparées par des virgules), dans
+   `backend/.env` ou, pour l'app de bureau, `~/Library/Application Support/Atelier Nexus/.env`.
+3. Relancer Nexus. Les agents de l'extension apparaissent après les agents fournis.
+
+`NEXUS_PLUGIN_PATHS` n'accepte que des dossiers absolus existants, ajoutés **après** les chemins
+de Nexus : une extension ne peut pas remplacer un module de Nexus ni de la bibliothèque standard.
 
 Rien n'est découvert automatiquement : un paquet installé mais absent de `NEXUS_PLUGINS` n'est
 jamais importé. Une extension introuvable ou qui échoue est journalisée
