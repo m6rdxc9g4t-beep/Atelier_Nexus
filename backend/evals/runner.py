@@ -214,12 +214,16 @@ Réponds uniquement par un objet JSON sur une ligne :
 #: Résultats d'outils montrés au juge : sans eux, un fait tiré d'un outil passe pour inventé
 JUDGE_RESULT_CHARS = 4_000
 JUDGE_RESULTS_CHARS = 16_000
+#: Un artefact coupé trop tôt faisait juger un compte rendu « incomplet »
+JUDGE_ARTIFACT_CHARS = 6_000
 
 
 def judge_prompt(case: EvalCase, transcript: Transcript) -> str:
     tools = ", ".join(transcript.tool_names) or "aucun"
     artifacts = "\n".join(
-        f"- {a.title} ({a.kind}) :\n{a.content[:1500]}" for a in transcript.artifacts
+        f"- {a.title} ({a.kind}) :\n{a.content[:JUDGE_ARTIFACT_CHARS]}"
+        + (" […]" if len(a.content) > JUDGE_ARTIFACT_CHARS else "")
+        for a in transcript.artifacts
     )
     results: list[str] = []
     budget = JUDGE_RESULTS_CHARS

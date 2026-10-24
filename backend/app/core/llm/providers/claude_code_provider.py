@@ -313,6 +313,37 @@ def loose_text(stdout: str) -> str:
     return "\n\n".join(kept)
 
 
+def native_calls(stdout: str, names: set[str]) -> list[dict[str, Any]]:
+    """Appels directs (refusés par Claude Code) à des actions qui existent dans Nexus.
+
+    Il arrive que le modèle appelle une action directement, reçoive « No such tool available »,
+    puis rende un objet SANS `tool_calls` en croyant l'avoir faite : son intention est claire. Ces
+    appels sont alors rendus à Nexus comme des `tool_calls` ordinaires (validation comprise) ;
+    une action inconnue de Nexus n'est jamais reprise."""
+    calls: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "assistant":
+            continue
+        message = event.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        for block in blocks if isinstance(blocks, list) else []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = str(block.get("name") or "")
+            if name not in names or name == STRUCTURED_TOOL:
+                continue
+            arguments = json.dumps(block.get("input") or {}, ensure_ascii=False, sort_keys=True)
+            if (name, arguments) not in seen:
+                seen.add((name, arguments))
+                calls.append({"name": name, "arguments": arguments})
+    return calls
+
+
 def _last_line(text: str) -> str:
     """Dernière ligne non vide, bornée (message d'erreur lisible)."""
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
@@ -488,9 +519,11 @@ class ClaudeCodeProvider(LLMProvider):
             code, stdout, stderr = await self._exec(
                 args, transcript(request.messages), self.timeout
             )
-        return self._extract(code, stdout, stderr, model)
+        return self._extract(code, stdout, stderr, model, {t.name for t in request.tools})
 
-    def _extract(self, code: int, stdout: str, stderr: str, model: str) -> LLMResponse:
+    def _extract(
+        self, code: int, stdout: str, stderr: str, model: str, actions: set[str] | None = None
+    ) -> LLMResponse:
         line = result_line(stdout)
         try:
             payload = json.loads(line) if line else None
@@ -510,6 +543,10 @@ class ClaudeCodeProvider(LLMProvider):
                     **structured,
                     "text": merge_text(loose, str(structured.get("text") or "")),
                 }
+            if not structured.get("tool_calls") and actions:
+                recovered = native_calls(stdout, actions)
+                if recovered:
+                    structured = {**structured, "tool_calls": recovered}
         else:
             # Sortie non structurée (ancienne version) : texte brut, ou JSON dans `result`. Le
             # texte libre n'est pas ajouté : il répète ce même JSON

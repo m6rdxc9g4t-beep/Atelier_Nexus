@@ -316,3 +316,20 @@ async def test_legacy_output_never_leaks_raw_json(
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "legacy")
     response = await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
     assert response.text == "Ligne 1\nLigne « 2 »"
+
+
+async def test_intended_direct_call_is_recovered_as_an_action(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Appel direct refusé puis objet sans action : l'appel voulu (action connue de Nexus) est
+    rendu comme un tool_call ordinaire ; un outil inconnu de Nexus n'est jamais repris."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "native_only")
+    tools = [ToolSpec(name="publish_artifact", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Publie le CR")], tools=tools))
+    calls = [b for b in response.content if isinstance(b, ToolUseBlock)]
+    assert [c.name for c in calls] == ["publish_artifact"]
+    assert calls[0].input == {"content": "x", "kind": "markdown", "title": "CR"}
+    assert response.stop_reason == "tool_use"
+    # Sans action déclarée par Nexus : rien n'est repris
+    response = await cli.complete(LLMRequest(messages=[Message.user("Publie le CR")]))
+    assert not [b for b in response.content if isinstance(b, ToolUseBlock)]

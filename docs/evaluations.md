@@ -63,7 +63,7 @@ Code de sortie : 0 si tous les cas joués réussissent tous leurs essais, 1 sino
   --provider ollama ») : le verrou a refusé Claude, ce n'est pas un échec de l'agent, sauf pour un
   cas qui attend précisément ce refus (`error_code`).
 - **Juge** : il reçoit la demande, les outils appelés **et leurs résultats** (4 000 caractères par
-  appel, 16 000 au total), les artefacts et la réponse : un fait lu dans un outil n'est pas un fait
+  appel, 16 000 au total), les artefacts (6 000 caractères chacun) et la réponse : un fait lu dans un outil n'est pas un fait
   inventé. Son verdict est lu même si son JSON est tronqué.
 - **Conversation** : chaque essai tourne dans une conversation qui lui est propre (identifiant
   `eval-<cas>-<hasard>`), comme dans l'interface.

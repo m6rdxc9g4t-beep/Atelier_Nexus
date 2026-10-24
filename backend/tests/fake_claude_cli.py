@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Faux programme `claude` (Claude Code) pour les tests : mêmes options, même sortie JSON.
 
-FAKE_CLAUDE_MODE : text | tool | loose | native | legacy | noresult | replay | login | limit |
+FAKE_CLAUDE_MODE : text | tool | loose | native | native_only | legacy | noresult | replay | login | limit |
 slow | auth_off. Chaque appel est
 consigné dans FAKE_CLAUDE_LOG (arguments, entrée standard, variables sensibles, dossier courant).
 Sortie `--output-format stream-json` (comme Claude Code 2.1.310) : ligne `system`, lignes
@@ -162,6 +162,25 @@ if mode == "native":
         {"type": "result", "is_error": False, "usage": usage, "structured_output": {
             "text": "Je consulte le tableau de bord.",
             "tool_calls": [{"name": "projets_dashboard", "arguments": "{\"project_id\": 1}"}],
+        }},
+    )  # fmt: skip
+    sys.exit(0)
+if mode == "native_only":
+    # Appel direct refusé, puis un objet SANS action : l'intention est reprise par Nexus
+    emit(
+        {"type": "system", "subtype": "init", "tools": ["StructuredOutput"]},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "publish_artifact", "input": {"title": "CR", "kind": "markdown", "content": "x"}},
+            {"type": "tool_use", "name": "outil_inconnu", "input": {}},
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "is_error": True, "content": "No such tool available"},
+        ]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "StructuredOutput", "input": {"text": "Je publie le compte rendu.", "tool_calls": []}},
+        ]}},
+        {"type": "result", "is_error": False, "usage": usage, "structured_output": {
+            "text": "Je publie le compte rendu.", "tool_calls": [],
         }},
     )  # fmt: skip
     sys.exit(0)
