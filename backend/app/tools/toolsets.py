@@ -21,6 +21,7 @@ from app.tools.cine import cine_read_tools, cine_write_tools
 from app.tools.cuisine import cuisine_budget_tools, cuisine_tools
 from app.tools.data_via import DataViaNotConfiguredError, data_via_tools
 from app.tools.environment import ToolEnvironment
+from app.tools.equipe import equipe_memory_tools, equipe_report_tools, equipe_write_tools
 from app.tools.formulaire import (
     formulaire_read_tools,
     formulaire_responses_tools,
@@ -346,6 +347,37 @@ register_toolset(
         is_configured=lambda s: bool(s.wiki_base_url),
         app="wiki",
         writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe",
+        label="Mémoire d'équipe — lecture",
+        description="Journal, décisions et comptes rendus de l'équipe (espace « Équipe Atelier » d'Atelier Wiki).",
+        build=lambda env: equipe_memory_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe_write",
+        label="Mémoire d'équipe — écriture",
+        description="Noter au journal, enregistrer une décision, ranger un compte rendu (avec validation).",
+        build=lambda env: equipe_write_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe_rapports",
+        label="Rapports de l'équipe",
+        description="Point d'avancement calculé depuis Projets, synthèse agrégée des formulaires ouverts (sans modèle).",
+        build=lambda env: equipe_report_tools(env),
+        is_configured=lambda s: bool(s.projets_base_url or s.formulaire_base_url),
+        app="projets",
     )
 )
 register_toolset(
