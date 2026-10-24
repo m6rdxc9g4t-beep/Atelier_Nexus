@@ -21,6 +21,11 @@ from app.tools.cine import cine_read_tools, cine_write_tools
 from app.tools.cuisine import cuisine_budget_tools, cuisine_tools
 from app.tools.data_via import DataViaNotConfiguredError, data_via_tools
 from app.tools.environment import ToolEnvironment
+from app.tools.formulaire import (
+    formulaire_read_tools,
+    formulaire_responses_tools,
+    formulaire_write_tools,
+)
 from app.tools.github import github_read_tools, github_write_tools
 from app.tools.http import AppNotConfiguredError
 from app.tools.projets import projets_read_tools, projets_write_tools
@@ -30,6 +35,7 @@ from app.tools.tab import tab_tools
 from app.tools.tab_mcp import tab_write_tools
 from app.tools.tab_projets import tab_projets_tools
 from app.tools.tresorerie import tresorerie_tools
+from app.tools.wiki import wiki_read_tools, wiki_write_tools
 
 
 @dataclass(frozen=True)
@@ -323,6 +329,59 @@ register_toolset(
 )
 register_toolset(
     Toolset(
+        id="wiki",
+        label="Atelier Wiki — lecture",
+        description="Espaces, recherche plein texte, liste et contenu des pages (procédures, décisions, comptes rendus).",
+        build=lambda env: wiki_read_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+    )
+)
+register_toolset(
+    Toolset(
+        id="wiki_write",
+        label="Atelier Wiki — rédaction",
+        description="Créer une page ou un espace, compléter une page, réécrire une page (avec validation ; historique gardé).",
+        build=lambda env: wiki_write_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire",
+        label="Atelier Formulaire — formulaires",
+        description="Formulaires, questions et synthèse agrégée des réponses (sans réponse individuelle).",
+        build=lambda env: formulaire_read_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire_write",
+        label="Atelier Formulaire — création",
+        description="Créer un formulaire, l'ouvrir ou le fermer, choisir qui peut répondre (avec validation).",
+        build=lambda env: formulaire_write_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire_reponses",
+        label="Atelier Formulaire — réponses individuelles",
+        description="Réponses une par une (répondants, textes libres). Données personnelles : modèle local imposé.",
+        build=lambda env: formulaire_responses_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+        sensitive=True,
+    )
+)
+register_toolset(
+    Toolset(
         id="github_read",
         label="GitHub — lecture",
         description="Dépôts autorisés : fichiers, recherche de code, pull requests, tickets.",
@@ -357,6 +416,8 @@ def _blank_settings() -> Settings:
         tresorerie_base_url="http://application.invalid/api",
         cine_base_url="http://application.invalid/api",
         savoir_base_url="http://application.invalid/api",
+        wiki_base_url="http://application.invalid/api",
+        formulaire_base_url="http://application.invalid/api",
         tab_exports_dir="/dev/null",
         tab_mcp_command="atelier-mcp",
         github_repo="atelier/exemple",

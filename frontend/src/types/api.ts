@@ -722,7 +722,7 @@ export interface EventFilter {
 }
 
 /** Applications qui publient des événements (atelier-node/1 §7.3). */
-export type TriggerApp = "viz" | "projets" | "tab";
+export type TriggerApp = "viz" | "projets" | "tab" | "wiki" | "formulaire";
 
 export interface TriggerCounters {
   fired: number;

@@ -2,7 +2,8 @@
 
 `claude` peut être installé sur la machine de test : sans cette précaution, le mode
 « auto » choisirait l'abonnement et les tests dépendraient de l'environnement.
-Le cache des manifestes des nœuds de la suite est vidé entre deux tests. La tâche de fond des
+Le cache des manifestes des nœuds de la suite est vidé entre deux tests. Wiki et Formulaire
+sont désactivés par défaut (adresse vide). La tâche de fond des
 déclencheurs de workflows est coupée (`TRIGGERS_ENABLED=false`).
 """
 
@@ -13,6 +14,10 @@ import pytest
 
 # Jamais de tâche de fond des déclencheurs pendant les tests : ils appellent `tick()` eux-mêmes
 os.environ["TRIGGERS_ENABLED"] = "false"
+# Wiki et Formulaire ont une adresse par défaut : vidée ici pour qu'aucun test n'appelle une
+# application réelle ; les tests qui en ont besoin passent une adresse et un transport simulé
+os.environ["WIKI_BASE_URL"] = ""
+os.environ["FORMULAIRE_BASE_URL"] = ""
 
 from app.suite.nodes import clear_manifest_cache
 

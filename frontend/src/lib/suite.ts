@@ -8,6 +8,8 @@ export type SuiteAppId =
   | "viz"
   | "tab"
   | "projets"
+  | "wiki"
+  | "formulaire"
   | "tresorerie"
   | "cine"
   | "savoir"
@@ -50,6 +52,9 @@ export function suiteApps(): SuiteApp[] {
   const tresorerie = clean(process.env.NEXT_PUBLIC_ATELIER_TRESORERIE_URL, "http://127.0.0.1:5050");
   const viz = clean(process.env.NEXT_PUBLIC_ATELIER_VIZ_URL, "http://127.0.0.1:8000");
   // Ciné sert son interface sur le port de son API en production (4000 ; app Mac : 47321)
+  // Wiki (3200) et Formulaire (3300) servent leur interface sur le port de leur API
+  const wiki = clean(process.env.NEXT_PUBLIC_ATELIER_WIKI_URL, "http://127.0.0.1:3200");
+  const formulaire = clean(process.env.NEXT_PUBLIC_ATELIER_FORMULAIRE_URL, "http://127.0.0.1:3300");
   const cine = clean(process.env.NEXT_PUBLIC_ATELIER_CINE_URL, "http://127.0.0.1:4000");
   // Savoir écoute sur 5050 par défaut, comme Trésorerie : lancé sur 5051 (docs/apps/savoir.md)
   const savoir = clean(process.env.NEXT_PUBLIC_ATELIER_SAVOIR_URL, "http://127.0.0.1:5051");
@@ -90,6 +95,22 @@ export function suiteApps(): SuiteApp[] {
       description: "Projets agiles, Git, temps passé",
       url: clean(process.env.NEXT_PUBLIC_ATELIER_PROJETS_URL, "http://127.0.0.1:4174"),
       healthUrl: `${projetsApi}/api/health`,
+    },
+    {
+      id: "wiki",
+      name: "Atelier Wiki",
+      short: "Wiki",
+      description: "Procédures, décisions, comptes rendus",
+      url: wiki,
+      healthUrl: `${wiki}/api/health`,
+    },
+    {
+      id: "formulaire",
+      name: "Atelier Formulaire",
+      short: "Formulaire",
+      description: "Sondages, inscriptions, retours",
+      url: formulaire,
+      healthUrl: `${formulaire}/api/health`,
     },
     {
       id: "tresorerie",

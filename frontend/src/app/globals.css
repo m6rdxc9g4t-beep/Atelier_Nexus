@@ -191,6 +191,25 @@
   }
 }
 
+/* ─── Signatures d'Atelier Wiki et d'Atelier Formulaire ─────────────
+   Absentes de la copie verbatim (styles/brand/atelier-brand.css, à ne pas modifier) : déclarées
+   ici sur le même modèle, avec les valeurs de wiki-signature.css et formulaire-signature.css de
+   leurs dépôts. À retirer quand la source commune les contiendra. */
+@layer components {
+  :root {
+    --atelier-sig-wiki: #4dabf7;
+    --atelier-sig-formulaire: #38d9a9;
+  }
+  [data-atelier-app="wiki"] {
+    --atelier-signature: var(--atelier-sig-wiki);
+    --atelier-signature-contrast: #0b0b0f;
+  }
+  [data-atelier-app="formulaire"] {
+    --atelier-signature: var(--atelier-sig-formulaire);
+    --atelier-signature-contrast: #0b0b0f;
+  }
+}
+
 /* ─── Contenu Markdown des réponses d'agents ────────────────────── */
 @layer components {
   .prose-chat {

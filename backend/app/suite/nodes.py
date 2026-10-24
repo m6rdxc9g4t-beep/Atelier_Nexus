@@ -212,7 +212,12 @@ class SuiteNodes:
 
     def base_url(self, app: str) -> str | None:
         s = self.env.settings
-        return {"viz": s.data_via_base_url, "projets": s.projets_base_url}.get(app)
+        return {
+            "viz": s.data_via_base_url,
+            "projets": s.projets_base_url,
+            "wiki": s.wiki_base_url,
+            "formulaire": s.formulaire_base_url,
+        }.get(app)
 
     def http(self, app: str) -> NodeHttpClient:
         if app not in self._http:
