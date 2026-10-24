@@ -401,6 +401,9 @@ async def test_repeat_measures_flakiness() -> None:
 
 
 def test_parse_verdict() -> None:
+    # Réponse tronquée au milieu de la raison : le verdict reste lisible
+    ok, reason = parse_verdict('{"verdict":"ok","raison":"La réponse reprend fidèlement l\'avan')
+    assert ok and reason.endswith("[…]")
     assert parse_verdict('Voici : {"verdict": "ok", "raison": "Complet."}') == (True, "Complet.")
     assert parse_verdict('{"verdict": "KO", "raison": "Il manque la région."}')[0] is False
     assert parse_verdict("pas de json")[0] is False

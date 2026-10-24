@@ -247,6 +247,11 @@ def parse_verdict(text: str) -> tuple[bool, str]:
                 return verdict == "ok", reason
         except json.JSONDecodeError:
             pass
+    # JSON coupé (réponse tronquée) : le verdict, écrit en premier, reste lisible
+    loose = re.search(r'"verdict"\s*:\s*"(ok|ko)"', text, re.I)
+    if loose:
+        reason = re.search(r'"raison"\s*:\s*"([^"]*)', text)
+        return loose.group(1).lower() == "ok", (reason.group(1) if reason else "") + " […]"
     return False, f"verdict illisible : {text[:200]}"
 
 
@@ -270,7 +275,7 @@ async def judge(
     request = LLMRequest(
         messages=[Message.user(judge_prompt(case, transcript))],
         system=JUDGE_SYSTEM,
-        max_tokens=400,
+        max_tokens=800,
         model=options.judge_model,
     )
     try:
