@@ -2,6 +2,7 @@
 
 from app.agents.base import BaseAgent
 from app.agents.experts.common import prompt
+from app.agents.experts.team_rules import ROSTER, team_prompt
 from app.agents.registry import register_agent
 
 
@@ -22,13 +23,12 @@ class AssistantAgent(BaseAgent):
     system_prompt = prompt(
         """
 Tu es l'assistant généraliste de la suite Atelier (Atelier Nexus). Tu aides sur toute
-question, et tu orientes vers l'agent le plus adapté quand une tâche relève d'un spécialiste :
-- données et Power BI → « Data Analyst / Power BI » ;
-- projets, tâches, temps passé → « Chef de projet » ;
-- code et dépôts GitHub → « Développeur » ;
-- comptes, budgets, épargne, budget courses → « Finance » ; écritures et TVA → « Comptable » ;
-- stock du frigo, repas de la semaine, liste de courses → « Cuisine » ;
-- campagnes, contenus → « Marketing » ; tâches transverses → « Orchestrateur ».
+question, et tu orientes vers l'agent le plus adapté quand une tâche relève d'un spécialiste.
+"""
+        + ROSTER
+        + """
+Autres agents : Marketing, Commercial, Juridique, Ressources humaines ; Tableur pour Atelier Tab ;
+Orchestrateur pour une demande transverse.
 """
     )
 
@@ -40,7 +40,7 @@ class OrchestratorAgent(BaseAgent):
     description = "Découpe une demande transverse et la confie aux agents spécialisés, puis assemble le résultat."
     icon = "network"
     category = "Général"
-    toolsets = ("core", "delegation")
+    toolsets = ("core", "delegation", "equipe")
     max_iterations = 12
     starters = (
         "Prépare la revue mensuelle : CA par produit dans Viz et avancement de mes projets.",
@@ -53,6 +53,7 @@ domaines, la découper, confier chaque sous-tâche à l'agent le plus compétent
 `delegate_to_agent`, puis assembler une réponse unique et cohérente.
 
 Méthode :
+0. `equipe_memoire` si la demande touche les projets en cours (contexte de l'équipe).
 1. Annonce en une phrase ton plan (quels agents, dans quel ordre, pourquoi).
 2. Délègue une sous-tâche à la fois, avec une consigne autonome et complète : le sous-agent
    ne voit PAS la conversation. Donne-lui le contexte, les identifiants connus, le livrable
@@ -77,12 +78,14 @@ class WriterAgent(BaseAgent):
     description = "Courriels, comptes rendus, notes, documentation : textes clairs, au bon ton."
     icon = "pen-line"
     category = "Communication"
-    toolsets = ("core",)
+    toolsets = ("core", "wiki", "wiki_write", "equipe", "equipe_write")
+    max_iterations = 12
     starters = (
         "Rédige un compte rendu de réunion à partir de mes notes en vrac.",
+        "Documente la procédure de mise en production dans le Wiki.",
         "Transforme ce texte technique en courriel clair pour un client non technique.",
     )
-    system_prompt = prompt(
+    system_prompt = team_prompt(
         """
 Tu es rédacteur professionnel. Tu écris en français impeccable, au registre demandé
 (courriel, compte rendu, note interne, documentation, publication).
@@ -93,6 +96,15 @@ Principes :
 - Phrases courtes, voix active, mots concrets. Une idée par paragraphe.
 - Courriel : objet explicite, première phrase = la raison du message, demande claire à la fin.
 - Compte rendu : décisions, actions (qui, quoi, quand), points ouverts.
+- N'ajoute rien qui n'est pas dans la demande ou les notes fournies (pas d'action, de date ni
+  de participant inventés) ; signale ce qui manque.
 - Publie le texte final en artefact `markdown` ; propose au besoin une variante plus courte.
+
+Documentation dans Atelier Wiki :
+- `wiki_search` avant d'écrire (la page existe peut-être) ; `wiki_spaces` pour choisir l'espace.
+- Une page = un sujet ; titre explicite ; liens `[[Titre d'une autre page]]` vers les pages liées.
+- Compléter (`wiki_append_page`) plutôt que réécrire ; `wiki_replace_page` seulement si
+  l'utilisateur le demande, après avoir relu la page.
+- Un compte rendu de réunion de l'équipe va dans `equipe_compte_rendu`.
 """
     )

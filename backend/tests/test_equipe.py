@@ -141,3 +141,43 @@ async def test_ritual_chain_report_then_note(team: Team) -> None:
         "Rituel du lundi — Point d'avancement" in journal["content"]
         and "#12345" in journal["content"]
     )
+
+
+# ═══ Les agents de l'équipe ══════════════════════════════════════
+
+
+async def test_team_roles_and_privacy() -> None:
+    from app.agents import AgentCatalog
+    from app.agents.registry import get_agent_class
+    from tests.fakes import make_router
+
+    members = (
+        "direction",
+        "chef_de_projet",
+        "product_owner",
+        "developpeur",
+        "data_analyst",
+        "redacteur",
+    )
+    for name in members:
+        cls = get_agent_class(name)
+        assert {"equipe", "equipe_write"} <= set(cls.toolsets), name
+        assert (
+            "Travail en équipe" in cls.system_prompt
+            and "Enquêtes (100 % local)" in cls.system_prompt
+        )
+    enquetes = get_agent_class("enquetes")
+    assert enquetes.privacy == "local_only" and "formulaire_reponses" in enquetes.toolsets
+    assert "JAMAIS de données" in enquetes.system_prompt
+    # Un agent local lit la mémoire mais n'y écrit pas ses montants
+    finance = get_agent_class("finance")
+    assert "equipe" in finance.toolsets and "equipe_write" not in finance.toolsets
+    # Aucun agent sur Claude n'a les réponses individuelles
+    infos = await AgentCatalog().infos(make_router(), ToolEnvironment(Settings(_env_file=None)))  # type: ignore[call-arg]
+    for info in infos:
+        if "formulaire_reponses" in info.toolsets:
+            assert info.local_only, info.name
+    assert infos[0].name == "assistant"
+    categories = list(dict.fromkeys(i.category for i in infos))
+    assert "Équipe" in categories[:3]
+    assert "Cuisine" not in get_agent_class("assistant").system_prompt

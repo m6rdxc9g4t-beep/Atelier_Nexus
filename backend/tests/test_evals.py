@@ -85,6 +85,8 @@ def full_environment() -> ToolEnvironment:
         cuisine_supabase_url="https://exemple.supabase.co",
         cuisine_supabase_anon_key="cle",
         cuisine_refresh_token="jeton",
+        wiki_base_url="http://127.0.0.1:3200/api",
+        formulaire_base_url="http://127.0.0.1:3300/api",
     )
     return ToolEnvironment(settings)
 
