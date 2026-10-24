@@ -11,6 +11,7 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
@@ -32,6 +33,7 @@ from app.api.errors import app_error_body, llm_error_body
 from app.core.config import Settings
 from app.core.llm import LLMError, LLMRouter, Message, ProviderName
 from app.core.llm.types import LLMRequest
+from app.tools.base import ToolContext
 from app.tools.environment import ToolEnvironment
 from app.tools.http import AppError
 from evals.cases import AppId, EvalCase
@@ -166,8 +168,11 @@ async def play(
         model = options.model if resolved == wanted else None
         calls: dict[str, ToolCallRecord] = {}
         async with asyncio.timeout(options.timeout):
+            # Comme une conversation enregistrée de l'interface : les outils qui gardent un état
+            # par conversation (jeux d'analyse, étape 25) en ont besoin ; un identifiant par essai
+            context = ToolContext(conversation_id=f"eval-{case.id}-{uuid.uuid4().hex[:8]}")
             async for event in agent.run_stream(
-                [Message.user(case.prompt)], provider=requested, model=model
+                [Message.user(case.prompt)], provider=requested, model=model, context=context
             ):
                 if isinstance(event, ToolCallEvent):
                     record = ToolCallRecord(id=event.id, name=event.name, input=event.input)
@@ -250,8 +255,8 @@ def parse_verdict(text: str) -> tuple[bool, str]:
     # JSON coupé (réponse tronquée) : le verdict, écrit en premier, reste lisible
     loose = re.search(r'"verdict"\s*:\s*"(ok|ko)"', text, re.I)
     if loose:
-        reason = re.search(r'"raison"\s*:\s*"([^"]*)', text)
-        return loose.group(1).lower() == "ok", (reason.group(1) if reason else "") + " […]"
+        why = re.search(r'"raison"\s*:\s*"([^"]*)', text)
+        return loose.group(1).lower() == "ok", (why.group(1) if why else "") + " […]"
     return False, f"verdict illisible : {text[:200]}"
 
 
