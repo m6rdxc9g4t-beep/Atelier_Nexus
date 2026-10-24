@@ -24,7 +24,7 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.core.llm.types import ProviderName
 from app.tools.base import ArtifactKind
@@ -92,7 +92,11 @@ class Expect(_Strict):
 class EvalCase(_Strict):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,60}$")
     agent: str
-    prompt: str = Field(min_length=3)
+    #: Message de l'utilisateur ; ou, avec `relais`, le message de relais d'une étape de chaîne
+    prompt: str = ""
+    #: « chaine_equipe:3 » : le prompt est le VRAI message de relais de l'étape 3 de la chaîne,
+    #: produit par `app/chains/handoff.py` (voir `evals/chain_prompts.py`)
+    relais: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]+:[1-9]$")
     description: str = ""
     #: Applications nécessaires ; le cas est ignoré si l'une manque
     apps: list[AppId] = Field(default_factory=list)
@@ -104,6 +108,21 @@ class EvalCase(_Strict):
     rubric: str | None = None
     #: Fichier d'origine (renseigné au chargement)
     source: str = ""
+
+    @model_validator(mode="after")
+    def _prompt(self) -> EvalCase:
+        if self.relais:
+            if self.prompt:
+                raise ValueError("prompt et relais sont exclusifs")
+            from evals.chain_prompts import relay_prompt
+
+            chain, stage = self.relais.split(":")
+            self.prompt = relay_prompt(chain, int(stage))
+        if not self.prompt:
+            raise ValueError("prompt ou relais manquant")
+        if len(self.prompt) < 3:
+            raise ValueError("prompt trop court (3 caractères au moins)")
+        return self
 
 
 class CaseFileError(ValueError):

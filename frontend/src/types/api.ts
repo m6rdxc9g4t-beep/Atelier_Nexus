@@ -148,7 +148,11 @@ export type StopReason =
   | "refusal"
   | "other"
   | "max_iterations"
-  | "awaiting_approval";
+  | "awaiting_approval"
+  /** Mode pas à pas : résultat d'outil à revoir avant que le modèle ne le lise. */
+  | "awaiting_review"
+  /** Arrêté par l'utilisateur après la revue d'un résultat. */
+  | "stopped_by_user";
 
 export interface AgentResult {
   agent: string;
@@ -170,6 +174,10 @@ export interface AgentRunRequest {
   conversation_id?: string | null;
   /** Reprise après validation : id d'appel → autorisé. */
   approvals?: Record<string, boolean> | null;
+  /** Mode pas à pas : pause après chaque résultat d'outil. */
+  review_results?: boolean;
+  /** Réponse à une pause de revue (« continue » ; « stop » = fin du tour sans le modèle). */
+  review?: "continue" | "stop" | null;
 }
 
 /** Événements du flux SSE de `POST /api/agents/{name}/stream`. */
@@ -179,6 +187,7 @@ export type AgentEvent =
   | { type: "tool_result"; id: string; name: string; content: string; is_error: boolean }
   | { type: "artifact"; artifact: Artifact }
   | { type: "approval_required"; calls: PendingCall[] }
+  | { type: "review_required"; call_ids: string[] }
   | { type: "done"; result: AgentResult }
   | { type: "saved"; conversation_id: string }
   | { type: "save_error"; message: string }
@@ -830,4 +839,56 @@ export interface EventsCatalog {
 /** `GET /api/workflow-runs/inbox-count` */
 export interface InboxCount {
   awaiting_approval: number;
+}
+
+// ─── Chaînes d'agents (Étape 24) ─────────────────────────────────
+
+export interface ChainStageInfo {
+  agent: string;
+  role: string;
+  instructions: string;
+  display_name: string;
+  local_only: boolean;
+}
+
+export interface ChainInfo {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  stages: ChainStageInfo[];
+}
+
+export type ChainStageStatus = "pending" | "active" | "validated" | "skipped";
+export type ChainRunStatus = "running" | "completed" | "stopped";
+
+export interface ChainStageState {
+  agent: string;
+  role: string;
+  status: ChainStageStatus;
+  conversation_id: string | null;
+  deliverable: { text: string; artifacts: Artifact[] } | null;
+  validated_at: string | null;
+}
+
+export interface ChainRun {
+  id: string;
+  chain: string;
+  request: string;
+  status: ChainRunStatus;
+  stage_index: number;
+  stages: ChainStageState[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Suite à donner : ouvrir la conversation de l'étape et y envoyer `handoff`, ou montrer `recap`. */
+export interface ChainStep {
+  run: ChainRun;
+  agent: string | null;
+  /** Agent de l'étape verrouillé sur le modèle local. */
+  local_only: boolean;
+  conversation_id: string | null;
+  handoff: string | null;
+  recap: Artifact | null;
 }

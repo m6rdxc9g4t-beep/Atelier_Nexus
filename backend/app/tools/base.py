@@ -50,14 +50,32 @@ class ToolOutput(BaseModel):
     data: Any = None
 
 
+class PreviousCall(BaseModel):
+    """Appel d'outil RÉUSSI plus tôt dans la conversation (tours ou requêtes précédents)."""
+
+    name: str
+    input: dict[str, Any] = Field(default_factory=dict)
+
+
 class ToolContext(BaseModel):
     """Contexte d'exécution transmis aux outils (identité, conversation…)."""
 
     conversation_id: str | None = None
     user_id: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
-    # État partagé entre les outils pendant UN tour d'agent (ex. schémas déjà consultés)
+    # État partagé entre les outils pendant UNE requête (ex. schémas déjà consultés). Avec la
+    # validation de chaque action, chaque appel arrive dans une nouvelle requête : un outil qui
+    # dépend d'un appel antérieur s'appuie aussi sur `previous_calls`.
     state: dict[str, Any] = Field(default_factory=dict)
+    #: Appels réussis de la conversation, renseignés par l'agent depuis l'historique
+    previous_calls: list[PreviousCall] = Field(default_factory=list)
+
+    def called_before(self, name: str, **match: Any) -> bool:
+        """Vrai si `name` a réussi plus tôt avec ces valeurs d'entrée (ex. dataset_id=…)."""
+        return any(
+            c.name == name and all(c.input.get(k) == v for k, v in match.items())
+            for c in self.previous_calls
+        )
 
 
 #: Sérialisation de clés de `ToolContext.state` (objets Python) pour qu'un workflow v2 repris

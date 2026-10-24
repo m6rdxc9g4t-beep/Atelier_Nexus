@@ -215,9 +215,12 @@ def evaluate(case: EvalCase, transcript: Transcript) -> list[CheckResult]:
             _is_subsequence(exp.tools_in_order, names),
             f"attendu dans l'ordre {' → '.join(exp.tools_in_order)} ; obtenu {' → '.join(names) or 'aucun'}",
         )
-    forbidden = [t for t in exp.tools_forbidden if t in names]
+    # Un appel en attente de validation compte aussi : demander l'écriture interdite est déjà
+    # la faute, même si l'utilisateur ne l'a pas (encore) validée
+    asked = {*names, *(p.name for p in transcript.pending)}
+    forbidden = [t for t in exp.tools_forbidden if t in asked]
     if exp.tools_forbidden:
-        add("outils interdits", not forbidden, f"appelés : {', '.join(forbidden)}")
+        add("outils interdits", not forbidden, f"appelés ou demandés : {', '.join(forbidden)}")
     for args in exp.tool_args:
         inputs = [
             normalize(json.dumps(c.input, ensure_ascii=False))

@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { AgentEditor } from "@/features/agent-editor/AgentEditor";
 import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
 import { AgentSidebar } from "@/features/chat-agent/AgentSidebar";
+import { ChainsDialog } from "@/features/chains/ChainsDialog";
 import { ChatPanel } from "@/features/chat-agent/ChatPanel";
 import { SuiteMapDialog } from "@/features/suite-map/SuiteMapDialog";
 import { InboxDialog } from "@/features/workflow-triggers/InboxDialog";
 import { WorkflowListDialog } from "@/features/workflows/WorkflowsDialog";
 import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
+import { useChains } from "@/hooks/useChains";
 import { API_URL } from "@/lib/api";
+import { useChainStore } from "@/stores/useChainStore";
 import { useChatStore } from "@/stores/useChatStore";
 
 import { AppHeader } from "./AppHeader";
@@ -21,6 +24,13 @@ import { AppHeader } from "./AppHeader";
 /** Écran principal : agents · conversation · artefacts. */
 export function Workspace() {
   const { agents, providers, apps, loading, error, reload } = useBackend();
+  const chains = useChains(agents.length);
+  const restoreChain = useChainStore((s) => s.restore);
+  const openChains = useChainStore((s) => s.openLauncher);
+  // Chaîne suivie au dernier passage : on la retrouve (bandeau au-dessus de la conversation)
+  useEffect(() => {
+    void restoreChain();
+  }, [restoreChain]);
   const [editor, setEditor] = useState<{ open: boolean; editing: string | null }>({
     open: false,
     editing: null,
@@ -58,6 +68,8 @@ export function Workspace() {
             onSelect={setAgent}
             onCreate={() => setEditor({ open: true, editing: null })}
             onEdit={(name) => setEditor({ open: true, editing: name })}
+            chains={chains}
+            onOpenChain={openChains}
           />
         </aside>
 
@@ -77,7 +89,7 @@ export function Workspace() {
             </Button>
           </div>
         ) : (
-          <ChatPanel agent={current} agents={agents} blocked={blocked} />
+          <ChatPanel agent={current} agents={agents} blocked={blocked} chains={chains} />
         )}
 
         <ArtifactPanel />
@@ -86,6 +98,7 @@ export function Workspace() {
       {/* Workflows (liste, éditeur en graphe), carte de la suite, « À valider » : une fenêtre à la fois */}
       <WorkflowListDialog agents={agents} />
       <SuiteMapDialog />
+      <ChainsDialog chains={chains} agents={agents} />
       <InboxDialog />
       <WorkflowGraphDialog agents={agents} />
 

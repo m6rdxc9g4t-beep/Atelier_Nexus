@@ -10,8 +10,9 @@ import { useArtifactStore } from "@/stores/useArtifactStore";
 
 import { ApprovalCard } from "./ApprovalCard";
 import { MessageAttachments } from "./AttachmentView";
-import { type ChatTurn, canSaveAsWorkflow } from "./conversation";
+import { type ChatTurn, type ReviewDecision, canSaveAsWorkflow } from "./conversation";
 import { Markdown } from "./Markdown";
+import { ReviewCard } from "./ReviewCard";
 import { ToolCall } from "./ToolCall";
 
 const PROVIDER_LABEL = { anthropic: "Claude", ollama: "Ollama" } as const;
@@ -20,11 +21,13 @@ interface MessageListProps {
   turns: ChatTurn[];
   streaming: boolean;
   onDecide: (decisions: Record<string, boolean>) => void;
+  /** Mode pas à pas : réponse à la revue d'un résultat. */
+  onReview: (decision: ReviewDecision) => void;
   /** « Enregistrer en workflow » sous le dernier tour réussi qui a utilisé des outils. */
   onSaveWorkflow?: () => void;
 }
 
-export function MessageList({ turns, streaming, onDecide, onSaveWorkflow }: MessageListProps) {
+export function MessageList({ turns, streaming, onDecide, onReview, onSaveWorkflow }: MessageListProps) {
   const end = useRef<HTMLDivElement>(null);
   const select = useArtifactStore((s) => s.select);
 
@@ -69,7 +72,22 @@ export function MessageList({ turns, streaming, onDecide, onSaveWorkflow }: Mess
             )}
             {turn.parts.map((part, i) => {
               if (part.kind === "text") return <Markdown key={i}>{part.text}</Markdown>;
-              if (part.kind === "tool") return <ToolCall key={`tool-${part.id}`} part={part} />;
+              if (part.kind === "tool") {
+                // Résultat en attente de revue : déplié pour être lu avant de continuer
+                const underReview = turn.parts.some(
+                  (p) => p.kind === "review" && !p.decision && p.callIds.includes(part.id),
+                );
+                return <ToolCall key={`tool-${part.id}`} part={part} defaultOpen={underReview} />;
+              }
+              if (part.kind === "review")
+                return (
+                  <ReviewCard
+                    key={`review-${part.callIds.join("-")}`}
+                    part={part}
+                    disabled={streaming}
+                    onSubmit={onReview}
+                  />
+                );
               if (part.kind === "attachment") return null;
               if (part.kind === "approval")
                 return (
@@ -104,16 +122,25 @@ export function MessageList({ turns, streaming, onDecide, onSaveWorkflow }: Mess
             {turn.meta && (
               <div className={cn("flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground")}>
                 <Badge variant="outline">{PROVIDER_LABEL[turn.meta.provider]}</Badge>
-                <span>{turn.meta.model}</span>
-                <span aria-hidden>·</span>
-                <span>
-                  {turn.meta.usage.input_tokens + turn.meta.usage.output_tokens} jetons
-                </span>
+                {turn.meta.model && <span>{turn.meta.model}</span>}
+                {/* Reprise sans appel au modèle (validation, revue, arrêt) : pas de « 0 jetons » */}
+                {turn.meta.usage.input_tokens + turn.meta.usage.output_tokens > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{turn.meta.usage.input_tokens + turn.meta.usage.output_tokens} jetons</span>
+                  </>
+                )}
                 {turn.meta.stop_reason === "max_tokens" && (
                   <Badge variant="warning">Réponse tronquée</Badge>
                 )}
                 {turn.meta.stop_reason === "awaiting_approval" && (
                   <Badge variant="warning">En attente de votre validation</Badge>
+                )}
+                {turn.meta.stop_reason === "awaiting_review" && (
+                  <Badge variant="warning">Résultat à vérifier</Badge>
+                )}
+                {turn.meta.stop_reason === "stopped_by_user" && (
+                  <Badge variant="outline">Arrêté à votre demande</Badge>
                 )}
                 {turn.meta.stop_reason === "max_iterations" && (
                   <Badge variant="warning">Limite d&apos;étapes atteinte</Badge>

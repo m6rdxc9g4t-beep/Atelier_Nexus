@@ -13,6 +13,11 @@ Garde-fous communs :
   seulement les outils `requires_approval`. L'agent s'arrête
   (`stop_reason = "awaiting_approval"`), l'interface affiche « Autoriser / Refuser » pour
   chaque appel, puis le client relance le tour avec `approvals`.
+- **Revue des résultats** (mode pas à pas, `review_results=True`, activé par défaut dans
+  l'interface) : après chaque résultat d'outil, l'agent s'arrête
+  (`stop_reason = "awaiting_review"`) AVANT que le modèle ne l'interprète. L'utilisateur
+  continue (le tour reprend), corrige (sa consigne est jointe aux résultats) ou arrête
+  (`review = "stop"` : le tour se termine sans appel au modèle).
 
     @register_agent
     class MonAgent(BaseAgent):
@@ -47,19 +52,28 @@ from app.core.llm.types import (
     ProviderName,
     ResponseComplete,
     StopReason,
+    TextBlock,
     TextDelta,
     ToolResultBlock,
     ToolUseBlock,
     Usage,
 )
-from app.tools.base import Artifact, BaseTool, ToolContext, ToolOutput
+from app.tools.base import Artifact, BaseTool, PreviousCall, ToolContext, ToolOutput
 from app.tools.toolsets import UnavailableToolset, build_tools, is_sensitive
 
 if TYPE_CHECKING:
     from app.tools.environment import ToolEnvironment
 
 Privacy = Literal["standard", "local_only"]
-AgentStopReason = StopReason | Literal["max_iterations", "awaiting_approval"]
+AgentStopReason = (
+    StopReason
+    | Literal["max_iterations", "awaiting_approval", "awaiting_review", "stopped_by_user"]
+)
+#: Décision après la revue d'un résultat (la correction se transmet par un texte de l'utilisateur
+#: joint aux résultats d'outils, comme une consigne ordinaire)
+ReviewAction = Literal["continue", "stop"]
+
+STOPPED = "Arrêté à votre demande après ce résultat. Dites-moi comment poursuivre."
 
 REFUSED = "L'utilisateur a refusé cette action : ne la relance pas, propose une alternative."
 
@@ -126,6 +140,14 @@ class ApprovalRequiredEvent(BaseModel):
     calls: list[PendingCall]
 
 
+class ReviewRequiredEvent(BaseModel):
+    """Résultats à vérifier avant que le modèle ne les interprète (mode pas à pas)."""
+
+    type: Literal["review_required"] = "review_required"
+    #: Identifiants des appels dont le résultat attend la revue
+    call_ids: list[str]
+
+
 class DoneEvent(BaseModel):
     type: Literal["done"] = "done"
     result: AgentResult
@@ -137,6 +159,7 @@ AnyAgentEvent = (
     | ToolResultEvent
     | ArtifactEvent
     | ApprovalRequiredEvent
+    | ReviewRequiredEvent
     | DoneEvent
 )
 AgentEvent = Annotated[AnyAgentEvent, Field(discriminator="type")]
@@ -280,6 +303,8 @@ class BaseAgent(ABC):
         context: ToolContext | None = None,
         approvals: dict[str, bool] | None = None,
         attachments: Mapping[str, AttachmentContent] | None = None,
+        review_results: bool = False,
+        review: ReviewAction | None = None,
     ) -> AgentResult:
         async for event in self.run_stream(
             messages,
@@ -288,6 +313,8 @@ class BaseAgent(ABC):
             context=context,
             approvals=approvals,
             attachments=attachments,
+            review_results=review_results,
+            review=review,
         ):
             if isinstance(event, DoneEvent):
                 return event.result
@@ -302,12 +329,22 @@ class BaseAgent(ABC):
         context: ToolContext | None = None,
         approvals: dict[str, bool] | None = None,
         attachments: Mapping[str, AttachmentContent] | None = None,
+        review_results: bool = False,
+        review: ReviewAction | None = None,
     ) -> AsyncIterator[AnyAgentEvent]:
         """`attachments` : contenu des pièces jointes citées (id → texte ou image), substitué
-        aux références juste avant chaque appel au modèle ; l'historique garde les références."""
+        aux références juste avant chaque appel au modèle ; l'historique garde les références.
+
+        `review_results` : pause après chaque résultat d'outil (mode pas à pas).
+        `review` : réponse à une pause de revue (`continue`, ou `stop` pour finir le tour sans
+        appeler le modèle). La conversation doit alors se terminer par les résultats revus."""
         if not messages:
             raise ValueError("La conversation est vide.")
         last = messages[-1]
+        if review is not None and not is_review_point(last):
+            raise ValueError(
+                "Rien à revoir : « review » répond à une pause après des résultats d'outils."
+            )
         resume_calls = [b for b in last.content if isinstance(b, ToolUseBlock)]
         if last.role == "assistant" and not (resume_calls and approvals is not None):
             raise ValueError(
@@ -316,6 +353,9 @@ class BaseAgent(ABC):
             )
 
         ctx = context or ToolContext()
+        # Appels réussis plus tôt dans la conversation : un outil qui dépend d'un appel antérieur
+        # (schéma Data Via consulté) le retrouve même quand chaque appel est une requête séparée
+        ctx.previous_calls = successful_calls(messages)
         provider = self.resolve_provider(provider)
         allow_fallback = not self.local_only
         history = list(messages)
@@ -328,6 +368,25 @@ class BaseAgent(ABC):
         specs = [t.spec() for t in self.tools.values()]
         response: LLMResponse | None = None
         iteration = 0
+
+        if review == "stop":
+            # L'utilisateur arrête après avoir vu un résultat : aucun appel au modèle
+            stopped = Message(role="assistant", content=[TextBlock(text=STOPPED)])
+            new_messages.append(stopped)
+            yield TextDeltaEvent(text=STOPPED)
+            yield DoneEvent(
+                result=self._result(
+                    None,
+                    provider,
+                    "stopped_by_user",
+                    0,
+                    usage,
+                    artifacts,
+                    new_messages,
+                    text=STOPPED,
+                )  # fmt: skip
+            )
+            return
 
         # Reprise après validation : exécuter les appels du dernier message assistant
         pending_calls = resume_calls if last.role == "assistant" else []
@@ -372,7 +431,23 @@ class BaseAgent(ABC):
                 history.append(tool_msg)
                 new_messages.append(tool_msg)
                 approvals = None  # une validation ne vaut que pour les appels présentés
+                executed = [r.tool_use_id for r in results if r.content != REFUSED]
                 pending_calls = []
+                if review_results and executed:
+                    # Pas à pas : le résultat est montré AVANT que le modèle ne l'interprète
+                    yield ReviewRequiredEvent(call_ids=executed)
+                    yield DoneEvent(
+                        result=self._result(
+                            response,
+                            provider,
+                            "awaiting_review",
+                            iteration,
+                            usage,
+                            artifacts,
+                            new_messages,
+                        )  # fmt: skip
+                    )
+                    return
 
             if iteration >= self.max_iterations:
                 yield DoneEvent(
@@ -483,12 +558,13 @@ class BaseAgent(ABC):
         new_messages: list[Message],
         *,
         pending: list[PendingCall] | None = None,
+        text: str | None = None,
     ) -> AgentResult:
         return AgentResult(
             agent=self.name,
             provider=response.provider if response else (provider or self.router.default),
             model=response.model if response else "",
-            text=response.text if response else "",
+            text=text if text is not None else (response.text if response else ""),
             stop_reason=stop_reason,
             iterations=iterations,
             usage=usage,
@@ -496,6 +572,28 @@ class BaseAgent(ABC):
             new_messages=list(new_messages),
             pending_approvals=pending or [],
         )
+
+
+def successful_calls(messages: Sequence[Message]) -> list[PreviousCall]:
+    """Appels d'outils de l'historique dont le résultat n'est pas une erreur."""
+    ok = {
+        b.tool_use_id
+        for m in messages
+        for b in m.content
+        if isinstance(b, ToolResultBlock) and not b.is_error
+    }
+    return [
+        PreviousCall(name=b.name, input=dict(b.input))
+        for m in messages
+        for b in m.content
+        if isinstance(b, ToolUseBlock) and b.id in ok
+    ]
+
+
+def is_review_point(message: Message) -> bool:
+    """Message de résultats d'outils (éventuellement suivis d'une consigne de l'utilisateur) :
+    là où le mode pas à pas s'arrête pour la revue."""
+    return message.role == "user" and any(isinstance(b, ToolResultBlock) for b in message.content)
 
 
 def call_kind(tool: BaseTool[Any]) -> CallKind:

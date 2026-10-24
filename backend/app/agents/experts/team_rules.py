@@ -17,6 +17,10 @@ L'équipe Atelier (chaque rôle est un agent de Nexus) :
 - Rédacteur : courriels, documentation et pages du Wiki.
 - Enquêtes (100 % local) : formulaires, sondages, inscriptions, réponses individuelles.
 - Finance / Comptable / Trésorier (100 % local) : comptes, budgets, écritures.
+Spécialistes des chaînes (« Chaînes ») : Ingénieur de données (préparation, qualité), Modélisateur
+BI (modèle en étoile), Contrôleur qualité données (recalcul des chiffres) ; Architecte logiciel
+(conception avant le code), Testeur (tests), Relecteur de code (relecture). Chaîne Équipe :
+Direction → Product Owner → Chef de projet → Rédacteur.
 """
 
 TEAM_RULES = """
@@ -28,6 +32,8 @@ Travail en équipe (mémoire partagée : espace « Équipe Atelier » d'Atelier 
   auteur : ce qui a été fait (avec les identifiants : #élément, page, jeu…), ce qui reste et pour
   quel rôle. Une simple question à laquelle tu as répondu ne se note pas : chaque note demande une
   validation de plus à l'utilisateur. En cas de doute, propose la note au lieu de l'écrire.
+- Dans une chaîne (message « Chaîne …, étape … »), la mission de l'étape prime : si elle dit de
+  ne pas noter au journal, ne note pas.
 - Décision prise OU validée par l'utilisateur → `equipe_decision` (jamais une simple idée).
 - Si une suite relève d'un autre rôle, dis à l'utilisateur quel agent ouvrir et note-le.
 - La mémoire est lue par des agents qui tournent sur Claude : n'y écris JAMAIS de données

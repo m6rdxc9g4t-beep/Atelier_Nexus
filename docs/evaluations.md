@@ -83,10 +83,15 @@ text_contains = ["Ile-de-France"]
 grounded_numbers = "warn"
 ```
 
+Étape d'une chaîne : `relais = "chaine_equipe:3"` à la place de `prompt` rejoue le **vrai** message
+de relais de l'étape 3 (mission, demande, livrables des étapes précédentes), produit par
+`app/chains/handoff.py` à partir de livrables fictifs (`evals/chain_prompts.py`) : si le format du
+relais change, le cas suit.
+
 | Attente | Vérifie |
 |---|---|
 | `stop_reason` | Raisons d'arrêt acceptées (défaut `end_turn` ; `awaiting_approval` pour une écriture). |
-| `tools_called`, `tools_in_order`, `tools_forbidden` | Outils appelés, dans l'ordre (sous-séquence), ou interdits. Un appel en attente de validation compte comme appelé. |
+| `tools_called`, `tools_in_order`, `tools_forbidden` | Outils appelés, dans l'ordre (sous-séquence), ou interdits. Un appel en attente de validation compte comme appelé (et donc, pour `tools_forbidden`, comme une faute). |
 | `tool_args` | Un appel de l'outil dont l'entrée JSON contient ces textes. |
 | `tool_errors_max` | Nombre maximal d'appels en erreur. |
 | `approval_requested` | Outils en attente de validation à la fin du tour. |

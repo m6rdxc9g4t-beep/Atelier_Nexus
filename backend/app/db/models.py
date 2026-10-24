@@ -210,3 +210,21 @@ class TriggerCursorRow(Base):
     app: Mapped[str] = mapped_column(String(20), primary_key=True)
     seq: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now, onupdate=_now)
+
+
+class ChainRunRow(Base):
+    """Exécution d'une chaîne d'agents : demande, étape courante, état et livrable figé de chaque
+    étape (chaque étape est une conversation ordinaire avec son agent)."""
+
+    __tablename__ = "chain_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    chain: Mapped[str] = mapped_column(String(41), index=True)
+    request: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="running")
+    stage_index: Mapped[int] = mapped_column(Integer, default=0)
+    stages: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=_now, onupdate=_now, index=True
+    )

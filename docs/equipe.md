@@ -58,8 +58,26 @@ l'utilisateur fait noter par la Direction ; la synthèse agrégée est aussi not
 
 Passer le travail d'un rôle à l'autre : le premier agent note au journal ce qui reste « pour le
 Développeur », tu ouvres le Développeur, qui commence par lire la mémoire. Les enchaînements formels
-avec livrable validé à chaque étape sont les **chaînes** (étape 24, PR #28) : une « Chaîne Équipe »
-s'y ajoutera une fois #28 fusionnée.
+avec livrable validé à chaque étape sont les **chaînes** ([`chaines.md`](chaines.md)), dont la
+Chaîne Équipe ci-dessous.
+
+### Chaîne Équipe
+
+« Chaînes » → **Chaîne Équipe** → écrire l'objectif (« Lancer la version mobile de la boutique pour
+la fin décembre ») → Lancer. Chaque étape est une conversation avec son agent ; vous validez son
+livrable, qui part à l'étape suivante avec votre demande.
+
+| Étape | Agent | Livrable | Écritures (chacune validée) |
+|---|---|---|---|
+| 1. Cadrage | Direction | Objectif daté, périmètre (dedans / dehors), trois priorités au plus, critères de réussite mesurables, risques | Aucune dans Projets ; une décision seulement si vous la prenez |
+| 2. User stories | Product Owner | Stories « En tant que… » avec critères d'acceptation et estimation en heures | Page de spécification dans le Wiki, après accord |
+| 3. Planification | Chef de projet | Tâches (titre, estimation en heures, échéance, priorité) ; somme des estimations comparée aux jours restants, calcul montré ; retards et blocages du projet (`equipe_point_avancement`) | Tâches dans Atelier Projets, **proposées avant** d'être créées, une par une |
+| 4. Communication | Rédacteur | Compte rendu de lancement, message d'annonce (artefact) | Compte rendu dans la mémoire d'équipe |
+
+Une seule trace au journal : le compte rendu de l'étape 4 (les étapes 1 à 3 ne notent pas). Aucun
+agent de la chaîne n'est local : le relais n'est jamais bloqué. Les missions ne citent que des
+outils de l'agent de l'étape (vérifié par un test). Évaluations : `--tag chaine-equipe` (chaque cas
+rejoue le vrai message de relais de son étape).
 
 ## 3. Rapports sans modèle
 
