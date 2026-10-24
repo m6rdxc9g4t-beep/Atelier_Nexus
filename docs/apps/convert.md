@@ -69,11 +69,13 @@ Un relevé bancaire est une donnée financière. Où vont ses lignes :
 |---|---|---|
 | Workflow (nœud) | Aucun | Les lignes lues restent sur la machine (exécution du workflow dans la base de Nexus). |
 | Workflow → étape suivante | Aucun | Une écriture peut les recopier ailleurs ; elle montre son entrée résolue avant validation. Envoyées dans **Atelier Viz**, elles deviennent lisibles par le Data Analyst. |
-| **Data Analyst** (extension, outils `convert_*`) | Claude possible | `convert_read_table` envoie au modèle jusqu'à 50 lignes de la conversion (libellés, montants, soldes). La boîte `convert` de l'extension n'est **pas** sensible : le Data Analyst peut tourner sur Claude. |
-| Trésorier (extension, 100 % local) | Ollama seulement | Analyse d'un relevé sans que rien ne quitte la machine. |
+| **Data Analyst** (extension, outils `convert_*`) | Claude possible | Les lignes d'une conversion ordinaire (Excel, CSV). Un **relevé bancaire** n'est pas lu : `convert_read_table` refuse et oriente vers le Trésorier (Agent_DatAnalyst#4). |
+| Trésorier (extension, 100 % local) | Ollama seulement | Lit les relevés (boîte sensible `convert_releves`) et les importe dans Atelier Trésorerie, sans que rien ne quitte la machine. |
 
-Pour un relevé : préférer Atelier Tab ou Atelier Trésorerie, et l'agent Trésorier ; ne demander au
-Data Analyst que des fichiers sans données personnelles, ou le régler sur le modèle local.
+Un relevé envoyé dans Atelier Tab ou Viz (écriture validée, par un workflow ou un agent) devient
+lisible par les agents qui lisent ces applications : pour un relevé, préférer Atelier Trésorerie et
+l'agent Trésorier. Avec une extension antérieure à Agent_DatAnalyst#4, le Data Analyst lit aussi
+les relevés (jusqu'à 50 lignes envoyées au modèle).
 
 ## Vérifier
 
