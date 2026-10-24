@@ -490,3 +490,59 @@ def test_data_agent_has_analysis_tools_and_can_be_extended() -> None:
     finally:
         cls.toolsets, cls.system_prompt, cls.starters = before
         _EXTENDED.discard(("data_analyst", "test"))
+
+
+# ═══ Parcours réel de l'agent : un jeu chargé survit aux validations every_step ═══
+
+
+async def test_frames_survive_every_step_approvals_across_requests() -> None:
+    from app.agents.base import DoneEvent, ToolResultEvent
+    from app.agents.registry import get_agent_class
+    from app.analysis.store import FRAMES
+    from app.core.llm.types import LLMResponse, Message, ToolUseBlock, Usage
+    from tests.fakes import ScriptedProvider, make_router, text_response
+
+    def call_tool(call_id: str, name: str, args: dict[str, Any]) -> LLMResponse:
+        return LLMResponse(
+            provider="anthropic", model="anthropic-model", stop_reason="tool_use",
+            content=[ToolUseBlock(id=call_id, name=name, input=args)],
+            usage=Usage(input_tokens=1, output_tokens=1),
+        )  # fmt: skip
+
+    provider = ScriptedProvider(
+        "anthropic",
+        [
+            call_tool("c1", "analyse_charger", {"source": "fichier", "reference": "ventes.csv"}),
+            call_tool("c2", "analyse_profil", {"nom": "ventes"}),
+            text_response("Profil prêt."),
+        ],
+    )
+    router = make_router(provider)
+
+    def fresh_agent() -> Any:  # une requête HTTP = un agent et un environnement neufs
+        env = ToolEnvironment(Settings(_env_file=None))  # type: ignore[call-arg]
+        env.files = ConversationFiles(FakeAttachments({"ventes.csv": SALES_CSV}), ["ventes.csv"])
+        return get_agent_class("data_analyst")(router, env)
+
+    async def turn(history: list[Message], approvals: dict[str, bool] | None) -> list[Any]:
+        ctx = ToolContext(conversation_id="conv-every-step")
+        return [
+            e async for e in fresh_agent().run_stream(history, context=ctx, approvals=approvals)
+        ]
+
+    history = [Message.user("Analyse ce fichier.")]
+    try:
+        first = await turn(history, None)
+        assert first[-1].result.stop_reason == "awaiting_approval"
+        history += first[-1].result.new_messages
+        second = await turn(history, {"c1": True})
+        assert second[-1].result.stop_reason == "awaiting_approval"  # analyse_profil attend
+        history += second[-1].result.new_messages
+        third = await turn(history, {"c2": True})
+        profile = next(e for e in third if isinstance(e, ToolResultEvent))
+        assert not profile.is_error and "Points d'attention" in profile.content
+        done = third[-1]
+        assert isinstance(done, DoneEvent) and done.result.text.strip() == "Profil prêt."
+        assert {a.kind for a in done.result.artifacts} == {"data_preview"}
+    finally:
+        FRAMES.clear()

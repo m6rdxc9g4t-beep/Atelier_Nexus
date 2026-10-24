@@ -2,8 +2,8 @@
 
 Une extension est un paquet Python externe qui ajoute à Nexus des boîtes à outils et des agents,
 sans modifier son code. Exemple : [Agent_DatAnalyst](https://github.com/m6rdxc9g4t-beep/Agent_DatAnalyst)
-(Atelier Convert, écritures Viz, plan de travail Projets, saisies Trésorerie, agents
-« Data Analyst Atelier » et « Trésorier »).
+(Atelier Convert, écritures Viz, plan de travail Projets, saisies Trésorerie ; complète l'agent
+Data Analyst et ajoute l'agent « Trésorier »).
 
 ## Activer une extension
 
@@ -33,6 +33,7 @@ Le module expose `register()`, appelé **une fois** par `app/plugins.py`, à la 
 |---|---|
 | Boîtes à outils | `app.tools.toolsets.register_toolset(Toolset(...))` |
 | Agents | `@app.agents.registry.register_agent` sur une sous-classe de `BaseAgent` |
+| Compléter un agent fourni | `app.agents.registry.extend_agent(nom, source=..., toolsets=..., instructions=..., starters=...)` |
 | Libellés lisibles des outils | `app.tools.labels.TOOL_LABELS.update({...})` |
 | Nom et couleur d'une nouvelle app | `app.suite.apps.APP_NAMES`, `APP_COLORS` |
 
@@ -51,3 +52,27 @@ outil sur des données financières ou personnelles porte `sensitive = True`, et
 `sensitive=True` (agent verrouillé sur le modèle local). Une boîte ne peut pas réutiliser
 l'identifiant d'une boîte existante : `register_toolset` lève une erreur et l'extension n'est
 pas chargée.
+
+## Compléter un agent fourni (`extend_agent`)
+
+Plutôt que de créer un second agent qui fait presque la même chose, une extension peut ajouter à
+un agent **fourni** ses boîtes, des consignes (ajoutées à la fin de son prompt) et des exemples :
+
+```python
+from app.agents.registry import extend_agent
+
+extend_agent(
+    "data_analyst",
+    source="atelier_datanalyst",          # idempotent : un second appel avec la même source ne fait rien
+    toolsets=("convert", "convert_write", "data_via_write", "projets_plan"),
+    instructions="Faire circuler un fichier dans la suite : …",
+    starters=("Voici mon fichier de ventes : fais-en un rapport Atelier Viz.",),
+)
+```
+
+Refus (`ValueError` ou `KeyError`, rien n'est modifié, l'extension n'est pas chargée) : agent
+inconnu, boîte inconnue (à enregistrer **avant** l'appel), boîte `sensitive` sur un agent qui n'est
+pas déjà « 100 % local » — une extension ne peut pas faire basculer un agent sur le modèle local à
+l'insu de l'utilisateur ; pour des données sensibles, enregistrer un agent séparé (ex. Trésorier).
+Les agents personnalisés (créés depuis l'interface) ne peuvent pas être complétés ainsi.
+

@@ -12,7 +12,7 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Général | Orchestrateur (`orchestrateur`) | core, delegation | Découpe, délègue, assemble ; 12 étapes |
 | Communication | Rédacteur (`redacteur`) | core | Courriels, comptes rendus, documentation |
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
-| Données | Data Analyst / Power BI (`data_analyst`) | core, data_via, tab | Exploration préalable obligatoire, DAX `VAR … RETURN`, modèle en étoile |
+| Données | Data Analyst (`data_analyst`) | core, analyse, data_via, tab (+ boîtes d'Agent_DatAnalyst si l'extension est chargée) | Récupère, nettoie, analyse (distributions, asymétrie, corrélations, tests, atypiques) et visualise ; Power BI : exploration préalable, DAX `VAR … RETURN`, modèle en étoile → [`analyse.md`](analyse.md) |
 | Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
 | Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets | Points d'avancement, saisie de temps, statuts, plannings Tab |
 | Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write | User stories, critères d'acceptation, estimations |
@@ -35,6 +35,7 @@ garde `cuisine_budget`. Les conversations passées avec ces agents restent consu
 | `id` | Outils | Écriture | Sensible |
 |---|---|---|---|
 | `core` | `current_datetime`, `publish_artifact` | — | — |
+| `analyse` | `analyse_charger`, `_jeux`, `_profil`, `_distribution`, `_correlations`, `_relation`, `_aberrants`, `_nettoyer` (copie), `_agreger`, `_graphique`, `_exporter` ([`analyse.md`](analyse.md)) | — (calculs dans Nexus) | — |
 | `data_via` | `data_via_list_datasets`, `_describe_dataset`, `_query`, `_check_expression` | — | — |
 | `projets_read` | `projets_list_projects`, `_dashboard`, `_structure`, `_list_work_items`, `_work_item`, `_timesheet`, `_milestones` | — | — |
 | `projets_write` | `projets_create_work_item`, `_update_work_item`, `_add_time_entry`, `_add_log_entry` | ✅ validation | — |

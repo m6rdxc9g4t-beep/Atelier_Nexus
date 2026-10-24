@@ -74,3 +74,47 @@ prompt = "Vérifie que l'expression DIVIDE(SUM(chiffre_affaires) - SUM(cout), SU
 [case.expect]
 tools_in_order = ["data_via_describe_dataset", "data_via_check_expression"]
 text_contains_any = ["0,53", "0.53", "53,4", "53.4", "53 %", "53%"]
+
+# ─── Analyse statistique (boîte « analyse ») ─────────────────────
+# Valeurs exactes sur le jeu simulé : corrélation chiffre_affaires / cout ≈ 0,98,
+# chiffre_affaires / quantite ≈ 0,75 (Pearson) ; asymétrie de chiffre_affaires G1 ≈ 0,64 ;
+# aucune différence entre régions (Kruskal-Wallis p ≈ 0,95).
+
+[[case]]
+id = "data-correlations"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "analyse"]
+description = "Corrélations calculées par l'outil sur toutes les lignes, pas estimées."
+prompt = "Dans mes ventes 2026 d'Atelier Viz, quelles variables numériques sont liées entre elles ?"
+rubric = "La réponse cite la forte corrélation entre chiffre d'affaires et coût (≈ 0,98) et celle avec la quantité (≈ 0,75 à 0,78), et rappelle qu'une corrélation n'est pas une causalité."
+[case.expect]
+tools_in_order = ["analyse_charger", "analyse_correlations"]
+artifacts = [{ kind = "chart" }]
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-asymetrie"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "analyse"]
+prompt = "Le chiffre d'affaires par vente de mes ventes 2026 est-il asymétrique ? Montre sa distribution."
+rubric = "La réponse dit que la distribution est modérément asymétrique à droite (G1 ≈ 0,64), que la médiane (≈ 1 882) est sous la moyenne (≈ 2 285) et qu'il n'y a pas de valeur atypique selon Tukey."
+[case.expect]
+tools_in_order = ["analyse_charger", "analyse_distribution"]
+tool_args = [{ tool = "analyse_distribution", contains = ["chiffre_affaires"] }]
+artifacts = [{ kind = "chart" }]
+text_contains_any = ["asymetri", "skew"]
+
+[[case]]
+id = "data-comparaison-regions"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "analyse"]
+description = "Test de groupes : pas de différence à inventer entre régions."
+prompt = "Le montant d'une vente diffère-t-il selon la région ? Teste-le sur mes ventes 2026."
+rubric = "La réponse conclut qu'il n'y a pas de différence significative entre régions (p ≈ 0,94 à 0,95, effet négligeable), sans présenter une région comme meilleure."
+[case.expect]
+tools_called = ["analyse_charger"]
+tools_forbidden = ["analyse_nettoyer"]
+text_contains_any = ["pas de difference", "non significati", "aucune difference"]
