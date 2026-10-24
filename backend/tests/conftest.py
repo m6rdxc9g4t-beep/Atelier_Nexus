@@ -2,8 +2,8 @@
 
 `claude` peut être installé sur la machine de test : sans cette précaution, le mode
 « auto » choisirait l'abonnement et les tests dépendraient de l'environnement.
-Le cache des manifestes des nœuds de la suite est vidé entre deux tests. Wiki et Formulaire
-sont désactivés par défaut (adresse vide). La tâche de fond des
+Le cache des manifestes des nœuds de la suite est vidé entre deux tests. Wiki, Formulaire et
+Convert sont désactivés par défaut (adresse vide). La tâche de fond des
 déclencheurs de workflows est coupée (`TRIGGERS_ENABLED=false`).
 """
 

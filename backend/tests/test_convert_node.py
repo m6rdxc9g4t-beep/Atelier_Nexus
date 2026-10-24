@@ -79,9 +79,8 @@ def test_convert_to_tab_workflow_waits_for_each_validation(
     (sent,) = suite.convert.sent
     assert sent["table_name"] == "Relevé octobre" and sent["rows"] == 3
     (post,) = [r for r in suite.convert.requests if r.method == "POST"]
-    assert post.headers["idempotency-key"].startswith("nexus:") and post.url.path.endswith(
-        f"/conversions/{CONV}/send-to-tab"
-    )
+    assert post.headers["idempotency-key"] == f"nexus:{run['id']}:envoyer"
+    assert post.url.path.endswith(f"/conversions/{CONV}/send-to-tab")
 
 
 async def test_new_conversion_event_launches_a_run_that_waits(
@@ -116,3 +115,68 @@ async def test_new_conversion_event_launches_a_run_that_waits(
     assert run["status"] == "awaiting_approval" and run["trigger"] == "event"
     assert run["pending"][0]["input"]["conversion_id"] == CONV
     assert not suite.convert.sent
+
+
+def workflow_v2(client: TestClient, steps: list[dict[str, Any]]) -> dict[str, Any]:
+    body = {"version": 2, "agent": None, "title": "Convert", "description": "", "params": [],
+            "steps": steps}  # fmt: skip
+    created = client.post("/api/workflows", json=body)
+    assert created.status_code == 201, created.text
+    run: dict[str, Any] = client.post(
+        f"/api/workflows/{created.json()['id']}/run", json={"params": {}}
+    ).json()
+    return run
+
+
+def test_read_a_conversion_table(client: TestClient, suite: Suite) -> None:
+    run = workflow_v2(client, [
+        {"id": "lire", "label": "", "uses": "node:convert/conversions.table",
+         "input": {"conversion_id": CONV, "limit": 2}, "needs": [], "on_error": "stop"},
+    ])  # fmt: skip
+    run = decide(client, run)
+    assert run["status"] == "completed", run["message"]
+    data = run["steps"][0]["data"]
+    assert data["format"] == "atelier-table/1" and data["name"] == "releve_octobre"
+    assert data["total"] == 3 and len(data["rows"]) == 2 and data["truncated"] is True
+
+
+def test_convert_file_and_delete_wait_for_their_validation(
+    client: TestClient, suite: Suite
+) -> None:
+    """Convertir un fichier (écriture) et supprimer une conversion (suppression) : rien ne part
+    avant « Autoriser » sur l'entrée résolue ; refuser n'envoie rien."""
+    run = workflow_v2(client, [
+        {"id": "convertir", "label": "", "uses": "node:convert/conversions.convert_file",
+         "input": {"filename": "releve.csv", "content_base64": "ZGF0ZTtsaWJlbGxl"},
+         "needs": [], "on_error": "stop"},
+        {"id": "supprimer", "label": "", "uses": "node:convert/conversions.delete",
+         "input": {"conversion_id": CONV}, "needs": ["convertir"], "on_error": "stop"},
+    ])  # fmt: skip
+    pending = run["pending"][0]
+    assert pending["step_id"] == "convertir" and pending["kind"] == "write"
+    assert pending["input"]["filename"] == "releve.csv"
+    assert not [r for r in suite.convert.requests if r.method != "GET"]
+    run = decide(client, run)
+    assert run["pending"][0]["step_id"] == "supprimer"
+    assert run["pending"][0]["kind"] == "destructive"
+    assert run["steps"][0]["data"]["conversion_id"] == "000000000002"
+    run = decide(client, run, allow=False)  # suppression refusée : rien de supprimé
+    assert CONV in suite.convert.conversions
+    assert not [r for r in suite.convert.requests if r.method == "DELETE"]
+
+
+async def test_non_loopback_address_is_refused(suite: Suite) -> None:
+    suite.convert_url = "https://convert.example.org/api"
+    env = suite.env()
+    try:
+        state = await env.suite().state("convert")
+    finally:
+        await env.aclose()
+    assert state.status == "unreachable" and not suite.convert.requests
+
+
+def test_suite_status_shows_convert(client: TestClient) -> None:
+    apps = {a["id"]: a for a in client.get("/api/apps/status").json()}
+    convert = apps["convert"]
+    assert convert["configured"] is True and convert["available"] is True, convert
+    assert convert["detail"] == "1 conversion(s), 0 envoyée(s) dans Atelier Tab"

@@ -14,7 +14,14 @@ outils `convert_*`) : même adresse, même variable.
 |---|---|---|
 | `CONVERT_BASE_URL` | `http://127.0.0.1:8010/api` | API d'Atelier Convert (app de bureau ou `uvicorn main:app --port 8010`) ; vide = nœud absent. Réglable dans la roue dentée → Applications Atelier |
 
-Adresse de bouclage seulement (garde du client de nœud) ; aucun proxy.
+- **Une seule adresse** pour le nœud et pour l'extension Agent_DatAnalyst : l'extension la lit dans
+  les réglages de Nexus, donc un changement dans la roue dentée vaut tout de suite pour les deux
+  (avec une extension antérieure à cette lecture, redémarrer Nexus).
+- **Adresse locale seulement** (`127.0.0.1` ou `localhost`), pour le nœud comme pour l'extension :
+  une autre adresse est refusée (nœud « injoignable », boîte d'outils de l'agent « non configurée »
+  avec la raison). Aucun proxy.
+- Convert écoute sur 8010 **s'il est libre** (sinon l'app de bureau en prend un autre : reporter
+  l'adresse) et seulement sur `127.0.0.1` : un backend Nexus en Docker ne le joint pas.
 
 ## Actions (manifeste `GET /api/atelier/manifest`, lu dans le dépôt de Convert)
 
@@ -56,12 +63,17 @@ Le projet de Tab se choisit avec `node:convert/tab.projects` (ou dans Tab : iden
 
 ## Confidentialité
 
-Un relevé bancaire est une donnée financière. Un workflow n'appelle aucun modèle : les lignes lues
-restent sur la machine (base de Nexus, exécution du workflow). Mais une étape suivante peut les
-recopier ailleurs : envoyées dans **Atelier Viz**, elles deviennent lisibles par le Data Analyst, qui
-peut tourner sur Claude. Pour un relevé, préférer Atelier Tab ou Atelier Trésorerie, et l'analyse par
-l'agent Trésorier (100 % local). Chaque écriture montre son entrée résolue avant validation : la
-relire en conséquence.
+Un relevé bancaire est une donnée financière. Où vont ses lignes :
+
+| Chemin | Modèle | Ce qui part |
+|---|---|---|
+| Workflow (nœud) | Aucun | Les lignes lues restent sur la machine (exécution du workflow dans la base de Nexus). |
+| Workflow → étape suivante | Aucun | Une écriture peut les recopier ailleurs ; elle montre son entrée résolue avant validation. Envoyées dans **Atelier Viz**, elles deviennent lisibles par le Data Analyst. |
+| **Data Analyst** (extension, outils `convert_*`) | Claude possible | `convert_read_table` envoie au modèle jusqu'à 50 lignes de la conversion (libellés, montants, soldes). La boîte `convert` de l'extension n'est **pas** sensible : le Data Analyst peut tourner sur Claude. |
+| Trésorier (extension, 100 % local) | Ollama seulement | Analyse d'un relevé sans que rien ne quitte la machine. |
+
+Pour un relevé : préférer Atelier Tab ou Atelier Trésorerie, et l'agent Trésorier ; ne demander au
+Data Analyst que des fichiers sans données personnelles, ou le régler sur le modèle local.
 
 ## Vérifier
 

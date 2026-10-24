@@ -48,7 +48,7 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **SDK Anthropic ≥ 1.x :** pas de paramètre `temperature` sur `messages.create`.
 * **Ollama :** les appels d'outils arrivent sans identifiant (le hub génère `call_…`) ; garder des schémas d'entrée simples pour les petits modèles.
 * **Proxy :** un client HTTP vers une app locale ne passe jamais par le proxy (`trust_env=use_env_proxy(url)`, `app/core/net.py`) ; sous macOS et Windows httpx applique sinon le proxy du système à `127.0.0.1`.
-* **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie), Wiki sur 3200, Formulaire sur 3300, Convert sur 8010 (3000 = Projets, 3100 = Nexus, 8000 = Viz) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
+* **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie), Wiki sur 3200, Formulaire sur 3300, Convert sur 8010 s'il est libre (3000 = Projets, 3100 = Nexus, 8000 = Viz) ; Projets, Trésorerie et Convert n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
 * **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
 * **Workflows v2 / nœuds :** une étape d'écriture (`write`, `destructive`, `requires_approval`) n'est jamais exécutée sans validation de son entrée **résolue** ; jamais de journalisation des `data` des étapes ; appels aux nœuds par `app/suite/` seulement (bouclage, sans redirection).
 * **Analyse :** toute statistique passe par la boîte `analyse` (`app/analysis/`, Python pur, vérifié contre SciPy) ; un état qui doit survivre à une validation `every_step` ne va pas dans `ToolContext.state` (perdu entre requêtes) mais dans un magasin par `conversation_id` (`app/analysis/store.py`).

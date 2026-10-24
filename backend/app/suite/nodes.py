@@ -5,6 +5,8 @@
 - **Tab** : fichier `{tab_exports_dir}/_atelier/manifest.json` (repli : outil MCP
   `atelier_manifest` si `TAB_MCP_COMMAND` est défini) ; actions par le serveur MCP ;
   événements dans `_atelier/events.jsonl` (repli : outil MCP `atelier_events`).
+- **Wiki**, **Formulaire**, **Convert** : `{<app>_base_url}/atelier/manifest` (HTTP), événements
+  `/api/atelier/events` (docs/apps/wiki.md, formulaire.md, convert.md).
 
 Manifestes gardés 60 s en mémoire (10 s pour une application qui ne répond pas). Statut :
 `ok`, `unreachable`, `no_contract` (route ou fichier absent : version de l'app antérieure

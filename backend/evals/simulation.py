@@ -437,6 +437,19 @@ def simulated_environment() -> ToolEnvironment:
             "tresorerie": httpx.MockTransport(SimulatedTresorerie()),
             "wiki": httpx.MockTransport(simulated_wiki()),
             "formulaire": httpx.MockTransport(FakeFormulaire()),
+            # Non simulé : refusé ici, pour que même le connecteur de l'extension Agent_DatAnalyst
+            # (qui lit sa propre adresse) ne joigne jamais l'app de la machine
+            "convert": httpx.MockTransport(refuse_convert),
+        },
+    )
+
+
+def refuse_convert(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+        503,
+        json={
+            "detail": "Atelier Convert n'est pas simulé dans les évaluations.",
+            "code": "UNAVAILABLE",
         },
     )
 
