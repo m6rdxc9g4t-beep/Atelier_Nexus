@@ -10,6 +10,8 @@ import { saveFile } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 import { type StoredArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 
+import { ChartView } from "./charts/ChartView";
+import { chartToCsv, parseChart } from "./charts/spec";
 import { type TableData, formatCell, parsePreview, toCsv } from "./preview";
 
 export const KIND_LABELS: Record<StoredArtifact["kind"], string> = {
@@ -22,6 +24,7 @@ export const KIND_LABELS: Record<StoredArtifact["kind"], string> = {
   markdown: "Document",
   json: "JSON",
   data_preview: "Données",
+  chart: "Graphique",
 };
 
 const EXTENSIONS: Record<StoredArtifact["kind"], string> = {
@@ -34,6 +37,7 @@ const EXTENSIONS: Record<StoredArtifact["kind"], string> = {
   markdown: "md",
   json: "json",
   data_preview: "csv",
+  chart: "csv",
 };
 
 
@@ -52,9 +56,11 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
     () => (artifact.kind === "data_preview" ? parsePreview(artifact.content) : null),
     [artifact],
   );
+  const chart = useMemo(() => (artifact.kind === "chart" ? parseChart(artifact.content) : null), [artifact]);
   const notes = typeof artifact.metadata.notes === "string" ? artifact.metadata.notes : null;
 
   const exportable: { text: string; type: string } = (() => {
+    if (chart) return { text: chartToCsv(chart), type: "text/csv" };
     if (preview?.view === "table") return { text: toCsv(preview.table), type: "text/csv" };
     if (preview?.view === "schema" && preview.schema.sample)
       return { text: toCsv(preview.schema.sample), type: "text/csv" };
@@ -111,11 +117,12 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
       <div className="min-h-0 flex-1 overflow-auto">
         {notes && (
           <div className="border-b bg-signature-faint px-4 py-3">
-            <p className="mb-1 text-xs font-medium text-accent-ink">Intégration</p>
+            <p className="mb-1 text-xs font-medium text-accent-ink">{chart ? "Lecture" : "Intégration"}</p>
             <Markdown className="text-sm">{notes}</Markdown>
           </div>
         )}
         <div className="p-4">
+          {chart && <ChartView spec={chart} />}
           {preview?.view === "table" && <DataTable table={preview.table} />}
           {preview?.view === "schema" && (
             <div className="space-y-5">
@@ -140,8 +147,8 @@ export function ArtifactViewer({ artifact }: { artifact: StoredArtifact }) {
               {preview.schema.sample && <DataTable caption="Échantillon" table={preview.schema.sample} />}
             </div>
           )}
-          {!preview && artifact.kind === "markdown" && <Markdown>{artifact.content}</Markdown>}
-          {!preview && artifact.kind !== "markdown" && <CodeBlock code={artifact.content} />}
+          {!preview && !chart && artifact.kind === "markdown" && <Markdown>{artifact.content}</Markdown>}
+          {!preview && !chart && artifact.kind !== "markdown" && <CodeBlock code={artifact.content} />}
         </div>
       </div>
     </div>

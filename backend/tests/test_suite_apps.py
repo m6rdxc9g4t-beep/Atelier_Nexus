@@ -483,10 +483,6 @@ def test_new_toolsets_and_agents() -> None:
 
     router = make_router(ScriptedProvider("anthropic"))
     env = ToolEnvironment(Settings())
-    tutor = get_agent_class("tuteur")(router, env)
-    assert tutor.local_only
-    assert {"savoir_due_cards", "savoir_record_reviews"} <= set(tutor.tools)
-    assert not get_agent_class("cineclub")(router, env).local_only
     assert "tab_aggregate" in get_agent_class("chef_de_projet")(router, env).tools
     assert "tab_check_table" in get_agent_class("data_analyst")(router, env).tools
 
@@ -494,5 +490,6 @@ def test_new_toolsets_and_agents() -> None:
 async def test_catalog_lists_new_agents() -> None:
     router = make_router(ScriptedProvider("anthropic"))
     infos = {i.name: i for i in await AgentCatalog().infos(router, ToolEnvironment(Settings()))}
-    assert {"tableur", "cineclub", "tuteur"} <= set(infos)
-    assert infos["tuteur"].local_only and infos["tuteur"].category == "Apprentissage"
+    assert "tableur" in set(infos)
+    # Ciné-club, Cuisine et Tuteur retirés : leurs connecteurs restent (workflows, Finance)
+    assert not {"cineclub", "cuisine", "tuteur"} & set(infos)

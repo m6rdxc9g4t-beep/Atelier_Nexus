@@ -20,8 +20,9 @@ from app.tools.labels import default_summary, tool_label
 logger = logging.getLogger(__name__)
 
 ArtifactKind = Literal[
-    "sql", "dax", "powerquery", "python", "react", "code", "markdown", "json", "data_preview"
-]
+    "sql", "dax", "powerquery", "python", "react", "code", "markdown", "json", "data_preview",
+    "chart",
+]  # fmt: skip
 
 
 class Artifact(BaseModel):

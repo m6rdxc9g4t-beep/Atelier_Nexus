@@ -51,6 +51,7 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
 * **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
 * **Workflows v2 / nœuds :** une étape d'écriture (`write`, `destructive`, `requires_approval`) n'est jamais exécutée sans validation de son entrée **résolue** ; jamais de journalisation des `data` des étapes ; appels aux nœuds par `app/suite/` seulement (bouclage, sans redirection).
+* **Analyse :** toute statistique passe par la boîte `analyse` (`app/analysis/`, Python pur, vérifié contre SciPy) ; un état qui doit survivre à une validation `every_step` ne va pas dans `ToolContext.state` (perdu entre requêtes) mais dans un magasin par `conversation_id` (`app/analysis/store.py`).
 * **Sortie structurée :** `ToolOutput.data` sert aux workflows et n'est jamais envoyé au modèle ; ajouter `data` à un outil ne change pas son `content`.
 * **SQLite (tests, bureau) :** `ON DELETE CASCADE` n'est pas appliqué sans PRAGMA et les dates relues sont naïves : supprimer les lignes liées explicitement dans le dépôt, considérer une date naïve comme UTC.
 * **Validation :** en `APPROVAL_MODE=every_step` (défaut, choix de l'utilisateur) toute action d'agent ou de workflow attend une validation humaine ; ne jamais ajouter d'autorisation permanente ni de bouton tout autoriser.

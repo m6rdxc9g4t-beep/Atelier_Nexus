@@ -70,10 +70,16 @@ def data_artifact(
         {"key": h, "field": h, "role": "dimension", "type": "number" if h in numeric else "string"}
         for h in headers
     ]
+    finite = [
+        [None if isinstance(v, float) and not math.isfinite(v) else v for v in r] for r in rows
+    ]
     return Artifact(
         kind="data_preview",
         title=title,
-        content=json.dumps({"columns": columns, "rows": rows}, ensure_ascii=False, default=str),
+        # NaN / Infinity : JSON invalide pour le navigateur → vides (allow_nan=False en garde-fou)
+        content=json.dumps(
+            {"columns": columns, "rows": finite}, ensure_ascii=False, default=str, allow_nan=False
+        ),
         language="json",
         metadata=metadata or {},
     )

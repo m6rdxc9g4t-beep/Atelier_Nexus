@@ -44,7 +44,7 @@ faire sans modèle). La fenêtre indique ce qui a été écarté et pourquoi.
   l'enregistrement comme au lancement.
 - **Contexte partagé** entre les étapes : l'exploration préalable de Data Via (schéma avant
   requête) reste satisfaite, comme pendant le tour d'origine.
-- **Aucun modèle** : un workflow d'un agent « 100 % local » (Finance, Tuteur…) ne fait que des
+- **Aucun modèle** : un workflow d'un agent « 100 % local » (Finance, Comptable…) ne fait que des
   appels aux applications locales.
 
 ## 3. API

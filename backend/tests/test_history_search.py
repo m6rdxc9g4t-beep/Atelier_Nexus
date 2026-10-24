@@ -91,8 +91,7 @@ def test_search_endpoint(client: TestClient, anthropic: ScriptedProvider) -> Non
     # Tous les mots doivent y être ; filtre par agent
     assert client.get("/api/conversations/search", params={"q": "reunion loyers"}).json() == []
     assert (
-        client.get("/api/conversations/search", params={"q": "loyers", "agent": "tuteur"}).json()
-        == []
+        client.get("/api/conversations/search", params={"q": "loyers", "agent": "rh"}).json() == []
     )
     # Les jokers LIKE sont des caractères ordinaires
     assert client.get("/api/conversations/search", params={"q": "%%"}).json() == []

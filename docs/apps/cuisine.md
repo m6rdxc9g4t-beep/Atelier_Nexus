@@ -72,8 +72,8 @@ texte brut d'un ticket (`raw_text`).
 
 ## Confidentialité et agents
 
-- **Cuisine** (`cuisine`, catégorie Maison, icône `cooking-pot`) : `core`, `cuisine`. Stock, repas, courses : pas de
-  données financières, l'agent peut tourner sur Claude ou sur Ollama. Il ne lit pas le budget et renvoie vers Finance.
+- L'agent Cuisine a été retiré. La boîte `cuisine` (stock, repas, courses : pas de données financières) reste
+  disponible pour les agents personnalisés et les workflows.
 - **Finance** (`finance`, 100 % local) : `core`, `tresorerie`, `cuisine_budget`. Budget et tickets sont des données
   financières : boîte `sensitive`, modèle local imposé, sans repli vers Claude. Le prompt rappelle de ne pas
   additionner ces montants à ceux de Trésorerie (mêmes achats souvent déjà débités par carte).

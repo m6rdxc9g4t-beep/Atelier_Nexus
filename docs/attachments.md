@@ -46,7 +46,7 @@ Les images selon le moteur :
 | Claude (abonnement, `claude -p`) | Entrée `--input-format stream-json` (texte et images dans l'ordre), sortie `stream-json` dont on lit la ligne `result`. Sans image, l'entrée texte habituelle |
 | Ollama | Champ `images` du message ; il faut un **modèle de vision** (`gemma3`, `qwen2.5vl`, `llava`…). Sinon, erreur explicite : installer un modèle de vision ou retirer l'image |
 
-Les agents « 100 % local » (Finance, Comptable, Tuteur) restent sur Ollama, pièces jointes comprises : un relevé
+Les agents « 100 % local » (Finance, Comptable, Trésorier) restent sur Ollama, pièces jointes comprises : un relevé
 bancaire joint ne quitte pas la machine.
 
 ## API

@@ -84,4 +84,7 @@ async def rename_conversation(
 async def delete_conversation(conversation_id: str, repo: RepoDep) -> Response:
     if not await repo.delete(conversation_id):
         raise _not_found(conversation_id)
+    from app.analysis.store import FRAMES, scope_of
+
+    FRAMES.drop(scope_of(conversation_id))  # jeux d'analyse de la conversation oubliés aussi
     return Response(status_code=status.HTTP_204_NO_CONTENT)
