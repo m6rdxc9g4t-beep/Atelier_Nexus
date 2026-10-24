@@ -77,6 +77,7 @@ INSTRUCTION = (
     "un seul appel à StructuredOutput (format JSON demandé ; les actions d'Atelier Nexus se "
     "nomment dans tool_calls, jamais en appel direct)."
 )
+INCOMPLETE = "réponse incomplète de Claude Code (aucun résultat final) ; réessayez"
 NOT_LOGGED_IN = (
     "Claude Code n'est pas connecté : ouvrez le Terminal, tapez « claude » et connectez-vous "
     "avec votre compte Claude, puis réessayez."
@@ -269,13 +270,20 @@ def result_line(stdout: str) -> str:
     return ""
 
 
+STRUCTURED_TOOL = "StructuredOutput"
+
+
 def loose_text(stdout: str) -> str:
     """Texte écrit par le modèle HORS de l'objet structuré (sortie stream-json).
 
     Claude Code laisse parfois le modèle écrire sa réponse en texte libre avant l'appel à
     `StructuredOutput`, puis mettre dans l'objet une phrase de conclusion seulement : sans ce
-    texte, la réponse était perdue (« Je n'ai rien écrit pour l'instant. »)."""
-    parts: list[str] = []
+    texte, la réponse était perdue (« Je n'ai rien écrit pour l'instant. »).
+
+    Seuls comptent les messages qui précèdent le dernier appel à `StructuredOutput` ; un message
+    qui tente un autre outil (appel direct refusé, « No such tool available ») est ignoré avec
+    son texte : c'est une narration de cette tentative, pas une réponse à l'utilisateur."""
+    messages: list[tuple[list[str], set[str]]] = []
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
@@ -285,12 +293,30 @@ def loose_text(stdout: str) -> str:
             continue
         message = event.get("message")
         blocks = message.get("content") if isinstance(message, dict) else None
+        texts: list[str] = []
+        tools: set[str] = set()
         for block in blocks if isinstance(blocks, list) else []:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text = str(block.get("text") or "").strip()
-                if text:
-                    parts.append(text)
-    return "\n\n".join(parts)
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text" and str(block.get("text") or "").strip():
+                texts.append(str(block["text"]).strip())
+            elif block.get("type") == "tool_use":
+                tools.add(str(block.get("name")))
+        messages.append((texts, tools))
+    last = max((i for i, (_, tools) in enumerate(messages) if STRUCTURED_TOOL in tools), default=-1)
+    kept = [
+        text
+        for texts, tools in messages[: last + 1]
+        if not (tools - {STRUCTURED_TOOL})
+        for text in texts
+    ]
+    return "\n\n".join(kept)
+
+
+def _last_line(text: str) -> str:
+    """Dernière ligne non vide, bornée (message d'erreur lisible)."""
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return lines[-1][:400] if lines else ""
 
 
 def _flat(text: str) -> str:
@@ -454,31 +480,34 @@ class ClaudeCodeProvider(LLMProvider):
         return self._extract(code, stdout, stderr, model)
 
     def _extract(self, code: int, stdout: str, stderr: str, model: str) -> LLMResponse:
-        line = result_line(stdout) or stdout.strip()
+        line = result_line(stdout)
         try:
             payload = json.loads(line) if line else None
         except ValueError:
             payload = None
         if not isinstance(payload, dict):
-            detail = (stderr or stdout or "erreur inconnue").strip()[:400]
-            raise self._error(detail)
+            # Pas de ligne `result` (flux tronqué, processus interrompu) : jamais le flux brut
+            # dans le message (identifiants de session, chemins) ; stderr seulement, borné
+            raise self._error(_last_line(stderr) or INCOMPLETE)
         if payload.get("is_error") or code != 0:
             raise self._error(str(payload.get("result") or stderr or "erreur inconnue").strip())
         structured = payload.get("structured_output")
-        if not isinstance(structured, dict):
-            # Sortie non structurée (ancienne version) : texte brut, ou JSON dans `result`
+        if isinstance(structured, dict):
+            loose = loose_text(stdout)
+            if loose:
+                structured = {
+                    **structured,
+                    "text": merge_text(loose, str(structured.get("text") or "")),
+                }
+        else:
+            # Sortie non structurée (ancienne version) : texte brut, ou JSON dans `result`. Le
+            # texte libre n'est pas ajouté : il répète ce même JSON
             result = str(payload.get("result") or "")
             try:
                 parsed = json.loads(result)
                 structured = parsed if isinstance(parsed, dict) else {"text": result}
             except ValueError:
                 structured = {"text": result}
-        loose = loose_text(stdout)
-        if loose:
-            structured = {
-                **structured,
-                "text": merge_text(loose, str(structured.get("text") or "")),
-            }
         return to_response(structured, model, usage_of(payload))
 
     def _error(self, detail: str) -> Exception:

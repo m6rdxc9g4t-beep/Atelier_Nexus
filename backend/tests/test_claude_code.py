@@ -265,3 +265,50 @@ async def test_text_written_outside_the_object_is_kept(
     assert merge_text("Bonjour", "Bonjour  ") == "Bonjour  "
     assert merge_text("A\n\nB", "A B C") == "A B C" and merge_text("A B C", "B") == "A B C"
     assert merge_text("", "Seul") == "Seul"
+
+
+async def test_real_stream_of_claude_code_is_parsed(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Vraie sortie stream-json de Claude Code 2.1.310 (anonymisée) : événements `system`,
+    `assistant` (appel à StructuredOutput), `user`, `rate_limit_event`, `result`."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "replay")
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Projet 1 ?")], tools=tools))
+    (call,) = [b for b in response.content if isinstance(b, ToolUseBlock)]
+    assert call.name == "projets_dashboard" and call.input == {"project_id": 1}
+    assert response.text == "Je consulte le tableau de bord du projet 1."
+    assert response.stop_reason == "tool_use" and response.usage.output_tokens > 0
+
+
+async def test_stream_without_result_is_a_readable_error(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Flux interrompu : un message lisible, jamais le flux brut (identifiants de session,
+    chemins), et jamais une « réponse vide » prise pour une réussite."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "noresult")
+    for code in ("1", "0"):
+        monkeypatch.setenv("FAKE_CLAUDE_CODE", code)
+        with pytest.raises(ProviderRequestError) as err:
+            await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
+        message = str(err.value)
+        assert "connexion interrompue" in message
+        assert "secret-session" not in message and "/Users" not in message
+
+
+async def test_native_attempt_narration_is_dropped(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "native")
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Projet 1 ?")], tools=tools))
+    assert response.text == "Je consulte le tableau de bord."
+    assert "Je vais regarder" not in response.text
+
+
+async def test_legacy_output_never_leaks_raw_json(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "legacy")
+    response = await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
+    assert response.text == "Ligne 1\nLigne « 2 »"

@@ -376,6 +376,28 @@ async def test_local_agent_on_claude_is_skipped_not_failed() -> None:
     assert not anthropic.requests
 
 
+async def test_each_attempt_runs_in_its_own_conversation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Comme dans l'interface : un identifiant de conversation par essai (les outils qui gardent
+    un état par conversation en ont besoin), jamais partagé entre deux essais."""
+    from app.agents.base import BaseAgent
+
+    seen: list[str | None] = []
+    real = BaseAgent.run_stream
+
+    def spy(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+        context = kwargs.get("context")
+        seen.append(context.conversation_id if context else None)
+        return real(self, messages, **kwargs)
+
+    monkeypatch.setattr(BaseAgent, "run_stream", spy)
+    anthropic = ScriptedProvider(
+        "anthropic", [text_response("Nous sommes le 21."), text_response("Le 21.")]
+    )
+    await run_case(CASES["assistant-date-du-jour"], deps_for(anthropic), RunOptions(repeat=2))
+    assert len(seen) == 2 and all(c and c.startswith("eval-assistant-date-du-jour-") for c in seen)
+    assert seen[0] != seen[1]
+
+
 async def test_case_is_skipped_when_its_app_is_missing() -> None:
     deps = deps_for(ScriptedProvider("anthropic"))
     outcome = await run_case(CASES["dev-jamais-sur-main"], deps, RunOptions())

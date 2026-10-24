@@ -168,8 +168,8 @@ async def play(
         model = options.model if resolved == wanted else None
         calls: dict[str, ToolCallRecord] = {}
         async with asyncio.timeout(options.timeout):
-            # Comme une conversation enregistrée de l'interface : les outils qui gardent un état
-            # par conversation (jeux d'analyse, étape 25) en ont besoin ; un identifiant par essai
+            # Comme une conversation enregistrée de l'interface : un outil qui garde un état par
+            # conversation (délégation, jeux d'analyse) le retrouve ; un identifiant par essai
             context = ToolContext(conversation_id=f"eval-{case.id}-{uuid.uuid4().hex[:8]}")
             async for event in agent.run_stream(
                 [Message.user(case.prompt)], provider=requested, model=model, context=context

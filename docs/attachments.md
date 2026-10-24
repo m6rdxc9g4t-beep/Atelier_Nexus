@@ -43,7 +43,7 @@ Les images selon le moteur :
 | Moteur | Images |
 |---|---|
 | Claude (clé API) | Bloc `image` natif |
-| Claude (abonnement, `claude -p`) | Entrée `--input-format stream-json` (texte et images dans l'ordre), sortie `stream-json` dont on lit la ligne `result`. Sans image, l'entrée texte habituelle |
+| Claude (abonnement, `claude -p`) | Entrée `--input-format stream-json` (texte et images dans l'ordre). Sans image, l'entrée texte habituelle. Sortie toujours `stream-json` : ligne `result`, plus le texte écrit hors de l'objet structuré ([`claude-code.md`](claude-code.md)) |
 | Ollama | Champ `images` du message ; il faut un **modèle de vision** (`gemma3`, `qwen2.5vl`, `llava`…). Sinon, erreur explicite : installer un modèle de vision ou retirer l'image |
 
 Les agents « 100 % local » (Finance, Comptable, Tuteur) restent sur Ollama, pièces jointes comprises : un relevé
