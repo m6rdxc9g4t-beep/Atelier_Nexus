@@ -11,6 +11,8 @@
 @import "../styles/atelier-ds/dark.css";
 @import "../styles/atelier-ds/colors.css";
 @import "../styles/brand/atelier-brand.css" layer(components);
+/* Signatures absentes de la copie verbatim ci-dessus (Wiki, Formulaire) */
+@import "../styles/suite-signatures.css" layer(components);
 
 /* Sombre = classe `dark` ET data-theme="dark" sur <html> (SUITE.md §1.5) */
 @custom-variant dark (&:is(.dark *));
@@ -188,25 +190,6 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
-  }
-}
-
-/* ─── Signatures d'Atelier Wiki et d'Atelier Formulaire ─────────────
-   Absentes de la copie verbatim (styles/brand/atelier-brand.css, à ne pas modifier) : déclarées
-   ici sur le même modèle, avec les valeurs de wiki-signature.css et formulaire-signature.css de
-   leurs dépôts. À retirer quand la source commune les contiendra. */
-@layer components {
-  :root {
-    --atelier-sig-wiki: #4dabf7;
-    --atelier-sig-formulaire: #38d9a9;
-  }
-  [data-atelier-app="wiki"] {
-    --atelier-signature: var(--atelier-sig-wiki);
-    --atelier-signature-contrast: #0b0b0f;
-  }
-  [data-atelier-app="formulaire"] {
-    --atelier-signature: var(--atelier-sig-formulaire);
-    --atelier-signature-contrast: #0b0b0f;
   }
 }
 
