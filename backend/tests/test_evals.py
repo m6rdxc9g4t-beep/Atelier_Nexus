@@ -202,6 +202,26 @@ def test_simulated_settings_only_enable_simulated_apps() -> None:
     settings = simulated_settings()
     assert settings.data_via_base_url and settings.projets_base_url and settings.tresorerie_base_url
     assert not (settings.cine_base_url or settings.savoir_base_url or settings.github_repo_list)
+    # Wiki et Formulaire : adresses de bouclage, mais transports simulés (rien d'appelé)
+    assert settings.wiki_base_url == "http://127.0.0.1:3200/api"
+
+
+async def test_simulated_team_memory_and_forms() -> None:
+    from app.tools.base import ToolContext
+    from app.tools.toolsets import build_tools
+    from evals.simulation import simulated_environment
+
+    env = simulated_environment()
+    try:
+        tools, unavailable = build_tools(["equipe", "formulaire"], env)
+        assert not unavailable
+        by_name = {t.name: t for t in tools}
+        memory = await by_name["equipe_memoire"].invoke({}, ToolContext(conversation_id="e"))
+        assert "Point du lundi" in memory.content and "#12345" in memory.content
+        forms = await by_name["formulaire_forms"].invoke({}, ToolContext(conversation_id="e"))
+        assert "Satisfaction atelier" in forms.content
+    finally:
+        await env.aclose()
 
 
 def test_unknown_expression_is_refused_without_eval() -> None:
