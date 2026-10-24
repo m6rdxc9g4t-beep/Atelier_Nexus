@@ -565,3 +565,18 @@ def test_totals_and_shares_count_as_grounded() -> None:
         stop_reason="end_turn", iterations=1, usage=Usage(), artifacts=[], new_messages=[],
     )  # fmt: skip
     assert ungrounded_numbers(transcript) == []
+
+
+def test_simulated_calculated_columns_are_checked_row_by_row() -> None:
+    from evals.simulation import check_column
+
+    rows = sales_rows()
+    margin = check_column("[chiffre_affaires] - [cout]", rows)
+    assert margin["ok"] and margin["preview"][0] == pytest.approx(
+        rows[0]["chiffre_affaires"] - rows[0]["cout"], abs=0.001
+    )
+    assert check_column('SI([region] = "Bretagne"; 1; 0)', rows)["ok"]
+    assert check_column("[vendeur] * 2", rows) == {
+        "ok": False, "error": "Colonne inconnue : vendeur", "position": 0,
+    }  # fmt: skip
+    assert not check_column("__import__('os')", rows)["ok"]

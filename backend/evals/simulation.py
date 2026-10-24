@@ -230,6 +230,78 @@ def _arithmetic(node: ast.expr) -> float | None:
     raise ValueError("Fonction ou colonne non reconnue")
 
 
+_COLUMN_REF = re.compile(r"\[([^\]]+)\]")
+_CMP: dict[type, Callable[[Any, Any], bool]] = {
+    ast.Gt: lambda a, b: a > b,
+    ast.GtE: lambda a, b: a >= b,
+    ast.Lt: lambda a, b: a < b,
+    ast.LtE: lambda a, b: a <= b,
+    ast.Eq: lambda a, b: a == b,
+    ast.NotEq: lambda a, b: a != b,
+}
+
+
+def _row_value(node: ast.expr, row: dict[str, Any]) -> Any:
+    """Colonne calculée, évaluée sur une ligne : colonnes, nombres, textes, + - * /,
+    comparaisons, IF/SI(cond; si_vrai; si_faux). Tout le reste est refusé."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, int | float | str):
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id not in COLUMNS:
+            raise ValueError(f"Colonne inconnue : {node.id}")
+        return row.get(node.id)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return -_row_value(node.operand, row)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add | ast.Sub | ast.Mult | ast.Div):
+        left, right = _row_value(node.left, row), _row_value(node.right, row)
+        if left is None or right is None:
+            return None
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        return left / right if right else None
+    if isinstance(node, ast.Compare) and len(node.ops) == 1 and type(node.ops[0]) in _CMP:
+        return _CMP[type(node.ops[0])](
+            _row_value(node.left, row), _row_value(node.comparators[0], row)
+        )
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id.upper() in {"IF", "SI"}
+        and len(node.args) == 3
+    ):
+        cond, yes, no = node.args
+        return _row_value(yes if _row_value(cond, row) else no, row)
+    raise ValueError("Fonction ou colonne non reconnue")
+
+
+def check_column(expression: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Colonne calculée (ligne à ligne), syntaxe proche d'Atelier Viz : `[col]` ou `col`,
+    `;` ou `,` entre arguments, `=` pour l'égalité."""
+    text = _COLUMN_REF.sub(lambda m: m.group(1).strip().replace(" ", "_"), expression)
+    text = text.replace(";", ",")
+    text = re.sub(r"(?<![<>!=])=(?!=)", "==", text)
+    try:
+        tree = ast.parse(text, mode="eval").body
+        values = [_row_value(tree, row) for row in rows[:5]]
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc), "position": 0}
+    except (SyntaxError, TypeError, ZeroDivisionError):
+        return {"ok": False, "error": "Expression invalide", "position": 0}
+    kind = (
+        "boolean"
+        if all(isinstance(v, bool) for v in values)
+        else (
+            "number" if all(isinstance(v, int | float) or v is None for v in values) else "string"
+        )
+    )
+    preview = [round(v, 4) if isinstance(v, float) else v for v in values]
+    return {"ok": True, "type": kind, "preview": preview}
+
+
 def check_expression(expression: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Vérifie une mesure simple (agrégats, DIVIDE, + - * /) et en calcule la valeur."""
     names = {"SOMME": "sum", "MOYENNE": "avg"}
@@ -341,7 +413,8 @@ class SimulatedDataVia:
                 return httpx.Response(422, json={"detail": str(exc)})
         if (method, path) == ("POST", f"/datasets/{DATASET_ID}/model/check"):
             body = json.loads(request.content)
-            return httpx.Response(200, json=check_expression(body["expression"], self.rows))
+            check = check_column if body.get("kind") == "column" else check_expression
+            return httpx.Response(200, json=check(body["expression"], self.rows))
         return httpx.Response(404, json={"detail": "Route inconnue de la simulation."})
 
 

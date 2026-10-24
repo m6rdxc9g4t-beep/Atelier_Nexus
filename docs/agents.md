@@ -16,9 +16,15 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Équipe | Enquêtes (`enquetes`) | core, formulaire, formulaire_write, formulaire_reponses, equipe | **100 % local** ; crée et ouvre les formulaires, lit les réponses ; lit la mémoire sans y écrire |
 | Données | Data Analyst (`data_analyst`) | core, analyse, data_via, tab, formulaire, equipe, equipe_write (+ boîtes d'Agent_DatAnalyst si l'extension est chargée) | Récupère, nettoie, analyse (distributions, asymétrie, corrélations, tests, atypiques) et visualise ; Power BI : exploration préalable, DAX `VAR … RETURN`, modèle en étoile → [`analyse.md`](analyse.md) |
 | Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
+| Données | Ingénieur de données (`ingenieur_donnees`) | core, data_via, tab | Inventaire des sources, qualité chiffrée, transformations Power Query typées ; ni modèle ni DAX |
+| Données | Modélisateur BI (`modelisateur_bi`) | core, data_via | Grain, faits et dimensions, table Date, relations ; cardinalités vérifiées par requête |
+| Données | Contrôleur qualité données (`controleur_donnees`) | core, data_via | Recalcule chaque chiffre annoncé, tableau des écarts, verdict |
 | Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets, equipe, equipe_write, equipe_rapports, wiki | Points d'avancement calculés, saisie de temps, statuts, plannings Tab |
 | Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write, equipe, equipe_write, wiki, wiki_write | User stories, critères d'acceptation, estimations |
 | Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read, equipe, equipe_write, wiki | Branches `feat/…`, commits `#ID`, PR brouillons |
+| Développement | Architecte logiciel (`architecte`) | core, github_read, projets_read | Conception avant le code : fichiers, contrats, risques, plan de tests ; lecture seule |
+| Développement | Testeur (`testeur`) | core, github_read, github_write | Tests sur la branche de travail (jamais `main`), cas limites, doublures |
+| Développement | Relecteur de code (`relecteur_code`) | core, github_read | Verdict et remarques classées sur une branche ou une PR ; lecture seule |
 | Finance | Finance (`finance`) | core, tresorerie, cuisine_budget, equipe | **100 % local** ; budget courses d'Atelier Cuisine |
 | Finance | Comptable (`comptable`) | core, tresorerie | **100 % local**, PCG / TVA, ne modifie rien |
 | Métiers | Commercial (`commercial`) | core, data_via | Propositions, objections, relances |
@@ -29,6 +35,8 @@ Boîte **partagée** (`shared`) : elle écrit là où lisent les agents sur Clau
 agent verrouillé sur le modèle local (déclaré, ou par une boîte ou un outil sensible), signalée
 « indisponible » avec la raison. Les données locales (finances, réponses individuelles) ne peuvent donc
 pas y être recopiées.
+
+Ces agents s'enchaînent dans les **chaînes Data et Dev** ([`chaines.md`](chaines.md)).
 
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
 `common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation) ;
@@ -94,6 +102,20 @@ Résumé d'une lecture : `BaseTool.approval_summary()` par défaut = nom lisible
 libellés que l'interface) + paramètres principaux (« Data Via · requête : dataset_id = « ventes », limit = 50 ») ;
 un outil d'écriture le surcharge (« Créer la TASK … »). En `every_step`, le prompt système prévient le modèle que
 chaque appel est validé.
+
+**Revue de chaque résultat (« Pas à pas »).** Interrupteur dans l'en-tête de la conversation, **activé par défaut**
+(choix de l'utilisateur, retenu dans le navigateur). Il complète la validation des actions, sans la remplacer :
+1. le client envoie `review_results: true` ; après chaque exécution d'outil, l'agent émet
+   `review_required` (`call_ids`) puis `done` avec `stop_reason = "awaiting_review"` **avant** que le modèle ne lise
+   le résultat. La conversation enregistrée se termine alors par les résultats ;
+2. l'interface déplie le résultat et propose **Continuer**, **Corriger** ou **Arrêter** ;
+3. *Continuer* : le client renvoie l'historique (`review: "continue"`), le modèle lit le résultat. *Corriger* : la
+   consigne est jointe aux résultats (« Consigne de l'utilisateur après ce résultat : … ») puis le tour continue.
+   *Arrêter* : `review: "stop"`, le tour se termine **sans appel au modèle** (`stop_reason = "stopped_by_user"`).
+
+Un appel refusé ne provoque pas de pause (le modèle propose une alternative). Désactivé, l'agent enchaîne ses
+étapes ; les actions restent validées selon `APPROVAL_MODE`. Les évaluations et les workflows n'utilisent pas ce mode
+(un workflow s'arrête déjà avant chaque étape, résultat précédent affiché).
 
 **Confidentialité (« 100 % local »).** Un agent est verrouillé sur Ollama s'il le déclare (`privacy = "local_only"`)
 ou s'il utilise une boîte sensible (`tresorerie`, `savoir_*`, `cuisine_budget`). Demander Claude → 403 `provider_not_allowed` ; pas de repli

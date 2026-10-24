@@ -90,8 +90,9 @@ export function registerToolLabels(agents: { tools: { name: string; label?: stri
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? backendLabels.get(name) ?? name;
 
 /** Appel d'outil replié : on voit qu'il a eu lieu, on déplie pour l'entrée et le résultat. */
-export function ToolCall({ part }: { part: ToolCallPart }) {
-  const [open, setOpen] = useState(false);
+export function ToolCall({ part, defaultOpen = false }: { part: ToolCallPart; defaultOpen?: boolean }) {
+  // Déplié d'office quand son résultat attend la revue (mode pas à pas)
+  const [open, setOpen] = useState(defaultOpen);
   const Icon =
     part.status === "running" ? LoaderCircle : part.status === "error" ? CircleAlert : CircleCheck;
   const state =
