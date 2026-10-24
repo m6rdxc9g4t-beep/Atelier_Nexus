@@ -14,7 +14,7 @@ from app.api.deps import get_env_factory
 from app.team_rituals import PREFIX, RITUALS, marker
 from app.tools.environment import ToolEnvironment
 from main import app
-from tests.test_suite_nodes import Suite
+from tests.test_suite_nodes import Suite, suite  # noqa: F401  (fixture)
 from tests.test_triggers import api, clock, triggers  # noqa: F401  (fixtures)
 
 
@@ -151,6 +151,45 @@ async def test_concurrent_installs_create_a_single_ritual(team_api: TestClient) 
         if marker("retours-vendredi") in (w.get("description") or "")
     ]  # fmt: skip
     assert len(rituals) == 1
+
+
+def test_friday_ritual_end_to_end(api: TestClient, suite: Suite) -> None:  # noqa: F811
+    """Rituel du vendredi exécuté pour de vrai (doubles fidèles) : synthèse puis note, chaque
+    étape validée ; le journal reçoit le Markdown brut ; sans formulaire ouvert, pas de note."""
+    from app.tools import equipe
+    from tests.fake_wiki_formulaire import FakeFormulaire, FakeWiki
+    from tests.test_workflows_v2 import decide
+
+    wiki, form = FakeWiki(), FakeFormulaire()
+
+    def env() -> ToolEnvironment:
+        base = suite.env(
+            wiki_base_url="http://127.0.0.1:3200/api",
+            formulaire_base_url="http://127.0.0.1:3300/api",
+        )
+        return ToolEnvironment(
+            base.settings,
+            transports={"wiki": httpx.MockTransport(wiki), "formulaire": httpx.MockTransport(form)},
+        )
+
+    app.dependency_overrides[get_env_factory] = lambda: env
+    workflow_id = api.post("/api/equipe/rituels/retours-vendredi").json()["workflow_id"]
+    run = api.post(f"/api/workflows/{workflow_id}/run", json={"params": {}}).json()
+    assert run["status"] == "awaiting_approval"
+    run = decide(api, run)  # synthèse
+    assert run["status"] == "awaiting_approval", run
+    run = decide(api, run)  # note au journal (entrée résolue montrée avant)
+    assert run["status"] == "completed", run
+    journal = next(p for p in wiki.pages.values() if p["title"] == equipe.JOURNAL)
+    assert "Rituel du vendredi — Retours des formulaires" in journal["content"]
+    assert "Satisfaction atelier" in journal["content"] and "<donnee" not in journal["content"]
+    assert "alice@exemple.fr" not in journal["content"]
+    # Aucun formulaire ouvert : la note est sautée (condition `not_empty`)
+    form.forms[1]["status"] = "closed"
+    run = api.post(f"/api/workflows/{workflow_id}/run", json={"params": {}}).json()
+    run = decide(api, run)
+    assert run["status"] == "completed", run
+    assert journal["content"].count("· Rituel du vendredi") == 1
 
 
 def test_friday_ritual_skips_the_note_without_open_forms(team_api: TestClient) -> None:

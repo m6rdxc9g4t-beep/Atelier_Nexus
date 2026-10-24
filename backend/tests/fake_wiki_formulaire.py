@@ -277,6 +277,8 @@ class FakeFormulaire:
                 {"id": 1, "respondent": "Alice", "answers": {"q1": 5, "q2": "Oui", "q3": "alice@exemple.fr"}},
                 {"id": 2, "respondent": "Bruno", "answers": {"q1": 3, "q2": "Peut-être", "q3": "bruno@exemple.fr"}},
                 {"id": 3, "respondent": "Chloé", "answers": {"q1": 4, "q2": "Oui", "q3": "chloe@exemple.fr"}},
+                {"id": 4, "respondent": "Damien", "answers": {"q1": 4, "q2": "Non", "q3": "damien@exemple.fr"}},
+                {"id": 5, "respondent": "Emma", "answers": {"q1": 2, "q2": "Oui", "q3": "emma@exemple.fr"}},
             ]
         }  # fmt: skip
         self.requests: list[httpx.Request] = []

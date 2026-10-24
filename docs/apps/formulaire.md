@@ -29,18 +29,23 @@ trois routes de l'interface pour créer et ouvrir un formulaire.
 Les réponses individuelles (nom du répondant, e-mails, textes libres) sont des **données personnelles** :
 la boîte `formulaire_reponses` est `sensitive`, l'agent qui l'utilise tourne uniquement sur le modèle local
 (choix de l'utilisateur). Le seul agent fourni qui l'a, Enquêtes, n'a **aucune écriture** vers ce que
-lisent les agents sur Claude (mémoire d'équipe, Wiki) : garde vérifiée par un test sur tous les agents,
-pas seulement par le prompt.
+lisent les agents sur Claude : le cœur retire les boîtes `shared` (mémoire d'équipe, Wiki) de tout agent
+verrouillé sur le modèle local, fourni, étendu ou créé dans l'interface.
 
-`formulaire_responses` lit les réponses **les plus récentes d'abord** (Formulaire les rend de la plus
-ancienne à la plus récente : Nexus lit jusqu'à 5 000 réponses et prend la fin), chacune en entier
-(jusqu'à 2 000 caractères par réponse libre, 40 000 au total) ; `avant_id` remonte dans le temps.
+`formulaire_responses` lit les réponses **les plus récentes d'abord**. Formulaire les rend de la plus
+ancienne à la plus récente, par pages de 5 000 au plus : Nexus avance de page en page (`since_id`,
+100 000 réponses au plus) et garde la fin. Chaque réponse est montrée en entier (jusqu'à 2 000 caractères
+par réponse libre) dans un budget de 40 000 caractères : on montre moins de réponses plutôt que d'en
+couper une, et `avant_id` désigne exactement la suivante à lire.
 
 La synthèse (`formulaire_summary`, `equipe_synthese_formulaires`) ne garde que des agrégats — effectifs
 par choix, minimum, moyenne, maximum, distribution d'une échelle — et retire les derniers textes libres
-que renvoie Formulaire. Une question à laquelle **moins de 3 personnes** ont répondu n'est montrée que par
-son nombre de réponses (avec une ou deux personnes, un minimum ou un effectif désigne quelqu'un). Elle
-peut alors être lue par un agent sur Claude et notée dans le Wiki.
+que renvoie Formulaire. Une question n'est montrée que par son nombre de réponses en dessous de
+**3 réponses** pour un choix, **5** pour un nombre ou une échelle (moyenne, minimum, maximum et
+distribution permettent de reconstituer chaque valeur d'un petit groupe). Elle peut alors être lue par
+un agent sur Claude et notée dans le Wiki. Limite connue : le rituel du vendredi note chaque semaine un
+agrégat **cumulé** ; la différence entre deux semaines peut isoler une réponse arrivée seule entre les
+deux. Pour un formulaire très sensible, ne pas installer ce rituel ou le désactiver.
 
 **À savoir.** Formulaire publie aussi ses réponses comme jeu de données pour Atelier Viz
 (`/api/exports/datasets/form-N`, colonne `repondant` comprise). Brancher ce jeu dans Viz le rend lisible

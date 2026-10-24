@@ -53,6 +53,10 @@ class Toolset:
     writes: bool = False
     #: Boîte réservée au code (ex. délégation) : non proposée dans l'éditeur d'agents
     internal: bool = False
+    #: Écrit dans un espace PARTAGÉ que lisent les agents sur Claude (Wiki, mémoire d'équipe) :
+    #: retirée de tout agent verrouillé sur le modèle local, pour que ses données (finances,
+    #: réponses individuelles) ne puissent pas y être recopiées (`build_tools(local=True)`)
+    shared: bool = False
     tags: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -101,19 +105,28 @@ class UnavailableToolset(BaseModel):
     reason: str
 
 
+SHARED_REFUSED = "refusée à un agent 100 % local (espace lu par les agents sur Claude)"
+
+
 def build_tools(
-    ids: list[str], env: ToolEnvironment
+    ids: list[str], env: ToolEnvironment, *, local: bool = False
 ) -> tuple[list[BaseTool[Any]], list[UnavailableToolset]]:
     """Outils des boîtes demandées, dans l'ordre, sans doublon de nom.
 
     Une boîte non configurée (adresse ou jeton absent) est écartée et signalée :
-    l'agent reste utilisable avec ses autres outils.
+    l'agent reste utilisable avec ses autres outils. `local` (agent verrouillé sur le modèle
+    local) : les boîtes `shared` sont écartées de la même façon.
     """
     tools: list[BaseTool[Any]] = []
     unavailable: list[UnavailableToolset] = []
     seen: set[str] = set()
     for toolset_id in ids:
         toolset = get_toolset(toolset_id)
+        if local and toolset.shared:
+            unavailable.append(
+                UnavailableToolset(id=toolset.id, label=toolset.label, reason=SHARED_REFUSED)
+            )
+            continue
         if not toolset.is_configured(env.settings):
             unavailable.append(
                 UnavailableToolset(id=toolset.id, label=toolset.label, reason="non configurée")
@@ -347,6 +360,7 @@ register_toolset(
         is_configured=lambda s: bool(s.wiki_base_url),
         app="wiki",
         writes=True,
+        shared=True,
     )
 )
 register_toolset(
@@ -368,6 +382,7 @@ register_toolset(
         is_configured=lambda s: bool(s.wiki_base_url),
         app="wiki",
         writes=True,
+        shared=True,
     )
 )
 register_toolset(

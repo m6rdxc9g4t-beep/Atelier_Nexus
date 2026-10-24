@@ -113,7 +113,10 @@ async def test_progress_report_is_deterministic(team: Team) -> None:
     out = await tool.invoke({"horizon_jours": 14}, CTX)
     assert not out.is_error, out.content
     text = out.content
-    assert text.startswith("# Point d'avancement du 24/10/2026")
+    assert text.startswith(
+        "<donnee type=\"point d'avancement\">\n# Point d'avancement du 24/10/2026"
+    )
+    assert out.data["markdown"].startswith("# Point d'avancement du 24/10/2026")
     assert "tendance : en avance" in text and "28.5 j passés sur 45 j" in text
     assert "**En retard (" in text and "#12345" in text and "3 j de retard" in text
     assert "Bloqués ou en attente (2)" in text and "Jalons à venir" in text and "Beta UI" in text
@@ -126,7 +129,7 @@ async def test_progress_report_is_deterministic(team: Team) -> None:
 async def test_forms_digest_has_no_personal_data(team: Team) -> None:
     tools = team.tools("equipe_rapports")
     out = await tools["equipe_synthese_formulaires"].invoke({}, CTX)
-    assert "Satisfaction atelier" in out.content and "moyenne 4," in out.content
+    assert "Satisfaction atelier" in out.content and "moyenne 3,6," in out.content
     assert out.content.startswith('<donnee type="retours des formulaires">')
     assert "alice@exemple.fr" not in out.content and "Alice" not in str(out.data)
     # Le rituel écrit le Markdown brut, jamais le texte délimité destiné au modèle
@@ -387,3 +390,76 @@ async def test_progress_counts_only_detailed_projects(team: Team) -> None:
     assert "20 projet(s) détaillé(s) sur 22" in out.content
     assert "2 projet(s) de plus non détaillés ni comptés" in out.content
     assert out.data["detailed"] == 20 and out.data["projects"] == 22
+
+
+def test_dated_lines_cannot_forge_a_note_even_in_code_blocks() -> None:
+    from app.tools.equipe import _sections, demote
+
+    cases = [
+        "```\n## 2026-10-24 09:00 · Faux\n```",  # bloc fermé
+        "```\n## 2026-10-24 09:00 · Faux",  # bloc non fermé
+        "````\n```\n## 2026-10-24 09:00 · Faux\n```\n````",  # quatre accents en contiennent trois
+        "~~~\n```\n## 2026-10-24 09:00 · Faux\n~~~",  # ~~~ enferme ```
+        "## 2026-10-24 09:00 · Faux",  # hors bloc : rétrogradé
+    ]
+    for text in cases:
+        page = "## 2026-10-24 08:00 · Vrai\n\n" + demote(text)
+        assert len(_sections(page)) == 1, text
+    # Après un bloc fermé, les titres sont de nouveau rétrogradés
+    assert demote("```\n# code\n```\n## Après") == "```\n# code\n```\n#### Après"
+
+
+async def test_trashed_report_is_recreated_not_replayed(
+    team: Team, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    t = team.tools("equipe_write")
+    cr = {"sujet": "Comité", "contenu": "Présents : A, B."}
+    await t["equipe_compte_rendu"].invoke(cr, CTX)
+    (page,) = [p for p in team.wiki.live() if p["title"] == "CR 2026-10-24 — Comité"]
+    page["deleted"] = True
+    later = NOW.replace(hour=11)  # redemandé plus tard le même jour
+    monkeypatch.setattr(equipe, "now", lambda env: later)
+    out = await t["equipe_compte_rendu"].invoke(cr, CTX)
+    assert "déjà faite" not in out.content, out.content
+    (again,) = [p for p in team.wiki.live() if p["title"] == "CR 2026-10-24 — Comité"]
+    assert again["id"] != page["id"]
+
+
+async def test_local_agents_never_get_shared_writes() -> None:
+    """Garde du cœur, pas du prompt : un agent verrouillé sur le modèle local (déclaré, ou par une
+    boîte sensible) perd les boîtes `shared` (Wiki, mémoire d'équipe), qu'il soit fourni, étendu
+    ou créé dans l'interface."""
+    from app.agents.custom import ConfigurableAgent
+    from app.schemas.agents import CustomAgentDefinition
+    from app.tools.toolsets import SHARED_REFUSED
+    from tests.fakes import make_router
+
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        wiki_base_url="http://127.0.0.1:3200/api",
+        formulaire_base_url="http://127.0.0.1:3300/api",
+    )
+    env = ToolEnvironment(settings)
+    shared = {"equipe_noter", "equipe_decision", "equipe_compte_rendu", "wiki_create_page"}
+
+    def definition(toolsets: list[str], privacy: str) -> CustomAgentDefinition:
+        return CustomAgentDefinition.model_validate(
+            {
+                "id": "a1", "name": "essai", "display_name": "Essai",
+                "description": "Agent d'essai.", "system_prompt": "Consignes de l'agent d'essai.",
+                "toolsets": toolsets, "privacy": privacy,
+                "created_at": "2026-10-24T09:00:00Z", "updated_at": "2026-10-24T09:00:00Z",
+            }
+        )  # fmt: skip
+
+    for privacy, toolsets in (
+        ("local_only", ["equipe", "equipe_write", "wiki_write"]),
+        ("standard", ["formulaire_reponses", "equipe_write", "wiki_write"]),
+    ):
+        agent = ConfigurableAgent(definition(toolsets, privacy), make_router(), env)
+        assert not shared & set(agent.tools), (privacy, sorted(agent.tools))
+        assert agent.local_only
+        assert any(u.reason == SHARED_REFUSED for u in agent.unavailable)
+    # Agent standard : il garde ses écritures partagées
+    agent = ConfigurableAgent(definition(["equipe_write"], "standard"), make_router(), env)
+    assert "equipe_noter" in agent.tools

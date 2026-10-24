@@ -49,7 +49,9 @@ Dans la fabrique d'une boîte (`build=lambda env: ...`), l'environnement d'exéc
 Les règles des agents fournis s'appliquent à l'identique (`docs/agents.md`) : tout outil qui
 modifie des données porte `requires_approval = True` et un `approval_summary()` concret ; tout
 outil sur des données financières ou personnelles porte `sensitive = True`, et sa boîte
-`sensitive=True` (agent verrouillé sur le modèle local). Une boîte ne peut pas réutiliser
+`sensitive=True` (agent verrouillé sur le modèle local). Une boîte qui écrit dans un espace lu
+par les agents sur Claude (Wiki, mémoire d'équipe…) porte `shared=True` : Nexus la retire de
+tout agent verrouillé sur le modèle local. Une boîte ne peut pas réutiliser
 l'identifiant d'une boîte existante : `register_toolset` lève une erreur et l'extension n'est
 pas chargée.
 

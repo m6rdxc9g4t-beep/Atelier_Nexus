@@ -104,15 +104,17 @@ async def test_formulaire_summary_never_leaks_free_text(apps: Apps) -> None:
     out = await t["formulaire_form"].invoke({"form_id": "1"}, CTX)
     assert "Note globale" in out.content and "Oui, Peut-être, Non" in out.content
     out = await t["formulaire_summary"].invoke({"form_id": "1"}, CTX)
-    assert "moyenne 4, minimum 3, maximum 5" in out.content and "| Oui | 2 | 67 % |" in out.content
+    assert (
+        "moyenne 3,6, minimum 2, maximum 5" in out.content and "| Oui | 3 | 60 % |" in out.content
+    )
     assert "alice@exemple.fr" not in out.content + json.dumps(out.data)
     assert "réponses libres, non reprises" in out.content
     assert out.content.startswith('<donnee type="synthèse du formulaire">')
 
 
 async def test_formulaire_summary_hides_small_groups_and_empty_numbers(apps: Apps) -> None:
-    """Moins de 3 réponses : ni minimum, ni maximum, ni effectifs (ils désigneraient quelqu'un) ;
-    aucune réponse numérique : « — », jamais « None »."""
+    """Moins de 3 réponses à un choix, moins de 5 à un nombre : ni minimum, ni maximum, ni
+    effectifs (ils désigneraient quelqu'un) ; aucune réponse : jamais « None »."""
     apps.form.forms[1]["questions"] += [
         {"id": "q4", "type": "number", "label": "Âge"},
         {"id": "q5", "type": "yes_no", "label": "Première visite ?"},
@@ -121,13 +123,16 @@ async def test_formulaire_summary_hides_small_groups_and_empty_numbers(apps: App
     for r, extra in zip(
         apps.form.responses[1],
         [{"q5": True, "q6": ["Vélo", "Bois"]}, {"q5": False, "q6": ["Vélo"]}, {"q5": True}],
-        strict=True,
+        strict=False,
     ):
         r["answers"].update(extra)
-    apps.form.responses[1][0]["answers"]["q4"] = 41
+    for r, age in zip(apps.form.responses[1], [41, 35, 52, 29], strict=False):
+        r["answers"]["q4"] = age
     out = await apps.tools("formulaire")["formulaire_summary"].invoke({"form_id": "1"}, CTX)
-    assert "**Âge** (1 réponse(s)) : moins de 3 réponses, détail non montré." in out.content
-    assert "41" not in out.content and "None" not in out.content
+    # 4 âges : sous le seuil des nombres (5) ; une échelle à 5 réponses est montrée
+    assert "**Âge** (4 réponse(s)) : moins de 5 réponses, détail non montré." in out.content
+    assert "41" not in out.content and "52" not in out.content and "None" not in out.content
+    assert "**Note globale** (5 réponse(s)) : moyenne" in out.content
     assert "| Oui | 2 | 67 % |" in out.content  # oui / non (3 réponses)
     assert "**Ateliers suivis** (2 réponse(s)) : moins de 3 réponses" in out.content
     age = next(q for q in out.data["questions"] if q["id"] == "q4")
@@ -142,14 +147,40 @@ async def test_formulaire_responses_are_sensitive_newest_first_and_whole(apps: A
     assert tool.sensitive and not tool.requires_approval
     long_text = "Très bien organisé. " * 30  # 600 caractères : jamais tronqué à 80
     apps.form.responses[1][2]["answers"]["q3"] = long_text
-    out = await tool.invoke({"form_id": "1", "nombre": 2}, CTX)
-    assert out.content.index("Réponse 3") < out.content.index("Réponse 2")
-    assert "Réponse 1 " not in out.content and "avant_id=2" in out.content
+    out = await tool.invoke({"form_id": "1", "nombre": 3}, CTX)
+    assert (
+        out.content.index("Réponse 5")
+        < out.content.index("Réponse 4")
+        < out.content.index("Réponse 3")
+    )
+    assert "Réponse 2 " not in out.content and "avant_id=3" in out.content
     assert long_text.strip() in out.content and "Chloé" in out.content
     assert "- Note globale : 4" in out.content and "<donnee" in out.content
-    out = await tool.invoke({"form_id": "1", "avant_id": "2"}, CTX)
-    assert "Alice" in out.content and "Bruno" not in out.content
-    assert "plus ancienne" not in out.content
+    out = await tool.invoke({"form_id": "1", "avant_id": "3"}, CTX)
+    assert "Alice" in out.content and "Bruno" in out.content and "Chloé" not in out.content
+    assert "avant_id=" not in out.content
+    out = await tool.invoke({"form_id": "1", "avant_id": "1"}, CTX)
+    assert out.content == "Aucune réponse avant la réponse 1."
+
+
+async def test_formulaire_responses_never_cut_silently_and_read_past_5000(apps: Apps) -> None:
+    """Budget de caractères : on montre moins de réponses, et `avant_id` désigne la suivante ;
+    au-delà de 5 000 réponses, on lit jusqu'à la fin (since_id)."""
+    (tool,) = apps.tools("formulaire_reponses").values()
+    apps.form.responses[1] = [
+        {"id": n, "respondent": f"R{n}", "answers": {"q1": 3, "q3": "x" * 2_000}}
+        for n in range(1, 101)
+    ]
+    out = await tool.invoke({"form_id": "1", "nombre": 100}, CTX)
+    shown = [n for n in range(1, 101) if f"### Réponse {n} " in out.content]
+    assert shown == list(range(shown[0], 101)) and len(shown) < 100
+    assert f"avant_id={shown[0]}" in out.content and "non montrés" not in out.content
+    apps.form.responses[1] = [
+        {"id": n, "respondent": f"R{n}", "answers": {"q1": 3}} for n in range(1, 5_004)
+    ]
+    out = await tool.invoke({"form_id": "1", "nombre": 2}, CTX)
+    assert "### Réponse 5003 " in out.content and "### Réponse 5002 " in out.content
+    assert "(sur 5003)" in out.content
 
 
 async def test_formulaire_create_open_and_share(apps: Apps) -> None:

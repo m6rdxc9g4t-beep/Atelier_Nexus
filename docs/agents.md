@@ -25,6 +25,11 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Métiers | Juridique (`juridique`) | core | Droit français ; renvoie vers un avocat |
 | Métiers | Ressources humaines (`rh`) | core | Fiches de poste, entretiens, intégration |
 
+Boîte **partagée** (`shared`) : elle écrit là où lisent les agents sur Claude ; elle est retirée de tout
+agent verrouillé sur le modèle local (déclaré, ou par une boîte ou un outil sensible), signalée
+« indisponible » avec la raison. Les données locales (finances, réponses individuelles) ne peuvent donc
+pas y être recopiées.
+
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
 `common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation) ;
 `team_rules.py` celles de l'équipe (mémoire partagée dans le Wiki, jamais de donnée personnelle ni financière) → [`equipe.md`](equipe.md).
@@ -57,12 +62,12 @@ le recréer sur un agent personnalisé qui a les mêmes boîtes.
 | `github_read` | `github_repo_overview`, `_list_files`, `_read_file`, `_search_code`, `_list_pull_requests`, `_list_issues` | — | — |
 | `github_write` | `github_create_branch`, `_commit_files`, `_open_pull_request` | ✅ validation | — |
 | `wiki` | `wiki_spaces`, `_search`, `_pages`, `_read_page` ([`apps/wiki.md`](apps/wiki.md)) | — | — |
-| `wiki_write` | `wiki_create_page`, `_append_page`, `_replace_page`, `_create_space` | ✅ validation | — |
+| `wiki_write` | `wiki_create_page`, `_append_page`, `_replace_page`, `_create_space` | ✅ validation, **partagée** | — |
 | `formulaire` | `formulaire_forms`, `_form`, `_summary` (agrégats, sans texte libre, masqués sous 3 réponses) ([`apps/formulaire.md`](apps/formulaire.md)) | — | — |
 | `formulaire_write` | `formulaire_create_form`, `_set_status`, `_set_access` | ✅ validation | — |
 | `formulaire_reponses` | `formulaire_responses` (réponses une par une, plus récentes d'abord) | — | ✅ local imposé |
 | `equipe` | `equipe_memoire` (espace « Équipe Atelier » du Wiki) | — | — |
-| `equipe_write` | `equipe_noter`, `_decision`, `_compte_rendu` | ✅ validation | — |
+| `equipe_write` | `equipe_noter`, `_decision`, `_compte_rendu` | ✅ validation, **partagée** | — |
 | `equipe_rapports` | `equipe_point_avancement` (Projets), `_synthese_formulaires` (Formulaire, agrégats) | — | — |
 | `delegation` | `delegate_to_agent` | — | — |
 

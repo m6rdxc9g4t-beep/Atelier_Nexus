@@ -40,7 +40,9 @@ Format : une note commence par un en-tête daté `## AAAA-MM-JJ …` ; ce sont c
 seuls, qui séparent les notes. Les titres `#` / `##` écrits dans une note sont rétrogradés
 (`###` / `####`) pour rester sous son en-tête. L'espace existant est retrouvé aux accents et à la
 casse près ; une page de structure mise à la corbeille est recréée ; un compte rendu déjà rangé à
-l'identique est signalé, un autre du même jour et du même sujet est numéroté « (2) ».
+l'identique est signalé, un autre du même jour et du même sujet est numéroté « (2) » ; un compte rendu mis à la corbeille
+puis redemandé est recréé. Un titre `## AAAA-MM-JJ…` écrit dans une note, même dans un bloc de code,
+est neutralisé : il ne peut pas passer pour une autre note.
 
 Règles des membres (prompt) : lire la mémoire au début d'une tâche ; noter à la fin ce qui a été fait
 (avec les identifiants) et ce qui reste, pour quel rôle ; n'enregistrer comme décision que ce que
@@ -48,8 +50,10 @@ l'utilisateur a décidé ou validé ; **jamais** de donnée personnelle ni de mo
 mémoire (elle est lue par des agents sur Claude).
 
 Confidentialité : les agents qui lisent des données personnelles ou financières (Enquêtes, Finance)
-**lisent** la mémoire mais n'y écrivent pas — garde technique (leurs boîtes), vérifiée par un test sur
-tous les agents. Pour partager un résultat d'enquête, Enquêtes rédige une synthèse anonyme que
+**lisent** la mémoire mais n'y écrivent pas. C'est une garde du cœur, pas une consigne : les boîtes
+marquées `shared` (`equipe_write`, `wiki_write`) sont retirées de tout agent verrouillé sur le modèle
+local (déclaré `local_only`, ou par une boîte ou un outil sensible), qu'il soit fourni, étendu par une
+extension ou créé dans l'interface ; l'agent les voit « indisponibles » avec la raison. Pour partager un résultat d'enquête, Enquêtes rédige une synthèse anonyme que
 l'utilisateur fait noter par la Direction ; la synthèse agrégée est aussi notée par le rituel du vendredi.
 
 Passer le travail d'un rôle à l'autre : le premier agent note au journal ce qui reste « pour le
@@ -62,7 +66,7 @@ s'y ajoutera une fois #28 fusionnée.
 | Outil | Source | Contenu |
 |---|---|---|
 | `equipe_point_avancement` | Atelier Projets | Par projet (20 au plus, détaillés et comptés) : avancement, tendance, budget (jours passés, part consommée, reste ou dépassement), échéance du projet (dépassée ?) ; en retard, à échéance (horizon réglable), bloqués ou en attente (une seule liste chacun ; un bloqué en retard compte dans « en retard, dont … bloqués ») ; jalons dépassés et à venir. Un projet illisible est signalé sans faire échouer le rapport. Fuseau `TIMEZONE`. |
-| `equipe_synthese_formulaires` | Atelier Formulaire | Formulaires ouverts : effectifs par choix, moyennes, distributions ; textes libres jamais repris ; détail masqué sous 3 réponses. |
+| `equipe_synthese_formulaires` | Atelier Formulaire | Formulaires ouverts : effectifs par choix, moyennes, distributions ; textes libres jamais repris ; détail masqué sous 3 réponses (5 pour les nombres et échelles). |
 
 Ce sont des calculs, pas des interprétations : utilisables dans les workflows et les rituels. Le
 modèle reçoit le texte délimité ; le Markdown brut est dans `data.markdown` (ce qu'écrivent les

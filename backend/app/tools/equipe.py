@@ -146,13 +146,15 @@ class _Memory[InputT: ToolInput](NodeTool[InputT]):
 
 #: Section d'une note ou d'une décision : `## 2026-10-24 …` (en-tête daté écrit par ces outils)
 _DATED = re.compile(r"^## (?=\d{4}-\d{2}-\d{2})", re.MULTILINE)
-_HEADING = re.compile(r"^(#{1,2})(?=\s)", re.MULTILINE)
-_FENCE = re.compile(r"^(```|~~~)", re.MULTILINE)
+_HEADING = re.compile(r"^(#{1,2})(?=\s)")
+_OPEN_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 def _sections(content: str) -> list[str]:
     """Sections datées d'une page (la plus récente en dernier). Les titres internes d'une note
-    (`## Projet`) ne coupent pas la note ; le texte d'avant la première note est ignoré."""
+    (`## Projet`) ne coupent pas la note ; le texte d'avant la première note est ignoré.
+    Les textes écrits par ces outils passent par `demote` : aucune de leurs lignes ne peut
+    ressembler à un en-tête daté, même dans un bloc de code."""
     starts = [m.start() for m in _DATED.finditer(content)]
     return [
         content[a:b].strip()
@@ -162,15 +164,26 @@ def _sections(content: str) -> list[str]:
 
 
 def demote(text: str) -> str:
-    """Titres `#` et `##` d'un texte ajouté → `###` / `####` (hors blocs de code), pour qu'ils
-    restent sous l'en-tête daté de leur note."""
+    """Prépare un texte ajouté au journal ou au registre :
+
+    - titres `#` et `##` → `###` / `####` hors blocs de code (ils restent sous l'en-tête daté) ;
+    - toute ligne `## AAAA-MM-JJ…`, même dans un bloc de code ou un bloc non fermé, reçoit une
+      espace en tête : elle ne peut pas passer pour l'en-tête d'une autre note.
+
+    Blocs de code au sens de CommonMark : une barrière se ferme par le même caractère, au moins
+    aussi long, sans texte après."""
     out: list[str] = []
-    fenced = False
+    fence: str | None = None
     for line in text.splitlines():
-        if _FENCE.match(line):
-            fenced = not fenced
-        elif not fenced:
-            line = _HEADING.sub(lambda m: m.group(1) + "##", line, count=1)
+        if fence is None:
+            if m := _OPEN_FENCE.match(line):
+                fence = m.group(1)
+            else:
+                line = _HEADING.sub(lambda m: m.group(1) + "##", line, count=1)
+        elif re.fullmatch(rf" {{0,3}}{re.escape(fence[0])}{{{len(fence)},}}\s*", line):
+            fence = None
+        if _DATED.match(line):
+            line = " " + line
         out.append(line)
     return "\n".join(out)
 
@@ -432,7 +445,13 @@ class ReportTool(_Memory[ReportInput]):
             "space_id": space,
             "parent_id": parent,
         }
-        result = await self.run_node("pages.create", payload, idempotent_on=payload)
+        # Clé à la minute : une même validation exécutée deux fois ne crée rien en double, mais un
+        # compte rendu mis à la corbeille puis redemandé plus tard est recréé (une clé sur le seul
+        # contenu ferait rejouer par le Wiki, 30 jours, la page supprimée)
+        minute = f"{now(self.env):%Y-%m-%d %H:%M}"
+        result = await self.run_node(
+            "pages.create", payload, idempotent_on={**payload, "minute": minute}
+        )
         return ToolOutput(
             content=f"Compte rendu « {title} » rangé (page {result.data.get('id')})"
             + (REPLAYED if result.replayed else "")
@@ -544,7 +563,8 @@ class ProgressTool(BaseTool[ProgressInput]):
             [f"# Point d'avancement du {today:%d/%m/%Y}", "", brief, *sections]
         ).rstrip()
         return ToolOutput(
-            content=text,
+            # Noms et titres viennent de Projets : texte délimité pour le modèle, brut ailleurs
+            content=as_data(text, kind="point d'avancement", limit=60_000),
             artifacts=[
                 Artifact(
                     kind="markdown", title=f"Point d'avancement {today:%d/%m/%Y}", content=text

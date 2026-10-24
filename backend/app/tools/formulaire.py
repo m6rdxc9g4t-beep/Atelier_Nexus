@@ -76,18 +76,18 @@ class FormTool(_FormTool[FormInput]):
             for q in form.get("questions") or []
         ]
         lines = [
-            f"Formulaire « {form.get('title')} » (id {form.get('id')}) : "
+            f"Formulaire {form.get('id')} : "
             f"{STATUS_LABELS.get(str(form.get('status')), form.get('status'))}, "
             f"{'accepte' if form.get('accepting') else "n'accepte pas"} de réponses, "
             f"{form.get('response_count')} réponse(s).",
         ]
+        text = [f"Titre : {form.get('title')}"]
         if form.get("description"):
-            lines.append(
-                as_data(str(form["description"]), kind="description du formulaire", limit=2000)
-            )
-        lines.append(
+            text.append(f"Description : {str(form['description'])[:2000]}")
+        text.append(
             markdown_table(["Id", "Type", "Question", "Obligatoire", "Choix / bornes"], rows)
         )
+        lines.append(as_data("\n".join(text), kind="formulaire", limit=30_000))
         return ToolOutput(content="\n".join(lines), data=form)
 
 
@@ -111,8 +111,11 @@ class SummaryTool(_FormTool[FormInput]):
 
 
 #: En dessous de ce nombre de réponses, le détail d'une question n'est pas montré : avec une ou
-#: deux personnes, un minimum, un maximum ou un effectif par choix désigne quelqu'un.
+#: deux personnes, un minimum, un maximum ou un effectif par choix désigne quelqu'un. Les nombres
+#: et échelles ont un seuil plus haut : moyenne + minimum + maximum + distribution permettent de
+#: reconstituer chaque valeur d'un petit groupe.
 MIN_GROUP = 3
+MIN_GROUP_NUMBERS = 5
 
 
 def aggregate_only(summary: dict[str, Any]) -> dict[str, Any]:
@@ -123,9 +126,10 @@ def aggregate_only(summary: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(q, dict):
             continue
         item = {k: v for k, v in q.items() if k != "latest"}
-        if (item.get("answered") or 0) < MIN_GROUP:
+        floor = MIN_GROUP_NUMBERS if item.get("kind") == "numbers" else MIN_GROUP
+        if (item.get("answered") or 0) < floor:
             item = {k: item.get(k) for k in ("id", "label", "type", "kind", "answered")}
-            item["masked"] = True
+            item["masked"] = floor
         questions.append(item)
     return {"total": summary.get("total"), "questions": questions}
 
@@ -149,7 +153,7 @@ def summary_markdown(summary: dict[str, Any]) -> str:
         head = f"\n**{label}** ({answered} réponse(s))"
         kind = q.get("kind")
         if q.get("masked"):
-            detail = "aucune réponse" if not answered else f"moins de {MIN_GROUP} réponses"
+            detail = "aucune réponse" if not answered else f"moins de {q['masked']} réponses"
             lines.append(f"{head} : {detail}, détail non montré.")
         elif kind == "choices":
             counts = q.get("counts") or []
@@ -222,31 +226,36 @@ class ResponsesTool(_FormTool[ResponsesInput]):
     sensitive = True
 
     async def run(self, params: ResponsesInput, ctx: ToolContext) -> ToolOutput:
-        # La route rend les réponses de la plus ancienne à la plus récente (since_id croissant)
-        data = await self.action(
-            "responses.list", {"form_id": params.form_id, "limit": FETCH_LIMIT}
-        )
-        rows = rows_of(self.app, data)
-        columns = [c for c in data["columns"] if isinstance(c, dict) and "key" in c]
+        rows, data, total = await self._latest(params)
         if params.avant_id:
             rows = [r for r in rows if _int(r.get("id")) < int(params.avant_id)]
         if not rows:
-            return ToolOutput(content="Aucune réponse pour l'instant.", data=data)
-        shown = list(reversed(rows[-params.nombre :]))
-        blocks = [_response_block(r, columns) for r in shown]
+            empty = (
+                f"Aucune réponse avant la réponse {params.avant_id}."
+                if params.avant_id
+                else "Aucune réponse pour l'instant."
+            )
+            return ToolOutput(content=empty, data=data)
+        columns = [c for c in data["columns"] if isinstance(c, dict) and "key" in c]
+        # On ne montre que ce qui tient dans le budget : l'en-tête et `avant_id` portent sur ce
+        # qui est réellement affiché (jamais une réponse coupée sans moyen d'y revenir)
+        blocks: list[str] = []
+        shown: list[dict[str, Any]] = []
+        used = 0
+        for row in reversed(rows[-params.nombre :]):
+            block = _response_block(row, columns)
+            if blocks and used + len(block) > RESPONSES_CHARS:
+                break
+            blocks.append(block)
+            shown.append(row)
+            used += len(block) + 2
         older = len(rows) - len(shown)
-        total = data.get("total")
         head = (
-            f"{len(shown)} réponse(s) les plus récentes"
-            + (f" sur {total}" if isinstance(total, int) else "")
+            f"{len(shown)} réponse(s), de la plus récente à la plus ancienne"
+            + (f" (sur {total})" if isinstance(total, int) else "")
             + (
                 f" ; {older} plus ancienne(s) : rappeler avec avant_id={shown[-1].get('id')}"
                 if older
-                else ""
-            )
-            + (
-                " ; la lecture s'arrête aux 5 000 premières réponses"
-                if data.get("truncated")
                 else ""
             )
             + "."
@@ -254,9 +263,43 @@ class ResponsesTool(_FormTool[ResponsesInput]):
         return ToolOutput(
             content=head
             + "\n"
-            + as_data("\n\n".join(blocks), kind="réponses au formulaire", limit=RESPONSES_CHARS),
+            + as_data(
+                "\n\n".join(blocks), kind="réponses au formulaire", limit=RESPONSES_CHARS + 1000
+            ),
             data=data,
         )
+
+    async def _latest(
+        self, params: ResponsesInput
+    ) -> tuple[list[dict[str, Any]], dict[str, Any], Any]:
+        """Les dernières réponses : la route les rend de la plus ancienne à la plus récente, par
+        pages de 5 000 au plus (`since_id`). On avance jusqu'à la fin et on garde la fenêtre
+        utile (les 5 000 dernières, ou celles d'avant `avant_id`)."""
+        since: str | None = None
+        window: list[dict[str, Any]] = []
+        data: dict[str, Any] = {}
+        total: Any = None
+        for _ in range(MAX_PAGES):
+            payload: dict[str, Any] = {"form_id": params.form_id, "limit": FETCH_LIMIT}
+            if since:
+                payload["since_id"] = since
+            data = await self.action("responses.list", payload)
+            if total is None:
+                total = data.get("total")  # première page (since_id absent) : total du formulaire
+            page = rows_of(self.app, data)
+            if params.avant_id:
+                page = [r for r in page if _int(r.get("id")) < int(params.avant_id)]
+            window = (window + page)[-FETCH_LIMIT:]
+            last = rows_of(self.app, data)
+            if not data.get("truncated") or not last:
+                break
+            since = str(last[-1].get("id"))
+            if params.avant_id and _int(since) >= int(params.avant_id):
+                break
+        return window, data, total
+
+
+MAX_PAGES = 20  # 100 000 réponses au plus
 
 
 def _int(value: Any) -> int:
@@ -402,7 +445,7 @@ class StatusTool(_FormTool[StatusInput]):
             "POST", f"/api/forms/{params.form_id}/status", {"status": params.status}
         )
         return ToolOutput(
-            content=f"Formulaire « {form.get('title')} » : {STATUS_LABELS.get(params.status)}.",
+            content=f"Formulaire {form.get('id')} : {STATUS_LABELS.get(params.status)}.",
             data={"id": str(form.get("id")), "status": form.get("status")},
         )
 
@@ -444,7 +487,7 @@ class AccessTool(_FormTool[AccessInput]):
             else ""
         )
         return ToolOutput(
-            content=f"Accès du formulaire « {form.get('title')} » : {params.access}.{link}",
+            content=f"Accès du formulaire {form.get('id')} : {params.access}.{link}",
             data={"id": str(form.get("id")), "access": form.get("access")},
         )
 
