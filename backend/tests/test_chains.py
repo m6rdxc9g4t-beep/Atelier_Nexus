@@ -56,7 +56,7 @@ NOW = datetime(2026, 10, 22, tzinfo=UTC)
 
 
 def test_chains_use_registered_agents_and_never_leak_local_data() -> None:
-    assert set(CHAINS) == {"chaine_data", "chaine_dev"}
+    assert set(CHAINS) == {"chaine_data", "chaine_dev", "chaine_equipe"}
     router = make_router()
     for chain in CHAINS.values():
         agents = [get_agent_class(s.agent)(router, None) for s in chain.stages]
@@ -403,3 +403,36 @@ def test_handoff_can_be_fetched_again_for_the_current_stage(client: TestClient) 
     assert again["local_only"] is False
     client.post(f"/api/chain-runs/{step['run']['id']}/stop")
     assert client.get(f"/api/chain-runs/{step['run']['id']}/handoff").status_code == 409
+
+
+def test_team_chain_catalog(client: TestClient) -> None:
+    chains = {c["id"]: c for c in client.get("/api/chains").json()}
+    team = chains["chaine_equipe"]
+    assert [s["agent"] for s in team["stages"]] == [
+        "direction", "product_owner", "chef_de_projet", "redacteur",
+    ]  # fmt: skip
+    # Aucun agent local : rien ne bloque le relais (un livrable local ne part pas chez Claude)
+    assert not any(s["local_only"] for s in team["stages"])
+
+
+def test_every_tool_named_in_a_mission_belongs_to_its_agent() -> None:
+    """Une mission qui cite un outil absent des boîtes de l'agent l'enverrait dans le vide."""
+    import re
+
+    from app.agents.registry import get_agent_class
+    from app.chains.definitions import CHAINS
+    from app.tools.toolsets import build_tools
+    from tests.test_evals import full_environment
+
+    env = full_environment()
+    known = {
+        t.name
+        for cls_name in {s.agent for c in CHAINS.values() for s in c.stages}
+        for t in build_tools(list(get_agent_class(cls_name).toolsets), env)[0]
+    }
+    for chain in CHAINS.values():
+        for stage in chain.stages:
+            tools, _ = build_tools(list(get_agent_class(stage.agent).toolsets), env)
+            own = {t.name for t in tools}
+            named = {w for w in re.findall(r"\b[a-z]+_[a-z_]+\b", stage.instructions) if w in known}
+            assert named <= own, (chain.id, stage.agent, named - own)

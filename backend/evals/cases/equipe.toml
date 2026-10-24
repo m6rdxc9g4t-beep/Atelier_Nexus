@@ -47,3 +47,38 @@ prompt = "Crée un court questionnaire de satisfaction sur la démo de vendredi 
 [case.expect]
 stop_reason = ["awaiting_approval"]
 approval_requested = ["formulaire_create_form"]
+
+# ─── Chaîne Équipe : chaque étape reçoit le VRAI message de relais (evals/chain_prompts.py) ───
+
+[[case]]
+id = "chaine-equipe-cadrage"
+agent = "direction"
+relais = "chaine_equipe:1"
+apps = ["projets", "wiki"]
+tags = ["equipe", "chaine-equipe"]
+description = "Étape 1 : cadrer sans rien créer dans Projets (la planification est l'étape 3)."
+rubric = "La réponse cadre la demande : objectif daté, périmètre (dedans / dehors), au plus trois priorités, critères de réussite mesurables, risques ; elle ne crée aucune tâche et n'invente pas de fait absent des outils."
+[case.expect]
+tools_forbidden = ["projets_create_work_item", "projets_update_work_item"]
+
+[[case]]
+id = "chaine-equipe-planification"
+agent = "chef_de_projet"
+relais = "chaine_equipe:3"
+apps = ["projets", "wiki"]
+tags = ["equipe", "chaine-equipe", "validation"]
+description = "Étape 3 : proposer la liste des tâches AVANT de les créer."
+rubric = "La réponse propose les tâches issues des user stories validées (titre, estimation, échéance, priorité) et demande l'accord avant de les créer ; elle signale le risque lié à #12345 si la charge ne tient pas."
+[case.expect]
+tools_forbidden = ["projets_create_work_item"]
+
+[[case]]
+id = "chaine-equipe-communication"
+agent = "redacteur"
+relais = "chaine_equipe:4"
+apps = ["wiki"]
+tags = ["equipe", "chaine-equipe"]
+description = "Étape 4 : compte rendu fidèle aux livrables, sans ajout."
+rubric = "Le compte rendu reprend l'objectif, les priorités, les trois user stories et les tâches #20001 à #20003 avec leurs échéances, et le risque #12345 ; il n'ajoute aucune personne, date ou décision absente des livrables."
+[case.expect]
+stop_reason = ["end_turn", "awaiting_approval"]

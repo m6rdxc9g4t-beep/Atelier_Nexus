@@ -102,7 +102,64 @@ DEV = ChainDefinition(
     ],
 )
 
-CHAINS: dict[str, ChainDefinition] = {c.id: c for c in (DATA, DEV)}
+EQUIPE = ChainDefinition(
+    id="chaine_equipe",
+    title="Chaîne Équipe",
+    description=(
+        "D'un objectif à un projet lancé dans vos applications : cadrage par la Direction, "
+        "user stories, tâches dans Atelier Projets, compte rendu de lancement dans le Wiki. "
+        "Vous validez le livrable de chaque étape et chaque écriture."
+    ),
+    icon="users",
+    stages=[
+        ChainStage(
+            agent="direction",
+            role="Cadrage",
+            instructions=(
+                "Lis la mémoire d'équipe et, si un projet existant est concerné, son point "
+                "d'avancement. Cadre la demande : objectif, périmètre (dedans / dehors), au plus "
+                "trois priorités, critères de réussite mesurables, échéance, risques. Ne crée rien "
+                "dans Atelier Projets : la planification est l'étape 3. Une décision n'est "
+                "enregistrée (equipe_decision) que si l'utilisateur la prend explicitement."
+            ),
+        ),
+        ChainStage(
+            agent="product_owner",
+            role="User stories",
+            instructions=(
+                "À partir du cadrage validé, écris les user stories (« En tant que…, je veux…, "
+                "afin de… ») avec leurs critères d'acceptation testables et une estimation, dans "
+                "l'ordre des priorités. Propose de ranger la spécification dans une page du Wiki "
+                "(wiki_search d'abord, puis wiki_create_page après accord). Ne crée pas encore de "
+                "tâches dans Atelier Projets."
+            ),
+        ),
+        ChainStage(
+            agent="chef_de_projet",
+            role="Planification",
+            instructions=(
+                "Planifie les user stories validées dans Atelier Projets : choisis ou fais choisir "
+                "le projet et la story parente (projets_structure), propose la liste des tâches "
+                "(titre, estimation, échéance, priorité) AVANT de les créer, puis crée-les une par "
+                "une (projets_create_work_item, chacune validée). Vérifie la charge avec "
+                "equipe_point_avancement et signale ce qui ne tient pas dans l'échéance."
+            ),
+        ),
+        ChainStage(
+            agent="redacteur",
+            role="Communication",
+            instructions=(
+                "Rédige le compte rendu de lancement à partir des livrables validés (objectif, "
+                "priorités, user stories, tâches créées avec leurs identifiants, échéances, "
+                "risques) et range-le dans la mémoire d'équipe (equipe_compte_rendu, après "
+                "accord). Rédige aussi le court message d'annonce à envoyer aux personnes "
+                "concernées, publié en artefact. N'ajoute rien qui ne soit dans les livrables."
+            ),
+        ),
+    ],
+)
+
+CHAINS: dict[str, ChainDefinition] = {c.id: c for c in (DATA, DEV, EQUIPE)}
 
 
 class ChainNotFoundError(LookupError):
