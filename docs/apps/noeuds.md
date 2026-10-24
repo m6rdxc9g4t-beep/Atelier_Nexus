@@ -1,7 +1,7 @@
 # Lecture des nœuds de la suite par Nexus (étape 19)
 
-Nexus lit le contrat `atelier-node/1` ([`noeud-atelier.md`](noeud-atelier.md)) de cinq
-applications (Wiki et Formulaire depuis l'étape 26) pour les workflows v2 et la carte de la suite. Code : `backend/app/suite/`.
+Nexus lit le contrat `atelier-node/1` ([`noeud-atelier.md`](noeud-atelier.md)) de six
+applications (Wiki et Formulaire depuis l'étape 26, Convert depuis l'étape 28) pour les workflows v2 et la carte de la suite. Code : `backend/app/suite/`.
 
 | Application | Manifeste | Actions | Événements |
 |---|---|---|---|
@@ -10,6 +10,7 @@ applications (Wiki et Formulaire depuis l'étape 26) pour les workflows v2 et la
 | Atelier Tab | fichier `{TAB_EXPORTS_DIR}/_atelier/manifest.json`, sinon outil MCP `atelier_manifest` | serveur MCP (`TAB_MCP_COMMAND`) | `_atelier/events.jsonl`, sinon outil MCP `atelier_events` |
 | Atelier Wiki | `GET {WIKI_BASE_URL}/atelier/manifest` | HTTP | `GET {WIKI_BASE_URL}/atelier/events` |
 | Atelier Formulaire | `GET {FORMULAIRE_BASE_URL}/atelier/manifest` | HTTP | `GET {FORMULAIRE_BASE_URL}/atelier/events` |
+| Atelier Convert | `GET {CONVERT_BASE_URL}/atelier/manifest` | HTTP | `GET {CONVERT_BASE_URL}/atelier/events` ([`convert.md`](convert.md)) |
 
 ## Statuts
 

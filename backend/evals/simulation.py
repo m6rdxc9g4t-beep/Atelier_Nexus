@@ -417,6 +417,7 @@ def simulated_settings() -> Settings:
         tresorerie_base_url="http://tresorerie.simule/api",
         wiki_base_url=WIKI_URL,
         formulaire_base_url=FORMULAIRE_URL,
+        convert_base_url=None,  # non simulé : jamais l'app de la machine pendant une évaluation
         cine_base_url=None,
         savoir_base_url=None,
         tab_exports_dir=None,

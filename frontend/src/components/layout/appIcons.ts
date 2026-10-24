@@ -1,9 +1,12 @@
 import {
   BarChart3,
+  BookOpen,
   CalendarCheck,
   CalendarDays,
   Clapperboard,
+  ClipboardList,
   CookingPot,
+  FileSpreadsheet,
   GraduationCap,
   Landmark,
   type LucideIcon,
@@ -25,6 +28,9 @@ export const APP_ICONS: Record<string, LucideIcon> = {
   savoir: GraduationCap,
   cuisine: CookingPot,
   dates: CalendarDays,
+  wiki: BookOpen,
+  formulaire: ClipboardList,
+  convert: FileSpreadsheet,
 };
 
 /** Application inconnue : prise générique. */

@@ -19,6 +19,7 @@ from app.suite.http import NodeActionError, NodeHttpClient, is_loopback
 from app.suite.manifest import ManifestError, parse_manifest
 from app.suite.nodes import build_http_request, validate_input
 from app.tools.environment import ToolEnvironment
+from tests.fake_convert import FakeConvert
 from tests.fake_suite import (
     PROJETS_MANIFEST,
     TAB_MANIFEST,
@@ -36,6 +37,9 @@ class Suite:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.viz = FakeVizNode()
         self.projets = FakeProjetsNode()
+        #: Atelier Convert : simulé, branché seulement si un test donne son adresse
+        self.convert = FakeConvert()
+        self.convert_url: str | None = None
         self.exports = tmp_path / "exports"
         self.exports.mkdir()
         shutil.copy(FIX / "tab" / "tbl_planning_lots.json", self.exports)
@@ -65,6 +69,7 @@ class Suite:
             "tab_mcp_command": mcp_command() if self.mcp else None,
             "github_repo": None,
             "approval_mode": self.approval_mode,
+            "convert_base_url": self.convert_url,
         }
         return Settings(**(values | extra))
 
@@ -74,6 +79,7 @@ class Suite:
             transports={
                 "data_via": self.viz.transport,
                 "projets": httpx.MockTransport(self.projets),
+                "convert": httpx.MockTransport(self.convert),
             },
         )
 
@@ -131,6 +137,7 @@ async def test_states_of_the_three_nodes(suite: Suite) -> None:
         "projets": "ok",
         "wiki": "not_configured",
         "formulaire": "not_configured",
+        "convert": "not_configured",
     }
     assert states["tab"].transport == "mcp" and states["viz"].transport == "http"
     assert states["viz"].ignored  # action mal formée signalée

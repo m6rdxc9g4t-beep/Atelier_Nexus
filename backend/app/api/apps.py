@@ -102,6 +102,12 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
         opened = sum(1 for r in rows if isinstance(r, dict) and r.get("accepte_reponses"))
         return f"{len(rows)} formulaire(s), {opened} ouvert(s) aux réponses"
 
+    async def convert() -> str:
+        items = (await env.suite().run_action("convert", "conversions.list", {})).data
+        rows = items if isinstance(items, list) else []
+        sent = sum(1 for r in rows if isinstance(r, dict) and r.get("sent"))
+        return f"{len(rows)} conversion(s), {sent} envoyée(s) dans Atelier Tab"
+
     async def cuisine() -> str:
         # App en ligne : on interroge Supabase (jamais l'adresse Vercel de l'interface)
         items = await env.cuisine().pantry()
@@ -124,6 +130,7 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
                 _probe("savoir", "Atelier Savoir", s.savoir_base_url, savoir),
                 _probe("wiki", "Atelier Wiki", s.wiki_base_url, wiki),
                 _probe("formulaire", "Atelier Formulaire", s.formulaire_base_url, formulaire),
+                _probe("convert", "Atelier Convert", s.convert_base_url, convert),
                 _probe(
                     "cuisine",
                     "Atelier Cuisine",

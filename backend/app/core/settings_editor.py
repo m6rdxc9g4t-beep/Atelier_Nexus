@@ -74,6 +74,8 @@ FIELDS: tuple[EditableField, ...] = (
                   "API d'Atelier Wiki (port 3200 par défaut)."),
     EditableField("FORMULAIRE_BASE_URL", "Atelier Formulaire", "Applications Atelier", "url",
                   "API d'Atelier Formulaire (port 3300 par défaut)."),
+    EditableField("CONVERT_BASE_URL", "Atelier Convert", "Applications Atelier", "url",
+                  "API d'Atelier Convert (port 8010 par défaut) : workflows et extension Agent_DatAnalyst."),
     EditableField("SAVOIR_BASE_URL", "Atelier Savoir", "Applications Atelier", "url",
                   "Lancez Savoir avec ATELIER_PORT=5051 (5050 est pris par Trésorerie)."),
     EditableField("TAB_EXPORTS_DIR", "Instantanés d'Atelier Tab", "Applications Atelier", "path",

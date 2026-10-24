@@ -204,6 +204,7 @@ def test_simulated_settings_only_enable_simulated_apps() -> None:
     assert not (settings.cine_base_url or settings.savoir_base_url or settings.github_repo_list)
     # Wiki et Formulaire : adresses de bouclage, mais transports simulés (rien d'appelé)
     assert settings.wiki_base_url == "http://127.0.0.1:3200/api"
+    assert settings.convert_base_url is None  # non simulé : jamais joint pendant une évaluation
 
 
 async def test_simulated_team_memory_and_forms() -> None:

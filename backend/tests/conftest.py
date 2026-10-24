@@ -18,6 +18,7 @@ os.environ["TRIGGERS_ENABLED"] = "false"
 # application réelle ; les tests qui en ont besoin passent une adresse et un transport simulé
 os.environ["WIKI_BASE_URL"] = ""
 os.environ["FORMULAIRE_BASE_URL"] = ""
+os.environ["CONVERT_BASE_URL"] = ""
 
 from app.suite.nodes import clear_manifest_cache
 

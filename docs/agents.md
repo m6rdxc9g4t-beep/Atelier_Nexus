@@ -155,6 +155,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |
 | `WIKI_BASE_URL` | `http://127.0.0.1:3200/api` | Atelier Wiki ([`apps/wiki.md`](apps/wiki.md)) |
 | `FORMULAIRE_BASE_URL` | `http://127.0.0.1:3300/api` | Atelier Formulaire ([`apps/formulaire.md`](apps/formulaire.md)) |
+| `CONVERT_BASE_URL` | `http://127.0.0.1:8010/api` | Atelier Convert : nœud des workflows ([`apps/convert.md`](apps/convert.md)) et connecteur de l'extension Agent_DatAnalyst |
 | `APPS_TIMEOUT` | `20` | Délai par appel (s) |
 | `GITHUB_TOKEN` | vide | Jeton *fine-grained* : Contents + Pull requests (lecture/écriture), dépôts choisis |
 | `GITHUB_REPO` / `GITHUB_ALLOWED_REPOS` | vide | Dépôt par défaut / autres dépôts autorisés |

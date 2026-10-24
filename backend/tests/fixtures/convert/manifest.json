@@ -1,0 +1,1112 @@
+{
+ "contract": "atelier-node/1",
+ "app": "convert",
+ "name": "Atelier Convert",
+ "version": "0.1.0",
+ "transport": "http",
+ "actions": [
+  {
+   "id": "conversions.list",
+   "label": "Lister les conversions",
+   "description": "Historique des conversions : fichier, ce qui a été reconnu, nombre de lignes, envois vers Atelier Tab.",
+   "kind": "read",
+   "http": {
+    "method": "GET",
+    "path": "/api/conversions"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "description": "Action sans paramètre.",
+    "properties": {},
+    "title": "NoInput",
+    "type": "object",
+    "required": []
+   },
+   "output": {
+    "format": "json",
+    "schema": {
+     "$defs": {
+      "ConversionSummary": {
+       "description": "Entrée de l'historique.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "name": {
+         "title": "Name",
+         "type": "string"
+        },
+        "created_at": {
+         "title": "Created At",
+         "type": "string"
+        },
+        "updated_at": {
+         "title": "Updated At",
+         "type": "string"
+        },
+        "source": {
+         "$ref": "#/$defs/SourceInfo"
+        },
+        "detected": {
+         "description": "Ce qui a été reconnu (« Relevé bancaire · 42 opérations »).",
+         "title": "Detected",
+         "type": "string"
+        },
+        "rows": {
+         "title": "Rows",
+         "type": "integer"
+        },
+        "columns": {
+         "title": "Columns",
+         "type": "integer"
+        },
+        "statement": {
+         "anyOf": [
+          {
+           "$ref": "#/$defs/StatementSummary"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null
+        },
+        "sent": {
+         "items": {
+          "$ref": "#/$defs/TabSend"
+         },
+         "title": "Sent",
+         "type": "array"
+        }
+       },
+       "required": [
+        "id",
+        "name",
+        "created_at",
+        "updated_at",
+        "source",
+        "detected",
+        "rows",
+        "columns"
+       ],
+       "title": "ConversionSummary",
+       "type": "object"
+      },
+      "SourceInfo": {
+       "description": "Fichier d'origine.",
+       "properties": {
+        "filename": {
+         "title": "Filename",
+         "type": "string"
+        },
+        "kind": {
+         "enum": [
+          "pdf",
+          "image",
+          "csv",
+          "txt",
+          "xlsx",
+          "xls",
+          "ofx",
+          "qif",
+          "json"
+         ],
+         "title": "Kind",
+         "type": "string"
+        },
+        "size": {
+         "title": "Size",
+         "type": "integer"
+        },
+        "sha256": {
+         "title": "Sha256",
+         "type": "string"
+        },
+        "pages": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Pages"
+        },
+        "encoding": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Encoding"
+        },
+        "delimiter": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Delimiter"
+        },
+        "sheets": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Sheets",
+         "type": "array"
+        },
+        "ocr": {
+         "default": false,
+         "description": "Texte obtenu par reconnaissance de caractères (OCR).",
+         "title": "Ocr",
+         "type": "boolean"
+        },
+        "ocr_confidence": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Confiance moyenne de l'OCR (0 à 100).",
+         "title": "Ocr Confidence"
+        },
+        "ocr_languages": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Ocr Languages"
+        }
+       },
+       "required": [
+        "filename",
+        "kind",
+        "size",
+        "sha256"
+       ],
+       "title": "SourceInfo",
+       "type": "object"
+      },
+      "StatementSummary": {
+       "description": "Synthèse d'un relevé bancaire (calculée sur les lignes obtenues).",
+       "properties": {
+        "transactions": {
+         "title": "Transactions",
+         "type": "integer"
+        },
+        "start": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Start"
+        },
+        "end": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "End"
+        },
+        "total_debit": {
+         "default": 0.0,
+         "title": "Total Debit",
+         "type": "number"
+        },
+        "total_credit": {
+         "default": 0.0,
+         "title": "Total Credit",
+         "type": "number"
+        },
+        "opening_balance": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Solde initial lu dans le document.",
+         "title": "Opening Balance"
+        },
+        "closing_balance": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Solde final lu dans le document.",
+         "title": "Closing Balance"
+        },
+        "balance_check": {
+         "default": "unknown",
+         "enum": [
+          "ok",
+          "mismatch",
+          "unknown"
+         ],
+         "title": "Balance Check",
+         "type": "string"
+        },
+        "balance_gap": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Écart : solde final − (initial + crédits − débits).",
+         "title": "Balance Gap"
+        },
+        "bank": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Banque reconnue dans le document, si possible.",
+         "title": "Bank"
+        }
+       },
+       "required": [
+        "transactions"
+       ],
+       "title": "StatementSummary",
+       "type": "object"
+      },
+      "TabSend": {
+       "description": "Envoi d'une conversion dans Atelier Tab.",
+       "properties": {
+        "at": {
+         "title": "At",
+         "type": "string"
+        },
+        "table_id": {
+         "title": "Table Id",
+         "type": "string"
+        },
+        "table_name": {
+         "title": "Table Name",
+         "type": "string"
+        },
+        "project_id": {
+         "title": "Project Id",
+         "type": "string"
+        },
+        "project_name": {
+         "title": "Project Name",
+         "type": "string"
+        },
+        "rows": {
+         "title": "Rows",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "at",
+        "table_id",
+        "table_name",
+        "project_id",
+        "project_name",
+        "rows"
+       ],
+       "title": "TabSend",
+       "type": "object"
+      }
+     },
+     "items": {
+      "$ref": "#/$defs/ConversionSummary"
+     },
+     "type": "array"
+    }
+   },
+   "idempotency": "natural"
+  },
+  {
+   "id": "conversions.table",
+   "label": "Lire la table d'une conversion",
+   "description": "Lignes d'une conversion (colonnes incluses) au format atelier-table/1, par pages.",
+   "kind": "read",
+   "http": {
+    "method": "GET",
+    "path": "/api/atelier/conversions/{conversion_id}/table"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "properties": {
+     "conversion_id": {
+      "description": "Identifiant de la conversion (12 caractères hexadécimaux).",
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Conversion Id",
+      "type": "string"
+     },
+     "offset": {
+      "default": 0,
+      "description": "Première ligne (0 = début).",
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+     },
+     "limit": {
+      "default": 1000,
+      "description": "Nombre de lignes.",
+      "maximum": 5000,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "conversion_id"
+    ],
+    "title": "TablePageInput",
+    "type": "object"
+   },
+   "output": {
+    "format": "atelier-table/1",
+    "schema": {
+     "$defs": {
+      "AtelierColumn": {
+       "properties": {
+        "key": {
+         "maxLength": 200,
+         "minLength": 1,
+         "title": "Key",
+         "type": "string"
+        },
+        "label": {
+         "maxLength": 200,
+         "minLength": 1,
+         "title": "Label",
+         "type": "string"
+        },
+        "type": {
+         "enum": [
+          "string",
+          "number",
+          "date",
+          "datetime",
+          "boolean"
+         ],
+         "title": "Type",
+         "type": "string"
+        }
+       },
+       "required": [
+        "key",
+        "label",
+        "type"
+       ],
+       "title": "AtelierColumn",
+       "type": "object"
+      }
+     },
+     "properties": {
+      "format": {
+       "const": "atelier-table/1",
+       "default": "atelier-table/1",
+       "title": "Format",
+       "type": "string"
+      },
+      "name": {
+       "maxLength": 200,
+       "minLength": 1,
+       "title": "Name",
+       "type": "string"
+      },
+      "label": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Label"
+      },
+      "columns": {
+       "items": {
+        "$ref": "#/$defs/AtelierColumn"
+       },
+       "minItems": 1,
+       "title": "Columns",
+       "type": "array"
+      },
+      "rows": {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "title": "Rows",
+       "type": "array"
+      },
+      "total": {
+       "anyOf": [
+        {
+         "minimum": 0,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Total"
+      },
+      "truncated": {
+       "default": false,
+       "title": "Truncated",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "name",
+      "columns"
+     ],
+     "title": "AtelierTable",
+     "type": "object"
+    }
+   },
+   "idempotency": "natural"
+  },
+  {
+   "id": "conversions.convert_file",
+   "label": "Convertir un fichier",
+   "description": "Lit un fichier (PDF de relevé, CSV, TXT, XLSX, OFX, QIF, JSON) transmis en base64 et crée une conversion.",
+   "kind": "write",
+   "http": {
+    "method": "POST",
+    "path": "/api/atelier/conversions"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "$defs": {
+     "ParseOptions": {
+      "description": "Options de lecture. `None` = détection automatique.",
+      "properties": {
+       "pdf_mode": {
+        "default": "auto",
+        "enum": [
+         "auto",
+         "statement",
+         "tables",
+         "text"
+        ],
+        "title": "Pdf Mode",
+        "type": "string"
+       },
+       "profile": {
+        "default": "auto",
+        "enum": [
+         "auto",
+         "statement",
+         "raw"
+        ],
+        "title": "Profile",
+        "type": "string"
+       },
+       "delimiter": {
+        "anyOf": [
+         {
+          "maxLength": 1,
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Séparateur (CSV / TXT), ex. « ; ».",
+        "title": "Delimiter"
+       },
+       "encoding": {
+        "anyOf": [
+         {
+          "maxLength": 40,
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Encodage (utf-8, cp1252, latin-1…).",
+        "title": "Encoding"
+       },
+       "header": {
+        "anyOf": [
+         {
+          "type": "boolean"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Première ligne utile = en-tête.",
+        "title": "Header"
+       },
+       "skip_rows": {
+        "default": 0,
+        "description": "Lignes ignorées au début (préambule).",
+        "maximum": 10000,
+        "minimum": 0,
+        "title": "Skip Rows",
+        "type": "integer"
+       },
+       "sheet": {
+        "anyOf": [
+         {
+          "maxLength": 200,
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Feuille d'un classeur Excel.",
+        "title": "Sheet"
+       },
+       "decimal": {
+        "default": "auto",
+        "enum": [
+         "auto",
+         ",",
+         "."
+        ],
+        "title": "Decimal",
+        "type": "string"
+       },
+       "date_order": {
+        "default": "auto",
+        "enum": [
+         "auto",
+         "dmy",
+         "mdy",
+         "ymd"
+        ],
+        "title": "Date Order",
+        "type": "string"
+       },
+       "pages": {
+        "anyOf": [
+         {
+          "maxLength": 100,
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Pages d'un PDF : « 1-3,5 ».",
+        "title": "Pages"
+       },
+       "year": {
+        "anyOf": [
+         {
+          "maximum": 2200,
+          "minimum": 1900,
+          "type": "integer"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "description": "Année des dates sans année (relevé).",
+        "title": "Year"
+       },
+       "ocr": {
+        "default": "auto",
+        "description": "Reconnaissance de texte (OCR) d'un PDF : auto = seulement s'il n'a pas de texte (scanné).",
+        "enum": [
+         "auto",
+         "always",
+         "never"
+        ],
+        "title": "Ocr",
+        "type": "string"
+       }
+      },
+      "title": "ParseOptions",
+      "type": "object"
+     }
+    },
+    "description": "Convertit un fichier transmis en base64 (jamais un chemin : le nœud ne lit pas le disque à la demande).",
+    "properties": {
+     "filename": {
+      "description": "Nom du fichier, avec son extension (.pdf, .csv…).",
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Filename",
+      "type": "string"
+     },
+     "content_base64": {
+      "description": "Contenu du fichier en base64.",
+      "maxLength": 70000000,
+      "minLength": 1,
+      "title": "Content Base64",
+      "type": "string"
+     },
+     "options": {
+      "$ref": "#/$defs/ParseOptions",
+      "description": "Options de lecture (détection automatique par défaut)."
+     }
+    },
+    "required": [
+     "filename",
+     "content_base64"
+    ],
+    "title": "ConvertFileInput",
+    "type": "object"
+   },
+   "output": {
+    "format": "json",
+    "schema": {
+     "properties": {
+      "conversion_id": {
+       "title": "Conversion Id",
+       "type": "string"
+      },
+      "name": {
+       "title": "Name",
+       "type": "string"
+      },
+      "detected": {
+       "title": "Detected",
+       "type": "string"
+      },
+      "rows": {
+       "title": "Rows",
+       "type": "integer"
+      },
+      "columns": {
+       "title": "Columns",
+       "type": "integer"
+      },
+      "warnings": {
+       "items": {
+        "type": "string"
+       },
+       "title": "Warnings",
+       "type": "array"
+      }
+     },
+     "required": [
+      "conversion_id",
+      "name",
+      "detected",
+      "rows",
+      "columns",
+      "warnings"
+     ],
+     "title": "ConvertFileResult",
+     "type": "object"
+    }
+   },
+   "idempotency": "header"
+  },
+  {
+   "id": "tab.projects",
+   "label": "Lister les projets d'Atelier Tab",
+   "description": "Projets du dossier de données d'Atelier Tab où une conversion peut être envoyée.",
+   "kind": "read",
+   "http": {
+    "method": "GET",
+    "path": "/api/tab"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "description": "Action sans paramètre.",
+    "properties": {},
+    "title": "NoInput",
+    "type": "object",
+    "required": []
+   },
+   "output": {
+    "format": "json",
+    "schema": {
+     "$defs": {
+      "TabProject": {
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "name": {
+         "title": "Name",
+         "type": "string"
+        },
+        "workspace": {
+         "title": "Workspace",
+         "type": "string"
+        },
+        "tables": {
+         "title": "Tables",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "id",
+        "name",
+        "workspace",
+        "tables"
+       ],
+       "title": "TabProject",
+       "type": "object"
+      }
+     },
+     "description": "Dossier de données d'Atelier Tab vu par Convert.",
+     "properties": {
+      "found": {
+       "title": "Found",
+       "type": "boolean"
+      },
+      "directory": {
+       "title": "Directory",
+       "type": "string"
+      },
+      "projects": {
+       "items": {
+        "$ref": "#/$defs/TabProject"
+       },
+       "title": "Projects",
+       "type": "array"
+      },
+      "detail": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Detail"
+      }
+     },
+     "required": [
+      "found",
+      "directory"
+     ],
+     "title": "TabStatus",
+     "type": "object"
+    }
+   },
+   "idempotency": "natural"
+  },
+  {
+   "id": "conversions.send_to_tab",
+   "label": "Envoyer dans Atelier Tab",
+   "description": "Crée une nouvelle table dans un projet d'Atelier Tab avec les colonnes incluses de la conversion.",
+   "kind": "write",
+   "http": {
+    "method": "POST",
+    "path": "/api/atelier/conversions/{conversion_id}/send-to-tab"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "properties": {
+     "conversion_id": {
+      "description": "Identifiant de la conversion (12 caractères hexadécimaux).",
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Conversion Id",
+      "type": "string"
+     },
+     "project_id": {
+      "description": "Projet d'Atelier Tab (identifiant, ex. « proj_… »).",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+     },
+     "table_name": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Nom de la nouvelle table.",
+      "title": "Table Name"
+     }
+    },
+    "required": [
+     "conversion_id",
+     "project_id"
+    ],
+    "title": "SendToTabInput",
+    "type": "object"
+   },
+   "output": {
+    "format": "json",
+    "schema": {
+     "properties": {
+      "table_id": {
+       "title": "Table Id",
+       "type": "string"
+      },
+      "table_name": {
+       "title": "Table Name",
+       "type": "string"
+      },
+      "project_id": {
+       "title": "Project Id",
+       "type": "string"
+      },
+      "project_name": {
+       "title": "Project Name",
+       "type": "string"
+      },
+      "rows": {
+       "title": "Rows",
+       "type": "integer"
+      },
+      "columns": {
+       "title": "Columns",
+       "type": "integer"
+      },
+      "file": {
+       "description": "Fichier écrit (chemin relatif au dossier d'Atelier Tab).",
+       "title": "File",
+       "type": "string"
+      }
+     },
+     "required": [
+      "table_id",
+      "table_name",
+      "project_id",
+      "project_name",
+      "rows",
+      "columns",
+      "file"
+     ],
+     "title": "SendToTabResult",
+     "type": "object"
+    }
+   },
+   "idempotency": "header"
+  },
+  {
+   "id": "conversions.delete",
+   "label": "Supprimer une conversion",
+   "description": "Supprime la conversion et son fichier source de l'historique (les tables envoyées dans Tab restent).",
+   "kind": "destructive",
+   "http": {
+    "method": "DELETE",
+    "path": "/api/conversions/{conversion_id}"
+   },
+   "mcp_tool": null,
+   "input_schema": {
+    "properties": {
+     "conversion_id": {
+      "description": "Identifiant de la conversion (12 caractères hexadécimaux).",
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Conversion Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "conversion_id"
+    ],
+    "title": "ConversionIdInput",
+    "type": "object"
+   },
+   "output": {
+    "format": "json",
+    "schema": {
+     "additionalProperties": {
+      "type": "boolean"
+     },
+     "type": "object"
+    }
+   },
+   "idempotency": "natural"
+  }
+ ],
+ "events": [
+  {
+   "type": "convert.conversion.created",
+   "label": "Conversion créée",
+   "data_schema": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "format": {
+      "description": "Format du fichier source (pdf, csv, txt, xlsx, xls, ofx, qif, json).",
+      "title": "Format",
+      "type": "string"
+     },
+     "rows": {
+      "title": "Rows",
+      "type": "integer"
+     },
+     "columns": {
+      "title": "Columns",
+      "type": "integer"
+     },
+     "statement": {
+      "description": "Relevé bancaire reconnu (colonnes normalisées).",
+      "title": "Statement",
+      "type": "boolean"
+     },
+     "ocr": {
+      "default": false,
+      "description": "Texte obtenu par reconnaissance de caractères (OCR).",
+      "title": "Ocr",
+      "type": "boolean"
+     },
+     "origin": {
+      "default": "interface",
+      "enum": [
+       "interface",
+       "workflow",
+       "ai"
+      ],
+      "title": "Origin",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "format",
+     "rows",
+     "columns",
+     "statement"
+    ],
+    "title": "ConversionCreatedData",
+    "type": "object"
+   }
+  },
+  {
+   "type": "convert.conversion.updated",
+   "label": "Conversion modifiée",
+   "data_schema": {
+    "properties": {
+     "rows": {
+      "title": "Rows",
+      "type": "integer"
+     },
+     "columns": {
+      "title": "Columns",
+      "type": "integer"
+     },
+     "reason": {
+      "enum": [
+       "options",
+       "columns",
+       "cells",
+       "ai",
+       "rename"
+      ],
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "rows",
+     "columns",
+     "reason"
+    ],
+    "title": "ConversionUpdatedData",
+    "type": "object"
+   }
+  },
+  {
+   "type": "convert.conversion.sent_to_tab",
+   "label": "Table envoyée dans Atelier Tab",
+   "data_schema": {
+    "properties": {
+     "table_id": {
+      "title": "Table Id",
+      "type": "string"
+     },
+     "table_name": {
+      "title": "Table Name",
+      "type": "string"
+     },
+     "project_id": {
+      "title": "Project Id",
+      "type": "string"
+     },
+     "rows": {
+      "title": "Rows",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "table_id",
+     "table_name",
+     "project_id",
+     "rows"
+    ],
+    "title": "ConversionSentData",
+    "type": "object"
+   }
+  },
+  {
+   "type": "convert.conversion.deleted",
+   "label": "Conversion supprimée",
+   "data_schema": {
+    "properties": {},
+    "title": "ConversionDeletedData",
+    "type": "object"
+   }
+  }
+ ]
+}
