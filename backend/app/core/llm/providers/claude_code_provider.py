@@ -73,9 +73,11 @@ CLI_ENV = (
 )
 MAX_RESULT_CHARS = 40_000
 INSTRUCTION = (
-    "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message, "
-    "au format JSON demandé."
+    "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message par "
+    "un seul appel à StructuredOutput (format JSON demandé ; les actions d'Atelier Nexus se "
+    "nomment dans tool_calls, jamais en appel direct)."
 )
+INCOMPLETE = "réponse incomplète de Claude Code (aucun résultat final) ; réessayez"
 NOT_LOGGED_IN = (
     "Claude Code n'est pas connecté : ouvrez le Terminal, tapez « claude » et connectez-vous "
     "avec votre compte Claude, puis réessayez."
@@ -168,9 +170,12 @@ def system_prompt(request: LLMRequest) -> str:
     if request.tools:
         lines = [
             "",
-            "# Outils",
-            "Tu peux appeler les outils ci-dessous. Atelier Nexus les exécute (pas toi) et te renvoie "
-            "leurs résultats dans la conversation, au tour suivant.",
+            "# Actions d'Atelier Nexus",
+            "Les actions ci-dessous ne sont PAS des outils de cette session : ton seul outil est "
+            "`StructuredOutput`, et un appel direct à une action échoue (« No such tool "
+            "available »). Pour utiliser une action, NOMME-LA dans `tool_calls` de l'objet que tu "
+            "passes à `StructuredOutput` : Atelier Nexus l'exécute lui-même et te renvoie son "
+            "résultat dans la conversation, au tour suivant.",
         ]
         for tool in request.tools:
             schema = json.dumps(tool.input_schema, ensure_ascii=False, separators=(",", ":"))
@@ -180,10 +185,13 @@ def system_prompt(request: LLMRequest) -> str:
         lines += [
             "",
             "# Format de réponse (obligatoire)",
-            "Réponds UNIQUEMENT par l'objet JSON du schéma imposé :",
-            '- pour utiliser des outils : `tool_calls` = [{"name": …, "arguments": "{…JSON…}"}] ; '
-            "`text` peut annoncer en une phrase ce que tu fais ;",
-            "- pour répondre à l'utilisateur : `tool_calls` = [] et `text` = ta réponse finale.",
+            "Réponds UNIQUEMENT par l'objet JSON du schéma imposé, en un seul appel à "
+            "`StructuredOutput` et rien d'autre :",
+            '- pour utiliser des actions : `tool_calls` = [{"name": …, "arguments": "{…JSON…}"}] '
+            "(plusieurs à la fois si elles sont indépendantes) ; `text` peut annoncer en une phrase "
+            "ce que tu fais ;",
+            "- pour répondre à l'utilisateur : `tool_calls` = [] et `text` = ta réponse finale "
+            "COMPLÈTE (tout ce que l'utilisateur doit lire : rien n'est transmis hors de l'objet).",
             "N'invente jamais le résultat d'un outil : attends-le. Une action soumise à validation "
             "peut être refusée par l'utilisateur : tiens-en compte.",
         ]
@@ -260,6 +268,112 @@ def result_line(stdout: str) -> str:
         if isinstance(payload, dict) and payload.get("type") == "result":
             return line
     return ""
+
+
+STRUCTURED_TOOL = "StructuredOutput"
+
+
+def loose_text(stdout: str) -> str:
+    """Texte écrit par le modèle HORS de l'objet structuré (sortie stream-json).
+
+    Claude Code laisse parfois le modèle écrire sa réponse en texte libre avant l'appel à
+    `StructuredOutput`, puis mettre dans l'objet une phrase de conclusion seulement : sans ce
+    texte, la réponse était perdue (« Je n'ai rien écrit pour l'instant. »).
+
+    Seuls comptent les messages qui précèdent le dernier appel à `StructuredOutput` ; un message
+    qui tente un autre outil (appel direct refusé, « No such tool available ») est ignoré avec
+    son texte : c'est une narration de cette tentative, pas une réponse à l'utilisateur."""
+    messages: list[tuple[list[str], set[str]]] = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "assistant":
+            continue
+        message = event.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        texts: list[str] = []
+        tools: set[str] = set()
+        for block in blocks if isinstance(blocks, list) else []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text" and str(block.get("text") or "").strip():
+                texts.append(str(block["text"]).strip())
+            elif block.get("type") == "tool_use":
+                tools.add(str(block.get("name")))
+        messages.append((texts, tools))
+    last = max((i for i, (_, tools) in enumerate(messages) if STRUCTURED_TOOL in tools), default=-1)
+    kept = [
+        text
+        for texts, tools in messages[: last + 1]
+        if not (tools - {STRUCTURED_TOOL})
+        for text in texts
+    ]
+    return "\n\n".join(kept)
+
+
+def native_calls(stdout: str, names: set[str]) -> list[dict[str, Any]]:
+    """Appels directs (refusés par Claude Code) à des actions qui existent dans Nexus.
+
+    Il arrive que le modèle appelle une action directement, reçoive « No such tool available »,
+    puis rende un objet SANS `tool_calls` en croyant l'avoir faite : son intention est claire. Ces
+    appels sont alors rendus à Nexus comme des `tool_calls` ordinaires (validation comprise) ;
+    une action inconnue de Nexus n'est jamais reprise."""
+    calls: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "assistant":
+            continue
+        message = event.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        for block in blocks if isinstance(blocks, list) else []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = str(block.get("name") or "")
+            if name not in names or name == STRUCTURED_TOOL:
+                continue
+            arguments = json.dumps(block.get("input") or {}, ensure_ascii=False, sort_keys=True)
+            if (name, arguments) not in seen:
+                seen.add((name, arguments))
+                calls.append({"name": name, "arguments": arguments})
+    return calls
+
+
+def _last_line(text: str) -> str:
+    """Dernière ligne non vide, bornée (message d'erreur lisible)."""
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return lines[-1][:400] if lines else ""
+
+
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+FULL_ANSWER = 400
+
+
+def merge_text(loose: str, structured: str) -> str:
+    """Réponse pour l'utilisateur, jamais en double :
+
+    - l'un contient l'autre → le plus complet ;
+    - deux réponses complètes formulées différemment (chacune d'au moins `FULL_ANSWER`
+      caractères, la plus courte au moins la moitié de l'autre) → la plus longue seule (l'autre
+      est un brouillon ou une version coupée) ;
+    - sinon (objet réduit à une phrase : « Le comité est restitué ci-dessus. ») → le texte libre
+      suivi de cette phrase."""
+    a, b = _flat(loose), _flat(structured)
+    if not a or a in b:
+        return structured
+    if not b or b in a:
+        return loose
+    if min(len(a), len(b)) >= max(FULL_ANSWER, 0.5 * max(len(a), len(b))):
+        return loose if len(a) > len(b) else structured
+    return f"{loose}\n\n{structured}"
 
 
 def parse_arguments(raw: Any) -> dict[str, Any]:
@@ -383,7 +497,8 @@ class ClaudeCodeProvider(LLMProvider):
         model = self.resolve_model(request)
         args = [
             "-p", INSTRUCTION,
-            "--output-format", "json",
+            # stream-json : la seule sortie qui montre aussi le texte écrit hors de l'objet
+            "--output-format", "stream-json", "--verbose",
             "--json-schema", json.dumps(response_schema(request.tools), ensure_ascii=False),
             "--system-prompt", system_prompt(request),
             "--model", model,
@@ -394,31 +509,47 @@ class ClaudeCodeProvider(LLMProvider):
         ]  # fmt: skip
         if any(isinstance(b, ImageBlock) for m in request.messages for b in m.content):
             # Images : entrée stream-json (le texte simple ne peut pas les porter)
-            i = args.index("--output-format")
-            args[i + 1 : i + 2] = ["stream-json", "--verbose", "--input-format", "stream-json"]
+            args[1 + args.index("--verbose") : 1 + args.index("--verbose")] = [
+                "--input-format", "stream-json",
+            ]  # fmt: skip
             code, stdout, stderr = await self._exec(
                 args, stream_json_input(request.messages), self.timeout
             )
-            stdout = result_line(stdout) or stdout[-2000:]
         else:
             code, stdout, stderr = await self._exec(
                 args, transcript(request.messages), self.timeout
             )
-        return self._extract(code, stdout, stderr, model)
+        return self._extract(code, stdout, stderr, model, {t.name for t in request.tools})
 
-    def _extract(self, code: int, stdout: str, stderr: str, model: str) -> LLMResponse:
+    def _extract(
+        self, code: int, stdout: str, stderr: str, model: str, actions: set[str] | None = None
+    ) -> LLMResponse:
+        line = result_line(stdout)
         try:
-            payload = json.loads(stdout.strip()) if stdout.strip() else None
+            payload = json.loads(line) if line else None
         except ValueError:
             payload = None
         if not isinstance(payload, dict):
-            detail = (stderr or stdout or "erreur inconnue").strip()[:400]
-            raise self._error(detail)
+            # Pas de ligne `result` (flux tronqué, processus interrompu) : jamais le flux brut
+            # dans le message (identifiants de session, chemins) ; stderr seulement, borné
+            raise self._error(_last_line(stderr) or INCOMPLETE)
         if payload.get("is_error") or code != 0:
             raise self._error(str(payload.get("result") or stderr or "erreur inconnue").strip())
         structured = payload.get("structured_output")
-        if not isinstance(structured, dict):
-            # Sortie non structurée (ancienne version) : texte brut, ou JSON dans `result`
+        if isinstance(structured, dict):
+            loose = loose_text(stdout)
+            if loose:
+                structured = {
+                    **structured,
+                    "text": merge_text(loose, str(structured.get("text") or "")),
+                }
+            if not structured.get("tool_calls") and actions:
+                recovered = native_calls(stdout, actions)
+                if recovered:
+                    structured = {**structured, "tool_calls": recovered}
+        else:
+            # Sortie non structurée (ancienne version) : texte brut, ou JSON dans `result`. Le
+            # texte libre n'est pas ajouté : il répète ce même JSON
             result = str(payload.get("result") or "")
             try:
                 parsed = json.loads(result)

@@ -45,6 +45,7 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 ## 6. Règles apprises (une erreur corrigée = une règle ici, courte)
 * **Agent ou workflow :** si les étapes sont toujours les mêmes, préférer un workflow rejouable à un nouvel agent ; un agent sert à explorer.
 * **Tests :** jamais d'appel réseau réel ni de Claude Code (`conftest.py` neutralise `claude`) ; applications simulées par `httpx.MockTransport`.
+* **Claude Code (`claude -p`) :** seul outil du modèle = `StructuredOutput` ; les outils de Nexus sont des actions à **nommer** dans `tool_calls`, jamais présentées comme des outils ; sortie `stream-json` pour récupérer le texte écrit hors de l'objet (`docs/claude-code.md`).
 * **SDK Anthropic ≥ 1.x :** pas de paramètre `temperature` sur `messages.create`.
 * **Ollama :** les appels d'outils arrivent sans identifiant (le hub génère `call_…`) ; garder des schémas d'entrée simples pour les petits modèles.
 * **Proxy :** un client HTTP vers une app locale ne passe jamais par le proxy (`trust_env=use_env_proxy(url)`, `app/core/net.py`) ; sous macOS et Windows httpx applique sinon le proxy du système à `127.0.0.1`.

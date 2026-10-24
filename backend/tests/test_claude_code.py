@@ -226,3 +226,110 @@ def test_router_modes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.core.llm.router.find_claude_binary", lambda *_: None)
     nothing = LLMRouter.from_settings(Settings(_env_file=None))  # type: ignore[call-arg]
     assert nothing.default == "ollama"
+
+
+def test_actions_are_never_presented_as_native_tools() -> None:
+    """Claude Code n'a qu'un outil (`StructuredOutput`, imposé par --json-schema) : présentées
+    comme des « outils », les actions de Nexus étaient appelées directement par le modèle
+    (« No such tool available »), parfois jusqu'à abandonner la tâche. Constaté avec Claude Code
+    2.1.310 dans l'environnement restreint du provider."""
+    from app.core.llm.providers.claude_code_provider import INSTRUCTION, system_prompt
+    from app.core.llm.types import LLMRequest
+
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    prompt = system_prompt(
+        LLMRequest(system="Tu es chef de projet.", messages=[Message.user("x")], tools=tools)
+    )
+    assert "ton seul outil est `StructuredOutput`" in prompt
+    assert "NOMME-LA dans `tool_calls`" in prompt and "# Outils" not in prompt
+    assert "StructuredOutput" in INSTRUCTION and "jamais en appel direct" in INSTRUCTION
+    # Sans action : rien sur les actions
+    plain = system_prompt(
+        LLMRequest(system="Tu es chef de projet.", messages=[Message.user("x")], tools=[])
+    )
+    assert "StructuredOutput" not in plain
+
+
+async def test_text_written_outside_the_object_is_kept(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Claude Code laisse parfois le modèle écrire sa réponse hors de l'objet structuré, qui ne
+    garde qu'une phrase : la réponse complète est conservée (constaté sur les évaluations)."""
+    from app.core.llm.providers.claude_code_provider import merge_text
+
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "loose")
+    response = await cli.complete(LLMRequest(messages=[Message.user("Prépare le comité")]))
+    assert response.text.startswith("## Comité du 24/10") and "71 %" in response.text
+    assert response.text.endswith("Je n'ai rien écrit pour l'instant.")
+    # Jamais en double : texte libre déjà repris dans l'objet, ou l'inverse
+    assert merge_text("Bonjour", "Bonjour  ") == "Bonjour  "
+    assert merge_text("A\n\nB", "A B C") == "A B C" and merge_text("A B C", "B") == "A B C"
+    assert merge_text("", "Seul") == "Seul"
+    # Deux réponses complètes, formulées différemment (constaté sur les évaluations) : une seule
+    full = "## Comité\n\nAvancement 71 %, quatre retards, trois priorités proposées." * 8
+    variant = "## Comité du jour\n\nAvancement : 71 % ; 4 retards ; 3 priorités." * 8
+    assert merge_text(full, variant) == full and merge_text(variant, full) == full
+
+
+async def test_real_stream_of_claude_code_is_parsed(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Vraie sortie stream-json de Claude Code 2.1.310 (anonymisée) : événements `system`,
+    `assistant` (appel à StructuredOutput), `user`, `rate_limit_event`, `result`."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "replay")
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Projet 1 ?")], tools=tools))
+    (call,) = [b for b in response.content if isinstance(b, ToolUseBlock)]
+    assert call.name == "projets_dashboard" and call.input == {"project_id": 1}
+    assert response.text == "Je consulte le tableau de bord du projet 1."
+    assert response.stop_reason == "tool_use" and response.usage.output_tokens > 0
+
+
+async def test_stream_without_result_is_a_readable_error(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Flux interrompu : un message lisible, jamais le flux brut (identifiants de session,
+    chemins), et jamais une « réponse vide » prise pour une réussite."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "noresult")
+    for code in ("1", "0"):
+        monkeypatch.setenv("FAKE_CLAUDE_CODE", code)
+        with pytest.raises(ProviderRequestError) as err:
+            await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
+        message = str(err.value)
+        assert "connexion interrompue" in message
+        assert "secret-session" not in message and "/Users" not in message
+
+
+async def test_native_attempt_narration_is_dropped(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "native")
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Projet 1 ?")], tools=tools))
+    assert response.text == "Je consulte le tableau de bord."
+    assert "Je vais regarder" not in response.text
+
+
+async def test_legacy_output_never_leaks_raw_json(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "legacy")
+    response = await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
+    assert response.text == "Ligne 1\nLigne « 2 »"
+
+
+async def test_intended_direct_call_is_recovered_as_an_action(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Appel direct refusé puis objet sans action : l'appel voulu (action connue de Nexus) est
+    rendu comme un tool_call ordinaire ; un outil inconnu de Nexus n'est jamais repris."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "native_only")
+    tools = [ToolSpec(name="publish_artifact", description="d", input_schema={"type": "object"})]
+    response = await cli.complete(LLMRequest(messages=[Message.user("Publie le CR")], tools=tools))
+    calls = [b for b in response.content if isinstance(b, ToolUseBlock)]
+    assert [c.name for c in calls] == ["publish_artifact"]
+    assert calls[0].input == {"content": "x", "kind": "markdown", "title": "CR"}
+    assert response.stop_reason == "tool_use"
+    # Sans action déclarée par Nexus : rien n'est repris
+    response = await cli.complete(LLMRequest(messages=[Message.user("Publie le CR")]))
+    assert not [b for b in response.content if isinstance(b, ToolUseBlock)]

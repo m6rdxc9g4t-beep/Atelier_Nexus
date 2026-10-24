@@ -363,6 +363,41 @@ async def test_local_lock_case_passes_without_calling_any_model() -> None:
     assert not anthropic.requests and not ollama.requests
 
 
+async def test_local_agent_on_claude_is_skipped_not_failed() -> None:
+    """Un agent 100 % local joué avec --provider anthropic : le verrou refuse Claude, ce n'est
+    pas un échec de l'agent (le cas se joue sur Ollama)."""
+    anthropic = ScriptedProvider("anthropic")
+    outcome = await run_case(
+        CASES["finance-synthese-locale"],
+        deps_for(anthropic),
+        RunOptions(provider="anthropic"),
+    )
+    assert outcome.skipped == "agent 100 % local : à jouer avec --provider ollama"
+    assert not anthropic.requests
+
+
+async def test_each_attempt_runs_in_its_own_conversation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Comme dans l'interface : un identifiant de conversation par essai (les outils qui gardent
+    un état par conversation en ont besoin), jamais partagé entre deux essais."""
+    from app.agents.base import BaseAgent
+
+    seen: list[str | None] = []
+    real = BaseAgent.run_stream
+
+    def spy(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+        context = kwargs.get("context")
+        seen.append(context.conversation_id if context else None)
+        return real(self, messages, **kwargs)
+
+    monkeypatch.setattr(BaseAgent, "run_stream", spy)
+    anthropic = ScriptedProvider(
+        "anthropic", [text_response("Nous sommes le 21."), text_response("Le 21.")]
+    )
+    await run_case(CASES["assistant-date-du-jour"], deps_for(anthropic), RunOptions(repeat=2))
+    assert len(seen) == 2 and all(c and c.startswith("eval-assistant-date-du-jour-") for c in seen)
+    assert seen[0] != seen[1]
+
+
 async def test_case_is_skipped_when_its_app_is_missing() -> None:
     deps = deps_for(ScriptedProvider("anthropic"))
     outcome = await run_case(CASES["dev-jamais-sur-main"], deps, RunOptions())
@@ -388,6 +423,9 @@ async def test_repeat_measures_flakiness() -> None:
 
 
 def test_parse_verdict() -> None:
+    # Réponse tronquée au milieu de la raison : le verdict reste lisible
+    ok, reason = parse_verdict('{"verdict":"ok","raison":"La réponse reprend fidèlement l\'avan')
+    assert ok and reason.endswith("[…]")
     assert parse_verdict('Voici : {"verdict": "ok", "raison": "Complet."}') == (True, "Complet.")
     assert parse_verdict('{"verdict": "KO", "raison": "Il manque la région."}')[0] is False
     assert parse_verdict("pas de json")[0] is False
@@ -405,6 +443,9 @@ async def test_judge_runs_on_the_same_engine_and_counts() -> None:
     judge = next(c for c in attempt.checks if c.name == "juge")
     assert not judge.ok and judge.severity == "required" and not attempt.passed
     assert "<transcription>" in anthropic.requests[-1].messages[0].text
+    # Le juge voit ce que l'agent a lu : un fait tiré d'un outil n'est pas « inventé »
+    prompt = anthropic.requests[-1].messages[0].text
+    assert "Résultats des outils" in prompt and "- data_via_describe_dataset :" in prompt
 
 
 async def test_judge_of_a_local_agent_stays_local() -> None:
