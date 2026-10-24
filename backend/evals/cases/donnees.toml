@@ -117,4 +117,4 @@ rubric = "La réponse conclut qu'il n'y a pas de différence significative entre
 [case.expect]
 tools_called = ["analyse_charger"]
 tools_forbidden = ["analyse_nettoyer"]
-text_contains_any = ["pas de difference", "non significati", "aucune difference"]
+text_contains_any = ["pas de difference", "non significati", "aucune difference", "ne differe pas"]
