@@ -363,6 +363,19 @@ async def test_local_lock_case_passes_without_calling_any_model() -> None:
     assert not anthropic.requests and not ollama.requests
 
 
+async def test_local_agent_on_claude_is_skipped_not_failed() -> None:
+    """Un agent 100 % local joué avec --provider anthropic : le verrou refuse Claude, ce n'est
+    pas un échec de l'agent (le cas se joue sur Ollama)."""
+    anthropic = ScriptedProvider("anthropic")
+    outcome = await run_case(
+        CASES["finance-synthese-locale"],
+        deps_for(anthropic),
+        RunOptions(provider="anthropic"),
+    )
+    assert outcome.skipped == "agent 100 % local : à jouer avec --provider ollama"
+    assert not anthropic.requests
+
+
 async def test_case_is_skipped_when_its_app_is_missing() -> None:
     deps = deps_for(ScriptedProvider("anthropic"))
     outcome = await run_case(CASES["dev-jamais-sur-main"], deps, RunOptions())
@@ -405,6 +418,9 @@ async def test_judge_runs_on_the_same_engine_and_counts() -> None:
     judge = next(c for c in attempt.checks if c.name == "juge")
     assert not judge.ok and judge.severity == "required" and not attempt.passed
     assert "<transcription>" in anthropic.requests[-1].messages[0].text
+    # Le juge voit ce que l'agent a lu : un fait tiré d'un outil n'est pas « inventé »
+    prompt = anthropic.requests[-1].messages[0].text
+    assert "Résultats des outils" in prompt and "- data_via_describe_dataset :" in prompt
 
 
 async def test_judge_of_a_local_agent_stays_local() -> None:

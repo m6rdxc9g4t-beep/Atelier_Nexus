@@ -206,15 +206,31 @@ Réponds uniquement par un objet JSON sur une ligne :
 {"verdict": "ok" ou "ko", "raison": "une phrase en français"}"""
 
 
+#: Résultats d'outils montrés au juge : sans eux, un fait tiré d'un outil passe pour inventé
+JUDGE_RESULT_CHARS = 4_000
+JUDGE_RESULTS_CHARS = 16_000
+
+
 def judge_prompt(case: EvalCase, transcript: Transcript) -> str:
     tools = ", ".join(transcript.tool_names) or "aucun"
     artifacts = "\n".join(
         f"- {a.title} ({a.kind}) :\n{a.content[:1500]}" for a in transcript.artifacts
     )
+    results: list[str] = []
+    budget = JUDGE_RESULTS_CHARS
+    for call in transcript.calls:
+        if call.result is None or budget <= 0:
+            continue
+        text = call.result[: min(JUDGE_RESULT_CHARS, budget)]
+        more = " […]" if len(call.result) > len(text) else ""
+        results.append(f"- {call.name}{' (ERREUR)' if call.is_error else ''} :\n{text}{more}")
+        budget -= len(text)
     return (
         f"<critere>{case.rubric}</critere>\n<transcription>\n"
         f"Demande de l'utilisateur : {case.prompt}\n"
         f"Outils appelés : {tools}\n"
+        f"Résultats des outils (ce que l'agent a lu ; un fait qui en vient n'est pas inventé) :\n"
+        f"{chr(10).join(results) or 'aucun'}\n"
         f"Artefacts publiés :\n{artifacts or 'aucun'}\n"
         f"Réponse finale de l'agent :\n{transcript.text[:6000]}\n</transcription>"
     )
@@ -287,6 +303,15 @@ async def run_case(case: EvalCase, deps: EvalDeps, options: RunOptions) -> CaseO
         if transcript.error and transcript.error[0] in ENGINE_DOWN and not case.expect.error_code:
             # Panne du moteur : rien à reprocher à l'agent, le cas est ignoré
             outcome.skipped = f"moteur indisponible ({transcript.error[1]})"
+            outcome.attempts = []
+            return outcome
+        if (
+            transcript.error
+            and transcript.error[0] == "provider_not_allowed"
+            and not case.expect.error_code
+        ):
+            # Agent 100 % local joué sur Claude : le verrou a fonctionné, le cas se joue sur Ollama
+            outcome.skipped = "agent 100 % local : à jouer avec --provider ollama"
             outcome.attempts = []
             return outcome
         checks = evaluate(case, transcript)
