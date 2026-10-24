@@ -155,9 +155,12 @@ EQUIPE = ChainDefinition(
             instructions=(
                 "Rédige le compte rendu de lancement à partir des livrables validés (objectif, "
                 "priorités, user stories, tâches créées avec leurs identifiants, échéances, "
-                "risques) et range-le dans la mémoire d'équipe (equipe_compte_rendu, après "
-                "accord) ; pas de note au journal en plus. Rédige aussi le court message d'annonce à envoyer aux personnes "
-                "concernées, publié en artefact. N'ajoute rien qui ne soit dans les livrables."
+                "risques) et le court message d'annonce aux personnes concernées. Dans cette "
+                "réponse, publie-les seulement en artefacts (publish_artifact) et demande si tu "
+                "peux ranger le compte rendu : n'appelle PAS equipe_compte_rendu dans la même "
+                "réponse (sa validation passerait avant la relecture). À la réponse suivante, "
+                "après accord, range-le (equipe_compte_rendu, validé) ; pas de note au journal en "
+                "plus. N'ajoute rien qui ne soit dans les livrables."
             ),
         ),
     ],

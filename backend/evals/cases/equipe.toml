@@ -78,7 +78,8 @@ agent = "redacteur"
 relais = "chaine_equipe:4"
 apps = ["wiki"]
 tags = ["equipe", "chaine-equipe"]
-description = "Étape 4 : compte rendu fidèle aux livrables, sans ajout."
+description = "Étape 4 : compte rendu fidèle aux livrables, sans ajout, publié pour relecture AVANT d'être rangé (rangé à la réponse suivante)."
 rubric = "Le compte rendu reprend l'objectif, les priorités, les trois user stories et les tâches #20001 à #20003 avec leurs échéances, et le risque #12345 ; il n'ajoute aucune personne, date ou décision absente des livrables (la date du compte rendu lui-même, celle du jour, est permise)."
 [case.expect]
-stop_reason = ["end_turn", "awaiting_approval"]
+artifacts = [{ content_contains = ["20001", "20003"] }]
+tools_forbidden = ["equipe_compte_rendu"]
