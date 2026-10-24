@@ -85,7 +85,9 @@ export type ArtifactKind =
   | "code"
   | "markdown"
   | "json"
-  | "data_preview";
+  | "data_preview"
+  /** Graphique calculé par les outils d'analyse (format `atelier-chart/1`). */
+  | "chart";
 
 export interface Artifact {
   kind: ArtifactKind;

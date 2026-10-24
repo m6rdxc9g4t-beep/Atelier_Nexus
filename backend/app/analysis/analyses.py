@@ -801,12 +801,14 @@ def _over_time(frame: Frame, cd: Column, cv: Column) -> Result:
         [k, len(buckets[k]), num(s), num(m)] for k, s, m in zip(labels, sums, means, strict=True)
     ]
     lines.append(markdown_table(["Période", "n", "Somme", "Moyenne"], rows[-30:]))
+    # Une seule série : la moyenne serait écrasée par l'échelle de la somme. Courbe de la
+    # moyenne : `analyse_graphique` (courbe, agregation = moyenne).
     spec = charts.categories(
         labels,
-        [("Somme", sums), ("Moyenne", means)],
+        [("Somme", sums)],
         kind="line",
         x_label=cd.name,
-        y_label=cv.name,
+        y_label=f"Somme de {cv.name}",
         x_kind="date",
     )
     return Result(
