@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from typing import Annotated, Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from pydantic import TypeAdapter, ValidationError
@@ -338,7 +339,8 @@ async def run(
             workflow.params,
             body.params,
             body.approvals,
-            ToolContext(extras={"workflow_id": workflow.id}),
+            # launch_id : portée des jeux d'analyse de ce lancement (app/analysis/store.py)
+            ToolContext(extras={"workflow_id": workflow.id, "launch_id": uuid4().hex}),
             binding=f"{workflow.id}:{workflow.updated_at.isoformat()}",
         )
     except WorkflowError as exc:

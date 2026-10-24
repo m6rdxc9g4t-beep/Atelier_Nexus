@@ -24,6 +24,11 @@ MISSING_TOKENS = {
 _TRUE = {"oui", "vrai", "true", "yes", "x", "✓", "1"}
 _FALSE = {"non", "faux", "false", "no", "0"}
 _NUMBER_CHARS = re.compile(r"[\s  €$£¥%]|eur\b|chf\b", re.IGNORECASE)
+_UNITS = re.compile(r"[€$£¥%]|\beur\b|\bchf\b", re.IGNORECASE)
+_SPACES = re.compile(r"[\s\u00a0\u202f]")
+_SPACED_THOUSANDS = re.compile(r"^[+\-−]?\s*\d{1,3}([\s\u00a0\u202f]\d{3})+([.,]\d+)?$")
+_LEADING_ZERO = re.compile(r"^0\d+$")  # code postal, client, téléphone : à garder en texte
+_AMBIGUOUS = re.compile(r"^\d{1,3}[.,]\d{3}$")  # « 1,234 » : milliers anglais ou décimale ?
 _DATE_DMY = re.compile(
     r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2}|\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$"
 )
@@ -55,6 +60,11 @@ def parse_number(value: Any) -> float | None:
     negative = text.startswith("(") and text.endswith(")")  # (1 234,00) = négatif comptable
     if negative:
         text = text[1:-1]
+    text = _UNITS.sub("", text).strip()
+    # Espaces dans le nombre : seulement des groupes de milliers (« 1 234 567,8 »), jamais un
+    # numéro de téléphone (« 06 12 34 56 78 ») ni deux nombres collés
+    if _SPACES.search(text) and not _SPACED_THOUSANDS.match(text):
+        return None
     text = _NUMBER_CHARS.sub("", text).replace("−", "-").replace("'", "")
     if not text:
         return None
@@ -156,6 +166,8 @@ class Inference:
     #: Valeurs présentes mais illisibles dans le type retenu (mises à vide)
     invalid: int = 0
     invalid_examples: list[str] = field(default_factory=list)
+    #: Avertissements de lecture (codes à zéro initial, séparateurs ambigus)
+    notes: list[str] = field(default_factory=list)
 
 
 def _clean_text(value: Any) -> Any:
@@ -192,9 +204,25 @@ def infer_column(raw: Sequence[Any], *, threshold: float = 0.95) -> Inference:
         found = attempt("boolean", parse_bool)
         if found:
             return found
+    strings = [v.strip() for v in present if isinstance(v, str)]
+    codes = sum(1 for v in strings if _LEADING_ZERO.match(v))
+    if codes:  # « 01000 » : un code, pas le nombre 1000 (le zéro initial serait perdu)
+        out = Inference("string", [None if v is None else _as_text(v) for v in values])
+        if codes < len(present):
+            out.notes.append(
+                f"{codes} valeur(s) à zéro initial (ex. « {next(v for v in strings if _LEADING_ZERO.match(v))} ») : "
+                "colonne gardée en texte (codes). `convertir` en nombre si ce sont des quantités."
+            )
+        return out
     for kind, parse in (("number", parse_number), ("date", parse_date)):
         found = attempt(kind, parse)  # type: ignore[arg-type]
         if found:
+            ambiguous = sum(1 for v in strings if _AMBIGUOUS.match(v))
+            if kind == "number" and ambiguous and ambiguous >= 0.5 * len(strings):
+                found.notes.append(
+                    f"{ambiguous} valeur(s) du type « 1,234 » lues avec une virgule ou un point "
+                    "DÉCIMAL (1,234) : si ce sont des milliers, la colonne est fausse d'un facteur 1000."
+                )
             return found
     return Inference("string", [None if v is None else _as_text(v) for v in values])
 
@@ -326,7 +354,7 @@ def unique_names(names: Sequence[str]) -> list[str]:
     """Noms de colonnes non vides et uniques (« Colonne 3 », « Montant (2) »…)."""
     out: list[str] = []
     for i, raw in enumerate(names):
-        base = (str(raw).strip() if raw is not None else "") or f"Colonne {i + 1}"
+        base = (" ".join(str(raw).split())[:80] if raw is not None else "") or f"Colonne {i + 1}"
         candidate, n = base, 2
         while candidate in out:
             candidate, n = f"{base} ({n})", n + 1
@@ -334,11 +362,18 @@ def unique_names(names: Sequence[str]) -> list[str]:
     return out
 
 
+def row_key_value(value: Any) -> Any:
+    """Valeur comparée pour les doublons : texte sans casse ni espaces en trop."""
+    return " ".join(value.split()).lower() if isinstance(value, str) else value
+
+
 _TOTAL_LABEL = re.compile(r"^\s*(sous[- ]?)?total(\s+g[ée]n[ée]ral)?\s*:?\s*$", re.IGNORECASE)
 
 
 def is_total_row(row: Sequence[Any]) -> bool:
-    """Ligne de total d'un export : première cellule renseignée = « Total », « Sous-total »…"""
+    """Ligne de total d'un export : première cellule renseignée = « Total », « Sous-total »,
+    « Total général » (exactement : « Total Energies » n'en est pas une). Règle unique du
+    chargement, du profil et de l'opération `supprimer_totaux`."""
     first = next((v for v in row if not is_missing(v)), None)
     return isinstance(first, str) and bool(_TOTAL_LABEL.match(first))
 
@@ -373,6 +408,7 @@ def frame_from_rows(
             continue
         inferred = infer_column(raw)
         columns.append(Column(col_name, inferred.type, inferred.values))
+        notes += [f"« {col_name} » : {n}" for n in inferred.notes]
         if inferred.invalid:
             examples = ", ".join(f"« {e} »" for e in inferred.invalid_examples)
             notes.append(

@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { chartToCsv, formatTick, linear, niceTicks, ordinalToDate, parseChart } from "./spec";
+import {
+  chartToCsv,
+  formatTick,
+  linear,
+  niceTicks,
+  ordinalToDate,
+  parseChart,
+} from "./spec";
 
-const wrap = (spec: Record<string, unknown>) => JSON.stringify({ format: "atelier-chart/1", title: "T", ...spec });
+const wrap = (spec: Record<string, unknown>) =>
+  JSON.stringify({ format: "atelier-chart/1", title: "T", ...spec });
 
 describe("parseChart", () => {
   it("lit un histogramme et ignore les classes invalides", () => {
@@ -25,17 +33,29 @@ describe("parseChart", () => {
   });
 
   it("refuse un autre format, un type inconnu ou du JSON invalide", () => {
-    expect(parseChart(JSON.stringify({ format: "autre", type: "bar" }))).toBeNull();
+    expect(
+      parseChart(JSON.stringify({ format: "autre", type: "bar" })),
+    ).toBeNull();
     expect(parseChart(wrap({ type: "pie" }))).toBeNull();
     expect(parseChart("{")).toBeNull();
-    expect(parseChart(wrap({ type: "bar", categories: [], series: [] }))).toBeNull();
+    expect(
+      parseChart(wrap({ type: "bar", categories: [], series: [] })),
+    ).toBeNull();
   });
 
   it("aligne les valeurs des séries sur les catégories", () => {
     const spec = parseChart(
-      wrap({ type: "bar", categories: ["Nord", "Sud", "Est"], series: [{ name: "somme", values: [1, null] }] }),
+      wrap({
+        type: "bar",
+        categories: ["Nord", "Sud", "Est"],
+        series: [{ name: "somme", values: [1, null] }],
+      }),
     );
-    expect(spec?.type === "bar" && spec.series[0].values).toEqual([1, null, null]);
+    expect(spec?.type === "bar" && spec.series[0].values).toEqual([
+      1,
+      null,
+      null,
+    ]);
   });
 
   it("garde les groupes d'un nuage alignés sur les points valides", () => {
@@ -69,12 +89,24 @@ describe("parseChart", () => {
       wrap({
         type: "box",
         groups: [
-          { label: "A", n: 4, min: 1, q1: 2, median: 3, q3: 4, max: 5, mean: 3, outliers: [9, "x"] },
+          {
+            label: "A",
+            n: 4,
+            min: 1,
+            q1: 2,
+            median: 3,
+            q3: 4,
+            max: 5,
+            mean: 3,
+            outliers: [9, "x"],
+          },
           { label: "incomplet", min: 1 },
         ],
       }),
     );
-    expect(box?.type === "box" && box.groups.map((g) => [g.label, g.outliers])).toEqual([["A", [9]]]);
+    expect(
+      box?.type === "box" && box.groups.map((g) => [g.label, g.outliers]),
+    ).toEqual([["A", [9]]]);
     const heat = parseChart(
       wrap({
         type: "heatmap",
@@ -131,6 +163,22 @@ describe("chartToCsv", () => {
         ],
       }),
     );
-    expect(spec && chartToCsv(spec)).toBe("Mois;Somme;Moyenne\n2026-01;1,5;0,5\n2026-02;2;");
+    expect(spec && chartToCsv(spec)).toBe(
+      "Mois;Somme;Moyenne\n2026-01;1,5;0,5\n2026-02;2;",
+    );
+  });
+});
+
+describe("protection de l'export", () => {
+  it("neutralise une formule venue d'un libellé", () => {
+    const spec = parseChart(
+      wrap({
+        type: "bar",
+        x: { label: "Client" },
+        categories: ["=HYPERLINK(1)", "-x"],
+        series: [{ name: "n", values: [1, -2] }],
+      }),
+    );
+    expect(spec && chartToCsv(spec)).toBe("Client;n\n'=HYPERLINK(1);1\n'-x;-2");
   });
 });

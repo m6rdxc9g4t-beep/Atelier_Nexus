@@ -20,8 +20,10 @@ from app.analysis.frame import (
     ColumnError,
     Frame,
     date_ordinal,
+    is_total_row,
     parse_date,
     parse_number,
+    row_key_value,
 )
 from app.tools.base import Artifact
 from app.tools.formatting import data_artifact, markdown_table
@@ -83,17 +85,11 @@ def _norm_text(v: str) -> str:
     return " ".join(v.split()).lower()
 
 
-def _total_like(v: Any) -> bool:
-    return isinstance(v, str) and v.strip().lower().startswith(
-        ("total", "sous-total", "sous total")
-    )
-
-
 def duplicate_rows(frame: Frame) -> int:
     seen: set[tuple[Any, ...]] = set()
     dup = 0
     for i in range(frame.rows):
-        key = tuple(c.values[i] for c in frame.columns)
+        key = tuple(row_key_value(c.values[i]) for c in frame.columns)
         if key in seen:
             dup += 1
         else:
@@ -115,7 +111,7 @@ def profile(frame: Frame) -> Result:
             f"{dup} ligne(s) en double ({pct(dup, n)}) → `supprimer_doublons` si ce ne sont pas des "
             "opérations légitimement identiques."
         )
-    totals = sum(1 for i in range(n) if any(_total_like(c.values[i]) for c in frame.columns))
+    totals = sum(1 for i in range(n) if is_total_row([c.values[i] for c in frame.columns]))
     if totals:
         issues.append(
             f"{totals} ligne(s) de total ou sous-total → `supprimer_totaux` avant de calculer."
@@ -405,6 +401,11 @@ def _groups(
 ) -> tuple[list[tuple[str, list[float]]], int]:
     """Valeurs numériques par modalité (les MAX_GROUPS plus fréquentes) ; renvoie aussi le
     nombre de modalités écartées."""
+    if value_col.type not in ("number", "date"):
+        raise ColumnError(
+            f"« {value_col.name} » est de type {TYPE_LABELS[value_col.type]} : il faut une colonne "
+            "de nombres (ou de dates) pour la comparer entre groupes."
+        )
     if (
         group_col.type in ("number",)
         and len({v for v in group_col.values if v is not None}) > MAX_GROUPS
@@ -421,6 +422,15 @@ def _groups(
         buckets[_label(g)].append(to_num(v))
     ordered = sorted(buckets.items(), key=lambda kv: -len(kv[1]))
     return ordered[:MAX_GROUPS], max(0, len(ordered) - MAX_GROUPS)
+
+
+def natural_key(label: Any) -> tuple[int, float, str]:
+    """Tri naturel des libellés : nombres dans l'ordre numérique (1, 2, 10), puis le texte."""
+    text = str(label)
+    try:
+        return (0, float(text), "")
+    except ValueError:
+        return (1, 0.0, text.lower())
 
 
 def _label(value: Any) -> str:
@@ -463,18 +473,24 @@ def _distribution_by(frame: Frame, col: Column, by: Column) -> Result:
     )
     if dropped:
         lines.append(f"{dropped} groupe(s) moins fréquent(s) non affiché(s).")
-    lines += _group_tests([v for _, v in groups], col.name, by.name)
+    lines += _group_tests([v for _, v in groups], col.name, by.name, dropped)
     spec = charts.box(groups, y_label=col.name, x_label=by.name)
     return Result(
         "\n".join(lines), [charts.artifact(f"{col.name} par {by.name}", spec, source=frame.name)]
     )
 
 
-def _group_tests(groups: list[list[float]], value: str, by: str) -> list[str]:
+def _group_tests(groups: list[list[float]], value: str, by: str, dropped: int = 0) -> list[str]:
     usable = [g for g in groups if len(g) >= 2]
     if len(usable) < 2:
         return ["Tests de comparaison : groupes trop petits."]
     out = ["\nComparaison des groupes :"]
+    excluded = dropped + len(groups) - len(usable)
+    if excluded:
+        out.append(
+            f"Tests sur {len(usable)} groupe(s) (les {MAX_GROUPS} plus fréquents, au moins 2 valeurs) ; "
+            f"{excluded} groupe(s) écarté(s) des tests."
+        )
     if len(usable) == 2:
         tests = [stats.welch_t(*usable), stats.mann_whitney(*usable)]
     else:
@@ -548,11 +564,21 @@ def correlations(
             )
     else:
         cols = [c for c in frame.columns if c.type == "number"]
+    target_name: str | None = None
     if target:
         t = frame.column(target)
+        if t.type not in ("number", "date", "boolean"):
+            raise ColumnError(
+                f"« {t.name} » est de type {TYPE_LABELS[t.type]} : une corrélation demande une "
+                "colonne numérique. Pour une catégorie, utilise `analyse_relation`."
+            )
+        target_name = t.name
         if t not in cols:
             cols = [t, *cols]
-    cols = [c for c in cols if len({v for v in c.values if v is not None}) > 1][:MAX_MATRIX]
+    usable = [c for c in cols if len({v for v in c.values if v is not None}) > 1]
+    dropped_constant = len(cols) - len(usable)
+    cols = usable[:MAX_MATRIX]
+    truncated = len(usable) - len(cols)
     if len(cols) < 2:
         raise ColumnError("Il faut au moins deux colonnes numériques non constantes.")
     values = {c.name: _numeric_values(c) for c in cols}
@@ -562,7 +588,7 @@ def correlations(
     spear: dict[tuple[int, int], stats.Correlation] = {}
     for i in range(k):
         for j in range(i + 1, k):
-            if target and names[i] != target and names[j] != target:
+            if target_name and target_name not in (names[i], names[j]):
                 continue
             xs, ys = _pairs(values[names[i]], values[names[j]])
             if method in ("pearson", "les_deux"):
@@ -577,9 +603,15 @@ def correlations(
     lines = [
         _source_line(frame),
         f"Corrélations ({'Pearson et Spearman' if method == 'les_deux' else label}) entre {k} colonnes"
-        + (f", par rapport à « {target} »" if target else "")
+        + (f", par rapport à « {target_name} »" if target_name else "")
         + f" ; {len(keys)} paire(s) testée(s), valeurs p corrigées (Holm).",
     ]
+    if dropped_constant:
+        lines.append(f"{dropped_constant} colonne(s) constante(s) écartée(s).")
+    if truncated:
+        lines.append(
+            f"{truncated} colonne(s) au-delà des {MAX_MATRIX} premières non calculées : précise `colonnes`."
+        )
     rows = []
     nonlinear: list[str] = []
     for key in ranked[:20]:
@@ -838,10 +870,27 @@ def outliers(frame: Frame, columns: Sequence[str] | None, method: Literal["iqr",
     ]  # fmt: skip
     rows: list[list[Any]] = []
     flagged: list[tuple[int, str, float, str]] = []
+    warnings: list[str] = []
     for col in cols:
         idx = [i for i, v in enumerate(col.values) if v is not None]
         values = [col.values[i] for i in idx]
         if len(values) < 4:
+            continue
+        degenerate = (
+            stats.iqr_fences(values).low == stats.iqr_fences(values).high
+            if method == "iqr"
+            else stats.quantile(
+                sorted(abs(v - stats.quantile(sorted(values), 0.5)) for v in values), 0.5
+            )
+            == 0
+        )
+        if degenerate:
+            rows.append([col.name, len(values), "—", "—", "—", "dispersion nulle", "—", "—"])
+            warnings.append(
+                f"« {col.name} » : plus de la moitié des valeurs sont identiques, la règle "
+                f"{'de Tukey' if method == 'iqr' else 'du MAD'} n'a pas de sens (toute autre valeur "
+                "serait atypique) ; regarder `analyse_distribution`."
+            )
             continue
         if method == "iqr":
             f = stats.iqr_fences(values)
@@ -876,6 +925,7 @@ def outliers(frame: Frame, columns: Sequence[str] | None, method: Literal["iqr",
         )  # fmt: skip
     headers = ["Colonne", "n", "Atypiques", "Part", "Extrêmes", "Bornes", "Côté bas", "Côté haut"]
     lines.append(markdown_table(headers, rows))
+    lines += warnings
     lines.append(
         "Une valeur atypique n'est pas forcément une erreur (grosse commande, saisonnalité) : "
         "vérifier avant de `plafonner` ou `supprimer_aberrants`. Sur une distribution très asymétrique, "
@@ -999,7 +1049,7 @@ def group_by(
         rows.append(row)
     if not dims:
         return headers, rows
-    rows.sort(key=lambda r: tuple(str(x) for x in r[: len(dims)]))
+    rows.sort(key=lambda r: tuple(natural_key(x) for x in r[: len(dims)]))
     return headers, rows
 
 
@@ -1088,6 +1138,12 @@ def chart(
         if not x or not y:
             raise ColumnError("Un nuage de points demande `x` et `y`.")
         cx, cy = frame.column(x), frame.column(y)
+        for c in (cx, cy):
+            if c.type not in ("number", "date", "boolean"):
+                raise ColumnError(
+                    f"« {c.name} » est de type {TYPE_LABELS[c.type]} : un nuage de points demande "
+                    "deux colonnes numériques (ou une date)."
+                )
         vx, vy = _numeric_values(cx), _numeric_values(cy)
         color_col = frame.column(group) if group else None
         xs: list[float] = []
@@ -1118,18 +1174,26 @@ def chart(
         raise ColumnError(f"Un graphique en {kind} demande `x`.")
     cx = frame.column(x)
     fn: AggName = agg or ("somme" if y else "nombre")
+    if y and fn not in ("nombre", "distinct") and frame.column(y).type != "number":
+        raise ColumnError(
+            f"« {fn} » de « {frame.column(y).name} » ne donne pas un nombre : choisis une colonne de "
+            "nombres, ou l'agrégation « nombre » / « distinct »."
+        )
     measure = MeasureSpec(fn, y)
     by = [cx.name] + ([group] if group else [])
     p = period or (
         _auto_period([v for v in cx.values if v is not None]) if cx.type == "date" else None
     )
     headers, rows = group_by(frame, by, [measure], p)
+    notes: list[str] = []
     if group:
-        totals: Counter[str] = Counter()
+        totals: dict[str, float] = defaultdict(float)
         for r in rows:
-            totals[r[1]] += r[2] or 0
-        series_names = [s for s, _ in totals.most_common(8)]
-        labels = sorted({r[0] for r in rows})
+            totals[r[1]] += abs(r[2]) if isinstance(r[2], int | float) else 0
+        series_names = sorted(totals, key=lambda k: -totals[k])[:8]
+        if len(totals) > 8:
+            notes.append(f"{len(totals) - 8} série(s) moins importante(s) non affichée(s).")
+        labels = sorted({r[0] for r in rows}, key=natural_key)
         table = {(r[0], r[1]): r[2] for r in rows}
         series = [(s, [table.get((lab, s)) for lab in labels]) for s in series_names]
     else:
@@ -1139,6 +1203,19 @@ def chart(
             order = sorted(range(len(labels)), key=lambda i: -(series[0][1][i] or 0))[:30]
             labels = [labels[i] for i in order]
             series = [(measure.key, [rows[i][1] for i in order])]
+    if len(labels) > charts.MAX_CATEGORIES and not (kind == "courbe" and cx.type == "date"):
+        notes.append(
+            f"{len(labels) - charts.MAX_CATEGORIES} catégorie(s) au-delà des "
+            f"{charts.MAX_CATEGORIES} premières non affichée(s)."
+        )
+        labels = labels[: charts.MAX_CATEGORIES]
+        series = [(name, values[: charts.MAX_CATEGORIES]) for name, values in series]
+    elif len(labels) > 400:  # courbe temporelle : période plus large conseillée
+        notes.append(
+            f"{len(labels) - 400} période(s) les plus anciennes non affichées : choisis une `periode` plus large."
+        )
+        labels = labels[-400:]
+        series = [(name, values[-400:]) for name, values in series]
     chart_kind: Literal["bar", "line"] = "bar" if kind == "barres" else "line"
     y_label = f"{_AGG_LABELS[fn]}{f' de {y}' if y else ''}"
     spec = charts.categories(
@@ -1147,7 +1224,8 @@ def chart(
     )  # fmt: skip
     name = title or f"{y_label} par {headers[0]}"
     return Result(
-        f"Graphique « {name} » publié ({len(labels)} catégorie(s), {len(series)} série(s)).",
+        f"Graphique « {name} » publié ({len(labels)} catégorie(s), {len(series)} série(s))."
+        + "".join(f" {n}" for n in notes),
         [charts.artifact(name, spec, source=frame.name)],
     )
 

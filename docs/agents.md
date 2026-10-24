@@ -28,7 +28,9 @@ Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîte
 
 Ciné-club, Cuisine et Tuteur ont été retirés (octobre 2026) : les boîtes `cine`, `cine_write`, `savoir_read`,
 `savoir_write` et `cuisine` restent disponibles pour les agents personnalisés et les workflows, et Finance
-garde `cuisine_budget`. Les conversations passées avec ces agents restent consultables dans l'historique.
+garde `cuisine_budget`. Les conversations passées avec ces agents restent consultables dans l'historique ;
+un workflow ou un déclencheur enregistré sur l'un d'eux répond « agent introuvable » (404) au lancement :
+le recréer sur un agent personnalisé qui a les mêmes boîtes.
 
 ## 2. Boîtes à outils
 

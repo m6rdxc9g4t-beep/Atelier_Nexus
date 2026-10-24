@@ -48,14 +48,22 @@ négligeable, < 0,3 faible, < 0,5 modérée, < 0,7 forte, sinon très forte ; se
 ## 3. Fichiers : formats français
 
 - Nombres : « 1 234,56 », « 1.234,56 € », « 12,5 % » (gardé à 12,5), « (1 000,00) » (négatif
-  comptable), puis formats anglais (« 1,234.56 ») ; « 1.234 » seul est lu 1,234.
+  comptable), puis formats anglais (« 1,234.56 »). Une espace n'est acceptée qu'entre groupes de
+  milliers : « 06 12 34 56 78 » n'est pas un nombre.
+- Codes à zéro initial (« 01000 », « 0612… ») : la colonne reste en texte (le zéro serait perdu) ;
+  `convertir` en nombre si ce sont vraiment des quantités.
+- « 1,234 » ou « 1.234 » seuls sont lus avec un séparateur décimal ; si la moitié des valeurs ont
+  cette forme, le chargement prévient (milliers anglais possibles, facteur 1000).
 - Dates : `AAAA-MM-JJ` (avec heure), `JJ/MM/AAAA`, `JJ-MM-AA`, `JJ.MM.AAAA`, cellules date d'Excel.
 - Oui / non : oui, non, vrai, faux, true, false, x ; une colonne 0 / 1 reste numérique.
 - Vides : cellule vide, N/A, NA, -, —, null, #N/A, #DIV/0!…
 - Une colonne prend un type si au moins 95 % de ses valeurs s'y lisent ; les autres sont mises à
   vide et signalées au chargement (« 3 valeur(s) illisible(s) mise(s) à vide »).
-- Lignes de titre au-dessus de l'en-tête ignorées ; lignes « Total », « Sous-total »,
-  « Total général » exclues (elles fausseraient tous les calculs).
+- Lignes de titre au-dessus de l'en-tête ignorées. Ligne de total : première cellule renseignée
+  exactement « Total », « Sous-total » ou « Total général » (« Total Energies » n'en est pas une) ;
+  même règle au chargement (exclue), dans le profil et pour `supprimer_totaux`.
+- Noms de colonnes ramenés à 80 caractères ; seules les lignes chargées sont gardées en mémoire
+  pendant la lecture (les suivantes sont comptées).
 - PDF, `.xls`, OFX, QIF : à convertir d'abord (Atelier Convert par l'extension Agent_DatAnalyst,
   ou export CSV / `.xlsx`).
 
@@ -63,10 +71,19 @@ négligeable, < 0,3 faible, < 0,5 modérée, < 0,7 forte, sinon très forte ; se
 
 En `every_step`, chaque appel validé arrive dans une nouvelle requête : l'état de tour
 (`ToolContext.state`) est perdu. Les jeux chargés vivent donc dans le processus du backend
-(`app/analysis/store.py`), rangés par `conversation_id` : 8 jeux au plus par conversation,
-32 conversations, oubli après 6 h sans usage, 3 millions de cellules au plus par jeu. Une
-conversation ne voit jamais les jeux d'une autre. Rien n'est écrit sur disque : après un
-redémarrage de Nexus, l'outil le dit et l'agent recharge la source.
+(`app/analysis/store.py`), rangés par **portée** : la conversation (`conv:<id>`), une exécution de
+workflow v2 (`run:<id>`) ou un lancement de workflow v1 (`launch:<id>`). Sans aucune des trois,
+l'outil refuse : jamais de jeux partagés entre conversations ou exécutions. Supprimer une
+conversation oublie ses jeux.
+
+Limites : 8 jeux par portée, 32 portées, 3 millions de cellules par jeu, 12 millions au total
+(les jeux les moins récemment utilisés sortent d'abord), oubli après 6 h sans usage. Rien n'est
+écrit sur disque : après un redémarrage de Nexus, l'outil le dit et l'agent recharge la source.
+
+Le nettoyage ne remplace jamais la source : `nouveau_nom` doit différer de `nom` (défaut :
+`<nom>_propre`, ou `<nom>_propre2` si la source s'appelle déjà ainsi). Une opération impossible
+annule toute la liste. Sont refusés : `convertir` qui viderait toute la colonne, `plafonner` ou
+`supprimer_aberrants` quand l'écart interquartile ou l'écart absolu médian est nul.
 
 ## 5. Graphiques (artefact `chart`)
 
@@ -74,8 +91,9 @@ Format `atelier-chart/1` (`backend/app/analysis/charts.py`), dessiné en SVG par
 `frontend/src/features/artifacts/charts/` avec les jetons du design system : `histogram`
 (repères moyenne et médiane), `box`, `scatter` (2 000 points au plus, échantillon régulier ;
 droite de tendance), `bar`, `line`, `heatmap` (corrélations : négatif en couleur secondaire, positif en couleur signature).
-La spécification ne contient que des nombres déjà calculés. Le bouton Télécharger exporte les
-données du graphique en CSV. `publish_artifact` n'accepte pas `chart` : le modèle n'écrit jamais
+La spécification ne contient que des nombres déjà calculés (12 chiffres significatifs). Le bouton
+Télécharger exporte les données du graphique en CSV (formules neutralisées) ; un tableau des
+valeurs est lu par les lecteurs d'écran ; les séries d'une courbe ont chacune un motif de trait. `publish_artifact` n'accepte pas `chart` : le modèle n'écrit jamais
 de graphique à la main.
 
 ## 6. Extensions

@@ -26,7 +26,7 @@ ChartType = Literal["histogram", "box", "scatter", "bar", "line", "heatmap"]
 def _num(value: float | None) -> float | None:
     if value is None or not math.isfinite(value):
         return None
-    return float(f"{value:.6g}")
+    return float(f"{value:.12g}")  # 12 chiffres : dates ordinales, grands montants intacts
 
 
 def artifact(

@@ -8,9 +8,9 @@ leurs VRAIS outils, contre les applications lancées sur la machine :
 - Finance / Comptable (Atelier Trésorerie, moteur local) : synthèse → budgets ;
 - Tableur (Atelier Tab) : tables → contrôle du planning ; ou ajout d'un lot par le serveur MCP
   de Tab (TAB_MCP_COMMAND), soumis à validation ;
-- Ciné-club (Atelier Ciné) : bilan de la médiathèque → titres en 4K ;
-- Tuteur (Atelier Savoir, moteur local) : séance du jour → question → notes enregistrées
-  après validation.
+- agent personnalisé avec la boîte `cine` (Atelier Ciné) : bilan de la médiathèque → titres en 4K ;
+- agent personnalisé avec les boîtes `savoir_*` (Atelier Savoir, moteur local) : séance du jour →
+  question → notes enregistrées après validation.
 
     cd backend && DATABASE_URL=sqlite+aiosqlite:///./data/demo.db python -m scripts.demo_server
 Usage réservé au développement : jamais en production.

@@ -70,7 +70,7 @@ extend_agent(
 )
 ```
 
-Refus (`ValueError` ou `KeyError`, rien n'est modifié, l'extension n'est pas chargée) : agent
+Refus (`ValueError`, rien n'est modifié, l'extension n'est pas chargée) : agent
 inconnu, boîte inconnue (à enregistrer **avant** l'appel), boîte `sensitive` sur un agent qui n'est
 pas déjà « 100 % local » — une extension ne peut pas faire basculer un agent sur le modèle local à
 l'insu de l'utilisateur ; pour des données sensibles, enregistrer un agent séparé (ex. Trésorier).

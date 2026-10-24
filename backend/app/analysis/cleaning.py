@@ -21,9 +21,11 @@ from app.analysis.frame import (
     ColumnType,
     Frame,
     is_missing,
+    is_total_row,
     parse_bool,
     parse_date,
     parse_number,
+    row_key_value,
     unique_names,
 )
 
@@ -67,8 +69,11 @@ def apply(frame: Frame, operations: list[Operation]) -> list[str]:
     for i, op in enumerate(operations, start=1):
         try:
             effects.append(_APPLY[op.op](frame, op))
-        except ColumnError as exc:
-            raise CleaningError(f"Opération {i} ({op.op}) : {exc}") from exc
+        except (ColumnError, CleaningError) as exc:
+            raise CleaningError(
+                f"Opération {i} ({op.op}) : {exc} Aucune opération n'a été appliquée (le jeu "
+                "nettoyé n'est pas créé) : corrige celle-ci et renvoie la liste complète."
+            ) from exc
         frame.recipe.append({k: v for k, v in op.__dict__.items() if v is not None})
     return effects
 
@@ -86,7 +91,7 @@ def _columns(frame: Frame, op: Operation, kinds: tuple[ColumnType, ...]) -> list
 
 
 def _key(value: Any) -> Any:
-    return value.strip().lower() if isinstance(value, str) else value
+    return row_key_value(value)
 
 
 def _duplicates(frame: Frame, op: Operation) -> str:
@@ -95,6 +100,9 @@ def _duplicates(frame: Frame, op: Operation) -> str:
     keep: list[int] = []
     for i in range(frame.rows):
         key = tuple(_key(c.values[i]) for c in cols)
+        if op.colonne and key == (None,):  # clé vide : jamais considérée comme un doublon
+            keep.append(i)
+            continue
         if key not in seen:
             seen.add(key)
             keep.append(i)
@@ -111,16 +119,9 @@ def _empty_rows(frame: Frame, _: Operation) -> str:
     return f"{removed} ligne(s) vide(s) supprimée(s)."
 
 
-_TOTAL = re.compile(r"^\s*(sous[- ]?)?total\b", re.IGNORECASE)
-
-
 def _totals(frame: Frame, _: Operation) -> str:
-    texts = [c for c in frame.columns if c.type == "string"]
-    keep = [
-        i
-        for i in range(frame.rows)
-        if not any(isinstance(c.values[i], str) and _TOTAL.match(c.values[i]) for c in texts)
-    ]
+    # Même règle qu'au chargement et dans le profil (`is_total_row`) : « Total Energies » reste
+    keep = [i for i in range(frame.rows) if not is_total_row([c.values[i] for c in frame.columns])]
     removed = frame.rows - len(keep)
     frame.take(keep)
     return f"{removed} ligne(s) de total ou sous-total supprimée(s)."
@@ -160,7 +161,16 @@ def _case(frame: Frame, op: Operation) -> str:
 
 
 def _title(text: str) -> str:
-    return text[:1].upper() + text[1:].lower() if text else text
+    """Première lettre en capitale ; sigles (« SNCF », « TVA ») gardés en capitales."""
+    out = []
+    for k, word in enumerate(text.split(" ")):
+        if word.isupper() and 2 <= len(word) <= 5:
+            out.append(word)
+        elif k == 0:
+            out.append(word[:1].upper() + word[1:].lower())
+        else:
+            out.append(word.lower())
+    return " ".join(out)
 
 
 _CONVERT = {
@@ -187,6 +197,12 @@ def _convert(frame: Frame, op: Operation) -> str:
         if v is not None and p is None:
             bad.append(str(v))
         out.append(p)
+    present = sum(1 for v in col.values if v is not None)
+    if present and len(bad) == present:
+        raise CleaningError(
+            f"aucune valeur de « {col.name} » ne se lit comme {target} (ex. « {bad[0]} ») : "
+            "la colonne serait entièrement vidée."
+        )
     col.values = out
     col.type = kind  # type: ignore[assignment]
     detail = (
@@ -235,8 +251,13 @@ def _fill(frame: Frame, op: Operation) -> str:
         for v in col.values:
             last = v if v is not None else last
             out.append(last)
+        filled = sum(1 for a, b in zip(col.values, out, strict=True) if a is None and b is not None)
         col.values = out
-        return f"« {col.name} » : {missing} valeur(s) manquante(s) remplie(s) par la précédente."
+        rest = missing - filled
+        tail = f" ; {rest} restée(s) vide(s) en tête de colonne" if rest else ""
+        return (
+            f"« {col.name} » : {filled} valeur(s) manquante(s) remplie(s) par la précédente{tail}."
+        )
     else:
         if not strategy:
             raise CleaningError(
@@ -274,6 +295,12 @@ def _bounds(col: Column, method: str) -> tuple[float, float]:
     method = method.lower()
     if method in ("", "iqr"):
         f = stats.iqr_fences(values)
+        if f.low == f.high:
+            raise CleaningError(
+                f"écart interquartile nul dans « {col.name} » (plus de la moitié des valeurs sont "
+                "identiques) : la règle de Tukey ramènerait tout à une seule valeur. Utilise "
+                "p1-p99 ou p5-p95, ou garde ces valeurs."
+            )
         return f.low, f.high
     if method == "p1-p99":
         s = sorted(values)
@@ -311,6 +338,17 @@ def _drop_outliers(frame: Frame, op: Operation) -> str:
     method = (op.valeur or "iqr").lower()
     if method == "mad":
         present = [(i, v) for i, v in enumerate(col.values) if v is not None]
+        if len(present) < 4:
+            raise CleaningError(
+                f"Trop peu de valeurs dans « {col.name} » pour repérer des aberrants."
+            )
+        ordered = sorted(v for _, v in present)
+        med = stats.quantile(ordered, 0.5)
+        if stats.quantile(sorted(abs(v - med) for v in ordered), 0.5) == 0:
+            raise CleaningError(
+                f"écart absolu médian nul dans « {col.name} » (plus de la moitié des valeurs sont "
+                "identiques) : toute autre valeur serait déclarée aberrante. Utilise iqr ou p1-p99."
+            )
         scores = stats.mad_scores([v for _, v in present])
         bad = {i for (i, _), z in zip(present, scores, strict=True) if abs(z) > 3.5}
         label = "score z robuste > 3,5"

@@ -210,6 +210,8 @@ def kurt_label(g2: float) -> str:
 
 
 def strength_label(r: float) -> str:
+    if r != r:
+        return "non calculable (variance nulle ou trop peu de lignes)"
     a = abs(r)
     if a < 0.1:
         word = "négligeable"

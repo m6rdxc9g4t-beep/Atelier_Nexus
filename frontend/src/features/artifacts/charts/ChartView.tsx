@@ -6,11 +6,11 @@
  * Tailwind) ; info-bulles natives (`<title>`) sur chaque marque.
  */
 
-import { type ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { type Axis, type ChartSpec, formatTick, linear, niceTicks } from "./spec";
+import { type Axis, type ChartSpec, chartRows, formatTick, linear, niceTicks } from "./spec";
 
 const W = 560;
 const H = 320;
@@ -33,11 +33,14 @@ const rotates = (labels: string[]) =>
 const FILL = ["fill-primary", "fill-chart-2", "fill-chart-3", "fill-chart-4", "fill-chart-5", "fill-chart-1"];
 const STROKE = ["stroke-primary", "stroke-chart-2", "stroke-chart-3", "stroke-chart-4", "stroke-chart-5", "stroke-chart-1"];
 const SWATCH = ["bg-primary", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5", "bg-chart-1"];
+/** Motifs de trait : les séries d'une courbe se distinguent aussi sans la couleur. */
+const DASH = [undefined, "6 3", "2 3", "8 3 2 3", "1 2", "10 4"];
 
 const fr = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
 const short = (s: string, n = 16) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 export function ChartView({ spec }: { spec: ChartSpec }) {
+  const dataId = useId();
   let body: ReactNode;
   let legend: string[] = [];
   switch (spec.type) {
@@ -62,9 +65,16 @@ export function ChartView({ spec }: { spec: ChartSpec }) {
   }
   return (
     <figure className="space-y-2">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={spec.title} className="h-auto w-full overflow-visible">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={spec.title}
+        aria-describedby={dataId}
+        className="h-auto w-full overflow-visible"
+      >
         {body}
       </svg>
+      <DataTableForScreenReaders spec={spec} id={dataId} />
       {legend.length > 0 && (
         <figcaption className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {legend.map((label, i) => (
@@ -90,6 +100,38 @@ export function ChartView({ spec }: { spec: ChartSpec }) {
   );
 }
 
+/** Valeurs du graphique en tableau, lu par les lecteurs d'écran (les info-bulles ne le sont pas). */
+function DataTableForScreenReaders({ spec, id }: { spec: ChartSpec; id: string }) {
+  const [head, ...rows] = chartRows(spec);
+  const shown = rows.slice(0, 200);
+  return (
+    <table id={id} className="sr-only">
+      <caption>
+        {spec.title}
+        {rows.length > shown.length ? ` (${shown.length} premières lignes sur ${rows.length})` : ""}
+      </caption>
+      <thead>
+        <tr>
+          {head.map((h, i) => (
+            <th key={i} scope="col">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {shown.map((r, i) => (
+          <tr key={i}>
+            {r.map((v, j) => (
+              <td key={j}>{v === null ? "—" : typeof v === "number" ? fr(v) : v}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 // ─── Axes ──────────────────────────────────────────────────────────
 
 function YAxis({
@@ -108,7 +150,7 @@ function YAxis({
       {ticks.map((t) => (
         <g key={t}>
           <line x1={M.left} x2={W - M.right} y1={scale(t)} y2={scale(t)} className="stroke-border" strokeWidth={1} />
-          <text x={M.left - 6} y={scale(t)} dy="0.32em" textAnchor="end" className="fill-muted-foreground text-[10px]">
+          <text x={M.left - 6} y={scale(t)} dy="0.32em" textAnchor="end" className="fill-muted-foreground text-[11px]">
             {formatTick(t)}
           </text>
         </g>
@@ -141,7 +183,7 @@ function XAxisNumeric({
     <g>
       <line x1={M.left} x2={W - M.right} y1={M.top + l.ph} y2={M.top + l.ph} className="stroke-border-strong" />
       {ticks.map((t) => (
-        <text key={t} x={scale(t)} y={M.top + l.ph + 16} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+        <text key={t} x={scale(t)} y={M.top + l.ph + 16} textAnchor="middle" className="fill-muted-foreground text-[11px]">
           {formatTick(t, axis.kind)}
         </text>
       ))}
@@ -171,7 +213,7 @@ function XAxisBands({ labels, center, l }: { labels: string[]; center: (i: numbe
             key={`${label}-${i}`}
             transform={`translate(${center(i)} ${M.top + l.ph + 14})${rotate ? " rotate(-35)" : ""}`}
             textAnchor={rotate ? "end" : "middle"}
-            className="fill-muted-foreground text-[10px]"
+            className="fill-muted-foreground text-[11px]"
           >
             <title>{label}</title>
             {short(label, rotate ? 12 : 16)}
@@ -367,15 +409,27 @@ function Categories({ spec }: { spec: Extract<ChartSpec, { type: "bar" | "line" 
               .join("");
             return (
               <g key={si}>
-                <path d={d} fill="none" className={STROKE[si % STROKE.length]} strokeWidth={2} />
-                {n <= 60 &&
-                  s.values.map((v, i) =>
-                    v === null ? null : (
-                      <circle key={i} cx={center(i)} cy={y(v)} r={2.5} className={FILL[si % FILL.length]}>
-                        <title>{`${spec.categories[i]} · ${s.name} : ${fr(v)}`}</title>
-                      </circle>
-                    ),
-                  )}
+                <path
+                  d={d}
+                  fill="none"
+                  className={STROKE[si % STROKE.length]}
+                  strokeWidth={2}
+                  strokeDasharray={DASH[si % DASH.length]}
+                />
+                {s.values.map((v, i) =>
+                  v === null ? null : (
+                    <circle
+                      key={i}
+                      cx={center(i)}
+                      cy={y(v)}
+                      r={n <= 60 ? 2.5 : 4}
+                      className={FILL[si % FILL.length]}
+                      fillOpacity={n <= 60 ? 1 : 0}
+                    >
+                      <title>{`${spec.categories[i]} · ${s.name} : ${fr(v)}`}</title>
+                    </circle>
+                  ),
+                )}
               </g>
             );
           })}
@@ -388,6 +442,7 @@ function Categories({ spec }: { spec: Extract<ChartSpec, { type: "bar" | "line" 
 // ─── Carte de chaleur (corrélations) ───────────────────────────────
 
 function Heatmap({ spec }: { spec: Extract<ChartSpec, { type: "heatmap" }> }) {
+  const dataId = useId();
   const k = spec.labels.length;
   const left = 120;
   const top = 96;
@@ -402,17 +457,18 @@ function Heatmap({ spec }: { spec: Extract<ChartSpec, { type: "heatmap" }> }) {
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={spec.title}
+        aria-describedby={dataId}
         className={cn("h-auto w-full", k <= 4 ? "max-w-sm" : k <= 8 ? "max-w-md" : undefined)}
       >
         {spec.labels.map((l, i) => (
           <g key={`${l}-${i}`}>
-            <text x={left - 6} y={top + cell * (i + 0.5)} dy="0.32em" textAnchor="end" className="fill-muted-foreground text-[10px]">
+            <text x={left - 6} y={top + cell * (i + 0.5)} dy="0.32em" textAnchor="end" className="fill-muted-foreground text-[11px]">
               <title>{l}</title>
               {short(l, 18)}
             </text>
             <text
               transform={`translate(${left + cell * (i + 0.5)} ${top - 6}) rotate(-45)`}
-              className="fill-muted-foreground text-[10px]"
+              className="fill-muted-foreground text-[11px]"
             >
               <title>{l}</title>
               {short(l, 18)}
@@ -433,13 +489,25 @@ function Heatmap({ spec }: { spec: Extract<ChartSpec, { type: "heatmap" }> }) {
               >
                 <title>{`${spec.labels[i]} × ${spec.labels[j]} : ${v === null ? "non calculé" : fr(v)}`}</title>
               </rect>
+              {v !== null && cell < 30 && v < 0 && (
+                <text
+                  x={left + cell * (j + 0.5)}
+                  y={top + cell * (i + 0.5)}
+                  dy="0.32em"
+                  textAnchor="middle"
+                  className="fill-foreground text-[11px]"
+                  aria-hidden
+                >
+                  −
+                </text>
+              )}
               {v !== null && cell >= 30 && (
                 <text
                   x={left + cell * (j + 0.5)}
                   y={top + cell * (i + 0.5)}
                   dy="0.32em"
                   textAnchor="middle"
-                  className={cn("text-[10px] tabular-nums", Math.abs(v) / maxAbs > 0.6 ? "fill-primary-foreground" : "fill-foreground")}
+                  className={cn("text-[11px] tabular-nums", Math.abs(v) / maxAbs > 0.6 ? "fill-primary-foreground" : "fill-foreground")}
                 >
                   {v.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
                 </text>
@@ -448,6 +516,7 @@ function Heatmap({ spec }: { spec: Extract<ChartSpec, { type: "heatmap" }> }) {
           )),
         )}
       </svg>
+      <DataTableForScreenReaders spec={spec} id={dataId} />
       <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>{spec.legend}</span>
         <span className="inline-flex items-center gap-1.5">

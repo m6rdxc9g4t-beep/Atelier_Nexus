@@ -21,7 +21,7 @@ backend/scripts/evals.py   # ligne de commande
 
 ```bash
 cd backend
-python -m scripts.evals --liste                                   # 22 cas
+python -m scripts.evals --liste                                   # 25 cas
 python -m scripts.evals --provider ollama --repeat 3              # tout, 3 essais par cas
 python -m scripts.evals --agent data_analyst --model qwen2.5:14b  # un agent, un autre modèle
 python -m scripts.evals --tag validation                          # par étiquette

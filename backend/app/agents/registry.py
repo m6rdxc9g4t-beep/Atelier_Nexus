@@ -84,7 +84,12 @@ def extend_agent(
     if (name, source) in _EXTENDED:
         return cls
     for toolset_id in toolsets:
-        toolset = get_toolset(toolset_id)  # KeyError si inconnue
+        try:
+            toolset = get_toolset(toolset_id)
+        except KeyError:
+            raise ValueError(f"Boîte à outils inconnue : {toolset_id}") from None
+        # Limite : seule la boîte est examinée ; une boîte non sensible ne doit contenir aucun
+        # outil `sensitive` (règle des extensions, docs/extensions.md)
         if toolset.sensitive and cls.privacy != "local_only":
             raise ValueError(
                 f"Boîte sensible « {toolset_id} » refusée pour « {name} » (agent non local)."

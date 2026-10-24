@@ -207,40 +207,42 @@ export function ordinalToDate(ordinal: number): string {
 
 // ─── Export ────────────────────────────────────────────────────────
 
-/** Données du graphique en CSV (séparateur « ; », virgule décimale) pour le téléchargement. */
+/** Données du graphique en tableau (export CSV et tableau lu par les lecteurs d'écran). */
+export function chartRows(spec: ChartSpec): (string | number | null)[][] {
+  switch (spec.type) {
+    case "histogram":
+      return [["Début", "Fin", "Effectif"], ...spec.bins.map((b) => [b.start, b.end, b.count])];
+    case "box":
+      return [
+        ["Groupe", "n", "Min", "Q1", "Médiane", "Q3", "Max", "Moyenne"],
+        ...spec.groups.map((g) => [g.label, g.n, g.min, g.q1, g.median, g.q3, g.max, g.mean]),
+      ];
+    case "scatter":
+      return [
+        [spec.x.label || "x", spec.y.label || "y", ...(spec.groups ? ["Groupe"] : [])],
+        ...spec.points.map((p, i) => [p[0], p[1], ...(spec.groups ? [spec.groups[i]] : [])]),
+      ];
+    case "bar":
+    case "line":
+      return [
+        [spec.x.label || "Catégorie", ...spec.series.map((s) => s.name)],
+        ...spec.categories.map((c, i) => [c, ...spec.series.map((s) => s.values[i])]),
+      ];
+    case "heatmap":
+      return [["", ...spec.labels], ...spec.labels.map((l, i) => [l, ...spec.values[i]])];
+  }
+}
+
+/** Données du graphique en CSV (séparateur « ; », virgule décimale). Un libellé qui commence
+ * par = + - @ (venu d'un fichier) est neutralisé : pas de formule à l'ouverture dans Excel. */
 export function chartToCsv(spec: ChartSpec): string {
   const cell = (v: string | number | null) => {
     if (v === null) return "";
-    const s = typeof v === "number" ? String(v).replace(".", ",") : v;
+    let s = typeof v === "number" ? String(v).replace(".", ",") : v;
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const rows: (string | number | null)[][] = [];
-  switch (spec.type) {
-    case "histogram":
-      rows.push(["Début", "Fin", "Effectif"], ...spec.bins.map((b) => [b.start, b.end, b.count]));
-      break;
-    case "box":
-      rows.push(
-        ["Groupe", "n", "Min", "Q1", "Médiane", "Q3", "Max", "Moyenne"],
-        ...spec.groups.map((g) => [g.label, g.n, g.min, g.q1, g.median, g.q3, g.max, g.mean]),
-      );
-      break;
-    case "scatter":
-      rows.push(
-        [spec.x.label || "x", spec.y.label || "y", ...(spec.groups ? ["Groupe"] : [])],
-        ...spec.points.map((p, i) => [p[0], p[1], ...(spec.groups ? [spec.groups[i]] : [])]),
-      );
-      break;
-    case "bar":
-    case "line":
-      rows.push(
-        [spec.x.label || "Catégorie", ...spec.series.map((s) => s.name)],
-        ...spec.categories.map((c, i) => [c, ...spec.series.map((s) => s.values[i])]),
-      );
-      break;
-    case "heatmap":
-      rows.push(["", ...spec.labels], ...spec.labels.map((l, i) => [l, ...spec.values[i]]));
-      break;
-  }
-  return rows.map((r) => r.map(cell).join(";")).join("\n");
+  return chartRows(spec)
+    .map((r) => r.map(cell).join(";"))
+    .join("\n");
 }

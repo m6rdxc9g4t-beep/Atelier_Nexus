@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from collections.abc import Iterable
 from typing import Any
 
 from app.analysis.frame import ColumnType, Frame, frame_from_rows
@@ -45,7 +46,7 @@ async def from_viz(client: DataViaClient, dataset_id: str, name: str, max_rows: 
         if headers is None:
             headers = page.columns or [c.name for c in profile.columns]
         total = page.total
-        rows += [[r.get(h) for h in headers] for r in page.rows]
+        rows += [[r.get(h) for h in headers] for r in page.rows[: limit - len(rows)]]
         if not page.rows:
             break
         offset += len(page.rows)
@@ -101,12 +102,14 @@ async def from_file(
 ) -> Frame:
     info, data = await files.load(ref)
     ext = info.name.rsplit(".", 1)[-1].lower() if "." in info.name else ""
+    keep = max_rows + _HEAD  # lignes gardées en mémoire (les suivantes sont seulement comptées)
     if ext in ("csv", "tsv", "txt"):
-        headers, rows, notes = _delimited(data)
+        headers, rows, notes, total = _delimited(data, keep)
     elif ext in ("xlsx", "xlsm"):
-        headers, rows, notes = _excel(data, sheet)
+        headers, rows, notes, total = _excel(data, sheet, keep)
     elif ext == "json":
         headers, rows, notes = _json(data)
+        total = len(rows)
     elif ext in ("pdf", "xls", "ofx", "qif", "ods"):
         raise LoadError(
             f"« {info.name} » ne se lit pas directement : convertis-le d'abord en table (Atelier "
@@ -122,9 +125,11 @@ async def from_file(
         name, info.name, f"Fichier joint « {info.name} »", headers, rows[:limit]
     )
     frame.notes = notes + frame.notes
-    frame.source_rows = len(rows)
-    if len(rows) > limit:
-        frame.notes.append(f"Chargé : {limit} ligne(s) sur {len(rows)} (limite de chargement).")
+    frame.source_rows = total
+    if total > frame.rows:
+        frame.notes.append(
+            f"Chargé : {frame.rows} ligne(s) sur environ {total} (limite de chargement)."
+        )
     return frame
 
 
@@ -162,7 +167,21 @@ def _split(rows: list[list[Any]]) -> tuple[list[str], list[list[Any]], list[str]
     return headers, rows[h + 1 :], notes
 
 
-def _delimited(data: bytes) -> tuple[list[str], list[list[Any]], list[str]]:
+_HEAD = 25  # lignes de titre possibles au-dessus de l'en-tête
+
+
+def _bounded(rows: Iterable[list[Any]], keep: int) -> tuple[list[list[Any]], int]:
+    """Garde les `keep` premières lignes, compte les autres sans les garder en mémoire."""
+    kept: list[list[Any]] = []
+    total = 0
+    for row in rows:
+        total += 1
+        if len(kept) < keep:
+            kept.append(row)
+    return kept, total
+
+
+def _delimited(data: bytes, keep: int) -> tuple[list[str], list[list[Any]], list[str], int]:
     from app.attachments.processing import decode_text
 
     text = decode_text(data)
@@ -172,11 +191,14 @@ def _delimited(data: bytes) -> tuple[list[str], list[list[Any]], list[str]]:
         )
     except csv.Error:
         dialect = csv.excel
-    rows: list[list[Any]] = [list(r) for r in csv.reader(io.StringIO(text), dialect)]
-    return _split(rows)
+    rows, total = _bounded((list(r) for r in csv.reader(io.StringIO(text), dialect)), keep)
+    headers, body, notes = _split(rows)
+    return headers, body, notes, max(len(body), total - (len(rows) - len(body)))
 
 
-def _excel(data: bytes, sheet: str | None) -> tuple[list[str], list[list[Any]], list[str]]:
+def _excel(
+    data: bytes, sheet: str | None, keep: int
+) -> tuple[list[str], list[list[Any]], list[str], int]:
     import openpyxl
     from openpyxl.utils.exceptions import InvalidFileException
 
@@ -193,13 +215,13 @@ def _excel(data: bytes, sheet: str | None) -> tuple[list[str], list[list[Any]], 
             ws = workbook[match[0]]
         else:
             ws = workbook[names[0]]
-        rows = [list(r) for r in ws.iter_rows(values_only=True)]
+        rows, total = _bounded((list(r) for r in ws.iter_rows(values_only=True)), keep)
     finally:
         workbook.close()
     headers, body, notes = _split(rows)
     if sheet is None and len(names) > 1:
         notes.insert(0, f"Feuille « {names[0]} » lue ; autres feuilles : {', '.join(names[1:])}.")
-    return headers, body, notes
+    return headers, body, notes, max(len(body), total - (len(rows) - len(body)))
 
 
 def _json(data: bytes) -> tuple[list[str], list[list[Any]], list[str]]:

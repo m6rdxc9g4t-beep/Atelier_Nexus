@@ -91,7 +91,9 @@ export function formatCell(value: Scalar): string {
 /** Export CSV (séparateur « ; », comme Excel en français). */
 export function toCsv(table: TableData): string {
   const esc = (v: Scalar) => {
-    const s = v === null ? "" : typeof v === "number" ? String(v).replace(".", ",") : String(v);
+    let s = v === null ? "" : typeof v === "number" ? String(v).replace(".", ",") : String(v);
+    // Texte commençant par = + - @ : neutralisé (pas de formule à l'ouverture dans Excel)
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [table.headers, ...table.rows].map((row) => row.map(esc).join(";")).join("\n");

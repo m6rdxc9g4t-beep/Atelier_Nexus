@@ -17,7 +17,15 @@ from app.analysis.analyses import AggName, ChartKind, MeasureSpec, Period
 from app.analysis.cleaning import CleaningError, Comparator, Operation, OpName, apply
 from app.analysis.frame import TYPE_LABELS, ColumnError, Frame
 from app.analysis.loaders import LoadError
-from app.analysis.store import FRAMES, NAME, FrameNotFoundError, FrameStore, frame_name
+from app.analysis.store import (
+    FRAMES,
+    NAME,
+    FrameNotFoundError,
+    FrameScopeError,
+    FrameStore,
+    frame_name,
+    scope_of,
+)
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.data_via import DataViaError
 from app.tools.environment import ToolEnvironment
@@ -32,15 +40,18 @@ _NAME_FIELD = Field(
 
 class _AnalyseTool[InputT: ToolInput](BaseTool[InputT]):
     expected_errors: ClassVar[tuple[type[Exception], ...]] = (
-        AppError, DataViaError, LoadError, ColumnError, CleaningError, FrameNotFoundError,
+        AppError, DataViaError, LoadError, ColumnError, CleaningError, FrameNotFoundError, FrameScopeError,
     )  # fmt: skip
 
     def __init__(self, env: ToolEnvironment, store: FrameStore | None = None) -> None:
         self.env = env
         self.store = store or FRAMES
 
+    def scope(self, ctx: ToolContext) -> str:
+        return scope_of(ctx.conversation_id, ctx.extras)
+
     def frame(self, ctx: ToolContext, name: str) -> Frame:
-        return self.store.get(ctx.conversation_id, name)
+        return self.store.get(self.scope(ctx), name)
 
     def output(self, result: analyses.Result) -> ToolOutput:
         return ToolOutput(content=result.content, artifacts=result.artifacts)
@@ -92,6 +103,7 @@ class LoadTool(_AnalyseTool[LoadInput]):
         )
 
     async def run(self, params: LoadInput, ctx: ToolContext) -> ToolOutput:
+        scope = self.scope(ctx)  # refuse avant tout chargement hors conversation
         name = params.nom or frame_name(params.reference)
         if params.source == "viz":
             frame = await loaders.from_viz(
@@ -111,7 +123,7 @@ class LoadTool(_AnalyseTool[LoadInput]):
             )
         if not params.nom and params.source in ("viz", "tab") and frame_name(frame.label) != "jeu":
             frame.name = frame_name(frame.label)  # nom lisible plutôt que l'identifiant
-        evicted = self.store.put(ctx.conversation_id, frame)
+        evicted = self.store.put(scope, frame)
         schema = ", ".join(f"{c.name} ({TYPE_LABELS[c.type]})" for c in frame.columns[:60])
         lines = [
             f"Jeu de travail « {frame.name} » chargé : {frame.rows} ligne(s), {len(frame.columns)} colonne(s).",
@@ -142,7 +154,7 @@ class ListFramesTool(_AnalyseTool[NoInput]):
     input_model = NoInput
 
     async def run(self, params: NoInput, ctx: ToolContext) -> ToolOutput:
-        frames = self.store.list(ctx.conversation_id)
+        frames = self.store.list(self.scope(ctx))
         if not frames:
             return ToolOutput(content="Aucun jeu chargé : utilise `analyse_charger`.")
         rows = [[f.name, f.rows, len(f.columns), f.origin, len(f.recipe)] for f in frames]
@@ -331,13 +343,11 @@ class CleanTool(_AnalyseTool[CleanInput]):
 
     async def run(self, params: CleanInput, ctx: ToolContext) -> ToolOutput:
         source = self.frame(ctx, params.nom)
-        target = params.nouveau_nom or (
-            params.nom if params.nom.endswith("_propre") else f"{params.nom[:33]}_propre"
-        )
+        target = _clean_target(params.nom, params.nouveau_nom)
         frame = source.copy(target)
         before_rows, before_missing = frame.rows, _missing(frame)
         effects = apply(frame, [Operation(**o.model_dump()) for o in params.operations])
-        evicted = self.store.put(ctx.conversation_id, frame)
+        evicted = self.store.put(self.scope(ctx), frame)
         lines = [
             f"Jeu « {frame.name} » créé à partir de « {source.name} » (source intacte) :",
             *[f"{i}. {e}" for i, e in enumerate(effects, start=1)],
@@ -355,6 +365,17 @@ class CleanTool(_AnalyseTool[CleanInput]):
             "Analyse ensuite le jeu nettoyé par son nom ; `analyse_exporter` pour le télécharger."
         )
         return ToolOutput(content="\n".join(lines))
+
+
+def _clean_target(source: str, wanted: str | None) -> str:
+    """Nom du jeu nettoyé : jamais celui de la source (elle reste intacte)."""
+    if wanted is not None:
+        if wanted == source:
+            raise CleaningError("`nouveau_nom` doit différer de `nom` : la source reste intacte.")
+        return wanted
+    base = source[:-7] if source.endswith("_propre") else source
+    candidate = f"{base[:33]}_propre"
+    return candidate if candidate != source else f"{base[:32]}_propre2"
 
 
 def _missing(frame: Frame) -> int:
@@ -380,14 +401,16 @@ class AggregateInput(ToolInput):
     par: list[str] = Field(
         default_factory=list, max_length=3, description="Colonnes de regroupement (vide = total)."
     )
-    mesures: list[MeasureInput] = Field(min_length=1, max_length=10)
+    mesures: list[MeasureInput] = Field(
+        min_length=1, max_length=10, description="Mesures calculées par groupe."
+    )
     periode: Period | None = Field(
         default=None,
         description="Pour une colonne date de `par` : annee, trimestre, mois, semaine, jour.",
     )
     tri: str | None = Field(default=None, description="Clé de tri, ex. « somme(montant) ».")
-    decroissant: bool = True
-    limite: int = Field(default=500, ge=1, le=5000)
+    decroissant: bool = Field(default=True, description="Tri décroissant (défaut) ou croissant.")
+    limite: int = Field(default=500, ge=1, le=5000, description="Nombre maximal de groupes rendus.")
 
 
 class AggregateTool(_AnalyseTool[AggregateInput]):
@@ -461,7 +484,7 @@ class ChartTool(_AnalyseTool[ChartInput]):
 
 class ExportInput(ToolInput):
     nom: str = _NAME_FIELD
-    max_lignes: int = Field(default=10_000, ge=1, le=50_000)
+    max_lignes: int = Field(default=10_000, ge=1, le=50_000, description="Lignes publiées au plus.")
 
 
 class ExportTool(_AnalyseTool[ExportInput]):

@@ -42,6 +42,13 @@ Y = [1.0, 1.9, 0.8, 4.1, 2.5, 1.4, 1.2, 6.9, 2.2, 2.6, 0.9, 1.6, 2.4, 1.5, 1.3, 
      3.9, 1.7, 1.4, 2.1, 1.6, 2.9, 1.0]  # fmt: skip
 
 
+def strict_json(text: str) -> Any:
+    def refuse(token: str) -> Any:
+        raise ValueError(f"JSON invalide pour le navigateur : {token}")
+
+    return json.loads(text, parse_constant=refuse)
+
+
 def close(a: float, b: float, rel: float = 1e-9) -> bool:
     return math.isclose(a, b, rel_tol=rel, abs_tol=1e-12)
 
@@ -200,8 +207,8 @@ def tools_for(
 
 async def call(tools: dict[str, Any], name: str, ctx: ToolContext, **kw: Any) -> Any:
     out = await tools[name].invoke(kw, ctx)
-    for artifact in out.artifacts:  # tout artefact est du JSON strict (pas de NaN)
-        json.loads(artifact.content)
+    for artifact in out.artifacts:  # tout artefact est du JSON strict (NaN refusé)
+        strict_json(artifact.content)
     return out
 
 
@@ -212,7 +219,7 @@ async def test_csv_load_profile_clean_and_analyse_end_to_end() -> None:
 
     out = await call(tools, "analyse_charger", ctx, source="fichier", reference="ventes")
     assert not out.is_error, out.content
-    frame = store.get("conv-1", "ventes")
+    frame = store.get("conv:conv-1", "ventes")
     assert frame.rows == 7  # titre et ligne Total exclus
     assert [c.type for c in frame.columns] == ["date", "string", "string", "number", "number"]
     assert (
@@ -230,8 +237,8 @@ async def test_csv_load_profile_clean_and_analyse_end_to_end() -> None:
                     {"op": "remplir", "colonne": "Quantité", "valeur": "mediane"}],
     )  # fmt: skip
     assert not out.is_error, out.content
-    clean = store.get("conv-1", "ventes_propre")
-    assert clean.rows == 6 and store.get("conv-1", "ventes").rows == 7  # source intacte
+    clean = store.get("conv:conv-1", "ventes_propre")
+    assert clean.rows == 6 and store.get("conv:conv-1", "ventes").rows == 7  # source intacte
     assert set(v for v in clean.column("Région").values if v) == {"Nord", "Sud", "Est"}
     assert None not in clean.column("Quantité").values and len(clean.recipe) == 3
 
@@ -301,14 +308,14 @@ async def test_excel_and_json_files() -> None:
         tools, "analyse_charger", ctx, source="fichier", reference="mesures.xlsx", feuille="mesures"
     )
     assert not out.is_error, out.content
-    frame = store.get("c", "mesures")
+    frame = store.get("conv:c", "mesures")
     assert [c.type for c in frame.columns] == ["string", "number", "date"] and frame.rows == 30
     out = await call(
         tools, "analyse_charger", ctx, source="fichier", reference="mesures.xlsx", feuille="Absente"
     )
     assert out.is_error and "Mesures" in out.content
     out = await call(tools, "analyse_charger", ctx, source="fichier", reference="lignes.json")
-    assert store.get("c", "lignes").column("c").values == [None, "[1, 2]"]
+    assert store.get("conv:c", "lignes").column("c").values == [None, "[1, 2]"]
     out = await call(tools, "analyse_charger", ctx, source="fichier", reference="inconnu.csv")
     assert out.is_error and "introuvable" in out.content
 
@@ -352,7 +359,7 @@ async def test_viz_load_pages_rows_and_respects_limit() -> None:
     ctx = ToolContext(conversation_id="v")
     out = await call(tools, "analyse_charger", ctx, source="viz", reference="ds_ventes")
     assert not out.is_error, out.content
-    frame = store.get("v", "ventes_2026")  # nom tiré du libellé du jeu
+    frame = store.get("conv:v", "ventes_2026")  # nom tiré du libellé du jeu
     assert frame.rows == 2500 and len([r for r in seen if r.url.path.endswith("/rows")]) == 3
     assert [c.type for c in frame.columns] == ["date", "string", "number", "number"]
 
@@ -365,7 +372,7 @@ async def test_viz_load_pages_rows_and_respects_limit() -> None:
         nom="extrait",
         max_lignes=1200,
     )
-    assert store.get("v", "extrait").rows == 1200 and "1200 ligne(s) sur 2500" in out.content
+    assert store.get("conv:v", "extrait").rows == 1200 and "1200 ligne(s) sur 2500" in out.content
 
     out = await call(tools, "analyse_charger", ctx, source="viz", reference="ds_absent")
     assert out.is_error
@@ -383,7 +390,7 @@ async def test_tab_load_excludes_totals(tmp_path: Path) -> None:
     ctx = ToolContext(conversation_id="t")
     out = await call(tools, "analyse_charger", ctx, source="tab", reference="tbl_planning_lots")
     assert not out.is_error, out.content
-    frame = store.list("t")[0]
+    frame = store.list("conv:t")[0]
     assert frame.rows == 3 and "Coût HT" in frame.names() and "Lignes de total" in out.content
     assert frame.column("Coût HT").type == "number"
 
@@ -431,13 +438,13 @@ def test_store_isolation_eviction_and_names() -> None:
     for i in range(MAX_FRAMES + 2):
         f = sample_frame()
         f.name = f"j{i}"
-        store.put("a", f)
-    assert [f.name for f in store.list("a")][0] == "j2"
+        store.put("conv:a", f)
+    assert [f.name for f in store.list("conv:a")][0] == "j2"
     with pytest.raises(FrameNotFoundError):
-        store.get("b", "j5")
+        store.get("conv:b", "j5")
     clock[0] = 7 * 3600
     with pytest.raises(FrameNotFoundError):
-        store.get("a", "j5")  # expiré
+        store.get("conv:a", "j5")  # expiré
     assert frame_name("Ventes 2026.csv") == "ventes_2026" and frame_name("2026.xlsx") == "c_2026"
 
 
@@ -469,7 +476,7 @@ def test_data_agent_has_analysis_tools_and_can_be_extended() -> None:
         with pytest.raises(ValueError, match="sensible"):
             extend_agent("data_analyst", source="test", toolsets=("tresorerie",))
         assert cls.toolsets == before[0]  # rien modifié
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="inconnue"):
             extend_agent("data_analyst", source="test", toolsets=("inconnue",))
         extend_agent(
             "data_analyst",
@@ -546,3 +553,134 @@ async def test_frames_survive_every_step_approvals_across_requests() -> None:
         assert {a.kind for a in done.result.artifacts} == {"data_preview"}
     finally:
         FRAMES.clear()
+
+
+# ═══ Régressions de la relecture ═════════════════════════════════
+
+
+async def test_no_shared_bucket_without_conversation_or_run() -> None:
+    from app.analysis.store import FrameScopeError, scope_of
+
+    store = FrameStore()
+    tools = tools_for({"ventes.csv": SALES_CSV}, store)
+    out = await call(tools, "analyse_charger", ToolContext(), source="fichier", reference="ventes")
+    assert out.is_error and "conversation" in out.content and store.list("conv:x") == []
+    assert scope_of(None, {"run_id": "r1"}) == "run:r1"
+    assert scope_of(None, {"workflow_id": "w", "launch_id": "l"}) == "launch:l"
+    with pytest.raises(FrameScopeError):
+        scope_of(None, {"workflow_id": "w"})  # un workflow seul ne suffit pas
+
+
+def test_store_global_cell_budget_and_drop() -> None:
+    from app.analysis import store as store_module
+
+    store = FrameStore()
+    big = frame_from_rows("big", "big", "t", ["a"], [[i] for i in range(10)], types=["number"])
+    old = store_module.MAX_TOTAL_CELLS
+    store_module.MAX_TOTAL_CELLS = 25
+    try:
+        for scope in ("conv:a", "conv:b", "conv:c"):
+            store.put(scope, big.copy("big"))
+        assert store.list("conv:a") == [] and len(store.list("conv:c")) == 1
+    finally:
+        store_module.MAX_TOTAL_CELLS = old
+    store.drop("conv:c")
+    assert store.list("conv:c") == []
+
+
+async def test_profile_artifact_has_no_nan_and_relation_on_constant_column() -> None:
+    store = FrameStore()
+    csv_bytes = b"a;b;c\n1;5;x\n2;5;y\n3;5;z\n"
+    tools = tools_for({"k.csv": csv_bytes}, store)
+    ctx = ToolContext(conversation_id="k")
+    await call(tools, "analyse_charger", ctx, source="fichier", reference="k.csv")
+    one = frame_from_rows("u", "u", "t", ["v"], [["1"]])
+    store.put("conv:k", one)
+    await call(tools, "analyse_profil", ctx, nom="u")  # écart-type NaN → cellule vide
+    out = await call(tools, "analyse_relation", ctx, nom="k", x="a", y="b")
+    assert "non calculable" in out.content and "très forte" not in out.content
+
+
+async def test_correlation_target_is_resolved_and_typed() -> None:
+    store = FrameStore()
+    tools = tools_for({"ventes.csv": SALES_CSV}, store)
+    ctx = ToolContext(conversation_id="cible")
+    await call(tools, "analyse_charger", ctx, source="fichier", reference="ventes")
+    out = await call(tools, "analyse_correlations", ctx, nom="ventes", cible="montant ht")
+    assert "« Montant HT »" in out.content and "1 paire(s)" in out.content
+    out = await call(tools, "analyse_correlations", ctx, nom="ventes", cible="Région")
+    assert out.is_error and "numérique" in out.content and "Erreur pendant" not in out.content
+    for kwargs in (
+        {"type": "nuage", "x": "Région", "y": "Montant HT"},
+        {"type": "boite", "x": "Produit", "y": "Région"},
+        {"type": "barres", "x": "Région", "y": "Produit", "agregation": "max", "groupe": "Date"},
+    ):
+        out = await call(tools, "analyse_graphique", ctx, nom="ventes", **kwargs)
+        assert out.is_error and "Erreur pendant" not in out.content, out.content
+
+
+def test_chart_numbers_keep_precision() -> None:
+    from app.analysis import charts
+
+    spec = charts.histogram([20240101.0 + i for i in range(31)], x_label="jour")
+    starts = [b["start"] for b in spec["bins"]]
+    assert len(set(starts)) == len(starts)
+    bars = charts.categories(["a"], [("s", [12_345_678.9])], kind="bar", x_label="", y_label="")
+    assert bars["series"][0]["values"] == [12_345_678.9]
+
+
+def test_totals_codes_phones_and_ambiguous_numbers() -> None:
+    assert not is_total_row(["Total Energies", 12]) and is_total_row([None, "Sous-total", 3])
+    frame = frame_from_rows(
+        "t",
+        "t",
+        "t",
+        ["Entreprise", "CA"],
+        [["Total Energies", "10"], ["Sncf", "5"], ["Total", "15"]],
+    )
+    assert frame.rows == 2  # seule la vraie ligne Total est exclue
+    cleaning.apply(frame, [Operation("supprimer_totaux")])
+    assert frame.rows == 2
+    assert infer_column(["01000", "75001", "13002"]).type == "string"
+    assert parse_number("06 12 34 56 78") is None and parse_number("1 234 567,8") == 1234567.8
+    assert infer_column(["1,234", "2,500", "3,750"]).notes
+
+
+def test_destructive_cleanings_are_refused() -> None:
+    zeros = frame_from_rows("z", "z", "t", ["v"], [["0"]] * 7 + [["5"], ["9"]])
+    for op in (Operation("plafonner", "v"), Operation("supprimer_aberrants", "v", "mad")):
+        with pytest.raises(CleaningError, match="nul"):
+            cleaning.apply(zeros.copy("z2"), [op])
+    codes = frame_from_rows("d", "d", "t", ["n"], [["20240115"], ["20240116"]])
+    with pytest.raises(CleaningError, match="entièrement vidée"):
+        cleaning.apply(codes, [Operation("convertir", "n", "date")])
+    dup = frame_from_rows(
+        "k", "k", "t", ["id", "v"], [["", "1"], ["", "2"], ["A", "3"], ["a", "4"]]
+    )
+    cleaning.apply(dup, [Operation("supprimer_doublons", "id")])
+    assert dup.rows == 3  # clés vides gardées, « A » et « a » fusionnés
+    title = frame_from_rows("c", "c", "t", ["n"], [["agence SNCF de lyon"]])
+    cleaning.apply(title, [Operation("casse", "n", "titre")])
+    assert title.column("n").values == ["Agence SNCF de lyon"]
+
+
+async def test_clean_never_overwrites_its_source() -> None:
+    store = FrameStore()
+    tools = tools_for({"ventes.csv": SALES_CSV}, store)
+    ctx = ToolContext(conversation_id="src")
+    await call(
+        tools, "analyse_charger", ctx, source="fichier", reference="ventes", nom="ventes_propre"
+    )
+    out = await call(
+        tools,
+        "analyse_nettoyer",
+        ctx,
+        nom="ventes_propre",
+        operations=[{"op": "supprimer_doublons"}],
+    )
+    assert "« ventes_propre2 »" in out.content and store.get("conv:src", "ventes_propre").rows == 7
+    out = await call(
+        tools, "analyse_nettoyer", ctx, nom="ventes_propre", nouveau_nom="ventes_propre",
+        operations=[{"op": "supprimer_doublons"}],
+    )  # fmt: skip
+    assert out.is_error and "différer" in out.content
