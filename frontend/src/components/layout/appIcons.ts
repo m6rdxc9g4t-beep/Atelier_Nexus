@@ -1,9 +1,11 @@
 import {
+  ArrowRightLeft,
   BarChart3,
   CalendarCheck,
   CalendarDays,
   Clapperboard,
   CookingPot,
+  GitBranch,
   GraduationCap,
   Landmark,
   type LucideIcon,
@@ -25,7 +27,26 @@ export const APP_ICONS: Record<string, LucideIcon> = {
   savoir: GraduationCap,
   cuisine: CookingPot,
   dates: CalendarDays,
+  convert: ArrowRightLeft,
+  github: GitBranch,
 };
+
+/** Nom court de chaque application (puces, palette, accueil). */
+export const APP_SHORT: Record<string, string> = {
+  nexus: "Nexus",
+  viz: "Viz",
+  tab: "Tab",
+  projets: "Projets",
+  tresorerie: "Trésorerie",
+  cine: "Ciné",
+  savoir: "Savoir",
+  cuisine: "Cuisine",
+  dates: "Dates",
+  convert: "Convert",
+  github: "GitHub",
+};
+
+export const appShort = (app: string | null | undefined): string => APP_SHORT[app || "nexus"] ?? (app || "Nexus");
 
 /** Application inconnue : prise générique. */
 export const appIcon = (app: string | null | undefined): LucideIcon => APP_ICONS[app || "nexus"] ?? Plug;

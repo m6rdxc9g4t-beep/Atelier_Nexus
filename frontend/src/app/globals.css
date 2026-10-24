@@ -54,6 +54,12 @@
   --destructive: var(--status-rejected);
   --success: var(--status-closed);
   --warning: var(--status-hold);
+  /* Encres : les mêmes couleurs utilisées comme TEXTE, mêlées au texte courant pour rester
+     lisibles (≥ 4,5:1) en clair comme en sombre (--atelier-text change seul). Les icônes et
+     pastilles gardent la couleur pure. */
+  --destructive-ink: color-mix(in oklab, var(--destructive) 78%, var(--atelier-text));
+  --success-ink: color-mix(in oklab, var(--success) 62%, var(--atelier-text));
+  --warning-ink: color-mix(in oklab, var(--warning) 52%, var(--atelier-text));
 
   /* Traits : séparateurs et lignes (par défaut sur tout élément) ; champs et boutons
      secondaires en trait doux ; contour des cartes = --atelier-border (utilitaire
@@ -116,6 +122,9 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
@@ -181,6 +190,11 @@
   ::selection {
     background-color: var(--atelier-surface-3);
   }
+  /* Barres de défilement fines, dans la signature */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--atelier-border-soft) transparent;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -188,6 +202,15 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* ─── Carte de décision (validation humaine) ──────────────────────
+   Barre ambre à gauche + halo de la signature : « à vous de décider » se distingue de l'orange
+   de Nexus par la barre, l'icône et le libellé (jamais par la seule couleur). */
+@layer components {
+  .decision-card {
+    box-shadow: inset 3px 0 0 var(--warning), var(--atelier-glow);
   }
 }
 

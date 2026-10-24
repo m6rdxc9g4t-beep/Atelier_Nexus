@@ -6,12 +6,21 @@
 
 import { create } from "zustand";
 
-import type { TriggerApp } from "@/types/api";
+import type { TriggerApp, WorkflowParam, WorkflowStepV2 } from "@/types/api";
 
 /** Déclencheur événement à préremplir (« + » d'un événement de la carte de la suite). */
 export interface TriggerPreset {
   app: TriggerApp;
   types: string[];
+}
+
+/** Modèle de workflow de suite (GET /api/workflows/library) à copier dans un nouveau brouillon. */
+export interface TemplateSeed {
+  slug: string;
+  title: string;
+  description: string;
+  params: WorkflowParam[];
+  steps: WorkflowStepV2[];
 }
 
 export type EditorTarget =
@@ -20,8 +29,11 @@ export type EditorTarget =
    * affiche cette exécution dans le suivi, `trigger` ouvre un déclencheur prérempli.
    */
   | { kind: "open"; id: string; panel?: "run" | "triggers"; runId?: string; trigger?: TriggerPreset }
-  /** Nouveau workflow (agent null = workflow de suite), éventuellement avec une première étape ou un déclencheur */
-  | { kind: "new"; agent: string | null; uses?: string; trigger?: TriggerPreset };
+  /**
+   * Nouveau workflow (agent null = workflow de suite), éventuellement avec une première étape, un
+   * déclencheur, ou copié d'un modèle de la suite (brouillon non enregistré)
+   */
+  | { kind: "new"; agent: string | null; uses?: string; trigger?: TriggerPreset; template?: TemplateSeed };
 
 type Window = "list" | "map" | "inbox";
 
@@ -53,6 +65,8 @@ interface WorkflowStudioState {
   setMapOpen: (open: boolean) => void;
   setInboxOpen: (open: boolean) => void;
   bumpInbox: () => void;
+  /** Ferme la liste, la carte et « À valider » (retour à l'accueil ou à la conversation) */
+  closeStudio: () => void;
   setLastWorkflow: (wf: { id: string; title: string } | null) => void;
   bump: () => void;
 }
@@ -96,6 +110,7 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
   setInboxOpen: (open) =>
     set((s) => ({ inboxOpen: open, listOpen: open ? false : s.listOpen, mapOpen: open ? false : s.mapOpen })),
   bumpInbox: () => set((s) => ({ inboxVersion: s.inboxVersion + 1 })),
+  closeStudio: () => set({ listOpen: false, mapOpen: false, inboxOpen: false }),
   setLastWorkflow: (wf) => set({ lastWorkflow: wf }),
   bump: () => set((s) => ({ version: s.version + 1 })),
 }));

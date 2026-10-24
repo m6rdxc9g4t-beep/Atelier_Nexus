@@ -15,6 +15,8 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-white hover:bg-destructive/90",
         outline: "border border-input bg-card hover:border-atelier-border hover:bg-accent",
         secondary: "bg-secondary text-secondary-foreground hover:bg-atelier-surface-3",
+        // Action secondaire mise en avant : signature en transparence, sans trait
+        soft: "bg-signature-faint text-accent-ink hover:bg-signature-soft",
         ghost: "text-muted-foreground hover:bg-accent hover:text-foreground",
         link: "text-accent-ink underline-offset-4 hover:underline",
       },
@@ -24,6 +26,7 @@ const buttonVariants = cva(
         lg: "h-10 px-6",
         icon: "size-9",
         "icon-sm": "size-8",
+        "icon-xs": "size-7 rounded-md [&_svg:not([class*='size-'])]:size-3.5",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

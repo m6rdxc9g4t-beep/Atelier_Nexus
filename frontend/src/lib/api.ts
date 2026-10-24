@@ -35,6 +35,7 @@ import type {
   WorkflowFields,
   WorkflowRun,
   WorkflowRunResult,
+  WorkflowTemplate,
   WorkflowV2,
   WorkflowV2Body,
 } from "@/types/api";
@@ -126,6 +127,9 @@ export const api = {
     sendJson<void>("DELETE", `/api/custom-agents/${encodeURIComponent(name)}`),
   conversations: (agent: string, signal?: AbortSignal) =>
     getJson<ConversationSummary[]>(`/api/conversations?agent=${encodeURIComponent(agent)}`, signal),
+  /** Conversations récentes, tous agents confondus (accueil). */
+  recentConversations: (limit = 6, signal?: AbortSignal) =>
+    getJson<ConversationSummary[]>(`/api/conversations?limit=${limit}`, signal),
   conversation: (id: string) =>
     getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`),
   /** Recherche (titre, messages, artefacts) ; `agent` null = tous les agents. */
@@ -159,6 +163,8 @@ export const api = {
 
   // ─── Workflows v2 (docs/workflows-v2-api.md) ───
   /** Catalogue des étapes ; sans `agent` (null) : catalogue de suite. */
+  /** Modèles de workflows de suite (Convert → Tab → Viz…), avec leur disponibilité. */
+  workflowLibrary: (signal?: AbortSignal) => getJson<WorkflowTemplate[]>("/api/workflows/library", signal),
   workflowCatalog: (agent: string | null, signal?: AbortSignal) =>
     getJson<Catalog>(`/api/workflows/catalog${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
   workflow: (id: string, signal?: AbortSignal) =>

@@ -12,27 +12,36 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useApprovalModeStore } from "@/stores/useApprovalModeStore";
+import { useUiStore } from "@/stores/useUiStore";
 import type { AppStatus, ProviderStatus, SettingsField, SettingsView } from "@/types/api";
 
 import { CHOICE_HELP, CHOICE_LABELS, type Draft, GROUP_NOTES, RADIO_FIELDS, byGroup, changes, initialDraft } from "./form";
 
-/** Bouton « Réglages » et fenêtre de configuration (clé Claude, modèles, apps, Cuisine, GitHub). */
+/** Bouton « Réglages » (barre latérale) : ouvre la fenêtre unique des Réglages. */
+export function SettingsButton({ className }: { className?: string }) {
+  const openSettings = useUiStore((s) => s.openSettings);
+  return (
+    <Button variant="ghost" size="icon-sm" aria-label="Réglages" title="Réglages" className={className} onClick={openSettings}>
+      <Settings />
+    </Button>
+  );
+}
+
+/**
+ * Fenêtre de configuration (clé Claude, modèles, apps, Cuisine, GitHub), montée une seule fois
+ * dans l'écran principal et ouverte par `useUiStore` (bouton Réglages, messages « non configuré »).
+ */
 export function SettingsDialog({ onSaved }: { onSaved: () => Promise<void> | void }) {
-  const [open, setOpen] = useState(false);
+  const open = useUiStore((s) => s.settingsOpen);
+  const setOpen = useUiStore((s) => s.setSettingsOpen);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Réglages" title="Réglages">
-          <Settings />
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-2xl grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
           <DialogTitle>Réglages</DialogTitle>
