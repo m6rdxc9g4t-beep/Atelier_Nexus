@@ -265,6 +265,10 @@ async def test_text_written_outside_the_object_is_kept(
     assert merge_text("Bonjour", "Bonjour  ") == "Bonjour  "
     assert merge_text("A\n\nB", "A B C") == "A B C" and merge_text("A B C", "B") == "A B C"
     assert merge_text("", "Seul") == "Seul"
+    # Deux réponses complètes, formulées différemment (constaté sur les évaluations) : une seule
+    full = "## Comité\n\nAvancement 71 %, quatre retards, trois priorités proposées." * 8
+    variant = "## Comité du jour\n\nAvancement : 71 % ; 4 retards ; 3 priorités." * 8
+    assert merge_text(full, variant) == full and merge_text(variant, full) == full
 
 
 async def test_real_stream_of_claude_code_is_parsed(

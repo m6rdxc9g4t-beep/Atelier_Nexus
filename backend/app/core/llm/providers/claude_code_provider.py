@@ -323,14 +323,25 @@ def _flat(text: str) -> str:
     return " ".join(text.split())
 
 
+FULL_ANSWER = 400
+
+
 def merge_text(loose: str, structured: str) -> str:
-    """Réponse pour l'utilisateur : le texte de l'objet, complété du texte libre qu'il ne
-    reprend pas (jamais en double)."""
+    """Réponse pour l'utilisateur, jamais en double :
+
+    - l'un contient l'autre → le plus complet ;
+    - deux réponses complètes formulées différemment (chacune d'au moins `FULL_ANSWER`
+      caractères, la plus courte au moins la moitié de l'autre) → la plus longue seule (l'autre
+      est un brouillon ou une version coupée) ;
+    - sinon (objet réduit à une phrase : « Le comité est restitué ci-dessus. ») → le texte libre
+      suivi de cette phrase."""
     a, b = _flat(loose), _flat(structured)
     if not a or a in b:
         return structured
     if not b or b in a:
         return loose
+    if min(len(a), len(b)) >= max(FULL_ANSWER, 0.5 * max(len(a), len(b))):
+        return loose if len(a) > len(b) else structured
     return f"{loose}\n\n{structured}"
 
 
