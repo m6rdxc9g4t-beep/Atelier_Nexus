@@ -27,6 +27,14 @@ l'interface affiche toujours « Claude »). Choisi par `LLMRouter.from_settings`
   validé par schéma (`--json-schema`) : `text` et `tool_calls` (`name` parmi les outils de l'agent, `arguments` en
   JSON). Nexus exécute les outils lui-même — **validations, verrou local et garde-fous inchangés** — puis renvoie les
   résultats au tour suivant. La boucle d'agent (`BaseAgent`) ne voit aucune différence avec l'API.
+  Claude Code ne donne au modèle qu'un outil, `StructuredOutput` (imposé par `--json-schema`) : les consignes
+  présentent les outils de Nexus comme des **actions à nommer** dans `tool_calls`, jamais comme des outils à
+  appeler. Présentées comme des « outils », elles étaient appelées directement (« No such tool available ») et
+  l'agent pouvait abandonner la tâche (constaté avec Claude Code 2.1.310).
+- **Sortie** : toujours `--output-format stream-json --verbose`. C'est la seule sortie qui montre le texte que le
+  modèle écrit parfois **hors** de l'objet structuré, avant de n'y mettre qu'une phrase : ce texte est ajouté à la
+  réponse quand l'objet ne le reprend pas (jamais en double). Ligne `result` finale : même forme que
+  `--output-format json`.
 - **Conversation** : transmise sur l'entrée standard, sous forme de texte (`## Utilisateur`, `## Assistant`,
   `## Assistant → appel de l'outil …`, `## Résultat de …`) ; résultats d'outils tronqués à 40 000 caractères.
 - **Sûreté** : environnement en liste blanche (SUITE.md §5.3 : `HOME`, `USER`, `LOGNAME`, `PATH` avec le dossier de
