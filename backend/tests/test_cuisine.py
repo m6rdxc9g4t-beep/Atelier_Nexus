@@ -521,7 +521,7 @@ def test_toolsets_need_full_configuration(tmp_path: Path) -> None:
     ]  # fmt: skip
 
 
-async def test_agents_cuisine_and_finance(tmp_path: Path) -> None:
+async def test_finance_reads_cuisine_budget(tmp_path: Path) -> None:
     clock = Clock()
     fake = FakeSupabase(clock)
     settings = Settings(  # type: ignore[call-arg]
@@ -534,12 +534,6 @@ async def test_agents_cuisine_and_finance(tmp_path: Path) -> None:
     )
     env = ToolEnvironment(settings, transports={"cuisine": httpx.MockTransport(fake)})
     router = make_router(ScriptedProvider("anthropic"), ScriptedProvider("ollama"))
-
-    chef = get_agent_class("cuisine")(router, env)
-    # Stock, repas, courses : pas de données financières, Claude reste possible
-    assert not chef.local_only and chef.category == "Maison" and chef.icon == "cooking-pot"
-    assert {"cuisine_stock", "cuisine_meal_plan", "cuisine_shopping_list"} <= set(chef.tools)
-    assert "cuisine_budget" not in chef.tools
 
     finance = get_agent_class("finance")(router, env)
     assert finance.local_only and "cuisine_budget" in finance.tools

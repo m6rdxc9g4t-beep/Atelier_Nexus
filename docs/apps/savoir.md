@@ -55,5 +55,5 @@ L'agent rédige lui-même les cartes avec le modèle local, puis les enregistre.
 
 ## Agent
 
-**Tuteur** (`tuteur`, catégorie Apprentissage, 100 % local) : `core`, `savoir_read`, `savoir_write`.
+L'agent Tuteur a été retiré ; les boîtes `savoir_read` et `savoir_write` (sensibles, modèle local imposé) restent disponibles pour les agents personnalisés et les workflows.
 Interrogation une question à la fois, correction, puis enregistrement groupé des notes.

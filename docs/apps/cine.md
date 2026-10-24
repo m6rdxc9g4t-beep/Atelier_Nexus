@@ -39,4 +39,4 @@ seul le nom du fichier (fiche d'un film) ou du dossier racine (erreurs d'analyse
 
 ## Agent
 
-**Ciné-club** (`cineclub`, catégorie Maison) : `core`, `cine`, `cine_write`.
+L'agent Ciné-club a été retiré ; les boîtes `cine` et `cine_write` restent disponibles pour les agents personnalisés et les workflows.

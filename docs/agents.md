@@ -19,15 +19,16 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read | Branches `feat/…`, commits `#ID`, PR brouillons |
 | Finance | Finance (`finance`) | core, tresorerie, cuisine_budget | **100 % local** ; budget courses d'Atelier Cuisine |
 | Finance | Comptable (`comptable`) | core, tresorerie | **100 % local**, PCG / TVA, ne modifie rien |
-| Apprentissage | Tuteur (`tuteur`) | core, savoir_read, savoir_write | **100 % local** ; interrogation, cartes, notes enregistrées en une validation |
-| Maison | Ciné-club (`cineclub`) | core, cine, cine_write | Recommandations dans la médiathèque, épisodes manquants, doublons |
-| Maison | Cuisine (`cuisine`) | core, cuisine | Ce qui presse dans le stock, idées de repas, planning, liste de courses ; lecture seule |
 | Métiers | Commercial (`commercial`) | core, data_via | Propositions, objections, relances |
 | Métiers | Juridique (`juridique`) | core | Droit français ; renvoie vers un avocat |
 | Métiers | Ressources humaines (`rh`) | core | Fiches de poste, entretiens, intégration |
 
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
 `common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation).
+
+Ciné-club, Cuisine et Tuteur ont été retirés (octobre 2026) : les boîtes `cine`, `cine_write`, `savoir_read`,
+`savoir_write` et `cuisine` restent disponibles pour les agents personnalisés et les workflows, et Finance
+garde `cuisine_budget`. Les conversations passées avec ces agents restent consultables dans l'historique.
 
 ## 2. Boîtes à outils
 

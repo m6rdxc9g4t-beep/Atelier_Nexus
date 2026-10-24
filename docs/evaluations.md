@@ -57,7 +57,7 @@ Code de sortie : 0 si tous les cas joués réussissent tous leurs essais, 1 sino
   simulées tournent en `APPROVAL_MODE=writes_only` (`simulated_settings`) : les lectures simulées
   s'exécutent pour suivre tout le raisonnement du modèle ; l'interface, elle, valide chaque action
   par défaut ([`settings.md`](settings.md)).
-- **Confidentialité** : un agent local (Finance, Comptable, Tuteur) ne parle qu'à Ollama, et
+- **Confidentialité** : un agent local (Finance, Comptable, Trésorier) ne parle qu'à Ollama, et
   son juge aussi. Demander `--juge-provider anthropic` pour lui donne un avertissement, pas un appel.
 - **Reproductible** en mode simulé : jeu de ventes généré avec une graine fixe (240 ventes,
   5 régions, 3 produits, janvier à septembre 2026, mesure `marge`), réponses réelles

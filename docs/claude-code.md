@@ -43,7 +43,7 @@ l'interface affiche toujours « Claude »). Choisi par `LLMRouter.from_settings`
 - **État** (`/api/llm/providers`) : `claude auth status` ; modèles proposés : sonnet, opus, haiku.
 - **Streaming** : la réponse structurée arrive d'un bloc (pas de texte partiel), tour par tour.
 
-Les agents « 100 % local » (Finance, Comptable, Tuteur) restent sur Ollama : l'abonnement est un service en ligne.
+Les agents « 100 % local » (Finance, Comptable, Trésorier) restent sur Ollama : l'abonnement est un service en ligne.
 
 ## Vérifier
 
