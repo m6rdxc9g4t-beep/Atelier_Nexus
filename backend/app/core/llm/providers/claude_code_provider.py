@@ -73,8 +73,9 @@ CLI_ENV = (
 )
 MAX_RESULT_CHARS = 40_000
 INSTRUCTION = (
-    "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message, "
-    "au format JSON demandé."
+    "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message par "
+    "un seul appel à StructuredOutput (format JSON demandé ; les actions d'Atelier Nexus se "
+    "nomment dans tool_calls, jamais en appel direct)."
 )
 NOT_LOGGED_IN = (
     "Claude Code n'est pas connecté : ouvrez le Terminal, tapez « claude » et connectez-vous "
@@ -168,9 +169,12 @@ def system_prompt(request: LLMRequest) -> str:
     if request.tools:
         lines = [
             "",
-            "# Outils",
-            "Tu peux appeler les outils ci-dessous. Atelier Nexus les exécute (pas toi) et te renvoie "
-            "leurs résultats dans la conversation, au tour suivant.",
+            "# Actions d'Atelier Nexus",
+            "Les actions ci-dessous ne sont PAS des outils de cette session : ton seul outil est "
+            "`StructuredOutput`, et un appel direct à une action échoue (« No such tool "
+            "available »). Pour utiliser une action, NOMME-LA dans `tool_calls` de l'objet que tu "
+            "passes à `StructuredOutput` : Atelier Nexus l'exécute lui-même et te renvoie son "
+            "résultat dans la conversation, au tour suivant.",
         ]
         for tool in request.tools:
             schema = json.dumps(tool.input_schema, ensure_ascii=False, separators=(",", ":"))
@@ -180,9 +184,11 @@ def system_prompt(request: LLMRequest) -> str:
         lines += [
             "",
             "# Format de réponse (obligatoire)",
-            "Réponds UNIQUEMENT par l'objet JSON du schéma imposé :",
-            '- pour utiliser des outils : `tool_calls` = [{"name": …, "arguments": "{…JSON…}"}] ; '
-            "`text` peut annoncer en une phrase ce que tu fais ;",
+            "Réponds UNIQUEMENT par l'objet JSON du schéma imposé, en un seul appel à "
+            "`StructuredOutput` et rien d'autre :",
+            '- pour utiliser des actions : `tool_calls` = [{"name": …, "arguments": "{…JSON…}"}] '
+            "(plusieurs à la fois si elles sont indépendantes) ; `text` peut annoncer en une phrase "
+            "ce que tu fais ;",
             "- pour répondre à l'utilisateur : `tool_calls` = [] et `text` = ta réponse finale.",
             "N'invente jamais le résultat d'un outil : attends-le. Une action soumise à validation "
             "peut être refusée par l'utilisateur : tiens-en compte.",

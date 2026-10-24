@@ -226,3 +226,25 @@ def test_router_modes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.core.llm.router.find_claude_binary", lambda *_: None)
     nothing = LLMRouter.from_settings(Settings(_env_file=None))  # type: ignore[call-arg]
     assert nothing.default == "ollama"
+
+
+def test_actions_are_never_presented_as_native_tools() -> None:
+    """Claude Code n'a qu'un outil (`StructuredOutput`, imposé par --json-schema) : présentées
+    comme des « outils », les actions de Nexus étaient appelées directement par le modèle
+    (« No such tool available »), parfois jusqu'à abandonner la tâche. Constaté avec Claude Code
+    2.1.310 dans l'environnement restreint du provider."""
+    from app.core.llm.providers.claude_code_provider import INSTRUCTION, system_prompt
+    from app.core.llm.types import LLMRequest
+
+    tools = [ToolSpec(name="projets_dashboard", description="d", input_schema={"type": "object"})]
+    prompt = system_prompt(
+        LLMRequest(system="Tu es chef de projet.", messages=[Message.user("x")], tools=tools)
+    )
+    assert "ton seul outil est `StructuredOutput`" in prompt
+    assert "NOMME-LA dans `tool_calls`" in prompt and "# Outils" not in prompt
+    assert "StructuredOutput" in INSTRUCTION and "jamais en appel direct" in INSTRUCTION
+    # Sans action : rien sur les actions
+    plain = system_prompt(
+        LLMRequest(system="Tu es chef de projet.", messages=[Message.user("x")], tools=[])
+    )
+    assert "StructuredOutput" not in plain
