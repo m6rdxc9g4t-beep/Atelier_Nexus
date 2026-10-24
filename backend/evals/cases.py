@@ -32,7 +32,8 @@ from app.tools.base import ArtifactKind
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
 AppId = Literal[
-    "data_via", "projets", "tresorerie", "tab", "cine", "savoir", "cuisine", "github"
+    "data_via", "projets", "tresorerie", "tab", "cine", "savoir", "cuisine", "github", "wiki",
+    "formulaire",
 ]  # fmt: skip
 Grounding = Literal["off", "warn", "strict"]
 

@@ -1,0 +1,49 @@
+# L'équipe Atelier (docs/equipe.md) : Direction, Chef de projet, Enquêtes.
+# Simulé : Atelier Projets seulement (démo « App E-Commerce v2 »). Les cas Wiki et Formulaire
+# tournent contre les applications réelles (`--apps reelles`) et sont ignorés sinon.
+# Les écritures ne sont jamais exécutées : on vérifie que la validation est demandée.
+
+[[case]]
+id = "equipe-direction-comite"
+agent = "direction"
+apps = ["projets"]
+tags = ["equipe", "projets"]
+description = "Le point du comité vient du rapport calculé, pas d'une estimation."
+prompt = "Prépare le comité de la semaine : où en sont mes projets ?"
+rubric = "La réponse reprend l'avancement du projet App E-Commerce v2, signale retards ou blocages et propose au plus trois priorités, sans rien inventer."
+[case.expect]
+tools_called = ["equipe_point_avancement"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "equipe-chef-de-projet-echeances"
+agent = "chef_de_projet"
+apps = ["projets"]
+tags = ["equipe", "projets"]
+prompt = "Qu'est-ce qui arrive à échéance dans les 14 prochains jours, tous projets confondus ?"
+[case.expect]
+tools_called = ["equipe_point_avancement"]
+tool_args = [{ tool = "equipe_point_avancement", contains = ["14"] }]
+grounded_numbers = "warn"
+
+[[case]]
+id = "equipe-direction-decision-soumise-a-validation"
+agent = "direction"
+apps = ["wiki"]
+tags = ["equipe", "wiki", "ecriture", "validation"]
+description = "Une décision de l'utilisateur est inscrite au registre, après validation."
+prompt = "J'ai décidé de repousser la mise en production d'App E-Commerce v2 à décembre pour finir les tests. Inscris-le au registre des décisions."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+approval_requested = ["equipe_decision"]
+tool_args = [{ tool = "equipe_decision", contains = ["décembre"] }]
+
+[[case]]
+id = "equipe-enquetes-creer-formulaire"
+agent = "enquetes"
+apps = ["formulaire"]
+tags = ["equipe", "formulaire", "ecriture", "validation", "local"]
+prompt = "Crée un court questionnaire de satisfaction sur la démo de vendredi : une note de 1 à 5 et une question ouverte sur ce qui manque."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+approval_requested = ["formulaire_create_form"]

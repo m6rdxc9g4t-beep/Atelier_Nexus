@@ -9,22 +9,25 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Catégorie | Agent (`name`) | Boîtes à outils | Particularités |
 |---|---|---|---|
 | Général | Assistant Atelier (`assistant`) | core | Oriente vers le bon spécialiste |
-| Général | Orchestrateur (`orchestrateur`) | core, delegation | Découpe, délègue, assemble ; 12 étapes |
-| Communication | Rédacteur (`redacteur`) | core | Courriels, comptes rendus, documentation |
+| Général | Orchestrateur (`orchestrateur`) | core, delegation, equipe | Découpe, délègue, assemble ; 12 étapes |
+| Communication | Rédacteur (`redacteur`) | core, wiki, wiki_write, equipe, equipe_write | Courriels, comptes rendus, documentation ; pages du Wiki |
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
-| Données | Data Analyst (`data_analyst`) | core, analyse, data_via, tab (+ boîtes d'Agent_DatAnalyst si l'extension est chargée) | Récupère, nettoie, analyse (distributions, asymétrie, corrélations, tests, atypiques) et visualise ; Power BI : exploration préalable, DAX `VAR … RETURN`, modèle en étoile → [`analyse.md`](analyse.md) |
+| Équipe | Direction (`direction`) | core, equipe, equipe_write, equipe_rapports, projets_read, projets_write, wiki, formulaire | Comité, priorités, arbitrages ; inscrit les décisions validées et les comptes rendus → [`equipe.md`](equipe.md) |
+| Équipe | Enquêtes (`enquetes`) | core, formulaire, formulaire_write, formulaire_reponses, equipe, equipe_write | **100 % local** ; crée et ouvre les formulaires, lit les réponses ; n'écrit que des agrégats dans la mémoire |
+| Données | Data Analyst (`data_analyst`) | core, analyse, data_via, tab, formulaire, equipe, equipe_write (+ boîtes d'Agent_DatAnalyst si l'extension est chargée) | Récupère, nettoie, analyse (distributions, asymétrie, corrélations, tests, atypiques) et visualise ; Power BI : exploration préalable, DAX `VAR … RETURN`, modèle en étoile → [`analyse.md`](analyse.md) |
 | Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
-| Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets | Points d'avancement, saisie de temps, statuts, plannings Tab |
-| Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write | User stories, critères d'acceptation, estimations |
-| Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read | Branches `feat/…`, commits `#ID`, PR brouillons |
-| Finance | Finance (`finance`) | core, tresorerie, cuisine_budget | **100 % local** ; budget courses d'Atelier Cuisine |
+| Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets, equipe, equipe_write, equipe_rapports, wiki | Points d'avancement calculés, saisie de temps, statuts, plannings Tab |
+| Gestion de projet | Product Owner (`product_owner`) | core, projets_read, projets_write, equipe, equipe_write, wiki, wiki_write | User stories, critères d'acceptation, estimations |
+| Développement | Développeur (`developpeur`) | core, github_read, github_write, projets_read, equipe, equipe_write, wiki | Branches `feat/…`, commits `#ID`, PR brouillons |
+| Finance | Finance (`finance`) | core, tresorerie, cuisine_budget, equipe | **100 % local** ; budget courses d'Atelier Cuisine |
 | Finance | Comptable (`comptable`) | core, tresorerie | **100 % local**, PCG / TVA, ne modifie rien |
 | Métiers | Commercial (`commercial`) | core, data_via | Propositions, objections, relances |
 | Métiers | Juridique (`juridique`) | core | Droit français ; renvoie vers un avocat |
 | Métiers | Ressources humaines (`rh`) | core | Fiches de poste, entretiens, intégration |
 
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
-`common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation).
+`common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation) ;
+`team_rules.py` celles de l'équipe (mémoire partagée dans le Wiki, jamais de donnée personnelle ni financière) → [`equipe.md`](equipe.md).
 
 Ciné-club, Cuisine et Tuteur ont été retirés (octobre 2026) : les boîtes `cine`, `cine_write`, `savoir_read`,
 `savoir_write` et `cuisine` restent disponibles pour les agents personnalisés et les workflows, et Finance
@@ -53,6 +56,14 @@ le recréer sur un agent personnalisé qui a les mêmes boîtes.
 | `cuisine_budget` | `cuisine_budget` (dépenses du mois, plafonds, tickets) | — (lecture seule) | ✅ local imposé |
 | `github_read` | `github_repo_overview`, `_list_files`, `_read_file`, `_search_code`, `_list_pull_requests`, `_list_issues` | — | — |
 | `github_write` | `github_create_branch`, `_commit_files`, `_open_pull_request` | ✅ validation | — |
+| `wiki` | `wiki_spaces`, `_search`, `_pages`, `_read_page` ([`apps/wiki.md`](apps/wiki.md)) | — | — |
+| `wiki_write` | `wiki_create_page`, `_append_page`, `_replace_page`, `_create_space` | ✅ validation | — |
+| `formulaire` | `formulaire_forms`, `_form`, `_summary` (agrégats, sans texte libre) ([`apps/formulaire.md`](apps/formulaire.md)) | — | — |
+| `formulaire_write` | `formulaire_create_form`, `_set_status`, `_set_access` | ✅ validation | — |
+| `formulaire_reponses` | `formulaire_responses` (réponses une par une) | — | ✅ local imposé |
+| `equipe` | `equipe_memoire` (espace « Équipe Atelier » du Wiki) | — | — |
+| `equipe_write` | `equipe_noter`, `_decision`, `_compte_rendu` | ✅ validation | — |
+| `equipe_rapports` | `equipe_point_avancement` (Projets), `_synthese_formulaires` (Formulaire, agrégats) | — | — |
 | `delegation` | `delegate_to_agent` | — | — |
 
 Une boîte **non configurée** (adresse ou jeton absent) est écartée sans casser l'agent : elle apparaît dans
@@ -137,6 +148,8 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
 | `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
 | `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |
+| `WIKI_BASE_URL` | `http://127.0.0.1:3200/api` | Atelier Wiki ([`apps/wiki.md`](apps/wiki.md)) |
+| `FORMULAIRE_BASE_URL` | `http://127.0.0.1:3300/api` | Atelier Formulaire ([`apps/formulaire.md`](apps/formulaire.md)) |
 | `APPS_TIMEOUT` | `20` | Délai par appel (s) |
 | `GITHUB_TOKEN` | vide | Jeton *fine-grained* : Contents + Pull requests (lecture/écriture), dépôts choisis |
 | `GITHUB_REPO` / `GITHUB_ALLOWED_REPOS` | vide | Dépôt par défaut / autres dépôts autorisés |
