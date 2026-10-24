@@ -248,3 +248,20 @@ def test_actions_are_never_presented_as_native_tools() -> None:
         LLMRequest(system="Tu es chef de projet.", messages=[Message.user("x")], tools=[])
     )
     assert "StructuredOutput" not in plain
+
+
+async def test_text_written_outside_the_object_is_kept(
+    cli: ClaudeCodeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Claude Code laisse parfois le modèle écrire sa réponse hors de l'objet structuré, qui ne
+    garde qu'une phrase : la réponse complète est conservée (constaté sur les évaluations)."""
+    from app.core.llm.providers.claude_code_provider import merge_text
+
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "loose")
+    response = await cli.complete(LLMRequest(messages=[Message.user("Prépare le comité")]))
+    assert response.text.startswith("## Comité du 24/10") and "71 %" in response.text
+    assert response.text.endswith("Je n'ai rien écrit pour l'instant.")
+    # Jamais en double : texte libre déjà repris dans l'objet, ou l'inverse
+    assert merge_text("Bonjour", "Bonjour  ") == "Bonjour  "
+    assert merge_text("A\n\nB", "A B C") == "A B C" and merge_text("A B C", "B") == "A B C"
+    assert merge_text("", "Seul") == "Seul"

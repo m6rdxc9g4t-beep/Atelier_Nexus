@@ -189,7 +189,8 @@ def system_prompt(request: LLMRequest) -> str:
             '- pour utiliser des actions : `tool_calls` = [{"name": …, "arguments": "{…JSON…}"}] '
             "(plusieurs à la fois si elles sont indépendantes) ; `text` peut annoncer en une phrase "
             "ce que tu fais ;",
-            "- pour répondre à l'utilisateur : `tool_calls` = [] et `text` = ta réponse finale.",
+            "- pour répondre à l'utilisateur : `tool_calls` = [] et `text` = ta réponse finale "
+            "COMPLÈTE (tout ce que l'utilisateur doit lire : rien n'est transmis hors de l'objet).",
             "N'invente jamais le résultat d'un outil : attends-le. Une action soumise à validation "
             "peut être refusée par l'utilisateur : tiens-en compte.",
         ]
@@ -266,6 +267,45 @@ def result_line(stdout: str) -> str:
         if isinstance(payload, dict) and payload.get("type") == "result":
             return line
     return ""
+
+
+def loose_text(stdout: str) -> str:
+    """Texte écrit par le modèle HORS de l'objet structuré (sortie stream-json).
+
+    Claude Code laisse parfois le modèle écrire sa réponse en texte libre avant l'appel à
+    `StructuredOutput`, puis mettre dans l'objet une phrase de conclusion seulement : sans ce
+    texte, la réponse était perdue (« Je n'ai rien écrit pour l'instant. »)."""
+    parts: list[str] = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "assistant":
+            continue
+        message = event.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        for block in blocks if isinstance(blocks, list) else []:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = str(block.get("text") or "").strip()
+                if text:
+                    parts.append(text)
+    return "\n\n".join(parts)
+
+
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def merge_text(loose: str, structured: str) -> str:
+    """Réponse pour l'utilisateur : le texte de l'objet, complété du texte libre qu'il ne
+    reprend pas (jamais en double)."""
+    a, b = _flat(loose), _flat(structured)
+    if not a or a in b:
+        return structured
+    if not b or b in a:
+        return loose
+    return f"{loose}\n\n{structured}"
 
 
 def parse_arguments(raw: Any) -> dict[str, Any]:
@@ -389,7 +429,8 @@ class ClaudeCodeProvider(LLMProvider):
         model = self.resolve_model(request)
         args = [
             "-p", INSTRUCTION,
-            "--output-format", "json",
+            # stream-json : la seule sortie qui montre aussi le texte écrit hors de l'objet
+            "--output-format", "stream-json", "--verbose",
             "--json-schema", json.dumps(response_schema(request.tools), ensure_ascii=False),
             "--system-prompt", system_prompt(request),
             "--model", model,
@@ -400,12 +441,12 @@ class ClaudeCodeProvider(LLMProvider):
         ]  # fmt: skip
         if any(isinstance(b, ImageBlock) for m in request.messages for b in m.content):
             # Images : entrée stream-json (le texte simple ne peut pas les porter)
-            i = args.index("--output-format")
-            args[i + 1 : i + 2] = ["stream-json", "--verbose", "--input-format", "stream-json"]
+            args[1 + args.index("--verbose") : 1 + args.index("--verbose")] = [
+                "--input-format", "stream-json",
+            ]  # fmt: skip
             code, stdout, stderr = await self._exec(
                 args, stream_json_input(request.messages), self.timeout
             )
-            stdout = result_line(stdout) or stdout[-2000:]
         else:
             code, stdout, stderr = await self._exec(
                 args, transcript(request.messages), self.timeout
@@ -413,8 +454,9 @@ class ClaudeCodeProvider(LLMProvider):
         return self._extract(code, stdout, stderr, model)
 
     def _extract(self, code: int, stdout: str, stderr: str, model: str) -> LLMResponse:
+        line = result_line(stdout) or stdout.strip()
         try:
-            payload = json.loads(stdout.strip()) if stdout.strip() else None
+            payload = json.loads(line) if line else None
         except ValueError:
             payload = None
         if not isinstance(payload, dict):
@@ -431,6 +473,12 @@ class ClaudeCodeProvider(LLMProvider):
                 structured = parsed if isinstance(parsed, dict) else {"text": result}
             except ValueError:
                 structured = {"text": result}
+        loose = loose_text(stdout)
+        if loose:
+            structured = {
+                **structured,
+                "text": merge_text(loose, str(structured.get("text") or "")),
+            }
         return to_response(structured, model, usage_of(payload))
 
     def _error(self, detail: str) -> Exception:

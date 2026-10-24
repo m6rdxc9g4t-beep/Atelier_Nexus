@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Faux programme `claude` (Claude Code) pour les tests : mêmes options, même sortie JSON.
 
-FAKE_CLAUDE_MODE : text | tool | login | limit | slow | auth_off. Chaque appel est consigné
-dans FAKE_CLAUDE_LOG (arguments, entrée standard, variables sensibles, dossier courant).
+FAKE_CLAUDE_MODE : text | tool | loose | login | limit | slow | auth_off. Chaque appel est
+consigné dans FAKE_CLAUDE_LOG (arguments, entrée standard, variables sensibles, dossier courant).
+Sortie `--output-format stream-json` (comme Claude Code 2.1.310) : ligne `system`, lignes
+`assistant` (texte libre éventuel, appel à StructuredOutput), ligne `result` finale.
+« loose » : la réponse est écrite en texte libre hors de l'objet, l'objet ne garde qu'une phrase.
 """
 
 import json
@@ -50,7 +53,21 @@ if log:
         )
 
 
-def out(payload: dict, code: int = 0) -> None:
+STREAM = "--output-format" in args and args[args.index("--output-format") + 1] == "stream-json"
+
+
+def out(payload: dict, code: int = 0, loose: str = "") -> None:
+    if not STREAM:
+        print(json.dumps(payload, ensure_ascii=False))
+        sys.exit(code)
+    assert "--verbose" in args  # exigé par Claude Code avec stream-json
+    print(json.dumps({"type": "system", "subtype": "init", "tools": ["StructuredOutput"]}))
+    content = [{"type": "text", "text": loose}] if loose else []
+    if "structured_output" in payload:
+        content.append(
+            {"type": "tool_use", "name": "StructuredOutput", "input": payload["structured_output"]}
+        )
+    print(json.dumps({"type": "assistant", "message": {"content": content}}, ensure_ascii=False))
     print(json.dumps(payload, ensure_ascii=False))
     sys.exit(code)
 
@@ -105,6 +122,16 @@ if mode == "tool" and "## Résultat de" not in stdin:
                 ],
             },
         }
+    )
+if mode == "loose":
+    out(
+        {
+            "type": "result",
+            "is_error": False,
+            "usage": usage,
+            "structured_output": {"text": "Je n'ai rien écrit pour l'instant.", "tool_calls": []},
+        },
+        loose="## Comité du 24/10\n\nAvancement : 71 %.",
     )
 final = "Nous sommes le 20 octobre." if "## Résultat de" in stdin else "Bonjour !"
 out(
