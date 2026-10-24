@@ -121,6 +121,7 @@ EQUIPE = ChainDefinition(
                 "trois priorités, critères de réussite mesurables, échéance, risques. Ne crée rien "
                 "dans Atelier Projets : la planification est l'étape 3. Une décision n'est "
                 "enregistrée (equipe_decision) que si l'utilisateur la prend explicitement."
+                " Ne note pas au journal : le compte rendu de l'étape 4 en tient lieu."
             ),
         ),
         ChainStage(
@@ -128,10 +129,10 @@ EQUIPE = ChainDefinition(
             role="User stories",
             instructions=(
                 "À partir du cadrage validé, écris les user stories (« En tant que…, je veux…, "
-                "afin de… ») avec leurs critères d'acceptation testables et une estimation, dans "
-                "l'ordre des priorités. Propose de ranger la spécification dans une page du Wiki "
+                "afin de… ») avec leurs critères d'acceptation testables et une estimation EN HEURES, "
+                "dans l'ordre des priorités. Propose de ranger la spécification dans une page du Wiki "
                 "(wiki_search d'abord, puis wiki_create_page après accord). Ne crée pas encore de "
-                "tâches dans Atelier Projets."
+                "tâches dans Atelier Projets. Ne note pas au journal : le compte rendu de l'étape 4 en tient lieu."
             ),
         ),
         ChainStage(
@@ -140,9 +141,12 @@ EQUIPE = ChainDefinition(
             instructions=(
                 "Planifie les user stories validées dans Atelier Projets : choisis ou fais choisir "
                 "le projet et la story parente (projets_structure), propose la liste des tâches "
-                "(titre, estimation, échéance, priorité) AVANT de les créer, puis crée-les une par "
-                "une (projets_create_work_item, chacune validée). Vérifie la charge avec "
-                "equipe_point_avancement et signale ce qui ne tient pas dans l'échéance."
+                "(titre, estimation en heures, échéance, priorité) AVANT de les créer ; l'accord "
+                "de l'utilisateur sur cette liste vaut intention, puis crée-les une par une "
+                "(projets_create_work_item, chacune validée). Charge : equipe_point_avancement "
+                "donne retards, blocages et jalons du projet (pas la charge) ; compare toi-même la "
+                "somme des estimations aux jours ouvrés restants avant l'échéance, calcul montré "
+                "(heures, heures par jour du projet, jours), et signale ce qui ne tient pas. Ne note pas au journal : le compte rendu de l'étape 4 en tient lieu."
             ),
         ),
         ChainStage(
@@ -152,7 +156,7 @@ EQUIPE = ChainDefinition(
                 "Rédige le compte rendu de lancement à partir des livrables validés (objectif, "
                 "priorités, user stories, tâches créées avec leurs identifiants, échéances, "
                 "risques) et range-le dans la mémoire d'équipe (equipe_compte_rendu, après "
-                "accord). Rédige aussi le court message d'annonce à envoyer aux personnes "
+                "accord) ; pas de note au journal en plus. Rédige aussi le court message d'annonce à envoyer aux personnes "
                 "concernées, publié en artefact. N'ajoute rien qui ne soit dans les livrables."
             ),
         ),

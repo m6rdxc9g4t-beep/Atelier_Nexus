@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from app.agents import AgentCatalog, get_agent_class
 from app.core.config import Settings
@@ -580,3 +581,41 @@ def test_simulated_calculated_columns_are_checked_row_by_row() -> None:
         "ok": False, "error": "Colonne inconnue : vendeur", "position": 0,
     }  # fmt: skip
     assert not check_column("__import__('os')", rows)["ok"]
+
+
+def test_relay_cases_replay_the_real_handoff() -> None:
+    """`relais` : le prompt est le vrai message de relais (mission, demande, livrables)."""
+    from app.chains.definitions import EQUIPE
+
+    case = EvalCase.model_validate(
+        {"id": "relais-essai", "agent": "chef_de_projet", "relais": "chaine_equipe:3"}
+    )
+    assert case.prompt.startswith("Chaîne « Chaîne Équipe », étape 3/4 : Planification.")
+    assert EQUIPE.stages[2].instructions in case.prompt
+    assert '<livrable etape="1"' in case.prompt and '<livrable etape="2"' in case.prompt
+    assert '<livrable etape="3"' not in case.prompt  # seulement les étapes précédentes
+    for raw, message in (
+        ({"prompt": "Bonjour", "relais": "chaine_equipe:1"}, "exclusifs"),
+        ({"relais": "chaine_equipe:5"}, "hors de la chaîne"),
+        ({"relais": "chaine_data:1"}, "pas de relais"),
+        ({}, "prompt ou relais manquant"),
+        ({"prompt": "ab"}, "trop court"),
+    ):
+        with pytest.raises(ValidationError, match=message):
+            EvalCase.model_validate({"id": "relais-essai", "agent": "direction", **raw})
+
+
+async def test_forbidden_tool_counts_even_when_only_requested() -> None:
+    """Demander une écriture interdite (en attente de validation) est déjà une faute : c'est
+    ce que vérifient les cas `chaine-equipe-cadrage` et `-planification`."""
+    args = {"story_id": 2, "type": "TASK", "title": "Panier mobile", "estimated_hours": 24}
+    anthropic = ScriptedProvider("anthropic", [tool_response("projets_create_work_item", args)])
+    case = CASES["chaine-equipe-planification"].model_copy(
+        update={"expect": CASES["chaine-equipe-planification"].expect.model_copy(
+            update={"stop_reason": ["end_turn", "awaiting_approval"]}
+        )}
+    )  # fmt: skip
+    attempt = (await run_case(case, deps_for(anthropic), RunOptions())).attempts[0]
+    assert attempt.pending == ["projets_create_work_item"] and not attempt.passed
+    check = next(c for c in attempt.checks if c.name == "outils interdits")
+    assert not check.ok and "projets_create_work_item" in check.detail

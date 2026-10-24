@@ -91,7 +91,7 @@ relais change, le cas suit.
 | Attente | Vérifie |
 |---|---|
 | `stop_reason` | Raisons d'arrêt acceptées (défaut `end_turn` ; `awaiting_approval` pour une écriture). |
-| `tools_called`, `tools_in_order`, `tools_forbidden` | Outils appelés, dans l'ordre (sous-séquence), ou interdits. Un appel en attente de validation compte comme appelé. |
+| `tools_called`, `tools_in_order`, `tools_forbidden` | Outils appelés, dans l'ordre (sous-séquence), ou interdits. Un appel en attente de validation compte comme appelé (et donc, pour `tools_forbidden`, comme une faute). |
 | `tool_args` | Un appel de l'outil dont l'entrée JSON contient ces textes. |
 | `tool_errors_max` | Nombre maximal d'appels en erreur. |
 | `approval_requested` | Outils en attente de validation à la fin du tour. |

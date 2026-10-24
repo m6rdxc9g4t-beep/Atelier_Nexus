@@ -118,8 +118,10 @@ class EvalCase(_Strict):
 
             chain, stage = self.relais.split(":")
             self.prompt = relay_prompt(chain, int(stage))
+        if not self.prompt:
+            raise ValueError("prompt ou relais manquant")
         if len(self.prompt) < 3:
-            raise ValueError("prompt manquant (ou relais)")
+            raise ValueError("prompt trop court (3 caractères au moins)")
         return self
 
 

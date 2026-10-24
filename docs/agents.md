@@ -36,7 +36,7 @@ agent verrouillé sur le modèle local (déclaré, ou par une boîte ou un outil
 « indisponible » avec la raison. Les données locales (finances, réponses individuelles) ne peuvent donc
 pas y être recopiées.
 
-Ces agents s'enchaînent dans les **chaînes Data et Dev** ([`chaines.md`](chaines.md)).
+Ces agents s'enchaînent dans les **chaînes Data, Dev et Équipe** ([`chaines.md`](chaines.md)).
 
 Chaque expert est une classe de `backend/app/agents/experts/` (identité, boîtes, exemples, consignes) ;
 `common.py` ajoute les règles communes (français, artefacts, pas de chiffre inventé, validation) ;

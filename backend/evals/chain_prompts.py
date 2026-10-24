@@ -2,8 +2,8 @@
 
 Produits par la vraie fonction `handoff_message` à partir d'une demande et de livrables fictifs
 cohérents avec la démo « App E-Commerce v2 » : le cas d'évaluation rejoue exactement ce que
-reçoit l'agent de l'étape. `tests/test_chains.py` vérifie que les prompts des cas restent égaux
-à ce que produit le code.
+reçoit l'agent de l'étape (calculé au chargement du cas : il suit le format du relais).
+Estimations en heures, comme le vrai Product Owner (`estimated_hours` d'Atelier Projets).
 """
 
 from __future__ import annotations
@@ -28,17 +28,17 @@ Priorités : 1. panier mobile ; 2. paiement mobile ; 3. tests sur deux télépho
 Critères de réussite : un achat complet sur mobile en moins de 2 minutes ; aucune erreur bloquante.
 Risque : #12345 (synchronisation Git) en retard de 3 j, à finir avant."""
 STORIES = """US1 — En tant que client sur mobile, je veux modifier mon panier d'un doigt, afin d'acheter
-sans zoomer. Critères : boutons de 44 px au moins ; total mis à jour sans recharger. Estimation : 3 j.
+sans zoomer. Critères : boutons de 44 px au moins ; total mis à jour sans recharger. Estimation : 24 h.
 US2 — En tant que client sur mobile, je veux payer en une page, afin de finir mon achat vite.
-Critères : formulaire sur un écran ; erreurs affichées sous le champ. Estimation : 4 j.
+Critères : formulaire sur un écran ; erreurs affichées sous le champ. Estimation : 32 h.
 US3 — En tant qu'équipe, nous voulons tester sur deux téléphones, afin d'éviter les surprises.
-Critères : parcours complet sur iPhone et Android. Estimation : 1 j.
+Critères : parcours complet sur iPhone et Android. Estimation : 8 h.
 Spécification rangée dans le Wiki : page « Spécification boutique mobile » (page 12)."""
 PLANNING = """Tâches créées dans Atelier Projets (projet 1, story 2) :
-#20001 Panier mobile — 3 j — échéance 20/11 — priorité haute
-#20002 Paiement en une page — 4 j — échéance 04/12 — priorité haute
-#20003 Tests sur deux téléphones — 1 j — échéance 11/12 — priorité normale
-Charge : tient dans l'échéance si #12345 est terminé avant le 31/10."""
+#20001 Panier mobile — 24 h — échéance 20/11 — priorité haute
+#20002 Paiement en une page — 32 h — échéance 04/12 — priorité haute
+#20003 Tests sur deux téléphones — 8 h — échéance 11/12 — priorité normale
+Charge : 64 h (8 j à 8 h/jour) d'ici le 18/12 ; tient si #12345 est terminé avant le 31/10."""
 
 
 def prompt(stage: int) -> str:
