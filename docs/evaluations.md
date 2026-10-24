@@ -83,6 +83,11 @@ text_contains = ["Ile-de-France"]
 grounded_numbers = "warn"
 ```
 
+Étape d'une chaîne : `relais = "chaine_equipe:3"` à la place de `prompt` rejoue le **vrai** message
+de relais de l'étape 3 (mission, demande, livrables des étapes précédentes), produit par
+`app/chains/handoff.py` à partir de livrables fictifs (`evals/chain_prompts.py`) : si le format du
+relais change, le cas suit.
+
 | Attente | Vérifie |
 |---|---|
 | `stop_reason` | Raisons d'arrêt acceptées (défaut `end_turn` ; `awaiting_approval` pour une écriture). |

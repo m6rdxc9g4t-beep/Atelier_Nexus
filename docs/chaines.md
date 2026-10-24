@@ -13,6 +13,7 @@ avec votre demande d'origine.
 |---|---|
 | **Chaîne Data** (`chaine_data`) | 1. Préparation des données (Ingénieur de données) → 2. Modèle en étoile (Modélisateur BI) → 3. Mesures DAX et analyse (Data Analyst) → 4. Contrôle qualité (Contrôleur qualité données) |
 | **Chaîne Dev** (`chaine_dev`) | 1. User story (Product Owner) → 2. Conception (Architecte logiciel) → 3. Réalisation (Développeur) → 4. Tests (Testeur) → 5. Relecture (Relecteur de code) |
+| **Chaîne Équipe** (`chaine_equipe`, étape 27) | 1. Cadrage (Direction) → 2. User stories (Product Owner) → 3. Planification (Chef de projet) → 4. Communication (Rédacteur) — [`equipe.md`](equipe.md#chaîne-équipe) |
 
 Définitions : `backend/app/chains/definitions.py` (agent, rôle et mission de chaque étape).
 
