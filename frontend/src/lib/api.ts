@@ -26,6 +26,7 @@ import type {
   ProviderStatus,
   SearchHit,
   SettingsView,
+  TeamRitual,
   SuiteEventsEntry,
   SuiteMap,
   ValidationResult,
@@ -140,6 +141,10 @@ export const api = {
     sendJson<ConversationDetail>("PATCH", `/api/conversations/${encodeURIComponent(id)}`, { title }),
   deleteConversation: (id: string) =>
     sendJson<void>("DELETE", `/api/conversations/${encodeURIComponent(id)}`),
+  /** Rituels de l'équipe : liste, puis installation (workflow + déclencheur horaire). */
+  teamRituals: (signal?: AbortSignal) => getJson<TeamRitual[]>("/api/equipe/rituels", signal),
+  installTeamRitual: (id: string) =>
+    sendJson<TeamRitual>("POST", `/api/equipe/rituels/${encodeURIComponent(id)}`, {}),
   settings: (signal?: AbortSignal) => getJson<SettingsView>("/api/settings", signal),
   updateSettings: (values: Record<string, string | null>) =>
     sendJson<SettingsView>("PUT", "/api/settings", { values }),

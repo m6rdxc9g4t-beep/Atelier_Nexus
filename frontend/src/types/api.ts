@@ -336,6 +336,21 @@ export interface SettingsView {
   fields: SettingsField[];
 }
 
+// ─── Rituels de l'équipe (docs/equipe.md) ─────────────────────────
+
+/** Rituel proposé : workflow v2 sans modèle + déclencheur horaire (GET /api/equipe/rituels). */
+export interface TeamRitual {
+  id: string;
+  title: string;
+  description: string;
+  /** Horaire lisible (« chaque lundi à 08:30 »). */
+  when: string;
+  /** Applications à configurer avant de l'installer (vide = installable). */
+  missing: string[];
+  /** Workflow installé, sinon null. */
+  workflow_id: string | null;
+}
+
 // ─── Workflows rejouables (Étape 18) ─────────────────────────────
 
 export interface WorkflowStep {

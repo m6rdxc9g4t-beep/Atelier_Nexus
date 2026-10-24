@@ -18,6 +18,7 @@ from app.api import (
     attachments,
     conversations,
     data_via,
+    equipe,
     llm,
     suite,
     triggers,
@@ -123,6 +124,7 @@ app.include_router(workflows.router)
 app.include_router(workflows.runs_router)
 app.include_router(triggers.router)
 app.include_router(suite.router)
+app.include_router(equipe.router)
 
 
 class HealthResponse(BaseModel):

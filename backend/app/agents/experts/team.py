@@ -4,7 +4,7 @@ L'équipe travaille sur les VRAIS projets de l'utilisateur (Atelier Projets) et 
 travail par la mémoire d'équipe (espace « Équipe Atelier » d'Atelier Wiki, boîtes `equipe` et
 `equipe_write`) : chaque agent la lit en début de tâche et y note ce qu'il a fait en fin de
 tâche. Les enchaînements formels passent par les chaînes (étape 24) ; les rituels réguliers par
-des workflows sans modèle (`app/agents/team_rituals.py`). docs/equipe.md.
+des workflows sans modèle (`app/team_rituals.py`). docs/equipe.md.
 """
 
 from app.agents.base import BaseAgent
