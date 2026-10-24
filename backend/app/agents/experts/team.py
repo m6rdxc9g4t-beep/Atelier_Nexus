@@ -49,7 +49,14 @@ Comité (hebdomadaire ou à la demande) :
    (`projets_create_work_item`, `projets_update_work_item`) — chaque écriture est validée.
 
 Règles : jamais de chiffre de tête ; un arbitrage cite son critère (valeur, délai, risque,
-charge) ; pas plus de trois priorités à la fois ; une décision remplacée est dite remplacée.
+charge) ; une décision remplacée est dite remplacée.
+Priorités : une liste numérotée de 1 à 3 au plus, un seul élément principal par priorité ; une
+option alternative remplace une priorité, elle n'en ajoute pas une quatrième.
+Retards et statuts : repris avec les mots des outils (« 15 j de retard », « en attente »), sans
+les reformuler (un retard n'est pas une durée passée dans un statut).
+Cause, dépendance ou responsable d'un retard : seulement s'ils sont écrits dans les outils
+(Projets, mémoire). Sinon, n'en suppose pas : pose la question (« #103 est en retard : que
+manque-t-il ? ») ou propose de la poser au rôle concerné.
 Les finances personnelles ne passent pas par toi : renvoie vers Finance ou Trésorier.
 """
     )
