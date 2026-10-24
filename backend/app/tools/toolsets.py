@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.core.config import Settings
+from app.tools.analyse import analyse_tools
 from app.tools.artifacts import PublishArtifactTool
 from app.tools.base import BaseTool
 from app.tools.cine import cine_read_tools, cine_write_tools
@@ -166,6 +167,19 @@ register_toolset(
         label="Essentiels",
         description="Date et heure, publication de livrables dans le panneau Artefacts.",
         build=lambda env: [CurrentDateTimeTool(), PublishArtifactTool()],
+    )
+)
+register_toolset(
+    Toolset(
+        id="analyse",
+        label="Analyse statistique",
+        description=(
+            "Charge un jeu (Viz, Tab ou fichier joint), profil et qualité, distributions (asymétrie, "
+            "aplatissement, normalité), corrélations, relations, valeurs atypiques, nettoyage d'une "
+            "copie, agrégations et graphiques. Calculs faits par Nexus, sans écriture dans les apps."
+        ),
+        build=lambda env: analyse_tools(env),
+        tags=("donnees",),
     )
 )
 register_toolset(

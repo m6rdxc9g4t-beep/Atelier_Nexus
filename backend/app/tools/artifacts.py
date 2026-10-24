@@ -5,15 +5,21 @@ appelle `publish_artifact` : le livrable part dans `useArtifactStore` et le
 modèle ne reçoit qu'un accusé de réception.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
-from app.tools.base import Artifact, ArtifactKind, BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.base import Artifact, BaseTool, ToolContext, ToolInput, ToolOutput
+
+#: Livrables qu'un agent écrit lui-même ; les graphiques (`chart`) sont calculés par les outils
+#: d'analyse, jamais rédigés par le modèle.
+PublishKind = Literal[
+    "sql", "dax", "powerquery", "python", "react", "code", "markdown", "json", "data_preview"
+]
 
 
 class PublishArtifactInput(ToolInput):
-    kind: ArtifactKind = Field(description="Type de livrable.")
+    kind: PublishKind = Field(description="Type de livrable.")
     title: str = Field(min_length=1, max_length=200, description="Titre court et explicite.")
     content: str = Field(min_length=1, description="Contenu complet du livrable.")
     language: str | None = Field(

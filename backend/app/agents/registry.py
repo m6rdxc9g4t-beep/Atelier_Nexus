@@ -55,6 +55,48 @@ def register_agent[AgentT: type[BaseAgent]](cls: AgentT) -> AgentT:
     return cls
 
 
+#: Extensions déjà appliquées à un agent fourni : (agent, source)
+_EXTENDED: set[tuple[str, str]] = set()
+
+
+def extend_agent(
+    name: str,
+    *,
+    source: str,
+    toolsets: tuple[str, ...] = (),
+    instructions: str = "",
+    starters: tuple[str, ...] = (),
+) -> type[BaseAgent]:
+    """Ajoute à un agent FOURNI des boîtes à outils, des consignes et des exemples (extensions).
+
+    Une extension complète ainsi un agent existant (ex. le Data Analyst reçoit Convert et les
+    écritures Viz d'`Agent_DatAnalyst`) au lieu d'en créer un second. Idempotent par `source`.
+    Refuse (ValueError, rien n'est modifié) : agent inconnu ou personnalisé, boîte inconnue, ou
+    boîte sensible sur un agent qui n'est pas déjà verrouillé sur le modèle local — une extension
+    ne peut pas faire basculer un agent en « 100 % local » à l'insu de l'utilisateur.
+    """
+    from app.tools.toolsets import get_toolset
+
+    try:
+        cls = get_agent_class(name)
+    except AgentNotFoundError:
+        raise ValueError(f"Agent fourni inconnu : {name}") from None
+    if (name, source) in _EXTENDED:
+        return cls
+    for toolset_id in toolsets:
+        toolset = get_toolset(toolset_id)  # KeyError si inconnue
+        if toolset.sensitive and cls.privacy != "local_only":
+            raise ValueError(
+                f"Boîte sensible « {toolset_id} » refusée pour « {name} » (agent non local)."
+            )
+    cls.toolsets = tuple(dict.fromkeys((*cls.toolsets, *toolsets)))
+    if instructions.strip():
+        cls.system_prompt = f"{cls.system_prompt.rstrip()}\n\n{instructions.strip()}\n"
+    cls.starters = tuple(dict.fromkeys((*cls.starters, *starters)))
+    _EXTENDED.add((name, source))
+    return cls
+
+
 def get_agent_class(name: str) -> type[BaseAgent]:
     try:
         return _REGISTRY[name]
