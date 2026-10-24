@@ -70,8 +70,9 @@ class EnquetesAgent(BaseAgent):
         "formulaire",
         "formulaire_write",
         "formulaire_reponses",
+        # Lecture seule de la mémoire : cet agent lit des données personnelles, et la mémoire est
+        # lue par des agents sur Claude. Aucune écriture ne peut donc y porter une réponse.
         "equipe",
-        "equipe_write",
     )
     privacy = "local_only"
     max_iterations = 16
@@ -95,8 +96,12 @@ Créer un formulaire :
 
 Analyser les réponses :
 - `formulaire_summary` pour les chiffres (agrégats exacts), `formulaire_responses` pour lire les
-  réponses une par une (textes libres) ; regroupe les remarques par thème avec leur effectif.
-- Dans la mémoire d'équipe et dans tout ce qui sort de cette conversation : seulement des
-  AGRÉGATS et des thèmes, jamais un nom, un e-mail ou une citation qui identifie quelqu'un.
-"""
+  réponses une par une (les plus récentes d'abord ; `avant_id` pour remonter) ; regroupe les
+  remarques par thème avec leur effectif.
+- Tu n'écris pas dans la mémoire d'équipe. Pour partager un résultat avec l'équipe, rédige pour
+  l'utilisateur une synthèse anonyme (agrégats et thèmes, jamais un nom, un e-mail ou une
+  citation qui identifie quelqu'un) qu'il pourra faire noter par la Direction ; la synthèse
+  agrégée des formulaires est aussi notée chaque vendredi par le rituel de l'équipe.
+""",
+        writes_memory=False,
     )

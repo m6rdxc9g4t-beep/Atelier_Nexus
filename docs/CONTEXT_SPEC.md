@@ -1,6 +1,6 @@
 # Atelier Nexus — Spécification de contexte
 
-> Statut : **Étape 22 (mise à jour automatique de l'app de bureau)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
+> Statut : **Étape 26 (l'équipe Atelier : Wiki, Formulaire, rituels)**. Les sections marquées `À COMPLÉTER` attendent les décisions produit.
 
 ## 1. Vision
 Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power BI, Dev, …) sur la suite d'applications **Atelier** (dont *Data Via*), avec un routage LLM hybride : API Anthropic (Claude) ou modèle local via Ollama.

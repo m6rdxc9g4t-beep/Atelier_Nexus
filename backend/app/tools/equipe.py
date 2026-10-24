@@ -19,19 +19,30 @@ carte de validation). Toutes les écritures passent par le nœud `atelier-node/1
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from pydantic import Field
 
-from app.schemas.projets import PRIORITY_LABELS, STATUS_LABELS, Project, WorkItem
+from app.schemas.projets import (
+    PRIORITY_LABELS,
+    STATUS_LABELS,
+    Dashboard,
+    DashboardBudget,
+    Milestone,
+    Project,
+    WorkItem,
+)
+from app.suite.http import NodeActionError
 from app.tools.base import Artifact, BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.environment import ToolEnvironment
 from app.tools.formatting import markdown_table
-from app.tools.formulaire import aggregate_only, summary_text
+from app.tools.formulaire import aggregate_only, summary_markdown
 from app.tools.http import AppError
-from app.tools.suite_node import NodeTool, as_data
+from app.tools.suite_node import REPLAYED, NodeTool, as_data, rows_of
 
 SPACE = "Équipe Atelier"
 SPACE_DESCRIPTION = (
@@ -49,9 +60,8 @@ INTRO = {
 DONE = {"RESOLVED", "CLOSED", "REJECTED"}
 
 
-class MemoryError(AppError):
-    def __init__(self, message: str) -> None:
-        super().__init__(message, app="wiki")
+#: Titre de section imposé par le Wiki à `pages.append` (manifeste : 200 caractères au plus)
+HEADING_MAX = 200
 
 
 def now(env: ToolEnvironment) -> datetime:
@@ -61,48 +71,113 @@ def now(env: ToolEnvironment) -> datetime:
 # ─── Accès à l'espace de l'équipe ─────────────────────────────────
 
 
+def normalize(title: str) -> str:
+    """Comme `normalizeTitle` d'Atelier Wiki : sans accents, minuscules, espaces réduits."""
+    plain = "".join(
+        c for c in unicodedata.normalize("NFD", title) if unicodedata.category(c) != "Mn"
+    )
+    return " ".join(plain.lower().split())
+
+
+def _by_id(row: dict[str, Any]) -> int:
+    try:
+        return int(str(row.get("id")))
+    except ValueError:
+        return 0
+
+
 class _Memory[InputT: ToolInput](NodeTool[InputT]):
     app = "wiki"
 
     async def space_id(self) -> str | None:
-        table = await self.action("spaces.list", {})
-        for row in table.get("rows", []):
-            if isinstance(row, dict) and row.get("nom") == SPACE:
+        # Le Wiki refuse deux espaces de même nom aux accents et à la casse près : même règle ici
+        wanted = normalize(SPACE)
+        for row in rows_of(self.app, await self.action("spaces.list", {})):
+            if normalize(str(row.get("nom") or "")) == wanted:
                 return str(row["id"])
         return None
 
     async def pages(self, space_id: str) -> list[dict[str, Any]]:
+        """Pages de l'espace (hors corbeille), les plus récemment modifiées d'abord."""
         table = await self.action("pages.list", {"space_id": space_id, "limit": 1000})
-        return [r for r in table.get("rows", []) if isinstance(r, dict)]
+        return rows_of(self.app, table)
 
     async def page_id(self, space_id: str, title: str) -> str | None:
-        for row in await self.pages(space_id):
-            if row.get("titre") == title and not row.get("parent_id"):
-                return str(row["id"])
-        return None
+        """Page de premier niveau de ce titre ; s'il y en a plusieurs, la plus ancienne (toujours
+        la même). Au-delà de 1000 pages, recherche par titre."""
+        table = await self.action("pages.list", {"space_id": space_id, "limit": 1000})
+        rows = rows_of(self.app, table)
+        if table.get("truncated"):
+            found = await self.action(
+                "pages.search", {"query": title, "space_id": space_id, "limit": 50}
+            )
+            rows = rows_of(self.app, found)
+        same = [r for r in rows if r.get("titre") == title and not r.get("parent_id")]
+        return str(min(same, key=_by_id)["id"]) if same else None
 
     async def ensure_space(self) -> str:
         found = await self.space_id()
         if found:
             return found
-        space = await self.http(
-            "POST", "/api/spaces", {"name": SPACE, "icon": "🤝", "description": SPACE_DESCRIPTION}
-        )
+        try:
+            space = await self.http(
+                "POST",
+                "/api/spaces",
+                {"name": SPACE, "icon": "🤝", "description": SPACE_DESCRIPTION},
+            )
+        except NodeActionError as exc:
+            # Créé entre-temps (autre écriture validée en même temps) : on le relit
+            if exc.status != 409 or not (found := await self.space_id()):
+                raise
+            return found
         return str(space["id"])
 
     async def ensure_page(self, space_id: str, title: str) -> str:
+        """Page de structure, créée si absente. Sans clé d'idempotence : une clé constante ferait
+        rejouer par le Wiki (30 jours) l'identifiant d'une page mise depuis à la corbeille."""
         found = await self.page_id(space_id, title)
         if found:
             return found
         payload = {"title": title, "content": INTRO[title], "space_id": space_id}
-        page = await self.action("pages.create", payload, idempotent_on=payload)
-        return str(page["id"])
+        page = await self.action("pages.create", payload)
+        # Deux créations simultanées : on garde partout la plus ancienne
+        return await self.page_id(space_id, title) or str(page["id"])
+
+
+#: Section d'une note ou d'une décision : `## 2026-10-24 …` (en-tête daté écrit par ces outils)
+_DATED = re.compile(r"^## (?=\d{4}-\d{2}-\d{2})", re.MULTILINE)
+_HEADING = re.compile(r"^(#{1,2})(?=\s)", re.MULTILINE)
+_FENCE = re.compile(r"^(```|~~~)", re.MULTILINE)
 
 
 def _sections(content: str) -> list[str]:
-    """Sections `## …` d'une page (la plus récente en dernier)."""
-    parts = ("\n" + content).split("\n## ")
-    return ["## " + p.strip() for p in parts[1:] if p.strip()]
+    """Sections datées d'une page (la plus récente en dernier). Les titres internes d'une note
+    (`## Projet`) ne coupent pas la note ; le texte d'avant la première note est ignoré."""
+    starts = [m.start() for m in _DATED.finditer(content)]
+    return [
+        content[a:b].strip()
+        for a, b in zip(starts, [*starts[1:], len(content)], strict=True)
+        if content[a:b].strip()
+    ]
+
+
+def demote(text: str) -> str:
+    """Titres `#` et `##` d'un texte ajouté → `###` / `####` (hors blocs de code), pour qu'ils
+    restent sous l'en-tête daté de leur note."""
+    out: list[str] = []
+    fenced = False
+    for line in text.splitlines():
+        if _FENCE.match(line):
+            fenced = not fenced
+        elif not fenced:
+            line = _HEADING.sub(lambda m: m.group(1) + "##", line, count=1)
+        out.append(line)
+    return "\n".join(out)
+
+
+def heading(*parts: str) -> str:
+    text = " ".join(" ".join(parts).split())
+    return text if len(text) <= HEADING_MAX else text[: HEADING_MAX - 1] + "…"
 
 
 # ─── Lecture de la mémoire ────────────────────────────────────────
@@ -142,9 +217,7 @@ class MemoryTool(_Memory[MemoryInput]):
                 "pages.search", {"query": params.recherche, "space_id": space, "limit": 20}
             )
             rows = [
-                [r.get("id"), r.get("titre"), r.get("extrait")]
-                for r in table.get("rows", [])
-                if isinstance(r, dict)
+                [r.get("id"), r.get("titre"), r.get("extrait")] for r in rows_of(self.app, table)
             ]
             if not rows:
                 return ToolOutput(
@@ -152,35 +225,46 @@ class MemoryTool(_Memory[MemoryInput]):
                 )
             return ToolOutput(
                 content="Pages de la mémoire d'équipe (lire en entier avec wiki_read_page) :\n"
-                + markdown_table(["Id", "Page", "Extrait"], rows)
+                + as_data(markdown_table(["Id", "Page", "Extrait"], rows), kind="recherche")
             )
         pages = await self.pages(space)
-        by_title = {r.get("titre"): r for r in pages if not r.get("parent_id")}
+        top = sorted((r for r in pages if not r.get("parent_id")), key=_by_id, reverse=True)
+        by_title = {r.get("titre"): r for r in top}  # le plus ancien gagne (comme page_id)
         lines = [f"Mémoire d'équipe (espace « {SPACE} », {len(pages)} page(s))."]
         journal = by_title.get(JOURNAL)
         if journal:
             page = await self.action("pages.get", {"page_id": str(journal["id"])})
             notes = _sections(str(page.get("content") or ""))[-params.entrees :]
-            lines.append(f"\nDernières notes du journal ({len(notes)}) :")
+            lines.append(f"\nDernières notes du journal ({len(notes)}, la plus récente en bas) :")
             lines.append(
-                as_data("\n\n".join(notes) or "(vide)", kind="journal de l'équipe", limit=20_000)
+                as_data(
+                    "\n\n".join(notes) or "(vide)",
+                    kind="journal de l'équipe",
+                    limit=20_000,
+                    keep="end",
+                )
             )
         decisions = by_title.get(DECISIONS)
         if decisions:
             page = await self.action("pages.get", {"page_id": str(decisions["id"])})
             titles = [s.splitlines()[0][3:] for s in _sections(str(page.get("content") or ""))]
             if titles:
+                lines.append(f"\nDécisions ({len(titles)}, page {decisions['id']}, 15 dernières) :")
                 lines.append(
-                    f"\nDécisions ({len(titles)}, page {decisions['id']}) : "
-                    + " ; ".join(t[:120] for t in titles[-15:])
+                    as_data("\n".join(t[:150] for t in titles[-15:]), kind="titres des décisions")
                 )
         reports = by_title.get(REPORTS)
         if reports:
-            children = [r for r in pages if str(r.get("parent_id")) == str(reports["id"])]
+            children = sorted(
+                (r for r in pages if str(r.get("parent_id")) == str(reports["id"])), key=_by_id
+            )
             if children:
+                lines.append(f"\nComptes rendus ({len(children)}, 10 derniers) :")
                 lines.append(
-                    "\nComptes rendus : "
-                    + " ; ".join(f"« {c.get('titre')} » ({c.get('id')})" for c in children[-10:])
+                    as_data(
+                        "\n".join(f"{c.get('titre')} (page {c.get('id')})" for c in children[-10:]),
+                        kind="titres des comptes rendus",
+                    )
                 )
         return ToolOutput(content="\n".join(lines))
 
@@ -224,13 +308,16 @@ class NoteTool(_Memory[NoteInput]):
     async def run(self, params: NoteInput, ctx: ToolContext) -> ToolOutput:
         space = await self.ensure_space()
         page = await self.ensure_page(space, JOURNAL)
-        heading = f"{now(self.env):%Y-%m-%d %H:%M} · {params.auteur}" + (
-            f" — {params.titre}" if params.titre else ""
+        title = heading(
+            f"{now(self.env):%Y-%m-%d %H:%M} · {params.auteur}",
+            f"— {params.titre}" if params.titre else "",
         )
-        payload = {"page_id": page, "heading": heading, "content": params.texte}
-        await self.action("pages.append", payload, idempotent_on=payload)
+        payload = {"page_id": page, "heading": title, "content": demote(params.texte)}
+        result = await self.run_node("pages.append", payload, idempotent_on=payload)
         return ToolOutput(
-            content=f"Note ajoutée au journal de l'équipe (page {page}) : « {heading} »."
+            content=f"Note ajoutée au journal de l'équipe (page {page}) : « {title} »"
+            + (REPLAYED if result.replayed else "")
+            + "."
         )
 
 
@@ -275,11 +362,15 @@ class DecisionTool(_Memory[DecisionInput]):
             body += ["", "**Conséquences** — " + params.consequences]
         payload = {
             "page_id": page,
-            "heading": f"{today:%Y-%m-%d} : {params.titre}",
-            "content": "\n".join(body),
+            "heading": heading(f"{today:%Y-%m-%d} : {params.titre}"),
+            "content": demote("\n".join(body)),
         }
-        await self.action("pages.append", payload, idempotent_on=payload)
-        return ToolOutput(content=f"Décision « {params.titre} » enregistrée (page {page}).")
+        result = await self.run_node("pages.append", payload, idempotent_on=payload)
+        return ToolOutput(
+            content=f"Décision « {params.titre} » enregistrée (page {page})"
+            + (REPLAYED if result.replayed else "")
+            + "."
+        )
 
 
 class ReportInput(ToolInput):
@@ -317,15 +408,35 @@ class ReportTool(_Memory[ReportInput]):
     async def run(self, params: ReportInput, ctx: ToolContext) -> ToolOutput:
         space = await self.ensure_space()
         parent = await self.ensure_page(space, REPORTS)
+        # Le Wiki accepte deux pages de même titre : le même compte rendu déjà rangé est signalé,
+        # un autre compte rendu du même jour et du même sujet reçoit « (2) », « (3) »…
+        children = {
+            str(r.get("titre")): str(r.get("id"))
+            for r in await self.pages(space)
+            if str(r.get("parent_id")) == parent
+        }
+        base = self.title(params)
+        title, n = base, 1
+        while title in children:
+            existing = await self.action("pages.get", {"page_id": children[title]})
+            if str(existing.get("content") or "").strip() == params.contenu.strip():
+                return ToolOutput(
+                    content=f"Ce compte rendu est déjà rangé : « {title} » (page {children[title]}). "
+                    "Rien de nouveau n'a été écrit."
+                )
+            n += 1
+            title = f"{base} ({n})"
         payload = {
-            "title": self.title(params),
+            "title": title,
             "content": params.contenu,
             "space_id": space,
             "parent_id": parent,
         }
-        page = await self.action("pages.create", payload, idempotent_on=payload)
+        result = await self.run_node("pages.create", payload, idempotent_on=payload)
         return ToolOutput(
-            content=f"Compte rendu « {payload['title']} » rangé (page {page.get('id')})."
+            content=f"Compte rendu « {title} » rangé (page {result.data.get('id')})"
+            + (REPLAYED if result.replayed else "")
+            + "."
         )
 
 
@@ -384,82 +495,54 @@ class ProgressTool(BaseTool[ProgressInput]):
                 )
         today = now(self.env).date()
         horizon = today + timedelta(days=params.horizon_jours)
-        lines = [f"# Point d'avancement du {today:%d/%m/%Y}", ""]
+        detailed = projects[:MAX_PROJECTS]
+        totals = {"late": 0, "late_blocked": 0, "soon": 0, "blocked": 0, "over_budget": 0}
+        failed: list[str] = []
+        sections: list[str] = []
+        for project in detailed:
+            try:
+                dash = await client.dashboard(project.id)
+                items = await client.work_items(project.id)
+                milestones = await client.milestones(project.id)
+            except AppError as exc:
+                failed.append(project.name)
+                sections += [
+                    f"## {project.name} (projet {project.id})",
+                    f"- Données indisponibles : {exc}",
+                    "",
+                ]
+                continue
+            sections += _project_section(project, dash, items, milestones, today, horizon, totals)
         if not projects:
-            lines.append("Aucun projet dans Atelier Projets.")
-        totals = {"late": 0, "soon": 0, "blocked": 0}
-        for project in projects[:20]:
-            dash = await client.dashboard(project.id)
-            items = await client.work_items(project.id)
-            milestones = await client.milestones(project.id)
-            active = [i for i in items if i.status not in DONE]
-            # Un élément bloqué ou en attente n'apparaît qu'une fois, dans sa propre liste
-            blocked = [i for i in active if i.status in ("BLOCKED", "ON_HOLD")]
-            moving = [i for i in active if i not in blocked]
-            late = sorted(
-                (i for i in moving if i.dueDate and i.dueDate < today),
-                key=lambda i: i.dueDate or today,
+            sections.append("Aucun projet dans Atelier Projets.")
+        if len(projects) > MAX_PROJECTS:
+            sections.append(
+                f"({len(projects) - MAX_PROJECTS} projet(s) de plus non détaillés ni comptés : "
+                "demander un projet précis.)"
             )
-            soon = sorted(
-                (i for i in moving if i.dueDate and today <= i.dueDate <= horizon),
-                key=lambda i: i.dueDate or today,
-            )
-            totals["late"] += len(late)
-            totals["soon"] += len(soon)
-            totals["blocked"] += len(blocked)
-            trend = {"AHEAD": "en avance", "ON_TRACK": "dans les temps", "BEHIND": "en retard"}.get(
-                dash.trend or "", "non calculée"
-            )
-            budget = (
-                f"{dash.budget.spent.days:g} j passés sur {dash.budget.initial.days:g} j"
-                if dash.budget.initial
-                else f"{dash.budget.spent.days:g} j passés (pas de budget)"
-            )
-            lines += [
-                f"## {project.name} (projet {project.id})",
-                f"- Avancement : {dash.progress.percent:.0f} % ; tendance : {trend} ; budget : {budget}.",
-                f"- Éléments : {dash.workItems.done} terminés sur {dash.workItems.total}"
-                + (
-                    f" ; échéance du projet le {project.dueDate:%d/%m/%Y}"
-                    if project.dueDate
-                    else ""
-                )
-                + ".",
-            ]
-            headers = ["Élément", "Titre", "Statut", "Priorité", "Échéance", "Avancement"]
-            for label, chosen in (
-                ("En retard", late),
-                (f"À échéance d'ici le {horizon:%d/%m}", soon),
-                ("Bloqués ou en attente", blocked),
-            ):
-                if chosen:
-                    lines += [
-                        "",
-                        f"**{label} ({len(chosen)})**",
-                        markdown_table(headers, [_item(i, today) for i in chosen[:15]]),
-                    ]
-                    if len(chosen) > 15:
-                        lines.append(f"(+{len(chosen) - 15} autres)")
-            missed = [m for m in milestones if not m.reached and m.date < today]
-            coming = [m for m in milestones if not m.reached and today <= m.date <= horizon]
-            for label, chosen_ms in (
-                ("Jalons dépassés non atteints", missed),
-                ("Jalons à venir", coming),
-            ):
-                if chosen_ms:
-                    lines.append(
-                        f"- {label} : "
-                        + " ; ".join(f"« {m.title} » ({m.date:%d/%m})" for m in chosen_ms)
-                    )
-            lines.append("")
-        if len(projects) > 20:
-            lines.append(f"({len(projects) - 20} projet(s) de plus non détaillés.)")
-        lines.insert(
-            2,
-            f"**En bref** : {len(projects)} projet(s) ; {totals['late']} élément(s) en retard, "
-            f"{totals['soon']} à échéance sous {params.horizon_jours} j, {totals['blocked']} bloqué(s) ou en attente.\n",
+        scope = (
+            f"{len(detailed)} projet(s) détaillé(s) sur {len(projects)}"
+            if len(projects) > len(detailed)
+            else f"{len(projects)} projet(s)"
         )
-        text = "\n".join(lines).rstrip()
+        blocked_late = (
+            f" (dont {totals['late_blocked']} bloqué(s))" if totals["late_blocked"] else ""
+        )
+        brief = (
+            f"**En bref** : {scope} ; {totals['late']} élément(s) en retard{blocked_late}, "
+            f"{totals['soon']} à échéance sous {params.horizon_jours} j, "
+            f"{totals['blocked']} bloqué(s) ou en attente"
+            + (
+                f", {totals['over_budget']} projet(s) au-delà du budget"
+                if totals["over_budget"]
+                else ""
+            )
+            + (f" ; données indisponibles pour : {', '.join(failed)}" if failed else "")
+            + ".\n"
+        )
+        text = "\n".join(
+            [f"# Point d'avancement du {today:%d/%m/%Y}", "", brief, *sections]
+        ).rstrip()
         return ToolOutput(
             content=text,
             artifacts=[
@@ -467,8 +550,98 @@ class ProgressTool(BaseTool[ProgressInput]):
                     kind="markdown", title=f"Point d'avancement {today:%d/%m/%Y}", content=text
                 )
             ],
-            data={"markdown": text, **totals, "projects": len(projects)},
+            data={
+                "markdown": text,
+                **totals,
+                "projects": len(projects),
+                "detailed": len(detailed),
+                "failed": failed,
+            },
         )
+
+
+MAX_PROJECTS = 20
+TRENDS = {"AHEAD": "en avance", "ON_TRACK": "dans les temps", "BEHIND": "en retard"}
+
+
+def _budget(b: DashboardBudget) -> tuple[str, bool]:
+    """Texte du budget (jours) et dépassement."""
+    if b.initial is None or b.initial.days <= 0:
+        return f"{b.spent.days:g} j passés (pas de budget)", False
+    percent = (
+        b.consumedPercent if b.consumedPercent is not None else 100 * b.spent.days / b.initial.days
+    )
+    over = b.spent.days > b.initial.days
+    rest = (
+        f"dépassé de {b.spent.days - b.initial.days:g} j"
+        if over
+        else f"reste {b.remaining.days if b.remaining else b.initial.days - b.spent.days:g} j"
+    )
+    return f"{b.spent.days:g} j passés sur {b.initial.days:g} j ({percent:.0f} %, {rest})", over
+
+
+def _project_section(
+    project: Project,
+    dash: Dashboard,
+    items: list[WorkItem],
+    milestones: list[Milestone],
+    today: date,
+    horizon: date,
+    totals: dict[str, int],
+) -> list[str]:
+    active = [i for i in items if i.status not in DONE]
+    # Un élément bloqué ou en attente n'apparaît qu'une fois, dans sa propre liste ; il compte
+    # pourtant dans le total « en retard » (signalé « dont … bloqués »)
+    blocked = [i for i in active if i.status in ("BLOCKED", "ON_HOLD")]
+    moving = [i for i in active if i not in blocked]
+    late = sorted((i for i in moving if i.dueDate and i.dueDate < today), key=_due)
+    soon = sorted((i for i in moving if i.dueDate and today <= i.dueDate <= horizon), key=_due)
+    late_blocked = [i for i in blocked if i.dueDate and i.dueDate < today]
+    totals["late"] += len(late) + len(late_blocked)
+    totals["late_blocked"] += len(late_blocked)
+    totals["soon"] += len(soon)
+    totals["blocked"] += len(blocked)
+    budget, over = _budget(dash.budget)
+    totals["over_budget"] += int(over)
+    due = ""
+    if project.dueDate:
+        overdue = (today - project.dueDate).days
+        due = f" ; échéance du projet le {project.dueDate:%d/%m/%Y}" + (
+            f" (DÉPASSÉE de {overdue} j)" if overdue > 0 and dash.progress.percent < 100 else ""
+        )
+    lines = [
+        f"## {project.name} (projet {project.id})",
+        f"- Avancement : {dash.progress.percent:.0f} % ; tendance : "
+        f"{TRENDS.get(dash.trend or '', 'non calculée')} ; budget : {budget}.",
+        f"- Éléments : {dash.workItems.done} terminés sur {dash.workItems.total}{due}.",
+    ]
+    headers = ["Élément", "Titre", "Statut", "Priorité", "Échéance", "Avancement"]
+    for label, chosen in (
+        ("En retard", late),
+        (f"À échéance d'ici le {horizon:%d/%m}", soon),
+        ("Bloqués ou en attente", sorted(blocked, key=_due)),
+    ):
+        if chosen:
+            lines += [
+                "",
+                f"**{label} ({len(chosen)})**",
+                markdown_table(headers, [_item(i, today) for i in chosen[:15]]),
+            ]
+            if len(chosen) > 15:
+                lines.append(f"(+{len(chosen) - 15} autres)")
+    missed = [m for m in milestones if not m.reached and m.date < today]
+    coming = [m for m in milestones if not m.reached and today <= m.date <= horizon]
+    for label, chosen_ms in (("Jalons dépassés non atteints", missed), ("Jalons à venir", coming)):
+        if chosen_ms:
+            lines.append(
+                f"- {label} : " + " ; ".join(f"« {m.title} » ({m.date:%d/%m})" for m in chosen_ms)
+            )
+    lines.append("")
+    return lines
+
+
+def _due(i: WorkItem) -> date:
+    return i.dueDate or date.max
 
 
 class FormsDigestInput(ToolInput):
@@ -491,8 +664,8 @@ class FormsDigestTool(NodeTool[FormsDigestInput]):
         table = await self.action("forms.list", {})
         forms = [
             r
-            for r in table.get("rows", [])
-            if isinstance(r, dict) and (params.tous or r.get("accepte_reponses"))
+            for r in rows_of(self.app, table)
+            if (params.tous or r.get("accepte_reponses")) and str(r.get("id", "")).isdigit()
         ]
         today = now(self.env).date()
         lines = [f"# Retours des formulaires au {today:%d/%m/%Y}", ""]
@@ -500,10 +673,10 @@ class FormsDigestTool(NodeTool[FormsDigestInput]):
         if not forms:
             lines.append("Aucun formulaire ouvert aux réponses.")
         for form in forms[:10]:
-            summary = await self.http("GET", f"/api/forms/{form['id']}/summary")
+            summary = await self.http("GET", f"/api/forms/{int(form['id'])}/summary")
             lines += [
                 f"## {form.get('titre')} (formulaire {form.get('id')})",
-                summary_text(summary),
+                summary_markdown(summary),
                 "",
             ]
             data.append(
@@ -511,7 +684,7 @@ class FormsDigestTool(NodeTool[FormsDigestInput]):
             )
         text = "\n".join(lines).rstrip()
         return ToolOutput(
-            content=text,
+            content=as_data(text, kind="retours des formulaires", limit=40_000),
             artifacts=[
                 Artifact(
                     kind="markdown", title=f"Retours des formulaires {today:%d/%m/%Y}", content=text

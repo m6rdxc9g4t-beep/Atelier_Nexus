@@ -16,6 +16,7 @@ import type { TeamRitual } from "@/types/api";
 export function TeamRituals({ version }: { version: number }) {
   const [items, setItems] = useState<TeamRitual[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const bump = useWorkflowStudioStore((s) => s.bump);
@@ -25,14 +26,26 @@ export function TeamRituals({ version }: { version: number }) {
     const controller = new AbortController();
     api
       .teamRituals(controller.signal)
-      .then(setItems)
-      .catch(() => {
-        // Backend antérieur aux rituels : la section ne s'affiche pas
-        if (!controller.signal.aborted) setItems([]);
+      .then((list) => {
+        setItems(list);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        // Backend antérieur aux rituels (404) : la section ne s'affiche pas ; sinon on le dit
+        if (err instanceof ApiError && err.status === 404) setItems([]);
+        else setLoadError(err instanceof ApiError ? err.message : "Rituels indisponibles pour l'instant.");
       });
     return () => controller.abort();
   }, [version, refresh]);
 
+  if (loadError && !items) {
+    return (
+      <p role="status" className="rounded-md border border-atelier-border-soft p-3 text-xs text-muted-foreground">
+        Rituels de l&apos;équipe : {loadError}
+      </p>
+    );
+  }
   if (!items || items.length === 0) return null;
 
   const install = async (id: string) => {

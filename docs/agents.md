@@ -13,7 +13,7 @@ le même routeur LLM (Claude ou Ollama) et des **boîtes à outils** branchées 
 | Communication | Rédacteur (`redacteur`) | core, wiki, wiki_write, equipe, equipe_write | Courriels, comptes rendus, documentation ; pages du Wiki |
 | Communication | Marketing (`marketing`) | core, data_via | Plans de campagne, contenus ; s'appuie sur Viz |
 | Équipe | Direction (`direction`) | core, equipe, equipe_write, equipe_rapports, projets_read, projets_write, wiki, formulaire | Comité, priorités, arbitrages ; inscrit les décisions validées et les comptes rendus → [`equipe.md`](equipe.md) |
-| Équipe | Enquêtes (`enquetes`) | core, formulaire, formulaire_write, formulaire_reponses, equipe, equipe_write | **100 % local** ; crée et ouvre les formulaires, lit les réponses ; n'écrit que des agrégats dans la mémoire |
+| Équipe | Enquêtes (`enquetes`) | core, formulaire, formulaire_write, formulaire_reponses, equipe | **100 % local** ; crée et ouvre les formulaires, lit les réponses ; lit la mémoire sans y écrire |
 | Données | Data Analyst (`data_analyst`) | core, analyse, data_via, tab, formulaire, equipe, equipe_write (+ boîtes d'Agent_DatAnalyst si l'extension est chargée) | Récupère, nettoie, analyse (distributions, asymétrie, corrélations, tests, atypiques) et visualise ; Power BI : exploration préalable, DAX `VAR … RETURN`, modèle en étoile → [`analyse.md`](analyse.md) |
 | Données | Tableur (`tableur`) | core, tab, tab_write, tab_projets | Totaux calculés par l'outil, erreurs de formule, échéances dépassées ; modifie les tables (validation) |
 | Gestion de projet | Chef de projet (`chef_de_projet`) | core, projets_read, projets_write, tab, tab_projets, equipe, equipe_write, equipe_rapports, wiki | Points d'avancement calculés, saisie de temps, statuts, plannings Tab |
@@ -58,9 +58,9 @@ le recréer sur un agent personnalisé qui a les mêmes boîtes.
 | `github_write` | `github_create_branch`, `_commit_files`, `_open_pull_request` | ✅ validation | — |
 | `wiki` | `wiki_spaces`, `_search`, `_pages`, `_read_page` ([`apps/wiki.md`](apps/wiki.md)) | — | — |
 | `wiki_write` | `wiki_create_page`, `_append_page`, `_replace_page`, `_create_space` | ✅ validation | — |
-| `formulaire` | `formulaire_forms`, `_form`, `_summary` (agrégats, sans texte libre) ([`apps/formulaire.md`](apps/formulaire.md)) | — | — |
+| `formulaire` | `formulaire_forms`, `_form`, `_summary` (agrégats, sans texte libre, masqués sous 3 réponses) ([`apps/formulaire.md`](apps/formulaire.md)) | — | — |
 | `formulaire_write` | `formulaire_create_form`, `_set_status`, `_set_access` | ✅ validation | — |
-| `formulaire_reponses` | `formulaire_responses` (réponses une par une) | — | ✅ local imposé |
+| `formulaire_reponses` | `formulaire_responses` (réponses une par une, plus récentes d'abord) | — | ✅ local imposé |
 | `equipe` | `equipe_memoire` (espace « Équipe Atelier » du Wiki) | — | — |
 | `equipe_write` | `equipe_noter`, `_decision`, `_compte_rendu` | ✅ validation | — |
 | `equipe_rapports` | `equipe_point_avancement` (Projets), `_synthese_formulaires` (Formulaire, agrégats) | — | — |

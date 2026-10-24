@@ -6,6 +6,8 @@ déclencheur vérifié (`TriggerService.check`). docs/equipe.md.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -17,6 +19,10 @@ from app.schemas.workflows_v2 import WorkflowV2
 from app.team_rituals import RITUALS, Ritual, installed, ritual
 
 router = APIRouter(prefix="/api/equipe", tags=["equipe"])
+
+#: Contrôle « déjà installé » et création sous le même verrou : deux clics simultanés
+#: n'installent pas deux fois le même rituel (un seul processus backend).
+_INSTALL_LOCK = asyncio.Lock()
 
 
 class RitualInfo(BaseModel):
@@ -35,8 +41,13 @@ async def _infos(service: Any, make_env: Any) -> list[RitualInfo]:
         settings = env.settings
     finally:
         await env.aclose()
-    titles = {w.title: w.id for w in await service.workflows.list() if isinstance(w, WorkflowV2)}
-    done = installed(titles)
+    done = installed(
+        [
+            (w.id, w.description or "")
+            for w in await service.workflows.list()
+            if isinstance(w, WorkflowV2)
+        ]
+    )
     return [_info(r, r.missing(settings), done.get(r.id)) for r in RITUALS]
 
 
@@ -70,7 +81,14 @@ async def install_ritual(
     found = ritual(ritual_id)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Rituel « {ritual_id} » inconnu.")
-    current = {i.id: i for i in await _infos(service, make_env)}[ritual_id]
+    async with _INSTALL_LOCK:
+        return await _install(found, service, llm, catalog, make_env)
+
+
+async def _install(
+    found: Ritual, service: Any, llm: Any, catalog: Any, make_env: Any
+) -> RitualInfo:
+    current = {i.id: i for i in await _infos(service, make_env)}[found.id]
     if current.workflow_id:
         raise HTTPException(
             status.HTTP_409_CONFLICT, f"Le rituel « {found.title} » est déjà installé."
@@ -90,6 +108,8 @@ async def install_ritual(
         state, internal = await service.initial_state(fields, note)
         await service.triggers.create(workflow.id, fields, state, internal)
     except Exception:
-        await service.workflows.delete(workflow.id)  # jamais un rituel à moitié installé
+        # Jamais un rituel à moitié installé ; l'erreur d'origine reste celle rendue
+        with contextlib.suppress(Exception):
+            await service.workflows.delete(workflow.id)
         raise
     return _info(found, [], workflow.id)

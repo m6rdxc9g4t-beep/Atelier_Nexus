@@ -15,7 +15,7 @@ l'extension Agent_DatAnalyst). Tu restes le seul décideur : chaque action atten
 | Développeur (`developpeur`) | Code, branches, PR liées aux tâches | GitHub, Projets, Wiki | lit et écrit |
 | Data Analyst (`data_analyst`) | Données, statistiques, graphiques, Power BI ; synthèse des formulaires | Viz, Tab, fichiers, Formulaire (agrégats) | lit et écrit |
 | Rédacteur (`redacteur`) | Courriels, documentation et pages du Wiki | Wiki | lit et écrit |
-| **Enquêtes** (`enquetes`, 100 % local) | Crée et ouvre les formulaires, lit les réponses une par une | Formulaire (réponses comprises) | lit ; n'y écrit que des agrégats |
+| **Enquêtes** (`enquetes`, 100 % local) | Crée et ouvre les formulaires, lit les réponses une par une | Formulaire (réponses comprises) | lit seulement |
 | Finance, Comptable, Trésorier (100 % local) | Comptes, budgets, écritures | Trésorerie | Finance lit, n'écrit pas |
 
 Annuaire et règles communes : `backend/app/agents/experts/team_rules.py` (repris dans le prompt de
@@ -32,14 +32,25 @@ la carte de validation) :
 | Registre des décisions | Une section par décision : date, titre, décision, contexte, conséquences | `equipe_decision` |
 | Comptes rendus | Une sous-page par réunion : `CR 2026-10-24 — sujet` | `equipe_compte_rendu` |
 
-`equipe_memoire` rend les dernières notes, les titres des décisions et des comptes rendus, ou une
-recherche dans l'espace. Le contenu lu est présenté au modèle comme une **donnée** délimitée, jamais
-comme une consigne.
+`equipe_memoire` rend les dernières notes (les plus récentes gardées si le journal est long), les
+titres des décisions et des comptes rendus, ou une recherche dans l'espace. Tout ce qui est lu est
+présenté au modèle comme une **donnée** délimitée, jamais comme une consigne.
+
+Format : une note commence par un en-tête daté `## AAAA-MM-JJ …` ; ce sont ces en-têtes, et eux
+seuls, qui séparent les notes. Les titres `#` / `##` écrits dans une note sont rétrogradés
+(`###` / `####`) pour rester sous son en-tête. L'espace existant est retrouvé aux accents et à la
+casse près ; une page de structure mise à la corbeille est recréée ; un compte rendu déjà rangé à
+l'identique est signalé, un autre du même jour et du même sujet est numéroté « (2) ».
 
 Règles des membres (prompt) : lire la mémoire au début d'une tâche ; noter à la fin ce qui a été fait
 (avec les identifiants) et ce qui reste, pour quel rôle ; n'enregistrer comme décision que ce que
 l'utilisateur a décidé ou validé ; **jamais** de donnée personnelle ni de montant personnel dans la
 mémoire (elle est lue par des agents sur Claude).
+
+Confidentialité : les agents qui lisent des données personnelles ou financières (Enquêtes, Finance)
+**lisent** la mémoire mais n'y écrivent pas — garde technique (leurs boîtes), vérifiée par un test sur
+tous les agents. Pour partager un résultat d'enquête, Enquêtes rédige une synthèse anonyme que
+l'utilisateur fait noter par la Direction ; la synthèse agrégée est aussi notée par le rituel du vendredi.
 
 Passer le travail d'un rôle à l'autre : le premier agent note au journal ce qui reste « pour le
 Développeur », tu ouvres le Développeur, qui commence par lire la mémoire. Les enchaînements formels
@@ -50,10 +61,12 @@ s'y ajoutera une fois #28 fusionnée.
 
 | Outil | Source | Contenu |
 |---|---|---|
-| `equipe_point_avancement` | Atelier Projets | Par projet : avancement, tendance, budget, éléments terminés ; en retard, à échéance (horizon réglable), bloqués ou en attente (une seule liste chacun) ; jalons dépassés et à venir. Fuseau `TIMEZONE`. |
-| `equipe_synthese_formulaires` | Atelier Formulaire | Formulaires ouverts : effectifs par choix, moyennes, distributions ; textes libres jamais repris. |
+| `equipe_point_avancement` | Atelier Projets | Par projet (20 au plus, détaillés et comptés) : avancement, tendance, budget (jours passés, part consommée, reste ou dépassement), échéance du projet (dépassée ?) ; en retard, à échéance (horizon réglable), bloqués ou en attente (une seule liste chacun ; un bloqué en retard compte dans « en retard, dont … bloqués ») ; jalons dépassés et à venir. Un projet illisible est signalé sans faire échouer le rapport. Fuseau `TIMEZONE`. |
+| `equipe_synthese_formulaires` | Atelier Formulaire | Formulaires ouverts : effectifs par choix, moyennes, distributions ; textes libres jamais repris ; détail masqué sous 3 réponses. |
 
-Ce sont des calculs, pas des interprétations : utilisables dans les workflows et les rituels.
+Ce sont des calculs, pas des interprétations : utilisables dans les workflows et les rituels. Le
+modèle reçoit le texte délimité ; le Markdown brut est dans `data.markdown` (ce qu'écrivent les
+rituels).
 
 ## 4. Rituels
 
@@ -70,9 +83,15 @@ la boîte **« À valider »**.
 
 API : `GET /api/equipe/rituels` (rituels, ce qui manque, workflow installé), `POST
 /api/equipe/rituels/{id}` (201 ; 409 si déjà installé ; 422 si une application manque).
-L'installation passe par les contrôles de l'éditeur et des déclencheurs ; si le déclencheur est
-refusé, le workflow créé est supprimé (jamais de rituel à moitié installé). Un rituel est reconnu
-installé par son titre (« Rituel · … »).
+L'installation passe par les contrôles de l'éditeur et des déclencheurs, sous un verrou (deux clics
+simultanés n'installent qu'un rituel) ; si le déclencheur est refusé, le workflow créé est supprimé
+(jamais de rituel à moitié installé) et l'erreur d'origine est rendue. Un rituel est reconnu installé
+par la marque `[rituel:<id>]` de sa description : son titre peut être changé, et un workflow de
+l'utilisateur au même titre ne bloque rien.
+
+Couleurs : Wiki et Formulaire n'ont pas encore de signature dans le fichier de marque copié de la suite
+(protégé) ; `frontend/src/styles/suite-signatures.css` les ajoute en attendant, à retirer quand la
+source commune les aura.
 
 ## 5. Démarrer
 

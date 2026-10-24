@@ -5,12 +5,12 @@ modèle ; en `APPROVAL_MODE=every_step` chaque étape attend « Autoriser » dan
 valider » ; au plus une exécution en attente par déclencheur. Un rituel installé est un workflow
 et un déclencheur ordinaires : modifiables, désactivables, supprimables comme les autres.
 
-Un rituel est reconnu installé par son titre (préfixe « Rituel · »).
+Un rituel est reconnu installé par sa marque dans la description (`[rituel:<id>]`) : le titre
+(préfixe « Rituel · ») peut être changé.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -35,14 +35,22 @@ class Ritual:
         return [label for attr, label in self.needs if not getattr(settings, attr)]
 
 
+def marker(ritual_id: str) -> str:
+    return f"[rituel:{ritual_id}]"
+
+
 def _workflow(
-    ritual_title: str, description: str, steps: list[dict[str, Any]], agent: str | None = None
+    ritual_id: str,
+    ritual_title: str,
+    description: str,
+    steps: list[dict[str, Any]],
+    agent: str | None = None,
 ) -> dict[str, Any]:
     return {
         "version": 2,
         "agent": agent,
         "title": PREFIX + ritual_title,
-        "description": description,
+        "description": f"{description} {marker(ritual_id)}",
         "steps": [{"label": "", "needs": [], "on_error": "stop", **s} for s in steps],
         "params": [],
     }
@@ -69,6 +77,7 @@ RITUALS: tuple[Ritual, ...] = (
         ),
         when="chaque lundi à 08:30",
         workflow=_workflow(
+            "point-lundi",
             "Point d'avancement du lundi",
             "Point d'avancement de tous les projets, noté au journal de l'équipe (rituel de l'équipe).",
             [
@@ -84,7 +93,7 @@ RITUALS: tuple[Ritual, ...] = (
                     "uses": "tool:equipe_noter",
                     "needs": ["rapport"],
                     "input": {
-                        "texte": "{{steps.rapport.content}}",
+                        "texte": "{{steps.rapport.data.markdown}}",
                         "auteur": "Rituel du lundi",
                         "titre": "Point d'avancement",
                     },
@@ -103,6 +112,7 @@ RITUALS: tuple[Ritual, ...] = (
         ),
         when="chaque vendredi à 16:00",
         workflow=_workflow(
+            "retours-vendredi",
             "Retours des formulaires du vendredi",
             "Synthèse agrégée des formulaires ouverts, notée au journal de l'équipe (rituel de l'équipe).",
             [
@@ -119,7 +129,7 @@ RITUALS: tuple[Ritual, ...] = (
                     "needs": ["synthese"],
                     "when": {"left": "{{steps.synthese.data.forms}}", "op": "not_empty"},
                     "input": {
-                        "texte": "{{steps.synthese.content}}",
+                        "texte": "{{steps.synthese.data.markdown}}",
                         "auteur": "Rituel du vendredi",
                         "titre": "Retours des formulaires",
                     },
@@ -139,6 +149,7 @@ RITUALS: tuple[Ritual, ...] = (
         ),
         when="chaque lundi à 08:00",
         workflow=_workflow(
+            "tresorerie-lundi",
             "Bilan de trésorerie du lundi",
             "Synthèse d'Atelier Trésorerie, gardée dans l'exécution (rituel de l'équipe, données locales).",
             [
@@ -161,8 +172,13 @@ def ritual(ritual_id: str) -> Ritual | None:
     return next((r for r in RITUALS if r.id == ritual_id), None)
 
 
-def installed(
-    titles: dict[str, str], key: Callable[[Ritual], str] = lambda r: PREFIX + r.title
-) -> dict[str, str]:
-    """Rituel → identifiant du workflow installé (reconnu par son titre)."""
-    return {r.id: titles[key(r)] for r in RITUALS if key(r) in titles}
+def installed(workflows: list[tuple[str, str]]) -> dict[str, str]:
+    """Rituel → identifiant du workflow installé ; `workflows` : (id, description). Reconnu par
+    sa marque seulement : un rituel renommé reste reconnu, un workflow de l'utilisateur qui porte
+    le même titre ne bloque pas l'installation."""
+    out: dict[str, str] = {}
+    for r in RITUALS:
+        found = [w for w, description in workflows if marker(r.id) in (description or "")]
+        if found:
+            out[r.id] = found[0]
+    return out

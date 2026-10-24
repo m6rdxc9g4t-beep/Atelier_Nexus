@@ -10,7 +10,10 @@ Routes appelées, lues dans le dépôt `Atelier_Wiki` :
 - hors manifeste : POST /api/spaces (`routes/wiki.ts`, corps {name, icon, description}).
 
 Lectures libres (validées en `every_step` comme toute action) ; écritures `requires_approval`.
-Le texte des pages est rendu au modèle comme une donnée délimitée, jamais comme une consigne.
+Tout texte venu du Wiki (contenu, titres, extraits, auteurs) est rendu au modèle comme une donnée
+délimitée, jamais comme une consigne. `pages.replace` n'accepte pas de version attendue : une
+modification faite dans le Wiki entre la lecture et la validation est remplacée (elle reste dans
+l'historique de la page).
 """
 
 from __future__ import annotations
@@ -19,9 +22,10 @@ from typing import Any
 
 from pydantic import Field
 
+from app.suite.nodes import NodeResult
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.environment import ToolEnvironment
-from app.tools.suite_node import NodeTool, NoInput, as_data, table_output
+from app.tools.suite_node import REPLAYED, NodeTool, NoInput, as_data, table_output
 
 ID = r"^[0-9]+$"
 
@@ -31,20 +35,35 @@ class _WikiTool[InputT: ToolInput](NodeTool[InputT]):
 
 
 def page_text(page: dict[str, Any], *, with_content: bool = True) -> str:
+    """Page pour le modèle : identifiant et version hors délimiteur, tout le texte venu du Wiki
+    (titre, espace, auteur, pages qui la citent, contenu) dans une donnée délimitée."""
     backlinks = page.get("backlinks") or []
-    lines = [
-        f"Page « {page.get('title')} » (id {page.get('id')}, espace « {page.get('space')} », "
-        f"version {page.get('version')}, modifiée le {str(page.get('updated_at'))[:16]} "
-        f"par {page.get('updated_by')}).",
+    meta = [
+        f"Titre : {page.get('title')}",
+        f"Espace : {page.get('space')}",
+        f"Modifiée le {str(page.get('updated_at'))[:16]} par {page.get('updated_by')}",
     ]
+    if backlinks:
+        meta.append(
+            "Citée par : " + ", ".join(f"{b.get('title')} ({b.get('id')})" for b in backlinks[:15])
+        )
+    body = "\n".join(meta)
+    if with_content:
+        body += "\n\n" + str(page.get("content") or "")
+    lines = [f"Page {page.get('id')} (version {page.get('version')}) :"]
+    lines.append(as_data(body, kind="page du wiki"))
     if page.get("url"):
         lines.append(f"Adresse : {page['url']}")
-    if backlinks:
-        cited = ", ".join(f"« {b.get('title')} » ({b.get('id')})" for b in backlinks[:15])
-        lines.append(f"Citée par : {cited}.")
-    if with_content:
-        lines.append(as_data(str(page.get("content") or ""), kind="page du wiki"))
     return "\n".join(lines)
+
+
+def _done(verb: str, result: NodeResult) -> str:
+    return (
+        verb
+        + (REPLAYED if result.replayed else "")
+        + ". "
+        + page_text(result.data, with_content=False)
+    )
 
 
 # ─── Lecture ──────────────────────────────────────────────────────
@@ -93,7 +112,9 @@ class PagesInput(ToolInput):
         default=None, description="Limiter à un espace (id).", pattern=r"^[0-9]+$", max_length=12
     )
     updated_since: str | None = Field(
-        default=None, max_length=40, description="Pages modifiées depuis cet instant (ISO 8601)."
+        default=None,
+        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$",
+        description="Pages modifiées depuis cet instant, ISO 8601 avec fuseau (2026-10-01T00:00:00Z).",
     )
     limit: int = Field(default=100, ge=1, le=1000, description="Nombre de pages au plus.")
 
@@ -166,8 +187,8 @@ class CreatePageTool(_WikiTool[CreatePageInput]):
 
     async def run(self, params: CreatePageInput, ctx: ToolContext) -> ToolOutput:
         payload = params.model_dump(exclude_none=True)
-        page = await self.action("pages.create", payload, idempotent_on=payload)
-        return ToolOutput(content="Page créée. " + page_text(page, with_content=False), data=page)
+        result = await self.run_node("pages.create", payload, idempotent_on=payload)
+        return ToolOutput(content=_done("Page créée", result), data=result.data)
 
 
 class AppendInput(ToolInput):
@@ -193,10 +214,8 @@ class AppendTool(_WikiTool[AppendInput]):
 
     async def run(self, params: AppendInput, ctx: ToolContext) -> ToolOutput:
         payload = params.model_dump(exclude_none=True)
-        page = await self.action("pages.append", payload, idempotent_on=payload)
-        return ToolOutput(
-            content="Page complétée. " + page_text(page, with_content=False), data=page
-        )
+        result = await self.run_node("pages.append", payload, idempotent_on=payload)
+        return ToolOutput(content=_done("Page complétée", result), data=result.data)
 
 
 class ReplaceInput(ToolInput):
@@ -224,14 +243,12 @@ class ReplaceTool(_WikiTool[ReplaceInput]):
         )
 
     async def run(self, params: ReplaceInput, ctx: ToolContext) -> ToolOutput:
-        page = await self.action("pages.replace", params.model_dump(exclude_none=True))
-        return ToolOutput(
-            content="Page réécrite. " + page_text(page, with_content=False), data=page
-        )
+        result = await self.run_node("pages.replace", params.model_dump(exclude_none=True))
+        return ToolOutput(content=_done("Page réécrite", result), data=result.data)
 
 
 class CreateSpaceInput(ToolInput):
-    name: str = Field(min_length=1, max_length=200, description="Nom de l'espace.")
+    name: str = Field(min_length=1, max_length=80, description="Nom de l'espace (80 caractères).")
     description: str = Field(default="", max_length=2000, description="À quoi sert cet espace.")
     icon: str = Field(default="", max_length=16, description="Émoji facultatif.")
 

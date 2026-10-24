@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.environment import ToolEnvironment
 from app.tools.formatting import markdown_table
-from app.tools.suite_node import NodeTool, NoInput, as_data, table_output
+from app.tools.suite_node import NodeTool, NoInput, as_data, rows_of, table_output
 
 QuestionType = Literal[
     "short_text", "long_text", "email", "number", "date", "single", "multiple", "dropdown",
@@ -110,32 +110,54 @@ class SummaryTool(_FormTool[FormInput]):
         return ToolOutput(content=summary_text(summary), data=aggregate_only(summary))
 
 
+#: En dessous de ce nombre de réponses, le détail d'une question n'est pas montré : avec une ou
+#: deux personnes, un minimum, un maximum ou un effectif par choix désigne quelqu'un.
+MIN_GROUP = 3
+
+
 def aggregate_only(summary: dict[str, Any]) -> dict[str, Any]:
-    """Synthèse sans les derniers textes libres (données personnelles possibles)."""
+    """Synthèse sans texte libre (données personnelles possibles) et sans détail d'une question
+    à laquelle moins de `MIN_GROUP` personnes ont répondu."""
     questions = []
     for q in summary.get("questions") or []:
         if not isinstance(q, dict):
             continue
-        questions.append({k: v for k, v in q.items() if k != "latest"})
+        item = {k: v for k, v in q.items() if k != "latest"}
+        if (item.get("answered") or 0) < MIN_GROUP:
+            item = {k: item.get(k) for k in ("id", "label", "type", "kind", "answered")}
+            item["masked"] = True
+        questions.append(item)
     return {"total": summary.get("total"), "questions": questions}
 
 
-def summary_text(summary: dict[str, Any]) -> str:
+def _num(value: Any) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, float):
+        return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    return str(value)
+
+
+def summary_markdown(summary: dict[str, Any]) -> str:
+    """Synthèse agrégée en Markdown (texte brut, à délimiter avant de l'envoyer au modèle)."""
     data = aggregate_only(summary)
     total = data.get("total") or 0
     lines = [f"{total} réponse(s) au total."]
     for q in data["questions"]:
         label = str(q.get("label") or q.get("id"))[:200]
-        answered = q.get("answered", 0)
+        answered = q.get("answered") or 0
         head = f"\n**{label}** ({answered} réponse(s))"
         kind = q.get("kind")
-        if kind == "choices":
+        if q.get("masked"):
+            detail = "aucune réponse" if not answered else f"moins de {MIN_GROUP} réponses"
+            lines.append(f"{head} : {detail}, détail non montré.")
+        elif kind == "choices":
             counts = q.get("counts") or []
             rows = [
                 [
                     c.get("option"),
                     c.get("count"),
-                    f"{100 * c.get('count', 0) / answered:.0f} %" if answered else "—",
+                    f"{100 * (c.get('count') or 0) / answered:.0f} %",
                 ]
                 for c in counts
                 if isinstance(c, dict)
@@ -143,13 +165,15 @@ def summary_text(summary: dict[str, Any]) -> str:
             lines += [head, markdown_table(["Choix", "Effectif", "Part"], rows)]
         elif kind == "numbers":
             lines.append(
-                f"{head} : moyenne {q.get('average')}, minimum {q.get('min')}, maximum {q.get('max')}."
+                f"{head} : moyenne {_num(q.get('average'))}, minimum {_num(q.get('min'))}, "
+                f"maximum {_num(q.get('max'))}."
             )
             dist = q.get("distribution")
             if dist:
                 lines.append(
                     markdown_table(
-                        ["Note", "Effectif"], [[d.get("value"), d.get("count")] for d in dist]
+                        ["Note", "Effectif"],
+                        [[d.get("value"), d.get("count")] for d in dist if isinstance(d, dict)],
                     )
                 )
         else:
@@ -159,6 +183,10 @@ def summary_text(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def summary_text(summary: dict[str, Any]) -> str:
+    return as_data(summary_markdown(summary), kind="synthèse du formulaire", limit=20_000)
+
+
 # ─── Réponses individuelles (sensible) ────────────────────────────
 
 
@@ -166,27 +194,95 @@ class ResponsesInput(ToolInput):
     form_id: str = Field(
         description="Identifiant du formulaire.", pattern=r"^[0-9]+$", max_length=12
     )
-    since_id: str | None = Field(
+    nombre: int = Field(
+        default=20, ge=1, le=100, description="Nombre de réponses à lire (les plus récentes)."
+    )
+    avant_id: str | None = Field(
         default=None,
-        description="Seulement les réponses arrivées après celle-ci.",
+        description="Lire les réponses arrivées AVANT celle-ci (pour remonter dans le temps).",
         pattern=r"^[0-9]+$",
         max_length=12,
     )
-    limit: int = Field(default=500, ge=1, le=5000, description="Nombre de réponses au plus.")
+
+
+#: Taille maximale d'une réponse libre montrée, et de l'ensemble montré au modèle
+ANSWER_CHARS = 2_000
+RESPONSES_CHARS = 40_000
+FETCH_LIMIT = 5_000  # maximum de `responses.list` (manifeste de Formulaire)
 
 
 class ResponsesTool(_FormTool[ResponsesInput]):
     name = "formulaire_responses"
     description = (
-        "Réponses individuelles d'un formulaire (une colonne par question, répondant, date). "
-        "Données personnelles : modèle local uniquement."
+        "Réponses individuelles d'un formulaire, les plus récentes d'abord, chaque réponse en "
+        "entier (répondant, date, réponse à chaque question). Données personnelles : modèle local "
+        "uniquement."
     )
     input_model = ResponsesInput
     sensitive = True
 
     async def run(self, params: ResponsesInput, ctx: ToolContext) -> ToolOutput:
-        data = await self.action("responses.list", params.model_dump(exclude_none=True))
-        return table_output(self.app, data, noun="réponse", empty="Aucune réponse pour l'instant.")
+        # La route rend les réponses de la plus ancienne à la plus récente (since_id croissant)
+        data = await self.action(
+            "responses.list", {"form_id": params.form_id, "limit": FETCH_LIMIT}
+        )
+        rows = rows_of(self.app, data)
+        columns = [c for c in data["columns"] if isinstance(c, dict) and "key" in c]
+        if params.avant_id:
+            rows = [r for r in rows if _int(r.get("id")) < int(params.avant_id)]
+        if not rows:
+            return ToolOutput(content="Aucune réponse pour l'instant.", data=data)
+        shown = list(reversed(rows[-params.nombre :]))
+        blocks = [_response_block(r, columns) for r in shown]
+        older = len(rows) - len(shown)
+        total = data.get("total")
+        head = (
+            f"{len(shown)} réponse(s) les plus récentes"
+            + (f" sur {total}" if isinstance(total, int) else "")
+            + (
+                f" ; {older} plus ancienne(s) : rappeler avec avant_id={shown[-1].get('id')}"
+                if older
+                else ""
+            )
+            + (
+                " ; la lecture s'arrête aux 5 000 premières réponses"
+                if data.get("truncated")
+                else ""
+            )
+            + "."
+        )
+        return ToolOutput(
+            content=head
+            + "\n"
+            + as_data("\n\n".join(blocks), kind="réponses au formulaire", limit=RESPONSES_CHARS),
+            data=data,
+        )
+
+
+def _int(value: Any) -> int:
+    try:
+        return int(str(value))
+    except ValueError:
+        return 0
+
+
+def _response_block(row: dict[str, Any], columns: list[dict[str, Any]]) -> str:
+    meta = {"id", "recu_le", "repondant", "source"}
+    lines = [
+        f"### Réponse {row.get('id')} — {row.get('recu_le') or '?'} — "
+        f"{row.get('repondant') or 'anonyme'} ({row.get('source') or '?'})"
+    ]
+    for c in columns:
+        if c["key"] in meta:
+            continue
+        value = row.get(c["key"])
+        if value is None or value == "":
+            continue
+        text = str(value)
+        if len(text) > ANSWER_CHARS:
+            text = text[:ANSWER_CHARS] + f" [… {len(text) - ANSWER_CHARS} caractères de plus]"
+        lines.append(f"- {c.get('label') or c['key']} : {text}")
+    return "\n".join(lines)
 
 
 # ─── Écriture (validation) ────────────────────────────────────────

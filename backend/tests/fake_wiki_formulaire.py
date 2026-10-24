@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from typing import Any
 
 import httpx
@@ -61,6 +62,31 @@ WIKI_MANIFEST = {
 }  # fmt: skip
 
 
+def normalize(title: str) -> str:
+    """domain/markdown.ts normalizeTitle."""
+    plain = "".join(
+        c for c in unicodedata.normalize("NFD", title) if unicodedata.category(c) != "Mn"
+    )
+    return " ".join(plain.lower().split())
+
+
+def slug_keys(questions: list[dict[str, Any]]) -> dict[str, str]:
+    """domain/questions.ts columnKeys : clé de colonne tirée du libellé."""
+    used, keys = {"id", "recu_le", "repondant", "source"}, {}
+    for q in questions:
+        if q["type"] == "section":
+            continue
+        base = re.sub(r"[^a-z0-9]+", "_", normalize(q.get("label") or q["id"])).strip("_")[:40]
+        if not re.match(r"[a-z]", base):
+            base = f"q_{base}".rstrip("_")
+        key, i = base, 2
+        while key in used:
+            key, i = f"{base}_{i}", i + 1
+        used.add(key)
+        keys[q["id"]] = key
+    return keys
+
+
 def table(
     name: str, label: str, columns: list[tuple[str, str, str]], rows: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -83,7 +109,8 @@ class FakeWiki:
                 "space_id": 1, "parent_id": None, "version": 1},
         }  # fmt: skip
         self.requests: list[httpx.Request] = []
-        self.replays: dict[str, tuple[int, Any]] = {}
+        self.replays: dict[str, tuple[str, int, Any]] = {}
+        self.clock = 0  # ordre de modification (pages.list : plus récentes d'abord)
 
     def page_json(self, page: dict[str, Any]) -> dict[str, Any]:
         space = next(s for s in self.spaces if s["id"] == page["space_id"])
@@ -101,13 +128,25 @@ class FakeWiki:
         path, method = request.url.path, request.method
         body = json.loads(request.content) if request.content else None
         key = request.headers.get("idempotency-key")
+        print_ = f"{method} {path} {json.dumps(body, sort_keys=True)}"
         if key and key in self.replays:
-            status, payload = self.replays[key]
+            fingerprint, status, payload = self.replays[key]
+            if fingerprint != print_:  # services/idempotency.ts
+                return httpx.Response(
+                    409, json={"detail": "Clé déjà utilisée.", "code": "IDEMPOTENCY_KEY_REUSED"}
+                )
             return httpx.Response(status, json=payload, headers={"Idempotency-Replayed": "true"})
         status, payload = self.route(method, path, request, body)
         if key and status < 300:
-            self.replays[key] = (status, payload)
+            self.replays[key] = (print_, status, payload)
         return httpx.Response(status, json=payload)
+
+    def touch(self, page: dict[str, Any]) -> None:
+        self.clock += 1
+        page["updated"] = self.clock
+
+    def live(self) -> list[dict[str, Any]]:
+        return [p for p in self.pages.values() if not p.get("deleted")]
 
     def route(self, method: str, path: str, request: httpx.Request, body: Any) -> tuple[int, Any]:
         if path == "/api/atelier/manifest":
@@ -123,9 +162,7 @@ class FakeWiki:
                               ("pages", "Pages", "number")], rows)  # fmt: skip
         if path == "/api/atelier/search" and method == "POST":
             q = body["query"].lower()
-            hits = [
-                p for p in self.pages.values() if q in (p["title"] + " " + p["content"]).lower()
-            ]
+            hits = [p for p in self.live() if q in (p["title"] + " " + p["content"]).lower()]
             space_id = body.get("space_id")
             hits = [p for p in hits if not space_id or str(p["space_id"]) == space_id]
             rows = [{"id": str(p["id"]), "titre": p["title"], "espace": "Général", "extrait": p["content"][:80],
@@ -137,12 +174,19 @@ class FakeWiki:
             out["total"] = None
             return 200, out
         if path == "/api/atelier/pages" and method == "GET":
+            # pagesTable : hors corbeille, filtre d'espace, plus récentes d'abord, limite
+            space_id = request.url.params.get("space_id")
+            limit = int(request.url.params.get("limit") or 200)
+            chosen = [p for p in self.live() if not space_id or str(p["space_id"]) == space_id]
+            chosen.sort(key=lambda p: (p.get("updated", 0), p["id"]), reverse=True)
             rows = [{"id": str(p["id"]), "titre": p["title"], "espace_id": str(p["space_id"]), "espace": "Général",
                      "parent_id": None if p["parent_id"] is None else str(p["parent_id"]),
                      "version": p["version"], "maj_le": "2026-10-24T09:00:00.000Z", "maj_par": "moi",
-                     "chemin": f"/p/{p['id']}", "url": None} for p in self.pages.values()]  # fmt: skip
-            return 200, table("pages", "Pages du wiki", [("id", "Id", "string"), ("titre", "Titre", "string"),
-                              ("espace", "Espace", "string"), ("version", "Version", "number")], rows)  # fmt: skip
+                     "chemin": f"/p/{p['id']}", "url": None} for p in chosen[:limit]]  # fmt: skip
+            out = table("pages", "Pages du wiki", [("id", "Id", "string"), ("titre", "Titre", "string"),
+                        ("espace", "Espace", "string"), ("version", "Version", "number")], rows)  # fmt: skip
+            out["total"], out["truncated"] = len(chosen), len(rows) < len(chosen)
+            return 200, out
         if path == "/api/atelier/pages" and method == "POST":
             pid = max(self.pages) + 1
             space_id = int(body.get("space_id") or 1)
@@ -151,17 +195,26 @@ class FakeWiki:
             self.pages[pid] = {"id": pid, "title": body["title"], "content": body.get("content", ""),
                                "space_id": space_id, "parent_id": int(body["parent_id"]) if body.get("parent_id") else None,
                                "version": 1}  # fmt: skip
+            self.touch(self.pages[pid])
             return 201, self.page_json(self.pages[pid])
         m = re.fullmatch(r"/api/atelier/pages/(\d+)(/append)?", path)
         if m:
             page = self.pages.get(int(m[1]))
-            if page is None:
+            if page is None or page.get("deleted"):
                 return 404, {"detail": "Page introuvable.", "code": "NOT_FOUND"}
+            if method != "GET":
+                self.touch(page)
             if method == "GET":
                 return 200, self.page_json(page)
             if m[2] and method == "POST":
-                heading = f"\n\n## {body['heading']}" if body.get("heading") else "\n\n"
-                page["content"] = page["content"].rstrip() + heading + "\n\n" + body["content"]
+                # domain/markdown.ts appendSection
+                block = (
+                    f"## {body['heading'].strip()}\n\n{body['content'].strip()}"
+                    if body.get("heading")
+                    else body["content"].strip()
+                )
+                base = page["content"].rstrip()
+                page["content"] = f"{base}\n\n{block}\n" if base else f"{block}\n"
                 page["version"] += 1
                 return 200, self.page_json(page)
             if method == "PUT":
@@ -170,8 +223,11 @@ class FakeWiki:
                 page["version"] += 1
                 return 200, self.page_json(page)
         if path == "/api/spaces" and method == "POST":
-            if any(s["name"] == body["name"] for s in self.spaces):
-                return 409, {"detail": "Un espace porte déjà ce nom.", "code": "CONFLICT"}
+            name = " ".join(str(body.get("name") or "").split())
+            if not name or len(name) > 80:  # services/spaces.ts cleanName
+                return 422, {"detail": "Nom d'espace invalide.", "code": "INPUT_INVALID"}
+            if any(normalize(s["name"]) == normalize(name) for s in self.spaces):
+                return 409, {"detail": f"Un espace « {name} » existe déjà.", "code": "CONFLICT"}
             sid = max(s["id"] for s in self.spaces) + 1
             self.spaces.append({"id": sid, "name": body["name"], "slug": body["name"].lower(),
                                 "description": body.get("description", ""), "icon": body.get("icon", "")})  # fmt: skip
@@ -220,6 +276,7 @@ class FakeFormulaire:
             1: [
                 {"id": 1, "respondent": "Alice", "answers": {"q1": 5, "q2": "Oui", "q3": "alice@exemple.fr"}},
                 {"id": 2, "respondent": "Bruno", "answers": {"q1": 3, "q2": "Peut-être", "q3": "bruno@exemple.fr"}},
+                {"id": 3, "respondent": "Chloé", "answers": {"q1": 4, "q2": "Oui", "q3": "chloe@exemple.fr"}},
             ]
         }  # fmt: skip
         self.requests: list[httpx.Request] = []
@@ -253,20 +310,34 @@ class FakeFormulaire:
             form = self.forms.get(int(m[1]))
             if form is None:
                 return 404, {"detail": "Formulaire introuvable.", "code": "NOT_FOUND"}
+            questions = [q for q in form["questions"] if q["type"] != "section"]
             if m[2]:
-                items = self.responses.get(form["id"], [])
-                rows = [{"id": str(r["id"]), "recu_le": "2026-10-24T09:00:00.000Z", "repondant": r["respondent"],
-                         "source": "suite", **{q["id"]: r["answers"].get(q["id"]) for q in form["questions"]}}
-                        for r in items]  # fmt: skip
-                cols = [("id", "Réponse", "string"), ("repondant", "Répondant", "string")] + [
-                    (q["id"], q["label"], "string") for q in form["questions"]
-                ]
-                return 200, table(f"form-{form['id']}", form["title"], cols, rows)
+                # services/responses.ts responsesTable : plus anciennes d'abord, since_id, limit
+                keys = slug_keys(questions)
+                since = int(request.url.params.get("since_id") or 0)
+                limit = int(request.url.params.get("limit") or 1000)
+                items = [r for r in self.responses.get(form["id"], []) if r["id"] > since]
+                rows = [{"id": str(r["id"]), "recu_le": r.get("at", "2026-10-24T09:00:00.000Z"),
+                         "repondant": r["respondent"], "source": "suite",
+                         **{keys[q["id"]]: _cell(r["answers"].get(q["id"])) for q in questions}}
+                        for r in items[:limit]]  # fmt: skip
+                cols = [("id", "Réponse", "string"), ("recu_le", "Reçue le", "datetime"),
+                        ("repondant", "Répondant", "string"), ("source", "Origine", "string")] + [
+                    (keys[q["id"]], q["label"], "string") for q in questions
+                ]  # fmt: skip
+                out = table(f"form-{form['id']}", form["title"], cols, rows)
+                out["total"], out["truncated"] = len(items), len(rows) < len(items)
+                return 200, out
+            reduced = [
+                {k: q[k] for k in ("id", "type", "label", "options", "min", "max") if k in q}
+                | {"required": bool(q.get("required"))}
+                for q in questions
+            ]
             return 200, {
                 "id": str(form["id"]), "title": form["title"], "description": form["description"],
                 "status": form["status"], "accepting": form["status"] == "open",
                 "response_count": len(self.responses.get(form["id"], [])),
-                "questions": form["questions"],
+                "questions": reduced,
             }  # fmt: skip
         m = re.fullmatch(r"/api/forms/(\d+)/(summary|status|access)", path)
         if m:
@@ -275,33 +346,11 @@ class FakeFormulaire:
                 return 404, {"detail": "Formulaire introuvable.", "code": "NOT_FOUND"}
             if m[2] == "summary":
                 items = self.responses.get(form["id"], [])
-                questions = []
-                for q in form["questions"]:
-                    values = [r["answers"][q["id"]] for r in items if q["id"] in r["answers"]]
-                    base = {
-                        "id": q["id"],
-                        "type": q["type"],
-                        "label": q["label"],
-                        "answered": len(values),
-                    }
-                    if q["type"] == "single":
-                        questions.append(
-                            {
-                                **base,
-                                "kind": "choices",
-                                "counts": [
-                                    {"option": o, "count": values.count(o)} for o in q["options"]
-                                ],
-                            }
-                        )
-                    elif q["type"] == "scale":
-                        questions.append({**base, "kind": "numbers", "min": min(values), "max": max(values),
-                                          "average": sum(values) / len(values),
-                                          "distribution": [{"value": v, "count": values.count(v)} for v in range(1, 6)]})  # fmt: skip
-                    else:
-                        questions.append(
-                            {**base, "kind": "texts", "latest": list(reversed(values))}
-                        )
+                questions = [
+                    _summarize(q, [r["answers"].get(q["id"]) for r in items])
+                    for q in form["questions"]
+                    if q["type"] != "section"
+                ]
                 return 200, {"total": len(items), "questions": questions}
             if m[2] == "status":
                 form["status"] = body["status"]
@@ -313,12 +362,12 @@ class FakeFormulaire:
             ids = set()
             for n, q in enumerate(body.get("questions", []), start=1):
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", str(q.get("id", ""))) or q["id"] in ids:
-                    return 400, {
+                    return 422, {
                         "detail": f"Question {n} : identifiant invalide.",
-                        "code": "VALIDATION",
+                        "code": "INPUT_INVALID",
                     }
                 if q.get("type") not in QUESTION_TYPES:
-                    return 400, {"detail": f"Question {n} : type inconnu.", "code": "VALIDATION"}
+                    return 422, {"detail": f"Question {n} : type inconnu.", "code": "INPUT_INVALID"}
                 ids.add(q["id"])
             fid = max(self.forms) + 1
             self.forms[fid] = {"id": fid, "title": body["title"], "description": body.get("description", ""),
@@ -326,3 +375,40 @@ class FakeFormulaire:
                                "questions": body.get("questions", [])}  # fmt: skip
             return 201, self.form_json(self.forms[fid])
         return 404, {"detail": "Route inconnue.", "code": "NOT_FOUND"}
+
+
+def _cell(value: Any) -> Any:
+    return ", ".join(value) if isinstance(value, list) else value
+
+
+def _summarize(q: dict[str, Any], raw: list[Any]) -> dict[str, Any]:
+    """domain/questions.ts summarize."""
+    values = [v for v in raw if v not in (None, "", [])]
+    base = {"id": q["id"], "type": q["type"], "label": q["label"], "answered": len(values)}
+    if q["type"] in ("single", "multiple", "dropdown", "yes_no"):
+        options = ["Oui", "Non"] if q["type"] == "yes_no" else q.get("options", [])
+        counts = dict.fromkeys(options, 0)
+        for v in values:
+            for item in (
+                v
+                if isinstance(v, list)
+                else [("Oui" if v else "Non") if isinstance(v, bool) else str(v)]
+            ):
+                counts[item] = counts.get(item, 0) + 1
+        return {
+            **base,
+            "kind": "choices",
+            "counts": [{"option": o, "count": c} for o, c in counts.items()],
+        }
+    if q["type"] in ("number", "scale"):
+        nums = [v for v in values if isinstance(v, (int, float))]
+        out = {**base, "kind": "numbers", "min": min(nums) if nums else None,
+               "max": max(nums) if nums else None,
+               "average": round(sum(nums) / len(nums), 2) if nums else None}  # fmt: skip
+        if q["type"] == "scale":
+            out["distribution"] = [
+                {"value": v, "count": nums.count(v)}
+                for v in range(q.get("min", 1), q.get("max", 5) + 1)
+            ]
+        return out
+    return {**base, "kind": "texts", "latest": [str(v) for v in reversed(values)][:5]}

@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_env_factory
-from app.team_rituals import PREFIX, RITUALS
+from app.team_rituals import PREFIX, RITUALS, marker
 from app.tools.environment import ToolEnvironment
 from main import app
 from tests.test_suite_nodes import Suite
@@ -91,3 +93,90 @@ def test_installed_ritual_runs_and_waits_for_approval(team_api: TestClient) -> N
     ).json()
     assert run["status"] == "awaiting_approval"
     assert run["steps"][0]["id"] == "rapport"
+
+
+def test_ritual_is_recognised_by_its_marker_not_its_title(team_api: TestClient) -> None:
+    # Un workflow de l'utilisateur au même titre ne bloque pas l'installation
+    same_title = {**RITUALS[0].workflow, "description": "Mon workflow à moi."}
+    assert team_api.post("/api/workflows", json=same_title).status_code == 201
+    out = team_api.post("/api/equipe/rituels/point-lundi")
+    assert out.status_code == 201, out.text
+    workflow_id = out.json()["workflow_id"]
+    wf = team_api.get(f"/api/workflows/{workflow_id}").json()
+    assert marker("point-lundi") in wf["description"]
+    # Renommé : toujours reconnu, pas réinstallable
+    renamed = {**RITUALS[0].workflow, "title": "Mon point du lundi"}
+    res = team_api.put(f"/api/workflows/{workflow_id}", json=renamed)
+    assert res.status_code == 200, res.text
+    assert team_api.post("/api/equipe/rituels/point-lundi").status_code == 409
+
+
+def test_failed_trigger_rolls_back_and_keeps_the_original_error(
+    team_api: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api import equipe as api_equipe
+
+    async def refuse(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("déclencheur refusé")
+
+    async def broken_delete(*args: object, **kwargs: object) -> None:
+        raise OSError("suppression impossible")
+
+    service: object = None
+
+    real_install = api_equipe._install
+
+    async def spy(found, svc, *rest):  # type: ignore[no-untyped-def]
+        nonlocal service
+        service = svc
+        monkeypatch.setattr(svc.triggers, "create", refuse)
+        monkeypatch.setattr(svc.workflows, "delete", broken_delete)
+        return await real_install(found, svc, *rest)
+
+    monkeypatch.setattr(api_equipe, "_install", spy)
+    with pytest.raises(RuntimeError, match="déclencheur refusé"):
+        team_api.post("/api/equipe/rituels/point-lundi")
+    assert service is not None
+
+
+async def test_concurrent_installs_create_a_single_ritual(team_api: TestClient) -> None:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://nexus") as client:
+        results = await asyncio.gather(
+            *(client.post("/api/equipe/rituels/retours-vendredi") for _ in range(3))
+        )
+    assert sorted(r.status_code for r in results) == [201, 409, 409]
+    rituals = [
+        w for w in team_api.get("/api/workflows").json()
+        if marker("retours-vendredi") in (w.get("description") or "")
+    ]  # fmt: skip
+    assert len(rituals) == 1
+
+
+def test_friday_ritual_skips_the_note_without_open_forms(team_api: TestClient) -> None:
+    (step,) = [s for s in RITUALS[1].workflow["steps"] if s["id"] == "journal"]
+    assert step["when"] == {"left": "{{steps.synthese.data.forms}}", "op": "not_empty"}
+    assert step["input"]["texte"] == "{{steps.synthese.data.markdown}}"
+    (step,) = [s for s in RITUALS[0].workflow["steps"] if s["id"] == "journal"]
+    assert step["input"]["texte"] == "{{steps.rapport.data.markdown}}"
+
+
+def test_failed_trigger_leaves_no_half_installed_ritual(
+    team_api: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api import equipe as api_equipe
+
+    real_install = api_equipe._install
+
+    async def refuse(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("déclencheur refusé")
+
+    async def spy(found, svc, *rest):  # type: ignore[no-untyped-def]
+        monkeypatch.setattr(svc.triggers, "create", refuse)
+        return await real_install(found, svc, *rest)
+
+    monkeypatch.setattr(api_equipe, "_install", spy)
+    with pytest.raises(RuntimeError):
+        team_api.post("/api/equipe/rituels/point-lundi")
+    workflows = team_api.get("/api/workflows").json()
+    assert not [w for w in workflows if marker("point-lundi") in (w.get("description") or "")]
