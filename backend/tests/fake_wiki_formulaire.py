@@ -101,7 +101,7 @@ class FakeWiki:
     """Espaces et pages en mémoire ; Idempotency-Key rejoué comme `runIdempotent`."""
 
     def __init__(self) -> None:
-        self.spaces = [
+        self.spaces: list[dict[str, Any]] = [
             {"id": 1, "name": "Général", "slug": "general", "description": "", "icon": ""}
         ]
         self.pages: dict[int, dict[str, Any]] = {
@@ -126,7 +126,7 @@ class FakeWiki:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         path, method = request.url.path, request.method
-        body = json.loads(request.content) if request.content else None
+        body: Any = json.loads(request.content) if request.content else {}
         key = request.headers.get("idempotency-key")
         print_ = f"{method} {path} {json.dumps(body, sort_keys=True)}"
         if key and key in self.replays:
@@ -297,7 +297,7 @@ class FakeFormulaire:
 
     def route(self, request: httpx.Request) -> tuple[int, Any]:
         path, method = request.url.path, request.method
-        body = json.loads(request.content) if request.content else None
+        body: Any = json.loads(request.content) if request.content else {}
         if path == "/api/atelier/manifest":
             return 200, FORM_MANIFEST
         if path == "/api/atelier/forms":
