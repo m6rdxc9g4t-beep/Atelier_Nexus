@@ -79,6 +79,6 @@ relais = "chaine_equipe:4"
 apps = ["wiki"]
 tags = ["equipe", "chaine-equipe"]
 description = "Étape 4 : compte rendu fidèle aux livrables, sans ajout."
-rubric = "Le compte rendu reprend l'objectif, les priorités, les trois user stories et les tâches #20001 à #20003 avec leurs échéances, et le risque #12345 ; il n'ajoute aucune personne, date ou décision absente des livrables."
+rubric = "Le compte rendu reprend l'objectif, les priorités, les trois user stories et les tâches #20001 à #20003 avec leurs échéances, et le risque #12345 ; il n'ajoute aucune personne, date ou décision absente des livrables (la date du compte rendu lui-même, celle du jour, est permise)."
 [case.expect]
 stop_reason = ["end_turn", "awaiting_approval"]
