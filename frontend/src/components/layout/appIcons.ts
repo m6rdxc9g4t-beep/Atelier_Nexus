@@ -1,8 +1,11 @@
 import {
+  ArrowRightLeft,
   BarChart3,
+  BookOpen,
   CalendarCheck,
   CalendarDays,
   Clapperboard,
+  ClipboardList,
   CookingPot,
   GraduationCap,
   Landmark,
@@ -25,6 +28,9 @@ export const APP_ICONS: Record<string, LucideIcon> = {
   savoir: GraduationCap,
   cuisine: CookingPot,
   dates: CalendarDays,
+  wiki: BookOpen,
+  formulaire: ClipboardList,
+  convert: ArrowRightLeft,
 };
 
 /** Application inconnue : prise générique. */

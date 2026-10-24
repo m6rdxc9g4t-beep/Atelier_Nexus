@@ -5,7 +5,7 @@ import { ONLINE_LABEL, checkHealth, suiteApps } from "./suite";
 afterEach(() => vi.unstubAllEnvs());
 
 describe("sélecteur « Suite Atelier »", () => {
-  it("liste les dix applications, Nexus en tête", () => {
+  it("liste les onze applications, Nexus en tête", () => {
     expect(suiteApps().map((a) => a.id)).toEqual([
       "nexus",
       "viz",
@@ -13,6 +13,7 @@ describe("sélecteur « Suite Atelier »", () => {
       "projets",
       "wiki",
       "formulaire",
+      "convert",
       "tresorerie",
       "cine",
       "savoir",

@@ -10,6 +10,7 @@ export type SuiteAppId =
   | "projets"
   | "wiki"
   | "formulaire"
+  | "convert"
   | "tresorerie"
   | "cine"
   | "savoir"
@@ -55,6 +56,8 @@ export function suiteApps(): SuiteApp[] {
   // Wiki (3200) et Formulaire (3300) servent leur interface sur le port de leur API
   const wiki = clean(process.env.NEXT_PUBLIC_ATELIER_WIKI_URL, "http://127.0.0.1:3200");
   const formulaire = clean(process.env.NEXT_PUBLIC_ATELIER_FORMULAIRE_URL, "http://127.0.0.1:3300");
+  // Convert : interface servie par son API (8010), comme Viz (docs/SUITE.md de Convert, §2)
+  const convert = clean(process.env.NEXT_PUBLIC_ATELIER_CONVERT_URL, "http://127.0.0.1:8010");
   const cine = clean(process.env.NEXT_PUBLIC_ATELIER_CINE_URL, "http://127.0.0.1:4000");
   // Savoir écoute sur 5050 par défaut, comme Trésorerie : lancé sur 5051 (docs/apps/savoir.md)
   const savoir = clean(process.env.NEXT_PUBLIC_ATELIER_SAVOIR_URL, "http://127.0.0.1:5051");
@@ -111,6 +114,14 @@ export function suiteApps(): SuiteApp[] {
       description: "Sondages, inscriptions, retours",
       url: formulaire,
       healthUrl: `${formulaire}/api/health`,
+    },
+    {
+      id: "convert",
+      name: "Atelier Convert",
+      short: "Convert",
+      description: "Relevés, PDF, Excel → tables pour Tab",
+      url: convert,
+      healthUrl: `${convert}/api/health`,
     },
     {
       id: "tresorerie",

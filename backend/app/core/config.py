@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # (docs/apps/wiki.md, docs/apps/formulaire.md)
     wiki_base_url: str | None = "http://127.0.0.1:3200/api"
     formulaire_base_url: str | None = "http://127.0.0.1:3300/api"
+    # Atelier Convert (API 8010) : contrat atelier-node/1 (docs/apps/convert.md). Même variable
+    # que l'extension Agent_DatAnalyst, qui y lit aussi son connecteur
+    convert_base_url: str | None = "http://127.0.0.1:8010/api"
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
     tab_exports_dir: str | None = "~/Atelier_Tab/exports"
     tab_max_snapshot_mb: int = Field(default=50, ge=1, le=2000)
@@ -126,6 +129,7 @@ class Settings(BaseSettings):
         "savoir_base_url",
         "wiki_base_url",
         "formulaire_base_url",
+        "convert_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",

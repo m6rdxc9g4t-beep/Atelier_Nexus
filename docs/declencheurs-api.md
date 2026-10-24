@@ -48,7 +48,7 @@ interface TriggerBase {
 interface ScheduleTrigger extends TriggerBase { kind: "schedule"; schedule: Schedule }
 interface EventTrigger extends TriggerBase {
   kind: "event";
-  app: "viz" | "projets" | "tab";
+  app: "viz" | "projets" | "tab" | "wiki" | "formulaire" | "convert";
   types: string[];                // 1 à 10 types d'événements déclarés par le manifeste de l'app
   filters: EventFilter[];         // 0 à 10
   debounce_seconds: number;       // 0 à 3600, défaut 0 : regroupe une rafale en un seul lancement (le dernier événement gagne)

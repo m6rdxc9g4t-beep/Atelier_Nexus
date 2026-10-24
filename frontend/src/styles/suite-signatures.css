@@ -1,10 +1,11 @@
-/* Signatures d'Atelier Wiki et d'Atelier Formulaire.
+/* Signatures d'Atelier Wiki, d'Atelier Formulaire et d'Atelier Convert.
    Absentes de la copie verbatim de la marque (styles/brand/atelier-brand.css, à ne pas modifier) :
    déclarées ici sur le même modèle, avec les valeurs de wiki-signature.css et
-   formulaire-signature.css de leurs dépôts. À retirer quand la source commune les contiendra. */
+   formulaire-signature.css de leurs dépôts, et de index.css d'Atelier Convert. À retirer quand la source commune les contiendra. */
 :root {
   --atelier-sig-wiki: #4dabf7;
   --atelier-sig-formulaire: #38d9a9;
+  --atelier-sig-convert: #c9951d;
 }
 
 [data-atelier-app="wiki"] {
@@ -14,5 +15,10 @@
 
 [data-atelier-app="formulaire"] {
   --atelier-signature: var(--atelier-sig-formulaire);
+  --atelier-signature-contrast: #0b0b0f;
+}
+
+[data-atelier-app="convert"] {
+  --atelier-signature: var(--atelier-sig-convert);
   --atelier-signature-contrast: #0b0b0f;
 }

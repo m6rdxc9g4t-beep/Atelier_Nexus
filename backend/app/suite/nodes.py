@@ -5,6 +5,8 @@
 - **Tab** : fichier `{tab_exports_dir}/_atelier/manifest.json` (repli : outil MCP
   `atelier_manifest` si `TAB_MCP_COMMAND` est défini) ; actions par le serveur MCP ;
   événements dans `_atelier/events.jsonl` (repli : outil MCP `atelier_events`).
+- **Wiki**, **Formulaire**, **Convert** : `{<app>_base_url}/atelier/manifest` (HTTP), événements
+  `/api/atelier/events` (docs/apps/wiki.md, formulaire.md, convert.md).
 
 Manifestes gardés 60 s en mémoire (10 s pour une application qui ne répond pas). Statut :
 `ok`, `unreachable`, `no_contract` (route ou fichier absent : version de l'app antérieure
@@ -90,6 +92,7 @@ def _key(app: str, env: ToolEnvironment) -> tuple[str, str]:
         "tab": f"{s.tab_exports_dir or ''}|{s.tab_mcp_command or ''}",
         "wiki": s.wiki_base_url or "",
         "formulaire": s.formulaire_base_url or "",
+        "convert": s.convert_base_url or "",
     }.get(app, "")
     return app, signature
 
@@ -219,6 +222,7 @@ class SuiteNodes:
             "projets": s.projets_base_url,
             "wiki": s.wiki_base_url,
             "formulaire": s.formulaire_base_url,
+            "convert": s.convert_base_url,
         }.get(app)
 
     def http(self, app: str) -> NodeHttpClient:

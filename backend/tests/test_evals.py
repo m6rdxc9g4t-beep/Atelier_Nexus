@@ -204,6 +204,15 @@ def test_simulated_settings_only_enable_simulated_apps() -> None:
     assert not (settings.cine_base_url or settings.savoir_base_url or settings.github_repo_list)
     # Wiki et Formulaire : adresses de bouclage, mais transports simulés (rien d'appelé)
     assert settings.wiki_base_url == "http://127.0.0.1:3200/api"
+    assert settings.convert_base_url is None  # non simulé : jamais joint pendant une évaluation
+    # … et même un connecteur qui lit sa propre adresse (extension) tombe sur un refus simulé
+    from evals.simulation import simulated_environment
+
+    env = simulated_environment()
+    transport = env.transport("convert")
+    assert transport is not None
+    response = httpx.Client(transport=transport).get("http://127.0.0.1:8010/api/conversions")
+    assert response.status_code == 503 and "pas simulé" in response.text
 
 
 async def test_simulated_team_memory_and_forms() -> None:

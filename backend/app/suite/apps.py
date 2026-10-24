@@ -16,6 +16,7 @@ APP_COLORS: dict[str, str] = {
     "dates": "#E03131",
     "wiki": "#4DABF7",
     "formulaire": "#38D9A9",
+    "convert": "#C9951D",
 }
 
 APP_NAMES: dict[str, str] = {
@@ -30,11 +31,12 @@ APP_NAMES: dict[str, str] = {
     "dates": "Atelier Dates",
     "wiki": "Atelier Wiki",
     "formulaire": "Atelier Formulaire",
+    "convert": "Atelier Convert",
     "github": "GitHub",
 }
 
 #: Applications qui implémentent le contrat `atelier-node/1`
-NODE_APPS = ("viz", "tab", "projets", "wiki", "formulaire")
+NODE_APPS = ("viz", "tab", "projets", "wiki", "formulaire", "convert")
 
 
 def app_color(app: str | None) -> str:

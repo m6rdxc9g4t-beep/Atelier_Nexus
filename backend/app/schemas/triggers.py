@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 WEEKDAYS: tuple[Weekday, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 FilterOp = Literal["eq", "ne", "in", "contains", "gt", "gte", "lt", "lte", "exists"]
-TriggerApp = Literal["viz", "projets", "tab", "wiki", "formulaire"]
+TriggerApp = Literal["viz", "projets", "tab", "wiki", "formulaire", "convert"]
 RunOrigin = Literal["manual", "schedule", "event", "test"]
 
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")

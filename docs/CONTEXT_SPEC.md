@@ -63,6 +63,7 @@ Hub web permettant d'utiliser des agents IA spécialisés (Data Analyst / Power 
 | 23, 24 | Mode pas à pas et chaînes d'agents : PR #27 et #28, en attente de fusion | — |
 | 25 | Agent Data unique : boîte `analyse` (chargement Viz / Tab / fichier aux formats français, profil, distributions, asymétrie, normalité, corrélations, tests de groupes, khi², atypiques, nettoyage d'une copie, agrégations), graphiques `chart` dans le panneau Artefacts, `extend_agent` pour les extensions ; agents Ciné-club, Cuisine et Tuteur retirés (connecteurs conservés) → [`analyse.md`](analyse.md) | ✅ |
 | 26 | L'équipe Atelier : connecteurs Atelier Wiki (3200) et Formulaire (3300) en nœuds `atelier-node/1`, mémoire d'équipe dans le Wiki (journal, décisions, comptes rendus), rapports sans modèle (point d'avancement Projets, synthèse agrégée des formulaires), agents Direction et Enquêtes (100 % local, seul à lire les réponses), rituels installables (workflow + déclencheur, chaque étape à valider) → [`equipe.md`](equipe.md), [`apps/wiki.md`](apps/wiki.md), [`apps/formulaire.md`](apps/formulaire.md) | ✅ |
+| 28 | Atelier Convert dans les workflows : nœud `atelier-node/1` (conversions, table d'une conversion, projets de Tab, envoi dans Tab, conversion d'un fichier, suppression), événements pour les déclencheurs, carte et sélecteur de la suite, `CONVERT_BASE_URL` partagé avec l'extension → [`apps/convert.md`](apps/convert.md) | ✅ |
 
 ## 5. À COMPLÉTER
 - Authentification (utilisateurs, SSO éventuel).
