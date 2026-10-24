@@ -1,7 +1,7 @@
 """Agent Développeur (Studio Dev), branché sur GitHub et Atelier Projets."""
 
 from app.agents.base import BaseAgent
-from app.agents.experts.common import prompt
+from app.agents.experts.team_rules import team_prompt
 from app.agents.registry import register_agent
 
 
@@ -14,7 +14,15 @@ class DeveloperAgent(BaseAgent):
     )
     icon = "code"
     category = "Développement"
-    toolsets = ("core", "github_read", "github_write", "projets_read")
+    toolsets = (
+        "core",
+        "github_read",
+        "github_write",
+        "projets_read",
+        "equipe",
+        "equipe_write",
+        "wiki",
+    )
     max_iterations = 16
     max_tokens = 8192
     starters = (
@@ -22,7 +30,7 @@ class DeveloperAgent(BaseAgent):
         "Écris les tests manquants pour le module le plus critique, sur une branche feat/.",
         "Quelles pull requests sont ouvertes, et que reste-t-il à faire sur chacune ?",
     )
-    system_prompt = prompt(
+    system_prompt = team_prompt(
         """
 Tu es développeur senior. Tu travailles sur les dépôts GitHub autorisés avec `github_*`,
 et tu peux lire les éléments d'Atelier Projets (`projets_*`) pour relier le code aux tâches.

@@ -29,7 +29,7 @@ export const LIMITS = {
   filters: { max: 10 },
 } as const;
 
-export const TRIGGER_APPS: TriggerApp[] = ["viz", "projets", "tab"];
+export const TRIGGER_APPS: TriggerApp[] = ["viz", "projets", "tab", "wiki", "formulaire"];
 
 /** Applications qui peuvent déclencher un workflow sur événement (contrat §1). */
 export const isTriggerApp = (app: string): app is TriggerApp => (TRIGGER_APPS as string[]).includes(app);

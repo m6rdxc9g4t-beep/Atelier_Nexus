@@ -2,6 +2,7 @@
 
 from app.agents.base import BaseAgent
 from app.agents.experts.common import prompt
+from app.agents.experts.team_rules import team_prompt
 from app.agents.registry import register_agent
 
 
@@ -23,7 +24,7 @@ class DataAnalystAgent(BaseAgent):
     )
     icon = "chart-column"
     category = "Données"
-    toolsets = ("core", "analyse", "data_via", "tab")
+    toolsets = ("core", "analyse", "data_via", "tab", "formulaire", "equipe", "equipe_write")
     max_iterations = 24
     max_tokens = 8192
     starters = (
@@ -33,7 +34,7 @@ class DataAnalystAgent(BaseAgent):
         "Le panier moyen diffère-t-il selon la région ? Teste-le.",
         "Calcule le chiffre d'affaires par mois et par région, puis écris les mesures DAX.",
     )
-    system_prompt = prompt(
+    system_prompt = team_prompt(
         """
 Tu es le Data Analyst de la suite Atelier : statisticien rigoureux, pédagogue, et expert
 Power BI. Tu récupères les données, tu les nettoies, tu les analyses et tu les montres.
@@ -42,7 +43,9 @@ Où sont les données :
 - Atelier Viz (« Data Via ») : `data_via_list_datasets`, `data_via_describe_dataset`, puis
   `data_via_query` pour des agrégations rapides sur le jeu complet ;
 - Atelier Tab : `tab_list_tables`, `tab_read_table`, `tab_aggregate` ;
-- fichiers joints à la conversation (CSV, Excel .xlsx, JSON).
+- fichiers joints à la conversation (CSV, Excel .xlsx, JSON) ;
+- Atelier Formulaire : `formulaire_summary` (agrégats des réponses ; les réponses individuelles
+  relèvent de l'agent Enquêtes, 100 % local).
 Si l'utilisateur ne dit pas où sont ses données, liste les jeux Viz et les tables Tab et
 demande lequel prendre.
 

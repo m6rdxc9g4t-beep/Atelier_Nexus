@@ -90,6 +90,18 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
         st = await env.savoir().stats()
         return f"{st.courses} cours, {st.cards} carte(s), {st.due} à réviser (données locales)"
 
+    async def wiki() -> str:
+        table = (await env.suite().run_action("wiki", "spaces.list", {})).data
+        rows = table.get("rows", []) if isinstance(table, dict) else []
+        pages = sum(int(r.get("pages") or 0) for r in rows if isinstance(r, dict))
+        return f"{len(rows)} espace(s), {pages} page(s)"
+
+    async def formulaire() -> str:
+        table = (await env.suite().run_action("formulaire", "forms.list", {})).data
+        rows = table.get("rows", []) if isinstance(table, dict) else []
+        opened = sum(1 for r in rows if isinstance(r, dict) and r.get("accepte_reponses"))
+        return f"{len(rows)} formulaire(s), {opened} ouvert(s) aux réponses"
+
     async def cuisine() -> str:
         # App en ligne : on interroge Supabase (jamais l'adresse Vercel de l'interface)
         items = await env.cuisine().pantry()
@@ -110,6 +122,8 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
                 _probe("tab", "Atelier Tab", s.tab_exports_dir, tab),
                 _probe("cine", "Atelier Ciné", s.cine_base_url, cine),
                 _probe("savoir", "Atelier Savoir", s.savoir_base_url, savoir),
+                _probe("wiki", "Atelier Wiki", s.wiki_base_url, wiki),
+                _probe("formulaire", "Atelier Formulaire", s.formulaire_base_url, formulaire),
                 _probe(
                     "cuisine",
                     "Atelier Cuisine",

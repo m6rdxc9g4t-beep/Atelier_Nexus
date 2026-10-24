@@ -21,6 +21,12 @@ from app.tools.cine import cine_read_tools, cine_write_tools
 from app.tools.cuisine import cuisine_budget_tools, cuisine_tools
 from app.tools.data_via import DataViaNotConfiguredError, data_via_tools
 from app.tools.environment import ToolEnvironment
+from app.tools.equipe import equipe_memory_tools, equipe_report_tools, equipe_write_tools
+from app.tools.formulaire import (
+    formulaire_read_tools,
+    formulaire_responses_tools,
+    formulaire_write_tools,
+)
 from app.tools.github import github_read_tools, github_write_tools
 from app.tools.http import AppNotConfiguredError
 from app.tools.projets import projets_read_tools, projets_write_tools
@@ -30,6 +36,7 @@ from app.tools.tab import tab_tools
 from app.tools.tab_mcp import tab_write_tools
 from app.tools.tab_projets import tab_projets_tools
 from app.tools.tresorerie import tresorerie_tools
+from app.tools.wiki import wiki_read_tools, wiki_write_tools
 
 
 @dataclass(frozen=True)
@@ -46,6 +53,10 @@ class Toolset:
     writes: bool = False
     #: Boîte réservée au code (ex. délégation) : non proposée dans l'éditeur d'agents
     internal: bool = False
+    #: Écrit dans un espace PARTAGÉ que lisent les agents sur Claude (Wiki, mémoire d'équipe) :
+    #: retirée de tout agent verrouillé sur le modèle local, pour que ses données (finances,
+    #: réponses individuelles) ne puissent pas y être recopiées (`build_tools(local=True)`)
+    shared: bool = False
     tags: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -94,19 +105,28 @@ class UnavailableToolset(BaseModel):
     reason: str
 
 
+SHARED_REFUSED = "refusée à un agent 100 % local (espace lu par les agents sur Claude)"
+
+
 def build_tools(
-    ids: list[str], env: ToolEnvironment
+    ids: list[str], env: ToolEnvironment, *, local: bool = False
 ) -> tuple[list[BaseTool[Any]], list[UnavailableToolset]]:
     """Outils des boîtes demandées, dans l'ordre, sans doublon de nom.
 
     Une boîte non configurée (adresse ou jeton absent) est écartée et signalée :
-    l'agent reste utilisable avec ses autres outils.
+    l'agent reste utilisable avec ses autres outils. `local` (agent verrouillé sur le modèle
+    local) : les boîtes `shared` sont écartées de la même façon.
     """
     tools: list[BaseTool[Any]] = []
     unavailable: list[UnavailableToolset] = []
     seen: set[str] = set()
     for toolset_id in ids:
         toolset = get_toolset(toolset_id)
+        if local and toolset.shared:
+            unavailable.append(
+                UnavailableToolset(id=toolset.id, label=toolset.label, reason=SHARED_REFUSED)
+            )
+            continue
         if not toolset.is_configured(env.settings):
             unavailable.append(
                 UnavailableToolset(id=toolset.id, label=toolset.label, reason="non configurée")
@@ -323,6 +343,92 @@ register_toolset(
 )
 register_toolset(
     Toolset(
+        id="wiki",
+        label="Atelier Wiki — lecture",
+        description="Espaces, recherche plein texte, liste et contenu des pages (procédures, décisions, comptes rendus).",
+        build=lambda env: wiki_read_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+    )
+)
+register_toolset(
+    Toolset(
+        id="wiki_write",
+        label="Atelier Wiki — rédaction",
+        description="Créer une page ou un espace, compléter une page, réécrire une page (avec validation ; historique gardé).",
+        build=lambda env: wiki_write_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+        writes=True,
+        shared=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe",
+        label="Mémoire d'équipe — lecture",
+        description="Journal, décisions et comptes rendus de l'équipe (espace « Équipe Atelier » d'Atelier Wiki).",
+        build=lambda env: equipe_memory_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe_write",
+        label="Mémoire d'équipe — écriture",
+        description="Noter au journal, enregistrer une décision, ranger un compte rendu (avec validation).",
+        build=lambda env: equipe_write_tools(env),
+        is_configured=lambda s: bool(s.wiki_base_url),
+        app="wiki",
+        writes=True,
+        shared=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="equipe_rapports",
+        label="Rapports de l'équipe",
+        description="Point d'avancement calculé depuis Projets, synthèse agrégée des formulaires ouverts (sans modèle).",
+        build=lambda env: equipe_report_tools(env),
+        is_configured=lambda s: bool(s.projets_base_url or s.formulaire_base_url),
+        app="projets",
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire",
+        label="Atelier Formulaire — formulaires",
+        description="Formulaires, questions et synthèse agrégée des réponses (sans réponse individuelle).",
+        build=lambda env: formulaire_read_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire_write",
+        label="Atelier Formulaire — création",
+        description="Créer un formulaire, l'ouvrir ou le fermer, choisir qui peut répondre (avec validation).",
+        build=lambda env: formulaire_write_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+        writes=True,
+    )
+)
+register_toolset(
+    Toolset(
+        id="formulaire_reponses",
+        label="Atelier Formulaire — réponses individuelles",
+        description="Réponses une par une (répondants, textes libres). Données personnelles : modèle local imposé.",
+        build=lambda env: formulaire_responses_tools(env),
+        is_configured=lambda s: bool(s.formulaire_base_url),
+        app="formulaire",
+        sensitive=True,
+    )
+)
+register_toolset(
+    Toolset(
         id="github_read",
         label="GitHub — lecture",
         description="Dépôts autorisés : fichiers, recherche de code, pull requests, tickets.",
@@ -357,6 +463,8 @@ def _blank_settings() -> Settings:
         tresorerie_base_url="http://application.invalid/api",
         cine_base_url="http://application.invalid/api",
         savoir_base_url="http://application.invalid/api",
+        wiki_base_url="http://application.invalid/api",
+        formulaire_base_url="http://application.invalid/api",
         tab_exports_dir="/dev/null",
         tab_mcp_command="atelier-mcp",
         github_repo="atelier/exemple",

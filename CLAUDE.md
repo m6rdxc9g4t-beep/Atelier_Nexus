@@ -48,10 +48,11 @@ Lorsque tu agis ou développes pour l'agent Data Analyst lié à **Data Via** :
 * **SDK Anthropic ≥ 1.x :** pas de paramètre `temperature` sur `messages.create`.
 * **Ollama :** les appels d'outils arrivent sans identifiant (le hub génère `call_…`) ; garder des schémas d'entrée simples pour les petits modèles.
 * **Proxy :** un client HTTP vers une app locale ne passe jamais par le proxy (`trust_env=use_env_proxy(url)`, `app/core/net.py`) ; sous macOS et Windows httpx applique sinon le proxy du système à `127.0.0.1`.
-* **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
+* **Ports :** Savoir écoute sur 5051 (5050 = Trésorerie), Wiki sur 3200, Formulaire sur 3300 (3000 = Projets, 3100 = Nexus) ; Projets et Trésorerie n'écoutent que sur `127.0.0.1`, un backend Nexus en Docker ne les joint pas.
 * **CI :** elle ne tourne pas sur `main` ; une PR n'est fusionnée que verte.
 * **Workflows v2 / nœuds :** une étape d'écriture (`write`, `destructive`, `requires_approval`) n'est jamais exécutée sans validation de son entrée **résolue** ; jamais de journalisation des `data` des étapes ; appels aux nœuds par `app/suite/` seulement (bouclage, sans redirection).
 * **Analyse :** toute statistique passe par la boîte `analyse` (`app/analysis/`, Python pur, vérifié contre SciPy) ; un état qui doit survivre à une validation `every_step` ne va pas dans `ToolContext.state` (perdu entre requêtes) mais dans un magasin par `conversation_id` (`app/analysis/store.py`).
+* **Données locales :** une boîte qui écrit dans un espace lu par les agents sur Claude (Wiki, mémoire d'équipe) porte `shared=True` ; `build_tools(local=True)` la retire de tout agent verrouillé local. Texte venu d'une app → `as_data` (délimité, balises neutralisées), jamais brut au modèle.
 * **Sortie structurée :** `ToolOutput.data` sert aux workflows et n'est jamais envoyé au modèle ; ajouter `data` à un outil ne change pas son `content`.
 * **SQLite (tests, bureau) :** `ON DELETE CASCADE` n'est pas appliqué sans PRAGMA et les dates relues sont naïves : supprimer les lignes liées explicitement dans le dépôt, considérer une date naïve comme UTC.
 * **Validation :** en `APPROVAL_MODE=every_step` (défaut, choix de l'utilisateur) toute action d'agent ou de workflow attend une validation humaine ; ne jamais ajouter d'autorisation permanente ni de bouton tout autoriser.

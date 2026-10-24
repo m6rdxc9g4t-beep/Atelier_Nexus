@@ -22,7 +22,7 @@ sous les gardes existantes (`local-only`, §5.1). Aucune action du manifeste ne 
 ```json
 {
   "contract": "atelier-node/1",
-  "app": "viz | projets | tab",
+  "app": "viz | projets | tab | wiki | formulaire",
   "name": "Atelier Viz",
   "version": "1.8.0",
   "transport": "http | mcp",
@@ -123,6 +123,8 @@ Format unique des tables qui passent d'une étape à l'autre (même forme que le
 | Projets | `projets.import.completed` | `project` | `source`, `created`, `updated`, `skipped` |
 | Tab | `tab.table.changed` | `table` | `revision`, `rows`, `project` |
 | Tab | `tab.table.deleted` | `table` | — |
+| Wiki | `wiki.space.created`, `wiki.page.created`, `.updated`, `.moved`, `.deleted`, `.restored` | `space` / `page` | voir le manifeste d'Atelier Wiki |
+| Formulaire | `formulaire.form.created`, `.updated`, `.opened`, `.closed`, `.deleted` ; `formulaire.response.submitted`, `.deleted` | `form` / `response` | voir le manifeste d'Atelier Formulaire |
 
 Un changement de statut émet `status_changed` **et** `updated`. Un import émet un seul `import.completed` (pas un événement par ligne).
 

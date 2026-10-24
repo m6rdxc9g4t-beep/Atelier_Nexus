@@ -88,6 +88,8 @@ def _key(app: str, env: ToolEnvironment) -> tuple[str, str]:
         "viz": s.data_via_base_url or "",
         "projets": s.projets_base_url or "",
         "tab": f"{s.tab_exports_dir or ''}|{s.tab_mcp_command or ''}",
+        "wiki": s.wiki_base_url or "",
+        "formulaire": s.formulaire_base_url or "",
     }.get(app, "")
     return app, signature
 
@@ -212,7 +214,12 @@ class SuiteNodes:
 
     def base_url(self, app: str) -> str | None:
         s = self.env.settings
-        return {"viz": s.data_via_base_url, "projets": s.projets_base_url}.get(app)
+        return {
+            "viz": s.data_via_base_url,
+            "projets": s.projets_base_url,
+            "wiki": s.wiki_base_url,
+            "formulaire": s.formulaire_base_url,
+        }.get(app)
 
     def http(self, app: str) -> NodeHttpClient:
         if app not in self._http:

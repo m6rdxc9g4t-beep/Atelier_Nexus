@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # sur 5050 comme Trésorerie : on le lance avec ATELIER_PORT=5051 (docs/apps/savoir.md).
     cine_base_url: str | None = "http://127.0.0.1:4000/api"
     savoir_base_url: str | None = "http://127.0.0.1:5051/api"
+    # Atelier Wiki (API 3200) et Atelier Formulaire (3300) : contrat atelier-node/1
+    # (docs/apps/wiki.md, docs/apps/formulaire.md)
+    wiki_base_url: str | None = "http://127.0.0.1:3200/api"
+    formulaire_base_url: str | None = "http://127.0.0.1:3300/api"
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
     tab_exports_dir: str | None = "~/Atelier_Tab/exports"
     tab_max_snapshot_mb: int = Field(default=50, ge=1, le=2000)
@@ -120,6 +124,8 @@ class Settings(BaseSettings):
         "tresorerie_base_url",
         "cine_base_url",
         "savoir_base_url",
+        "wiki_base_url",
+        "formulaire_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",

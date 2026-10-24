@@ -5,6 +5,10 @@
   ne les a pas inventés.
 - **Atelier Projets** et **Atelier Trésorerie** : les réponses réelles enregistrées dans
   `tests/fixtures/` (démo « App E-Commerce v2 », six mois fictifs de Trésorerie).
+- **Atelier Wiki** et **Atelier Formulaire** : les doubles fidèles des tests
+  (`tests/fake_wiki_formulaire.py`, contrats `atelier-node/1` recopiés des dépôts), avec une
+  mémoire d'équipe de démonstration sur le projet App E-Commerce v2 et un formulaire de
+  satisfaction à cinq réponses fictives.
 
 Les écritures ne sont jamais exécutées pendant une évaluation (aucune validation n'est donnée) ;
 la simulation de Projets accepte tout de même une création, pour les tests.
@@ -27,11 +31,16 @@ import httpx
 
 from app.core.config import Settings
 from app.tools.environment import ToolEnvironment
+from tests.fake_wiki_formulaire import FakeFormulaire, FakeWiki
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
 #: Applications disponibles en mode simulé (identifiants des cas d'évaluation)
-SIMULATED_APPS = ("data_via", "projets", "tresorerie")
+SIMULATED_APPS = ("data_via", "projets", "tresorerie", "wiki", "formulaire")
+#: Adresses de bouclage : les nœuds `atelier-node/1` refusent toute autre adresse ; le transport
+#: simulé est injecté, rien n'est appelé sur la machine
+WIKI_URL = "http://127.0.0.1:3200/api"
+FORMULAIRE_URL = "http://127.0.0.1:3300/api"
 
 # ─── Data Via ─────────────────────────────────────────────────────
 
@@ -406,6 +415,8 @@ def simulated_settings() -> Settings:
         data_via_base_url="http://viz.simule/api",
         projets_base_url="http://projets.simule/api",
         tresorerie_base_url="http://tresorerie.simule/api",
+        wiki_base_url=WIKI_URL,
+        formulaire_base_url=FORMULAIRE_URL,
         cine_base_url=None,
         savoir_base_url=None,
         tab_exports_dir=None,
@@ -423,5 +434,34 @@ def simulated_environment() -> ToolEnvironment:
             "data_via": httpx.MockTransport(SimulatedDataVia()),
             "projets": httpx.MockTransport(SimulatedProjets()),
             "tresorerie": httpx.MockTransport(SimulatedTresorerie()),
+            "wiki": httpx.MockTransport(simulated_wiki()),
+            "formulaire": httpx.MockTransport(FakeFormulaire()),
         },
     )
+
+
+DEMO_JOURNAL = """Notes datées de l'équipe d'agents et de l'utilisateur, la plus récente en bas.
+
+## 2026-10-20 09:05 · Chef de projet — Point du lundi
+
+App E-Commerce v2 : lot « Authentification GitHub » terminé. Reste la synchronisation Git
+(#12345, en retard) et les tokens CSS (#205, bloqué en attente de la charte).
+
+## 2026-10-22 17:40 · Product Owner — Recette
+
+Critères d'acceptation de la synchronisation Git rédigés (page « Spécification synchro Git »).
+Pour le Développeur : reprendre #12345 en priorité.
+"""
+
+
+def simulated_wiki() -> FakeWiki:
+    """Wiki de démonstration : l'espace « Équipe Atelier » existe déjà, avec deux notes."""
+    wiki = FakeWiki()
+    wiki.spaces.append(
+        {"id": 2, "name": "Équipe Atelier", "slug": "equipe-atelier", "description": "", "icon": ""}
+    )
+    wiki.pages[2] = {
+        "id": 2, "title": "Journal de l'équipe", "content": DEMO_JOURNAL,
+        "space_id": 2, "parent_id": None, "version": 3,
+    }  # fmt: skip
+    return wiki

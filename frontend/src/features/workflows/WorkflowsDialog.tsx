@@ -35,6 +35,7 @@ import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { AgentInfo, AnyWorkflow, StepResult, Workflow, WorkflowRunResult } from "@/types/api";
 
 import { allDecided, initialValues, missingParams } from "./form";
+import { TeamRituals } from "./TeamRituals";
 import { WorkflowEditor } from "./WorkflowEditor";
 
 type ListState =
@@ -91,6 +92,7 @@ export function WorkflowListDialog({ agents }: { agents: AgentInfo[] }) {
               Carte de la suite
             </Button>
           </div>
+          {open && !agentName && <TeamRituals version={version + reload} />}
           {open && (
             <WorkflowList
               agentName={agentName}

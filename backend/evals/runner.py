@@ -128,6 +128,8 @@ def configured_apps(settings: Settings) -> set[str]:
         "savoir": bool(settings.savoir_base_url),
         "cuisine": settings.cuisine_configured,
         "github": bool(settings.github_repo_list),
+        "wiki": bool(settings.wiki_base_url),
+        "formulaire": bool(settings.formulaire_base_url),
     }
     return {app for app, ok in apps.items() if ok}
 

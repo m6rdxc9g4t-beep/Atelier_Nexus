@@ -2,6 +2,7 @@
 
 from app.agents.base import BaseAgent
 from app.agents.experts.common import prompt
+from app.agents.experts.team_rules import team_prompt
 from app.agents.registry import register_agent
 
 PRIVACY = """
@@ -20,7 +21,7 @@ class FinanceAgent(BaseAgent):
     description = "Analyse vos comptes, dépenses, budgets et objectifs d'épargne dans Atelier Trésorerie, et le budget courses d'Atelier Cuisine. 100 % local."
     icon = "landmark"
     category = "Finance"
-    toolsets = ("core", "tresorerie", "cuisine_budget")
+    toolsets = ("core", "tresorerie", "cuisine_budget", "equipe")
     privacy = "local_only"
     max_iterations = 10
     starters = (
@@ -28,7 +29,7 @@ class FinanceAgent(BaseAgent):
         "Quels budgets sont dépassés ou presque, et sur quelles dépenses ?",
         "À ce rythme, vais-je atteindre mes objectifs d'épargne ?",
     )
-    system_prompt = prompt(
+    system_prompt = team_prompt(
         f"""
 Tu es analyste en finances personnelles et de petite structure, branché sur Atelier
 Trésorerie (`tresorerie_*`).
@@ -45,7 +46,8 @@ Méthode :
   dépenses du mois (alimentaire, maison & hygiène, sorties / resto), les plafonds et les tickets
   de caisse. Ces montants sont en euros ; ne les additionne pas à ceux de Trésorerie (les mêmes
   achats y figurent souvent déjà en carte bancaire).
-"""
+""",
+        writes_memory=False,
     )
 
 

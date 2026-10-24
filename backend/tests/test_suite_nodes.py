@@ -125,7 +125,13 @@ async def test_states_of_the_three_nodes(suite: Suite) -> None:
         states = {s.app: s for s in await env.suite().states()}
     finally:
         await env.aclose()
-    assert {a: s.status for a, s in states.items()} == {"viz": "ok", "tab": "ok", "projets": "ok"}
+    assert {a: s.status for a, s in states.items()} == {
+        "viz": "ok",
+        "tab": "ok",
+        "projets": "ok",
+        "wiki": "not_configured",
+        "formulaire": "not_configured",
+    }
     assert states["tab"].transport == "mcp" and states["viz"].transport == "http"
     assert states["viz"].ignored  # action mal formée signalée
     # Lu une seule fois grâce au cache (60 s)

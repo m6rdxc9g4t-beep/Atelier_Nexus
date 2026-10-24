@@ -205,7 +205,12 @@ class BaseAgent(ABC):
         """Outils issus des boîtes déclarées (`toolsets`). Sans environnement : aucun outil."""
         if self.env is None:
             return []
-        tools, self.unavailable = build_tools(list(self.toolsets), self.env)
+        ids = list(self.toolsets)
+        locked = self.privacy == "local_only" or is_sensitive(ids)
+        tools, self.unavailable = build_tools(ids, self.env, local=locked)
+        if not locked and any(t.sensitive for t in tools):
+            # Un outil sensible dans une boîte qui ne l'est pas verrouille aussi l'agent
+            tools, self.unavailable = build_tools(ids, self.env, local=True)
         return tools
 
     def build_system_prompt(self, ctx: ToolContext) -> str:
