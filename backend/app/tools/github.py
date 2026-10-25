@@ -881,8 +881,10 @@ class TextEdit(BaseModel):
 
 class EditFileInput(ToolInput):
     repo: str | None = REPO_FIELD
-    branch: str
-    path: str = Field(min_length=1)
+    branch: str = Field(
+        description="Branche de travail (feat/… ou fix/…), jamais la branche par défaut."
+    )
+    path: str = Field(min_length=1, description="Chemin du fichier dans le dépôt.")
     message: str = Field(
         min_length=3, max_length=300, description="Conventional Commits : fix(scope): … #ID"
     )

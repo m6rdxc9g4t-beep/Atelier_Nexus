@@ -690,8 +690,8 @@ class CreateStoryInput(ToolInput):
         max_length=20_000,
         description="Markdown : objectif, périmètre, hors périmètre.",
     )
-    start_date: date | None = None
-    due_date: date | None = None
+    start_date: date | None = Field(default=None, description="Début prévu, AAAA-MM-JJ.")
+    due_date: date | None = Field(default=None, description="Échéance, AAAA-MM-JJ.")
 
 
 class CreateStoryTool(_ProjetsTool[CreateStoryInput]):
@@ -747,7 +747,9 @@ class CreateWorkItemInput(ToolInput):
         default=None, description="Markdown : objectif + critères d'acceptation."
     )
     priority: Priority | None = None
-    estimated_hours: float | None = Field(default=None, gt=0, le=10_000)
+    estimated_hours: float | None = Field(
+        default=None, gt=0, le=10_000, description="Nouvelle estimation, en heures."
+    )
     due_date: date | None = None
 
 
@@ -786,7 +788,9 @@ class CreateWorkItemTool(_ProjetsTool[CreateWorkItemInput]):
 
 class UpdateWorkItemInput(ToolInput):
     work_item_id: int
-    title: str | None = Field(default=None, min_length=1, max_length=200, pattern=TITLE)
+    title: str | None = Field(
+        default=None, min_length=1, max_length=200, pattern=TITLE, description="Nouveau titre."
+    )
     description: str | None = Field(
         default=None,
         max_length=20_000,

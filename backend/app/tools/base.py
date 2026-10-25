@@ -104,6 +104,9 @@ class BaseTool[InputT: ToolInput](ABC):
     output_format: ClassVar[Literal["atelier-table/1", "json", "text"]] = "text"
     # Colonnes (`{key, label, type}`) ou champs attendus, quand ils sont connus d'avance
     output_hint: ClassVar[dict[str, Any] | None] = None
+    # L'outil lit le contexte reconstruit d'après l'historique (`restore`) : la relecture n'a
+    # lieu que juste avant un tel outil, jamais avant un outil sans rapport
+    uses_restored_state: ClassVar[bool] = False
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:

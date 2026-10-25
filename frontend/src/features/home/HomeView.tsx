@@ -7,6 +7,7 @@ import { AppChip } from "@/components/layout/AppChip";
 import { appDot } from "@/components/layout/AppsMenu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatusDot } from "@/components/ui/status-dot";
 import { AgentTile } from "@/features/chat-agent/AgentTile";
@@ -351,12 +352,12 @@ function QuickAsk({ agent, onAsked }: { agent: AgentInfo; onAsked: () => void })
       <label htmlFor="home-ask" className="sr-only">
         Question pour {agent.display_name}
       </label>
-      <input
+      <Input
         id="home-ask"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={`Demander à ${agent.display_name}… (il vous oriente vers le bon agent)`}
-        className="h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
+        className="h-10 flex-1 border-0 bg-transparent px-0 text-[15px] shadow-none focus-visible:shadow-none"
         autoComplete="off"
       />
       <Button type="submit" size="icon" className="rounded-full" disabled={!text.trim() || streaming} aria-label="Envoyer">

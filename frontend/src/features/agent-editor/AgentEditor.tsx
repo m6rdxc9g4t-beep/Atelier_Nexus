@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogBody,
@@ -301,14 +302,13 @@ export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEdito
                             : "border-atelier-line bg-card hover:border-atelier-border",
                         )}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           id={index === 0 ? field("toolsets") : undefined}
                           checked={checked}
                           aria-invalid={errors.toolsets ? true : undefined}
                           aria-describedby={errors.toolsets ? field("toolsets-note") : undefined}
-                          onChange={() => toggleToolset(t.id)}
-                          className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                          onCheckedChange={() => toggleToolset(t.id)}
+                          className="mt-0.5"
                         />
                         <span className="min-w-0">
                           <span className="flex flex-wrap items-center gap-1.5 font-medium">

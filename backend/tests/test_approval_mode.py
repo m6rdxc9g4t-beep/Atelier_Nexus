@@ -359,6 +359,27 @@ async def test_restore_hook_runs_only_before_an_executed_tool() -> None:
     assert len(viz.requests) == 1  # le describe autorisé, et rien d'autre
 
 
+async def test_unrelated_tool_does_not_replay_the_history() -> None:
+    """Un outil qui ne lit pas le contexte reconstruit (ici la liste des jeux) s'exécute seul :
+    aucune relecture d'un schéma décrit plus tôt, qui partirait sans carte."""
+    viz = FakeDataVia()
+    provider = ScriptedProvider(
+        "anthropic",
+        [
+            tool_response("data_via_describe_dataset", {"dataset_id": DATASET_ID}, call_id="d1"),
+            tool_response("data_via_list_datasets", {}, call_id="l1"),
+            text_response("Voici les jeux."),
+        ],
+    )
+    router = make_router(provider)
+    history = [Message.user("Quels jeux ?")]
+    for approvals in (None, {"d1": True}, {"l1": True}):
+        events = await viz_request(router, viz, history, approvals)
+        history += events[-1].result.new_messages
+    paths = [(r.method, r.url.path) for r in viz.requests]
+    assert paths == [("GET", f"/api/datasets/{DATASET_ID}"), ("GET", "/api/datasets")]
+
+
 def test_default_summary_is_readable() -> None:
     tool = WeatherTool()
     long = "très " * 30

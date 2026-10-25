@@ -228,6 +228,12 @@ un relevé se convertit dans Convert, le workflow part de son historique.
 | Synchronisation Tab → Projets → Viz (`tab-projets-viz-synchro`) | `tool:projets_import_tab_table` → `node:projets/tables.get` et `node:projets/work_items.list` (bloqués) → `node:viz/datasets.upsert_table` → `node:viz/datasets.query` (par statut) | Instantané Tab, Projets, Viz | `tab.table.changed`, attente 300 s |
 | Alerte Viz → tâche de suivi Projets (`viz-alerte-tache-projets`) | `node:viz/datasets.get` → `node:projets/work_items.create` → `node:projets/work_items.log` | Viz, Projets ; une story pour les tâches | `viz.alert.triggered` |
 
+**Données bancaires.** Les deux modèles Convert recopient des opérations de relevé dans Tab et Viz.
+Les boîtes `tab` et `data_via` ne sont pas sensibles : une fois là, ces lignes sont lisibles par les
+agents qui lisent ces applications (Data Analyst, Tableur, Orchestrateur…), y compris sur Claude. Les
+étapes elles-mêmes n'appellent aucun modèle. Le premier prérequis de ces modèles le rappelle ; pour une
+analyse 100 % locale, utiliser les agents Finance et Comptable (verrouillés sur Ollama).
+
 Exemple de déclencheur « Relevé → Tab » pour le budget consolidé : événement
 `convert.conversion.created`, filtre `data.statement` `eq` `true` (seulement les relevés bancaires
 reconnus), paramètre `conversion` = `{{event.subject.id}}`. Lancée par l'événement, l'exécution

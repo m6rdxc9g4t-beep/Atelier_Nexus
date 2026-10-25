@@ -513,6 +513,7 @@ class QueryInput(ToolInput):
 
 
 class QueryTool(_DataViaTool[QueryInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_query"
     description = (
         "Exécute une requête d'agrégation sur un jeu Data Via (regrouper, agréger, filtrer, "
@@ -594,6 +595,7 @@ class CheckExpressionInput(ToolInput):
 
 
 class CheckExpressionTool(_DataViaTool[CheckExpressionInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_check_expression"
     description = (
         "Vérifie (sans rien enregistrer) une mesure ou une colonne calculée dans le langage "
@@ -617,15 +619,18 @@ class CheckExpressionTool(_DataViaTool[CheckExpressionInput]):
 
 
 class RowsInput(ToolInput):
-    dataset_id: str
+    dataset_id: str = Field(
+        description="Identifiant du jeu, décrit avant par data_via_describe_dataset."
+    )
     offset: int = Field(default=0, ge=0, description="Lignes à sauter (0 = début du jeu).")
-    limit: int = Field(default=20, ge=1, le=MAX_RAW_ROWS)
+    limit: int = Field(default=20, ge=1, le=MAX_RAW_ROWS, description="Nombre de lignes à lire.")
     columns: list[str] = Field(
         default_factory=list, max_length=20, description="Colonnes à garder (vide = toutes)."
     )
 
 
 class RowsTool(_DataViaTool[RowsInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_rows"
     description = (
         f"Lignes brutes d'un jeu Data Via, dans l'ordre du fichier (au plus {MAX_RAW_ROWS} par "
@@ -687,6 +692,7 @@ class CheckRelationInput(ToolInput):
 
 
 class CheckRelationTool(_DataViaTool[CheckRelationInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_check_relation"
     description = (
         "Vérifie (sans rien enregistrer) une relation plusieurs-à-un d'un modèle en étoile, fait → "

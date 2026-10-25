@@ -101,12 +101,14 @@ outils `requires_approval`. Un appel à valider suit toujours le même chemin :
    font l'aller-retour à l'identique.
 
 **D'une requête à l'autre.** Chaque validation relance l'agent dans une nouvelle requête, avec un contexte d'outils
-vide. Avant d'exécuter le premier outil de la requête, l'agent rejoue le crochet facultatif `BaseTool.restore()` pour
+vide. Juste avant le premier outil qui lit ce contexte (`uses_restored_state` : requête, lignes et vérifications Data
+Via), l'agent rejoue le crochet facultatif `BaseTool.restore()` pour
 chaque appel **réussi** de l'historique (un appel refusé ou en erreur n'est jamais rejoué) : Data Via relit ainsi, sans
 rien montrer au modèle, le schéma d'un jeu déjà décrit (et autorisé), et `data_via_query` validée à la requête
 suivante passe le contrôle « schéma consulté ». Une requête qui ne fait que présenter des cartes ne touche à aucune
-application ; une requête qui exécute un outil relit une fois chaque jeu déjà décrit dans la conversation (relecture
-qui échoue : sans effet, l'outil redemande alors la description). Le nombre d'étapes (`max_iterations`) porte sur **tout le tour**, reprises comprises
+application, ni une requête qui n'exécute que des outils sans rapport (Projets, Tab…) ; une requête qui exécute un
+outil dépendant relit une fois chaque jeu déjà décrit dans la conversation (relecture qui échoue : sans effet, l'outil
+redemande alors la description). Le nombre d'étapes (`max_iterations`) porte sur **tout le tour**, reprises comprises
 (`AgentResult.iterations` compte les appels au modèle depuis le dernier message de l'utilisateur) ; au plafond, un
 dernier appel, dont les éventuels appels d'outils sont écartés sans être exécutés, produit une synthèse
 (`stop_reason = "max_iterations"`, sans étape de plus), jamais un texte vide.
@@ -193,7 +195,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 |---|---|---|
 | GET | `/api/agents` | Catalogue complet : `icon`, `category`, `starters`, `source`, `toolsets`, `local_only`, `tools[].requires_approval`, `unavailable_toolsets` |
 | POST | `/api/agents/{name}/run` · `/stream` | Corps : `messages`, `provider`, `model`, `conversation_id`, **`approvals`** |
-| GET | `/api/apps/status` | État de Viz, Projets, Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais) |
+| GET | `/api/apps/status` | État de Viz, Projets, Convert (nœud de workflow), Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais) |
 
 Événements SSE : `text_delta`, `tool_call`, `tool_result`, `artifact`, **`approval_required`**, `done`, `error`.
 
@@ -208,6 +210,8 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `TAB_MCP_COMMAND`, `TAB_DATA_DIR` | vide | Écriture dans Atelier Tab par son serveur MCP ([`apps/tab.md`](apps/tab.md)) |
 | `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
 | `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
+| `CONVERT_BASE_URL`, `CONVERT_TIMEOUT` | `http://127.0.0.1:8010/api`, `120` | Atelier Convert, nœud des workflows de suite (aucune boîte à outils dans le cœur ; l'extension Agent_DatAnalyst lit la même adresse) ([`apps/noeuds.md`](apps/noeuds.md)) |
+| `OLLAMA_NUM_CTX` | `8192` | Fenêtre de contexte demandée à Ollama (vide = celle du serveur) : consignes et outils des agents 100 % locaux ([`settings.md`](settings.md)) |
 | `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |
 | `APPS_TIMEOUT` | `20` | Délai par appel (s) |
 | `GITHUB_TOKEN` | vide | Jeton *fine-grained* : Contents + Pull requests (lecture/écriture), dépôts choisis |

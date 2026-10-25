@@ -111,6 +111,12 @@ PROJETS = "Atelier Projets lancé (PROJETS_BASE_URL)"
 TAB_MCP = "TAB_MCP_COMMAND (serveur MCP de Tab) pour lire et écrire les tables d'Atelier Tab"
 TAB_FILES = "Instantané de la table publié par Atelier Tab (TAB_EXPORTS_DIR)"
 IMPORT_TOKEN = "PROJETS_IMPORT_TOKEN si l'import depuis Atelier Tab est protégé dans Projets"
+#: Relevés bancaires recopiés dans Tab et Viz : leurs boîtes à outils ne sont pas « sensibles »
+BANK_DATA = (
+    "Données bancaires : une fois dans Tab et Viz, les opérations sont lisibles par les agents "
+    "qui lisent ces applications (Data Analyst, Tableur…), y compris sur Claude ; pour une "
+    "analyse 100 % locale, préférez les agents Finance et Comptable"
+)
 LIMIT_1000 = (
     "1 000 lignes au plus passent d'une étape à l'autre : au-delà, le jeu Viz est partiel "
     "(préférez alors une connexion directe dans Viz)"
@@ -186,6 +192,7 @@ TEMPLATES: tuple[WorkflowTemplate, ...] = (
             ),
         ],
         requirements=[
+            BANK_DATA,
             CONVERT,
             VIZ,
             "Une conversion dans l'historique de Convert ; les colonnes Date, Débit et Crédit "
@@ -268,6 +275,7 @@ TEMPLATES: tuple[WorkflowTemplate, ...] = (
             ),
         ],
         requirements=[
+            BANK_DATA,
             CONVERT,
             TAB_MCP,
             VIZ,

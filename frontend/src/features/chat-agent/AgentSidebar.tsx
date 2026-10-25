@@ -3,6 +3,7 @@
 import { ChevronRight, Lock, Pencil, Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { SectionLabel } from "@/components/ui/section-label";
 import { cn } from "@/lib/utils";
@@ -98,7 +99,7 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
         <label htmlFor={`${uid}-search`} className="sr-only">
           Rechercher un agent
         </label>
-        <input
+        <Input
           ref={search}
           id={`${uid}-search`}
           type="search"
@@ -113,7 +114,7 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
             if (e.key === "Enter" && groups[0]?.[1][0]) onSelect(groups[0][1][0].name);
           }}
           placeholder="Rechercher un agent"
-          className="h-8 w-full rounded-lg border border-atelier-line bg-atelier-field pr-8 pl-8 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-atelier-border focus-visible:shadow-focus [&::-webkit-search-cancel-button]:hidden"
+          className="h-8 rounded-lg border-atelier-line pr-8 pl-8 text-[13px] focus-visible:border-atelier-border [&::-webkit-search-cancel-button]:hidden"
         />
         {searching ? (
           <button

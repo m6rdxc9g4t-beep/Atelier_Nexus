@@ -453,8 +453,9 @@ class BaseAgent(ABC):
                 results: list[ToolResultBlock] = []
                 for call in pending_calls:
                     yield ToolCallEvent(id=call.id, name=call.name, input=call.input)
-                    if not restored and self._will_run(call, approvals):
-                        # Nouvelle requête, contexte vide : rejouer d'abord l'historique
+                    if not restored and self._needs_restore(call, approvals):
+                        # Nouvelle requête, contexte vide : rejouer d'abord l'historique, juste
+                        # avant le premier outil qui en dépend (relecture déjà autorisée)
                         await self._restore(messages, ctx)
                         restored = True
                     output = await self._execute_tool(call, ctx, approvals)
@@ -555,6 +556,11 @@ class BaseAgent(ABC):
         if tool is None:
             return False
         return not self.needs_approval(tool) or (approvals or {}).get(call.id, False)
+
+    def _needs_restore(self, call: ToolUseBlock, approvals: dict[str, bool] | None) -> bool:
+        """Vrai si cet appel va s'exécuter ET lit le contexte reconstruit (ex. data_via_query)."""
+        tool = self.tools.get(call.name)
+        return tool is not None and tool.uses_restored_state and self._will_run(call, approvals)
 
     async def _restore(self, history: Sequence[Message], ctx: ToolContext) -> None:
         """Reconstruit `ctx.state`, perdu d'une requête à l'autre : chaque appel réussi de
