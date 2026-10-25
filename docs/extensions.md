@@ -51,3 +51,15 @@ outil sur des données financières ou personnelles porte `sensitive = True`, et
 `sensitive=True` (agent verrouillé sur le modèle local). Une boîte ne peut pas réutiliser
 l'identifiant d'une boîte existante : `register_toolset` lève une erreur et l'extension n'est
 pas chargée.
+
+**Atelier Convert et Agent_DatAnalyst.** Convert est aussi un nœud des workflows du cœur
+(`node:convert/…`, `docs/apps/noeuds.md`) : `CONVERT_BASE_URL` (défaut
+`http://127.0.0.1:8010/api`) et `CONVERT_TIMEOUT` (120 s) sont désormais des réglages de Nexus
+(`Settings`, Réglages → Applications Atelier pour l'adresse). Ce sont les mêmes variables, dans le
+même `.env`, que celles de l'extension : une seule valeur sert aux deux. Le cœur n'enregistre
+**aucune** boîte `convert` : les boîtes `convert` et `convert_write` restent celles de
+l'extension (sinon elle ne se chargerait plus), et `APP_NAMES` / `APP_COLORS` connaissent déjà
+Convert (le `setdefault` de l'extension est sans effet). L'extension garde son propre cache de
+réglages : après un changement de `CONVERT_BASE_URL` dans les Réglages, le nœud suit tout de suite,
+les outils `convert_*` de l'extension au redémarrage. Dans les tests, le transport simulé
+`env.transport("convert")` est partagé par le nœud et le client de l'extension.

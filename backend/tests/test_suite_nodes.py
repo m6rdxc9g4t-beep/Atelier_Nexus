@@ -1,7 +1,8 @@
 """Nœuds de la suite (atelier-node/1) : manifestes, exécuteur d'action, événements.
 
-Viz et Projets simulés par httpx.MockTransport ; Tab par un dossier `_atelier/` réel et le faux
-serveur MCP (sous-processus). Aucune requête réseau réelle.
+Viz, Projets et Convert simulés par httpx.MockTransport ; Tab par un dossier `_atelier/` réel et
+le faux serveur MCP (sous-processus). Aucune requête réseau réelle : chaque nœud HTTP de la suite
+a son transport simulé (`Suite.env`), sinon `states()` joindrait la vraie application locale.
 """
 
 from __future__ import annotations
@@ -20,11 +21,16 @@ from app.suite.manifest import ManifestError, parse_manifest
 from app.suite.nodes import build_http_request, validate_input
 from app.tools.environment import ToolEnvironment
 from tests.fake_suite import (
+    BRUT_ID,
+    CONVERT_MANIFEST,
     PROJETS_MANIFEST,
+    RELEVE_ID,
     TAB_MANIFEST,
     VIZ_MANIFEST,
+    FakeConvertNode,
     FakeProjetsNode,
     FakeVizNode,
+    convert_event,
     mcp_command,
     write_tab_manifest,
 )
@@ -36,6 +42,7 @@ class Suite:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.viz = FakeVizNode()
         self.projets = FakeProjetsNode()
+        self.convert = FakeConvertNode()
         self.exports = tmp_path / "exports"
         self.exports.mkdir()
         shutil.copy(FIX / "tab" / "tbl_planning_lots.json", self.exports)
@@ -58,6 +65,7 @@ class Suite:
             "_env_file": None,
             "data_via_base_url": "http://127.0.0.1:8000/api",
             "projets_base_url": "http://127.0.0.1:3000/api",
+            "convert_base_url": "http://127.0.0.1:8010/api",
             "tresorerie_base_url": None,
             "cine_base_url": None,
             "savoir_base_url": None,
@@ -74,6 +82,8 @@ class Suite:
             transports={
                 "data_via": self.viz.transport,
                 "projets": httpx.MockTransport(self.projets),
+                # Même clé que le client Convert de l'extension Agent_DatAnalyst
+                "convert": self.convert.transport,
             },
         )
 
@@ -119,29 +129,35 @@ def test_manifest_parsing_keeps_valid_actions_and_reports_the_others() -> None:
     assert len(problems) == 4 and any("double" in p for p in problems)
 
 
-async def test_states_of_the_three_nodes(suite: Suite) -> None:
+async def test_states_of_the_four_nodes(suite: Suite) -> None:
     env = suite.env()
     try:
         states = {s.app: s for s in await env.suite().states()}
     finally:
         await env.aclose()
-    assert {a: s.status for a, s in states.items()} == {"viz": "ok", "tab": "ok", "projets": "ok"}
+    assert list(states) == ["viz", "tab", "projets", "convert"]
+    assert {s.status for s in states.values()} == {"ok"}
     assert states["tab"].transport == "mcp" and states["viz"].transport == "http"
+    assert states["convert"].transport == "http" and states["convert"].name == "Atelier Convert"
     assert states["viz"].ignored  # action mal formée signalée
     # Lu une seule fois grâce au cache (60 s)
     env = suite.env()
     try:
         await env.suite().state("viz")
+        await env.suite().state("convert")
     finally:
         await env.aclose()
     manifests = [r for r in suite.viz.requests if r.url.path == "/api/atelier/manifest"]
     assert len(manifests) == 1
     assert str(manifests[0].url) == "http://127.0.0.1:8000/api/atelier/manifest"
+    convert = [r for r in suite.convert.requests if r.url.path == "/api/atelier/manifest"]
+    assert [str(r.url) for r in convert] == ["http://127.0.0.1:8010/api/atelier/manifest"]
 
 
 async def test_status_unreachable_no_contract_and_not_configured(suite: Suite) -> None:
     suite.viz.mode = "down"
     suite.projets.mode = "no_contract"
+    suite.convert.mode = "down"
     suite.manifest_file.unlink()
     suite.mcp = False
     env = suite.env()
@@ -152,8 +168,15 @@ async def test_status_unreachable_no_contract_and_not_configured(suite: Suite) -
     assert states["viz"].status == "unreachable" and "injoignable" in (states["viz"].reason or "")
     assert states["projets"].status == "no_contract"
     assert states["tab"].status == "no_contract" and states["tab"].transport == "files"
+    assert states["convert"].status == "unreachable"
+    assert "Atelier Convert injoignable" in (states["convert"].reason or "")
     env = ToolEnvironment(
-        suite.settings(data_via_base_url=None, projets_base_url=None, tab_exports_dir=None)
+        suite.settings(
+            data_via_base_url=None,
+            projets_base_url=None,
+            convert_base_url=None,
+            tab_exports_dir=None,
+        )
     )
     try:
         assert {s.status for s in await env.suite().states()} == {"not_configured"}
@@ -208,6 +231,37 @@ def test_http_request_building_encodes_path_and_splits_query_and_body() -> None:
     with pytest.raises(NodeActionError):
         build_http_request(upsert, {"table": {}})
     assert validate_input(upsert, {"name": "x"}) == [("table", "'table' is a required property")]
+
+
+async def test_unresolvable_ref_refuses_the_input_without_request(suite: Suite) -> None:
+    """Manifeste mal formé (`$ref` introuvable, ou adresse extérieure jamais lue) : erreur
+    d'entrée lisible, jamais d'exception (catalogue, validation, porte de contrôle)."""
+    broken = {**CONVERT_MANIFEST, "actions": [dict(a) for a in CONVERT_MANIFEST["actions"]]}
+    table = next(a for a in broken["actions"] if a["id"] == "conversions.table")
+    table["input_schema"] = {
+        "type": "object",
+        "properties": {
+            "conversion_id": {"$ref": "#/$defs/Absent"},
+            "limit": {"$ref": "https://schemas.example.com/limit.json"},
+        },
+        "required": ["conversion_id"],
+    }
+    manifest, ignored = parse_manifest(broken, "convert")
+    action = manifest.action("conversions.table")
+    assert ignored == [] and action is not None
+    problem = "schéma d'entrée de conversions.table illisible (référence $ref introuvable)"
+    assert validate_input(action, {"conversion_id": RELEVE_ID}) == [("", problem)]
+    suite.convert.manifest = broken
+    env = suite.env()
+    try:
+        with pytest.raises(NodeActionError) as refused:
+            await env.suite().run_action(
+                "convert", "conversions.table", {"conversion_id": RELEVE_ID, "limit": 5}
+            )
+    finally:
+        await env.aclose()
+    assert refused.value.code == "INPUT_INVALID" and problem in str(refused.value)
+    assert all(r.url.path == "/api/atelier/manifest" for r in suite.convert.requests)
 
 
 async def test_http_action_validates_sends_idempotency_and_replays(suite: Suite) -> None:
@@ -348,3 +402,161 @@ def test_tab_manifest_double_matches_the_mcp_double() -> None:
         "add_rows",
         "delete_rows",
     }
+
+
+# ─── Atelier Convert (manifeste réel enregistré) ──────────────────
+
+
+def test_convert_real_manifest_parses_without_loss() -> None:
+    manifest, ignored = parse_manifest(CONVERT_MANIFEST, "convert")
+    assert ignored == [] and manifest.transport == "http"
+    assert [a.id for a in manifest.actions] == [
+        "conversions.list",
+        "conversions.table",
+        "conversions.convert_file",
+        "tab.projects",
+        "conversions.send_to_tab",
+        "conversions.delete",
+    ]
+    kinds = {a.id: a.kind for a in manifest.actions}
+    assert kinds["conversions.delete"] == "destructive"
+    assert kinds["conversions.send_to_tab"] == kinds["conversions.convert_file"] == "write"
+    table = manifest.action("conversions.table")
+    send = manifest.action("conversions.send_to_tab")
+    assert table is not None and send is not None
+    assert table.output.format == "atelier-table/1" and table.http is not None
+    assert table.http.path_params == ["conversion_id"] and send.idempotency == "header"
+    created = next(e for e in manifest.events if e.type == "convert.conversion.created")
+    assert created.data_fields == [
+        "name",
+        "format",
+        "rows",
+        "columns",
+        "statement",
+        "ocr",
+        "origin",
+    ]
+    assert [e.type for e in manifest.events] == [
+        "convert.conversion.created",
+        "convert.conversion.updated",
+        "convert.conversion.sent_to_tab",
+        "convert.conversion.deleted",
+    ]
+
+
+async def test_convert_actions(suite: Suite) -> None:
+    env = suite.env()
+    nodes = env.suite()
+    try:
+        listed = await nodes.run_action("convert", "conversions.list", {})
+        table = await nodes.run_action(
+            "convert", "conversions.table", {"conversion_id": RELEVE_ID, "limit": 2}
+        )
+        sent = await nodes.run_action(
+            "convert",
+            "conversions.send_to_tab",
+            {"conversion_id": RELEVE_ID, "project_id": "proj_budget", "table_name": "Octobre"},
+            idempotency_key="nexus:run:vers_tab",
+        )
+        again = await nodes.run_action(
+            "convert",
+            "conversions.send_to_tab",
+            {"conversion_id": RELEVE_ID, "project_id": "proj_budget", "table_name": "Octobre"},
+            idempotency_key="nexus:run:vers_tab",
+        )
+        with pytest.raises(NodeActionError) as invalid:
+            await nodes.run_action("convert", "conversions.table", {"conversion_id": "bad"})
+        with pytest.raises(NodeActionError) as missing:
+            await nodes.run_action(
+                "convert", "conversions.table", {"conversion_id": "ffffffffffff"}
+            )
+    finally:
+        await env.aclose()
+    assert [c["id"] for c in listed.data] == [RELEVE_ID, BRUT_ID]  # plus récent d'abord
+    assert "2 élément(s)" in listed.content
+    assert table.data["format"] == "atelier-table/1" and table.data["total"] == 3
+    assert "2 ligne(s) sur 3" in table.content
+    get = next(r for r in suite.convert.requests if r.url.path.endswith("/table"))
+    assert get.method == "GET" and get.url.path == f"/api/atelier/conversions/{RELEVE_ID}/table"
+    assert get.url.params["limit"] == "2" and "conversion_id" not in get.url.params
+    assert sent.data["table_id"] == "tbl_001" and not sent.replayed
+    assert again.replayed and "rejouée" in again.content and len(suite.convert.sent) == 1
+    post = next(r for r in suite.convert.requests if r.method == "POST")
+    assert post.headers["idempotency-key"] == "nexus:run:vers_tab"
+    assert json.loads(post.content) == {"project_id": "proj_budget", "table_name": "Octobre"}
+    assert invalid.value.code == "INPUT_INVALID"  # motif ^[0-9a-f]{12}$, aucune requête
+    assert all("bad" not in r.url.path for r in suite.convert.requests)
+    assert missing.value.code == "NOT_FOUND" and "Conversion introuvable" in str(missing.value)
+
+
+async def test_convert_actions_use_their_own_timeout(suite: Suite) -> None:
+    """CONVERT_TIMEOUT ne vaut que pour les actions de Convert : ses événements gardent le délai
+    court (le passage des déclencheurs lit les applications l'une après l'autre)."""
+    env = suite.env(convert_timeout=300, apps_timeout=7)
+    nodes = env.suite()
+    try:
+        await nodes.run_action("convert", "conversions.table", {"conversion_id": RELEVE_ID})
+        await nodes.events("convert", since=1)
+        await nodes.run_action("viz", "datasets.list", {"limit": 5})
+    finally:
+        await env.aclose()
+
+    def read_timeout(requests: list[httpx.Request], end: str) -> float:
+        request = next(r for r in requests if r.url.path.endswith(end))
+        timeouts: dict[str, float] = request.extensions["timeout"]
+        return timeouts["read"]
+
+    assert read_timeout(suite.convert.requests, "/table") == 300
+    assert read_timeout(suite.convert.requests, "/atelier/events") == 7
+    assert read_timeout(suite.viz.requests, "/api/atelier/datasets") == 7
+
+
+async def test_convert_events_and_gap(suite: Suite) -> None:
+    suite.convert.events = [convert_event(seq) for seq in (5, 6, 7)]
+    env = suite.env()
+    nodes = env.suite()
+    try:
+        page = await nodes.events("convert", since=5, limit=1)
+        latest = await nodes.events("convert")
+        reset = await nodes.events("convert", since=40)
+        lost = await nodes.events("convert", since=1)
+    finally:
+        await env.aclose()
+    assert [e.seq for e in page.events] == [6] and page.next == 6 and not page.gap
+    assert page.events[0].subject.id == RELEVE_ID and page.events[0].data["statement"] is True
+    assert [e.seq for e in latest.events] == [5, 6, 7]
+    assert reset.gap and reset.events == []  # journal remis à zéro (§7.3)
+    assert lost.gap  # événements retirés avant `oldest`
+
+
+async def test_convert_non_loopback_refused(suite: Suite) -> None:
+    env = suite.env(convert_base_url="http://convert.example.com/api")
+    try:
+        state = await env.suite().state("convert")
+    finally:
+        await env.aclose()
+    assert state.status == "unreachable" and "bouclage" in (state.reason or "")
+    assert not suite.convert.requests
+
+
+async def test_convert_cache_follows_the_address(suite: Suite) -> None:
+    env = suite.env()
+    try:
+        assert (await env.suite().state("convert")).status == "ok"
+    finally:
+        await env.aclose()
+    # Nouvelle adresse (Réglages) : le manifeste est relu tout de suite, pas après 60 s
+    env = suite.env(convert_base_url="http://127.0.0.1:8011/api")
+    try:
+        assert (await env.suite().state("convert")).status == "ok"
+    finally:
+        await env.aclose()
+    hosts = [r.url.port for r in suite.convert.requests if r.url.path == "/api/atelier/manifest"]
+    assert hosts == [8010, 8011]
+    # `fresh` (vérification depuis les Réglages) relit même quand le cache est valide
+    env = suite.env(convert_base_url="http://127.0.0.1:8011/api")
+    try:
+        await env.suite().state("convert", fresh=True)
+    finally:
+        await env.aclose()
+    assert len([r for r in suite.convert.requests if r.url.path == "/api/atelier/manifest"]) == 3

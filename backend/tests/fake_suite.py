@@ -1,6 +1,7 @@
 """Doubles des nœuds de la suite (contrat atelier-node/1) pour httpx.MockTransport et MCP.
 
-Noms d'actions supposés (les applications les publient dans leur manifeste) :
+Manifestes de Viz, Projets et Tab : noms d'actions SUPPOSÉS, choisis pour exercer le moteur
+(les vrais manifestes en diffèrent : voir `REAL_MANIFESTS`) :
 - Viz : `datasets.query` (lecture, table), `datasets.list` (GET avec requête),
   `datasets.upsert_rows` (écriture, `Idempotency-Key`), `datasets.delete` (destructive) ;
 - Projets : `work_items.list` (lecture, table), `work_items.create` (écriture, `Idempotency-Key`),
@@ -8,6 +9,15 @@ Noms d'actions supposés (les applications les publient dans leur manifeste) :
 - Tab (MCP) : `tables.query` (`query_table`), `rows.add` (`add_rows`, champ `idempotency_key`),
   `rows.delete` (`delete_rows`, destructive).
 Les routes non « atelier » sont déléguées aux doubles existants (Data Via, Projets).
+
+Convert : manifeste RÉEL (`tests/fixtures/convert/manifest.json`, capturé une fois avec
+`build_manifest()` dans le venv d'Atelier_Convert, version 0.1.0), jamais retouché. Le double
+répond aux routes de ce manifeste (`FakeConvertNode`).
+
+`REAL_MANIFESTS` : manifestes réels de Viz (0.1.0, `build_manifest()`), Projets (0.1.0,
+`buildManifest()` du backend compilé) et Tab (0.6.0, `_atelier/manifest.json` écrit par l'app),
+enregistrés dans `tests/fixtures/<app>/manifest.json` : la bibliothèque des modèles de workflows
+est validée contre eux (`tests/test_workflow_library.py`).
 """
 
 from __future__ import annotations
@@ -24,6 +34,18 @@ from tests.fake_data_via import FakeDataVia
 from tests.test_connectors import FakeProjets
 
 FAKE_MCP = str(Path(__file__).parent / "fake_tab_mcp.py")
+FIX = Path(__file__).parent / "fixtures"
+
+
+def _recorded(app: str) -> dict[str, Any]:
+    manifest: dict[str, Any] = json.loads((FIX / app / "manifest.json").read_text("utf-8"))
+    return manifest
+
+
+CONVERT_MANIFEST = _recorded("convert")
+REAL_MANIFESTS: dict[str, dict[str, Any]] = {
+    app: _recorded(app) for app in ("viz", "projets", "tab", "convert")
+}
 
 TABLE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -440,6 +462,160 @@ class FakeProjetsNode(_Node):
         if method == "DELETE" and path.startswith("/api/atelier/work-items/"):
             return httpx.Response(200, json={"deleted": int(path.rsplit("/", 1)[1])})
         return self.projets(request)
+
+
+#: Identifiants de conversion (12 caractères hexadécimaux, comme Convert)
+RELEVE_ID = "0123456789ab"
+BRUT_ID = "abcdef012345"
+
+
+def convert_event(seq: int, conversion_id: str = RELEVE_ID, **data: Any) -> dict[str, Any]:
+    """Événement `convert.conversion.created` au format §7.3 (champs du manifeste réel)."""
+    return {
+        "seq": seq,
+        "type": "convert.conversion.created",
+        "at": f"2026-10-24T10:{seq % 60:02d}:00+02:00",
+        "subject": {"kind": "conversion", "id": conversion_id, "label": "Relevé octobre"},
+        "data": {"name": "Relevé octobre", "format": "pdf", "rows": 3, "columns": 5,
+                 "statement": True, "ocr": False, "origin": "interface"} | data,
+    }  # fmt: skip
+
+
+class FakeConvertNode(_Node):
+    """Atelier Convert (API sur 8010, préfixe `/api`) : routes de son manifeste réel.
+
+    Deux conversions : un relevé bancaire reconnu (`RELEVE_ID`, colonnes normalisées Date,
+    Libellé, Débit, Crédit, Montant) et un CSV brut (`BRUT_ID`). Écritures idempotentes
+    (`Idempotency-Key`, rejeu, 409)."""
+
+    manifest = CONVERT_MANIFEST
+
+    COLUMNS = [
+        {"key": "date", "label": "Date", "type": "date"},
+        {"key": "libelle", "label": "Libellé", "type": "string"},
+        {"key": "debit", "label": "Débit", "type": "number"},
+        {"key": "credit", "label": "Crédit", "type": "number"},
+        {"key": "montant", "label": "Montant", "type": "number"},
+    ]
+    ROWS = [
+        {"date": "2026-10-01", "libelle": "Loyer", "debit": 850.0, "credit": None, "montant": -850.0},
+        {"date": "2026-10-03", "libelle": "Salaire", "debit": None, "credit": 2400.0, "montant": 2400.0},
+        {"date": "2026-10-12", "libelle": "Courses", "debit": 92.4, "credit": None, "montant": -92.4},
+    ]  # fmt: skip
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sent: list[dict[str, Any]] = []
+        self.converted: list[dict[str, Any]] = []
+        self.deleted: list[str] = []
+        self.events = [convert_event(seq) for seq in (1, 2, 3)]
+        self.conversions: dict[str, dict[str, Any]] = {
+            RELEVE_ID: {
+                "id": RELEVE_ID, "name": "Relevé octobre",
+                "created_at": "2026-10-24T10:00:00+02:00", "updated_at": "2026-10-24T10:05:00+02:00",
+                "source": {"filename": "releve-octobre.pdf", "kind": "pdf", "size": 48213,
+                           "sha256": "0" * 64, "pages": 2, "ocr": False},
+                "detected": "Relevé bancaire · 3 opérations", "rows": 3, "columns": 5,
+                "statement": {"transactions": 3, "start": "2026-10-01", "end": "2026-10-12",
+                              "total_debit": 942.4, "total_credit": 2400.0,
+                              "balance_check": "ok", "bank": "Banque Exemple"},
+                "sent": [],
+            },
+            BRUT_ID: {
+                "id": BRUT_ID, "name": "Export brut",
+                "created_at": "2026-10-20T09:00:00+02:00", "updated_at": "2026-10-20T09:00:00+02:00",
+                "source": {"filename": "export.csv", "kind": "csv", "size": 1200, "sha256": "1" * 64},
+                "detected": "Tableau · 2 lignes", "rows": 2, "columns": 2, "statement": None,
+                "sent": [],
+            },
+        }  # fmt: skip
+
+    def _table(self, conversion_id: str, request: httpx.Request) -> dict[str, Any]:
+        offset = int(request.url.params.get("offset", "0"))
+        limit = int(request.url.params.get("limit", "1000"))
+        name, label, columns, rows = "releve_octobre", "Relevé octobre", self.COLUMNS, self.ROWS
+        if conversion_id == BRUT_ID:
+            name, label = "export_brut", "Export brut"
+            columns = [{"key": "ref", "label": "Réf", "type": "string"},
+                       {"key": "qte", "label": "Qté", "type": "number"}]  # fmt: skip
+            rows = [{"ref": "A", "qte": 1}, {"ref": "B", "qte": 2}]
+        chosen = rows[offset : offset + limit]
+        return {
+            "format": "atelier-table/1", "name": name, "label": label, "columns": columns,
+            "rows": chosen, "total": len(rows), "truncated": offset + len(chosen) < len(rows),
+        }  # fmt: skip
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        answer = self.common(request)
+        if answer is not None:
+            return answer
+        path, method = request.url.path, request.method
+        parts = path.strip("/").split("/")
+        not_found = httpx.Response(
+            404, json={"detail": "Conversion introuvable", "code": "NOT_FOUND"}
+        )
+        if (method, path) == ("GET", "/api/conversions"):
+            listed = sorted(self.conversions.values(), key=lambda c: c["updated_at"], reverse=True)
+            return httpx.Response(200, json=listed)
+        if (method, path) == ("GET", "/api/tab"):
+            return httpx.Response(
+                200,
+                json={"found": True, "directory": "/Users/test/Atelier_Tab",
+                      "projects": [{"id": "proj_budget", "name": "Budget", "workspace": "Maison",
+                                    "tables": 2}]},
+            )  # fmt: skip
+        if (
+            method == "GET"
+            and parts[:3] == ["api", "atelier", "conversions"]
+            and parts[-1] == "table"
+        ):
+            if parts[3] not in self.conversions:
+                return not_found
+            return httpx.Response(200, json=self._table(parts[3], request))
+        if (method, path) == ("POST", "/api/atelier/conversions"):
+            body = json.loads(request.content)
+
+            def convert() -> dict[str, Any]:
+                result = {
+                    "conversion_id": "fedcba987654", "name": body["filename"].rsplit(".", 1)[0],
+                    "detected": "Tableau · 1 ligne", "rows": 1, "columns": 1, "warnings": [],
+                }  # fmt: skip
+                self.converted.append(result)
+                return result
+
+            return self.idempotent(request, body, convert)
+        if (
+            method == "POST"
+            and parts[:3] == ["api", "atelier", "conversions"]
+            and parts[-1] == "send-to-tab"
+        ):
+            conversion = self.conversions.get(parts[3])
+            if conversion is None:
+                return not_found
+            body = json.loads(request.content)
+
+            def send() -> dict[str, Any]:
+                result = {
+                    "table_id": f"tbl_{len(self.sent) + 1:03d}",
+                    "table_name": body.get("table_name") or conversion["name"],
+                    "project_id": body["project_id"], "project_name": "Budget",
+                    "rows": conversion["rows"], "columns": conversion["columns"],
+                    "file": f"tables/tbl_{len(self.sent) + 1:03d}.json",
+                }  # fmt: skip
+                self.sent.append({"conversion_id": parts[3], **result})
+                return result
+
+            return self.idempotent(request, body, send)
+        if method == "DELETE" and parts[:2] == ["api", "conversions"] and len(parts) == 3:
+            if self.conversions.pop(parts[2], None) is None:
+                return not_found
+            self.deleted.append(parts[2])
+            return httpx.Response(200, json={"deleted": True})
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+    @property
+    def transport(self) -> httpx.MockTransport:
+        return httpx.MockTransport(self)
 
 
 def write_tab_manifest(exports: Path, manifest: dict[str, Any] | None = None) -> Path:

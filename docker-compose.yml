@@ -38,6 +38,10 @@ services:
       # Ciné écoute sur toutes les interfaces : joignable. Savoir, comme Projets, reste sur 127.0.0.1.
       CINE_BASE_URL: ${CINE_BASE_URL:-http://host.docker.internal:4000/api}
       SAVOIR_BASE_URL: ${SAVOIR_BASE_URL:-http://host.docker.internal:5051/api}
+      # Convert n'écoute que sur 127.0.0.1 de l'hôte, et le nœud atelier-node/1 refuse une
+      # adresse hors bouclage : en Docker, Convert apparaît « injoignable » (comme Viz et Projets
+      # pour les workflows). Lancer le backend Nexus en local pour les workflows de la suite.
+      CONVERT_BASE_URL: ${CONVERT_BASE_URL:-http://host.docker.internal:8010/api}
       # Instantanés d'Atelier Tab, montés en lecture seule (voir volumes)
       TAB_EXPORTS_DIR: /data/atelier_tab_exports
       CORS_ORIGINS: http://localhost:3100,http://127.0.0.1:3100

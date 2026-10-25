@@ -2,6 +2,8 @@
 
 - **Viz** : `{data_via_base_url}/atelier/manifest` (HTTP), événements `/api/atelier/events`.
 - **Projets** : `{projets_base_url}/atelier/manifest` (HTTP), mêmes événements.
+- **Convert** : `{convert_base_url}/atelier/manifest` (HTTP), mêmes événements ; délai des
+  actions `CONVERT_TIMEOUT` (une conversion avec OCR est longue).
 - **Tab** : fichier `{tab_exports_dir}/_atelier/manifest.json` (repli : outil MCP
   `atelier_manifest` si `TAB_MCP_COMMAND` est défini) ; actions par le serveur MCP ;
   événements dans `_atelier/events.jsonl` (repli : outil MCP `atelier_events`).
@@ -23,8 +25,9 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import quote
 
 from jsonschema import Draft202012Validator
+from referencing.exceptions import Unresolvable
 
-from app.suite.apps import NODE_APPS, app_name
+from app.suite.apps import HTTP_NODES, NODE_APPS, app_name
 from app.suite.http import NodeActionError, NodeHttpClient, is_loopback
 from app.suite.manifest import (
     EventPage,
@@ -83,13 +86,14 @@ def clear_manifest_cache() -> None:
 
 
 def _key(app: str, env: ToolEnvironment) -> tuple[str, str]:
+    """Clé du cache : l'application et ce qui la désigne (un changement d'adresse dans les
+    Réglages relit le manifeste dès la requête suivante)."""
     s = env.settings
-    signature = {
-        "viz": s.data_via_base_url or "",
-        "projets": s.projets_base_url or "",
-        "tab": f"{s.tab_exports_dir or ''}|{s.tab_mcp_command or ''}",
-    }.get(app, "")
-    return app, signature
+    if app == "tab":
+        return app, f"{s.tab_exports_dir or ''}|{s.tab_mcp_command or ''}"
+    if app in HTTP_NODES:
+        return app, getattr(s, HTTP_NODES[app][0]) or ""
+    return app, ""
 
 
 # ─── Conversion des entrées ───────────────────────────────────────
@@ -141,10 +145,16 @@ def build_http_request(
 
 
 def validate_input(action: NodeAction, payload: dict[str, Any]) -> list[tuple[str, str]]:
-    """Erreurs `(champ, message)` de l'entrée contre `input_schema` (champ racine = "")."""
+    """Erreurs `(champ, message)` de l'entrée contre `input_schema` (champ racine = "").
+    Un `$ref` introuvable (manifeste mal formé, adresse extérieure jamais lue) est une erreur
+    de l'entrée, jamais une exception : l'action est refusée sans requête."""
     validator = Draft202012Validator(action.input_schema)
+    try:
+        found = sorted(validator.iter_errors(payload), key=lambda e: list(e.absolute_path))
+    except Unresolvable:
+        return [("", f"schéma d'entrée de {action.id} illisible (référence $ref introuvable)")]
     errors = []
-    for error in sorted(validator.iter_errors(payload), key=lambda e: list(e.absolute_path)):
+    for error in found:
         path = list(error.absolute_path)
         field_name = str(path[0]) if path else ""
         if not path and error.validator == "required":
@@ -211,8 +221,10 @@ class SuiteNodes:
     # ─── Configuration ────────────────────────────────────────────
 
     def base_url(self, app: str) -> str | None:
-        s = self.env.settings
-        return {"viz": s.data_via_base_url, "projets": s.projets_base_url}.get(app)
+        if app not in HTTP_NODES:
+            return None
+        value: str | None = getattr(self.env.settings, HTTP_NODES[app][0])
+        return value
 
     def http(self, app: str) -> NodeHttpClient:
         if app not in self._http:
@@ -221,15 +233,22 @@ class SuiteNodes:
                 raise NodeActionError(
                     f"{app_name(app)} n'est pas configuré.", app=app, code="NOT_CONFIGURED"
                 )
-            transport = self.env.transport("data_via" if app == "viz" else app)
             self._http[app] = NodeHttpClient(
                 app,
                 app_name(app),
                 base,
+                # Événements : délai court (le passage des déclencheurs lit les apps l'une après
+                # l'autre) ; manifeste borné à MANIFEST_TIMEOUT (`state`) ; actions : `action_timeout`
                 timeout=self.env.settings.apps_timeout,
-                transport=transport,
+                transport=self.env.transport(HTTP_NODES[app][1]),
             )
         return self._http[app]
+
+    def action_timeout(self, app: str) -> float:
+        """Délai d'UNE action : `CONVERT_TIMEOUT` pour Convert (une conversion avec OCR est
+        longue), `APPS_TIMEOUT` pour les autres nœuds."""
+        s = self.env.settings
+        return s.convert_timeout if app == "convert" else s.apps_timeout
 
     def _tab_folder(self) -> Path | None:
         folder = self.env.settings.tab_exports_dir
@@ -240,11 +259,13 @@ class SuiteNodes:
     async def states(self, apps: tuple[str, ...] = NODE_APPS) -> list[NodeState]:
         return list(await asyncio.gather(*(self.state(app) for app in apps)))
 
-    async def state(self, app: str) -> NodeState:
+    async def state(self, app: str, *, fresh: bool = False) -> NodeState:
+        """État du nœud (cache court) ; `fresh` relit le manifeste et met le cache à jour
+        (vérification demandée par l'utilisateur, `GET /api/apps/status`)."""
         key = _key(app, self.env)
         cached = _CACHE.get(key)
         now = time.monotonic()
-        if cached and cached[0] > now:
+        if cached and cached[0] > now and not fresh:
             return cached[1]
         try:
             state = await asyncio.wait_for(self._load(app), timeout=MANIFEST_TIMEOUT)
@@ -428,7 +449,12 @@ class SuiteNodes:
                 else None
             )
             response = await self.http(app).call(
-                action.http.method, path, params=query, json_body=json_body, headers=headers
+                action.http.method,
+                path,
+                params=query,
+                json_body=json_body,
+                headers=headers,
+                timeout=self.action_timeout(app),
             )
             data = _finite(response.body)
             return NodeResult(

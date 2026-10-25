@@ -12,6 +12,20 @@ def test_empty_env_values_mean_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.llm_fallback_provider is None
 
 
+def test_convert_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CONVERT_BASE_URL", raising=False)
+    monkeypatch.delenv("CONVERT_TIMEOUT", raising=False)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    # Défauts : API locale de Convert, délai long (conversion avec OCR)
+    assert settings.convert_base_url == "http://127.0.0.1:8010/api"
+    assert settings.convert_timeout == 120
+    monkeypatch.setenv("CONVERT_BASE_URL", "")  # « CONVERT_BASE_URL= » : non défini
+    assert Settings(_env_file=None).convert_base_url is None  # type: ignore[call-arg]
+    monkeypatch.setenv("CONVERT_TIMEOUT", "0")
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+
+
 def test_router_from_settings_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("LLM_FALLBACK_PROVIDER", "ollama")

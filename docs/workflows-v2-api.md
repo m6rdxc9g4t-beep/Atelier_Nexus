@@ -70,7 +70,7 @@ comme avant. `GET /api/workflows` renvoie les deux ; le champ `version` les dist
 interface CatalogEntry {
   uses: string;                   // "tool:…" | "node:app/action"
   source: "tool" | "node";
-  app: string | null;             // "viz" | "tab" | "projets" | "cine" | … | null (outil système)
+  app: string | null;             // "viz" | "tab" | "projets" | "convert" | "cine" | … | null (outil système)
   label: string; description: string;
   kind: "read" | "write" | "destructive";   // outil : requires_approval → "write"
   input_schema: Record<string, unknown>;    // JSON Schema (portable_schema pour un outil)
@@ -86,7 +86,9 @@ interface Catalog {
 ```
 
 Couleurs (signature, docs/SUITE.md §1.7) : viz `#F2C811`, tab `#21A366`, projets `#94D82D`, nexus `#E8590C`, cine `#E64980`,
-savoir `#9B5DE5`, tresorerie `#3B5BDB`, cuisine `#E056E2`, dates `#E03131`, système (null) → couleur nexus.
+savoir `#9B5DE5`, tresorerie `#3B5BDB`, cuisine `#E056E2`, dates `#E03131`, convert `#C9951D`, système (null) → couleur nexus.
+Les actions des nœuds viennent des manifestes de Viz, Tab, Projets et Convert (`node:convert/conversions.table`…), dans cet
+ordre ; Convert arrêté → `status: "unreachable"` et aucune entrée `node:convert/…`.
 
 ## 4. Validation
 
@@ -101,6 +103,35 @@ La validation d'entrée tolère les gabarits : un champ qui contient un gabarit 
 `GET /api/workflows?agent=` (sans `agent` : tous, v1 et v2) · `POST /api/workflows` (corps v2 avec `version: 2`, ou v1) →
 201 · `GET/PUT/DELETE /api/workflows/{id}` · `POST /api/workflows/{id}/convert` (v1 → v2, enregistré, renvoie le v2 :
 ids `s1..sn`, chaîne linéaire de `needs`, `{{nom}}` → `{{params.nom}}`).
+
+### Bibliothèque de modèles de la suite
+
+`GET /api/workflows/library` → `WorkflowTemplate[]` : enchaînements prêts à copier dans un brouillon de workflow de suite
+(`agent: null`), jamais exécutés tels quels. Code : `backend/app/workflows_v2/library.py` (données et logique pure).
+
+```ts
+interface WorkflowTemplate {
+  slug: string;                   // stable, unique (« convert-derniere-conversion-tab-viz »)
+  title: string; description: string;   // description ≤ 500 caractères : copiable telle quelle
+  value: string;                  // bénéfice pour l'utilisateur, une phrase
+  apps: string[];                 // applications enchaînées, dans l'ordre (puces colorées)
+  params: WorkflowParam[];        // libellé et défaut sûr ; identifiant à saisir → défaut vide (« Renseignez … » au lancement)
+  steps: WorkflowStepV2[];        // avec `position` en couches, de gauche à droite (mise en page de l'éditeur)
+  requirements: string[];         // prérequis en clair (« Atelier Convert lancé… », « TAB_MCP_COMMAND (serveur MCP de Tab)… »)
+  trigger_hint: string | null;    // déclencheur conseillé, en clair (null : manuel)
+  available: boolean;             // toutes les étapes connues et leurs applications joignables, sur cette machine
+  missing: string[];              // « node:convert/conversions.list : Atelier Convert injoignable », « tool:tab_check_table :
+                                  // boîte « Atelier Tab » non configurée », « … : action absente du manifeste d'Atelier Viz 0.1.0 »
+}
+```
+
+`available` / `missing` sont calculés à chaque lecture avec le registre d'étapes réel (catalogue de suite) : une ligne par
+étape inutilisable (application injoignable, non configurée, sans manifeste, action absente, Tab sans `TAB_MCP_COMMAND`,
+boîte non configurée), puis les autres erreurs de validation (champ refusé par un manifeste plus récent). La route ne lève
+jamais pour une application arrêtée (connexion refusée tout de suite, échec gardé 10 s en cache) ; un manifeste inattendu
+ne rend indisponible que le modèle concerné (« Vérification impossible sur cette machine… »). Chaque modèle passe la validation v2 du moteur contre les manifestes réels enregistrés
+(`tests/test_workflow_library.py`) ; aucun ne demande de fichier en base64. Liste des modèles : `docs/workflows.md`, section
+« Modèles de la suite ».
 
 ## 6. Exécutions (persistées)
 
@@ -162,10 +193,11 @@ interface SuiteMap {
 }
 ```
 `flows` fixes : tab→projets « Import DataFlow » (webhook), tab→viz « Instantanés » (fichiers), projets→viz « Jeux de données » (HTTP),
-plus nexus→chaque app atteinte par au moins un outil d'écriture (« Écritures validées ») et chaque app→nexus lue (« Lecture »).
+convert→tab « Nouvelle table » (fichiers : Convert écrit la table dans le dossier de données de Tab), plus nexus→chaque app atteinte par au moins un outil d'écriture (« Écritures validées ») et chaque app→nexus lue (« Lecture »).
 
 `GET /api/suite/events?app=&since=&limit=` → `{ app: string; events: AtelierEvent[]; next: number; gap?: boolean; status: string }[]`
-(une entrée par app ; `since` n'a de sens qu'avec `app`). `AtelierEvent` = format §7.3 du contrat.
+(une entrée par app de `NODE_APPS` : viz, tab, projets, convert ; `since` n'a de sens qu'avec `app`). `AtelierEvent` = format §7.3
+du contrat.
 
 ## 8. Sortie structurée des outils
 

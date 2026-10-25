@@ -4,13 +4,14 @@ d'événements (chaque `op`), gabarits `{{event.…}}`, catalogue des champs d'u
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, get_args
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.triggers import DailySchedule, EventFilter, IntervalSchedule
+from app.schemas.triggers import DailySchedule, EventFilter, IntervalSchedule, TriggerApp
+from app.suite.apps import NODE_APPS
 from app.suite.manifest import parse_manifest
 from app.triggers.matching import (
     MISSING,
@@ -196,3 +197,9 @@ def test_manifest_event_fields_from_the_data_schema() -> None:
     assert by_type["projets.work_item.status_changed"].data_fields == ["project_id", "from", "to"]
     assert by_type["projets.work_item.deleted"].data_fields == []  # schéma illisible : ignoré
     assert by_type["projets.time_entry.created"].data_fields[1] == "hours"
+
+
+def test_trigger_apps_are_the_suite_nodes() -> None:
+    """Le Literal figé du contrat (docs/declencheurs-api.md) suit la liste des nœuds : une app
+    ajoutée à NODE_APPS doit l'être aussi à TriggerApp (et à TRIGGER_APPS du frontend)."""
+    assert set(get_args(TriggerApp)) == set(NODE_APPS)

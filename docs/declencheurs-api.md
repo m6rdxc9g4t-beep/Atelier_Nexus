@@ -3,6 +3,8 @@
 Suite de `docs/workflows-v2-api.md`. Un **déclencheur** lance un workflow v2 tout seul : à heure fixe (**horaire**) ou quand
 une application publie un **événement** (contrat `atelier-node/1`, `docs/apps/noeud-atelier.md` §7.3 et §7.7).
 Les noms ci-dessous sont **figés** : le frontend code contre eux avec des doubles, le backend les implémente tels quels.
+Seule évolution : `app` accepte `"convert"` (Atelier Convert, 4e nœud), ajouté en même temps dans `TriggerApp` du backend
+(`app/schemas/triggers.py`) et du frontend (`types/api.ts`, `TRIGGER_APPS`).
 
 ## 0. Règles qui ne se négocient pas
 
@@ -48,7 +50,7 @@ interface TriggerBase {
 interface ScheduleTrigger extends TriggerBase { kind: "schedule"; schedule: Schedule }
 interface EventTrigger extends TriggerBase {
   kind: "event";
-  app: "viz" | "projets" | "tab";
+  app: "viz" | "projets" | "tab" | "convert";  // = NODE_APPS (test d'égalité côté backend)
   types: string[];                // 1 à 10 types d'événements déclarés par le manifeste de l'app
   filters: EventFilter[];         // 0 à 10
   debounce_seconds: number;       // 0 à 3600, défaut 0 : regroupe une rafale en un seul lancement (le dernier événement gagne)

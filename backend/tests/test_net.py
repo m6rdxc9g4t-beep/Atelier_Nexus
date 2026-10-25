@@ -91,10 +91,13 @@ async def test_local_connectors_and_nodes_are_reached_directly(system_proxy: Non
     async with _Demo("http://127.0.0.1:5051/api") as savoir:
         assert not _proxied(savoir._http, "http://127.0.0.1:5051/api/notes")
     node = NodeHttpClient("viz", "Atelier Viz", "http://127.0.0.1:8000/api")
+    convert = NodeHttpClient("convert", "Atelier Convert", "http://127.0.0.1:8010/api")
     try:
         assert not _proxied(node._http, "http://127.0.0.1:8000/api/atelier/manifest")
+        assert not _proxied(convert._http, "http://127.0.0.1:8010/api/atelier/manifest")
     finally:
         await node.aclose()
+        await convert.aclose()
 
 
 async def test_remote_apps_keep_the_system_proxy(system_proxy: None) -> None:

@@ -1,0 +1,4994 @@
+{
+  "contract": "atelier-node/1",
+  "app": "projets",
+  "name": "Atelier Projets",
+  "version": "0.1.0",
+  "transport": "http",
+  "actions": [
+    {
+      "id": "projects.list",
+      "label": "Lister les projets",
+      "description": "Projets d’Atelier Projets avec leur budget, leurs dates et leur dépôt.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/projects"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "slug",
+              "description",
+              "local_repo_path",
+              "github",
+              "default_branch",
+              "hours_per_day",
+              "budget",
+              "start_date",
+              "due_date",
+              "git_scanned_at",
+              "github_synced_at",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "local_repo_path": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "github": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "owner",
+                      "repo",
+                      "url"
+                    ],
+                    "properties": {
+                      "owner": {
+                        "type": "string"
+                      },
+                      "repo": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "default_branch": {
+                "type": "string"
+              },
+              "hours_per_day": {
+                "type": "number"
+              },
+              "budget": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "hours",
+                      "days"
+                    ],
+                    "properties": {
+                      "hours": {
+                        "type": "number"
+                      },
+                      "days": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "start_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "git_scanned_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "github_synced_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-10-18T14:30:00.000Z"
+                ]
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "examples": [
+                  "2026-10-18T14:30:00.000Z"
+                ]
+              }
+            },
+            "description": "Projet, lié à un dépôt Git local et à un dépôt GitHub"
+          },
+          "description": "Projets, par nom"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "projects.tree",
+      "label": "Arborescence d’un projet",
+      "description": "Phases, epics, stories et éléments d’un projet, avec agrégats, jalons et dépendances.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/projects/{project_id}/tree"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "project",
+            "hours_per_day",
+            "range",
+            "aggregate",
+            "phases",
+            "milestones",
+            "dependencies",
+            "critical_path"
+          ],
+          "properties": {
+            "project": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "slug",
+                "description",
+                "local_repo_path",
+                "github",
+                "default_branch",
+                "hours_per_day",
+                "budget",
+                "start_date",
+                "due_date",
+                "git_scanned_at",
+                "github_synced_at",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "local_repo_path": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "github": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "owner",
+                        "repo",
+                        "url"
+                      ],
+                      "properties": {
+                        "owner": {
+                          "type": "string"
+                        },
+                        "repo": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "default_branch": {
+                  "type": "string"
+                },
+                "hours_per_day": {
+                  "type": "number"
+                },
+                "budget": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "hours",
+                        "days"
+                      ],
+                      "properties": {
+                        "hours": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "start_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "description": "Date calendaire AAAA-MM-JJ",
+                      "examples": [
+                        "2026-10-18"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "due_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "description": "Date calendaire AAAA-MM-JJ",
+                      "examples": [
+                        "2026-10-18"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "git_scanned_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "examples": [
+                        "2026-10-18T14:30:00.000Z"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "github_synced_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "examples": [
+                        "2026-10-18T14:30:00.000Z"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "examples": [
+                    "2026-10-18T14:30:00.000Z"
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "examples": [
+                    "2026-10-18T14:30:00.000Z"
+                  ]
+                }
+              },
+              "description": "Projet, lié à un dépôt Git local et à un dépôt GitHub"
+            },
+            "hours_per_day": {
+              "type": "number"
+            },
+            "range": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "start": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "Date calendaire AAAA-MM-JJ",
+                      "examples": [
+                        "2026-10-18"
+                      ]
+                    },
+                    "end": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "Date calendaire AAAA-MM-JJ",
+                      "examples": [
+                        "2026-10-18"
+                      ]
+                    }
+                  },
+                  "description": "Plage de dates (bornes incluses)"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "aggregate": {
+              "type": "object",
+              "required": [
+                "status",
+                "progress",
+                "estimate",
+                "spent",
+                "work_items",
+                "status_counts"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "OPEN",
+                    "IN_PROGRESS",
+                    "IN_REVIEW",
+                    "ON_HOLD",
+                    "BLOCKED",
+                    "RESOLVED",
+                    "CLOSED",
+                    "REJECTED"
+                  ],
+                  "type": "string",
+                  "description": "Un des 8 statuts du workflow"
+                },
+                "progress": {
+                  "type": "number",
+                  "description": "Avancement pondéré par les estimations, en %"
+                },
+                "estimate": {
+                  "type": "object",
+                  "required": [
+                    "hours",
+                    "days"
+                  ],
+                  "properties": {
+                    "hours": {
+                      "type": "number"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                },
+                "spent": {
+                  "type": "object",
+                  "required": [
+                    "hours",
+                    "days"
+                  ],
+                  "properties": {
+                    "hours": {
+                      "type": "number"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                },
+                "work_items": {
+                  "type": "integer"
+                },
+                "status_counts": {
+                  "type": "object",
+                  "required": [
+                    "OPEN",
+                    "IN_PROGRESS",
+                    "IN_REVIEW",
+                    "ON_HOLD",
+                    "BLOCKED",
+                    "RESOLVED",
+                    "CLOSED",
+                    "REJECTED"
+                  ],
+                  "properties": {
+                    "OPEN": {
+                      "type": "integer"
+                    },
+                    "IN_PROGRESS": {
+                      "type": "integer"
+                    },
+                    "IN_REVIEW": {
+                      "type": "integer"
+                    },
+                    "ON_HOLD": {
+                      "type": "integer"
+                    },
+                    "BLOCKED": {
+                      "type": "integer"
+                    },
+                    "RESOLVED": {
+                      "type": "integer"
+                    },
+                    "CLOSED": {
+                      "type": "integer"
+                    },
+                    "REJECTED": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "description": "Agrégat calculé à partir des WorkItems contenus"
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "project_id",
+                  "title",
+                  "description",
+                  "position",
+                  "start_date",
+                  "due_date",
+                  "created_at",
+                  "updated_at",
+                  "code",
+                  "span",
+                  "aggregate",
+                  "epics",
+                  "milestones"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "project_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "integer"
+                  },
+                  "start_date": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Date calendaire AAAA-MM-JJ",
+                        "examples": [
+                          "2026-10-18"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "due_date": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Date calendaire AAAA-MM-JJ",
+                        "examples": [
+                          "2026-10-18"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Numérotation affichée (PHASE 1, EPIC 2, STORY 2.1)"
+                  },
+                  "span": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "start",
+                          "end"
+                        ],
+                        "properties": {
+                          "start": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date calendaire AAAA-MM-JJ",
+                            "examples": [
+                              "2026-10-18"
+                            ]
+                          },
+                          "end": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date calendaire AAAA-MM-JJ",
+                            "examples": [
+                              "2026-10-18"
+                            ]
+                          }
+                        },
+                        "description": "Plage de dates (bornes incluses)"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "aggregate": {
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "progress",
+                      "estimate",
+                      "spent",
+                      "work_items",
+                      "status_counts"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "OPEN",
+                          "IN_PROGRESS",
+                          "IN_REVIEW",
+                          "ON_HOLD",
+                          "BLOCKED",
+                          "RESOLVED",
+                          "CLOSED",
+                          "REJECTED"
+                        ],
+                        "type": "string",
+                        "description": "Un des 8 statuts du workflow"
+                      },
+                      "progress": {
+                        "type": "number",
+                        "description": "Avancement pondéré par les estimations, en %"
+                      },
+                      "estimate": {
+                        "type": "object",
+                        "required": [
+                          "hours",
+                          "days"
+                        ],
+                        "properties": {
+                          "hours": {
+                            "type": "number"
+                          },
+                          "days": {
+                            "type": "number"
+                          }
+                        },
+                        "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                      },
+                      "spent": {
+                        "type": "object",
+                        "required": [
+                          "hours",
+                          "days"
+                        ],
+                        "properties": {
+                          "hours": {
+                            "type": "number"
+                          },
+                          "days": {
+                            "type": "number"
+                          }
+                        },
+                        "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                      },
+                      "work_items": {
+                        "type": "integer"
+                      },
+                      "status_counts": {
+                        "type": "object",
+                        "required": [
+                          "OPEN",
+                          "IN_PROGRESS",
+                          "IN_REVIEW",
+                          "ON_HOLD",
+                          "BLOCKED",
+                          "RESOLVED",
+                          "CLOSED",
+                          "REJECTED"
+                        ],
+                        "properties": {
+                          "OPEN": {
+                            "type": "integer"
+                          },
+                          "IN_PROGRESS": {
+                            "type": "integer"
+                          },
+                          "IN_REVIEW": {
+                            "type": "integer"
+                          },
+                          "ON_HOLD": {
+                            "type": "integer"
+                          },
+                          "BLOCKED": {
+                            "type": "integer"
+                          },
+                          "RESOLVED": {
+                            "type": "integer"
+                          },
+                          "CLOSED": {
+                            "type": "integer"
+                          },
+                          "REJECTED": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "description": "Agrégat calculé à partir des WorkItems contenus"
+                  },
+                  "epics": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "phase_id",
+                        "title",
+                        "description",
+                        "position",
+                        "start_date",
+                        "due_date",
+                        "created_at",
+                        "updated_at",
+                        "code",
+                        "span",
+                        "aggregate",
+                        "stories"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "phase_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "position": {
+                          "type": "integer"
+                        },
+                        "start_date": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "description": "Date calendaire AAAA-MM-JJ",
+                              "examples": [
+                                "2026-10-18"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "due_date": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "description": "Date calendaire AAAA-MM-JJ",
+                              "examples": [
+                                "2026-10-18"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "examples": [
+                            "2026-10-18T14:30:00.000Z"
+                          ]
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "examples": [
+                            "2026-10-18T14:30:00.000Z"
+                          ]
+                        },
+                        "code": {
+                          "type": "string",
+                          "description": "Numérotation affichée (PHASE 1, EPIC 2, STORY 2.1)"
+                        },
+                        "span": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "start",
+                                "end"
+                              ],
+                              "properties": {
+                                "start": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "Date calendaire AAAA-MM-JJ",
+                                  "examples": [
+                                    "2026-10-18"
+                                  ]
+                                },
+                                "end": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "Date calendaire AAAA-MM-JJ",
+                                  "examples": [
+                                    "2026-10-18"
+                                  ]
+                                }
+                              },
+                              "description": "Plage de dates (bornes incluses)"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "aggregate": {
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "progress",
+                            "estimate",
+                            "spent",
+                            "work_items",
+                            "status_counts"
+                          ],
+                          "properties": {
+                            "status": {
+                              "enum": [
+                                "OPEN",
+                                "IN_PROGRESS",
+                                "IN_REVIEW",
+                                "ON_HOLD",
+                                "BLOCKED",
+                                "RESOLVED",
+                                "CLOSED",
+                                "REJECTED"
+                              ],
+                              "type": "string",
+                              "description": "Un des 8 statuts du workflow"
+                            },
+                            "progress": {
+                              "type": "number",
+                              "description": "Avancement pondéré par les estimations, en %"
+                            },
+                            "estimate": {
+                              "type": "object",
+                              "required": [
+                                "hours",
+                                "days"
+                              ],
+                              "properties": {
+                                "hours": {
+                                  "type": "number"
+                                },
+                                "days": {
+                                  "type": "number"
+                                }
+                              },
+                              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                            },
+                            "spent": {
+                              "type": "object",
+                              "required": [
+                                "hours",
+                                "days"
+                              ],
+                              "properties": {
+                                "hours": {
+                                  "type": "number"
+                                },
+                                "days": {
+                                  "type": "number"
+                                }
+                              },
+                              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                            },
+                            "work_items": {
+                              "type": "integer"
+                            },
+                            "status_counts": {
+                              "type": "object",
+                              "required": [
+                                "OPEN",
+                                "IN_PROGRESS",
+                                "IN_REVIEW",
+                                "ON_HOLD",
+                                "BLOCKED",
+                                "RESOLVED",
+                                "CLOSED",
+                                "REJECTED"
+                              ],
+                              "properties": {
+                                "OPEN": {
+                                  "type": "integer"
+                                },
+                                "IN_PROGRESS": {
+                                  "type": "integer"
+                                },
+                                "IN_REVIEW": {
+                                  "type": "integer"
+                                },
+                                "ON_HOLD": {
+                                  "type": "integer"
+                                },
+                                "BLOCKED": {
+                                  "type": "integer"
+                                },
+                                "RESOLVED": {
+                                  "type": "integer"
+                                },
+                                "CLOSED": {
+                                  "type": "integer"
+                                },
+                                "REJECTED": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          },
+                          "description": "Agrégat calculé à partir des WorkItems contenus"
+                        },
+                        "stories": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "epic_id",
+                              "title",
+                              "description",
+                              "position",
+                              "start_date",
+                              "due_date",
+                              "created_at",
+                              "updated_at",
+                              "code",
+                              "span",
+                              "aggregate",
+                              "work_items"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "epic_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "position": {
+                                "type": "integer"
+                              },
+                              "start_date": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "Date calendaire AAAA-MM-JJ",
+                                    "examples": [
+                                      "2026-10-18"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "due_date": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "Date calendaire AAAA-MM-JJ",
+                                    "examples": [
+                                      "2026-10-18"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "examples": [
+                                  "2026-10-18T14:30:00.000Z"
+                                ]
+                              },
+                              "updated_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "examples": [
+                                  "2026-10-18T14:30:00.000Z"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "description": "Numérotation affichée (PHASE 1, EPIC 2, STORY 2.1)"
+                              },
+                              "span": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "required": [
+                                      "start",
+                                      "end"
+                                    ],
+                                    "properties": {
+                                      "start": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "description": "Date calendaire AAAA-MM-JJ",
+                                        "examples": [
+                                          "2026-10-18"
+                                        ]
+                                      },
+                                      "end": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "description": "Date calendaire AAAA-MM-JJ",
+                                        "examples": [
+                                          "2026-10-18"
+                                        ]
+                                      }
+                                    },
+                                    "description": "Plage de dates (bornes incluses)"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "aggregate": {
+                                "type": "object",
+                                "required": [
+                                  "status",
+                                  "progress",
+                                  "estimate",
+                                  "spent",
+                                  "work_items",
+                                  "status_counts"
+                                ],
+                                "properties": {
+                                  "status": {
+                                    "enum": [
+                                      "OPEN",
+                                      "IN_PROGRESS",
+                                      "IN_REVIEW",
+                                      "ON_HOLD",
+                                      "BLOCKED",
+                                      "RESOLVED",
+                                      "CLOSED",
+                                      "REJECTED"
+                                    ],
+                                    "type": "string",
+                                    "description": "Un des 8 statuts du workflow"
+                                  },
+                                  "progress": {
+                                    "type": "number",
+                                    "description": "Avancement pondéré par les estimations, en %"
+                                  },
+                                  "estimate": {
+                                    "type": "object",
+                                    "required": [
+                                      "hours",
+                                      "days"
+                                    ],
+                                    "properties": {
+                                      "hours": {
+                                        "type": "number"
+                                      },
+                                      "days": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                                  },
+                                  "spent": {
+                                    "type": "object",
+                                    "required": [
+                                      "hours",
+                                      "days"
+                                    ],
+                                    "properties": {
+                                      "hours": {
+                                        "type": "number"
+                                      },
+                                      "days": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                                  },
+                                  "work_items": {
+                                    "type": "integer"
+                                  },
+                                  "status_counts": {
+                                    "type": "object",
+                                    "required": [
+                                      "OPEN",
+                                      "IN_PROGRESS",
+                                      "IN_REVIEW",
+                                      "ON_HOLD",
+                                      "BLOCKED",
+                                      "RESOLVED",
+                                      "CLOSED",
+                                      "REJECTED"
+                                    ],
+                                    "properties": {
+                                      "OPEN": {
+                                        "type": "integer"
+                                      },
+                                      "IN_PROGRESS": {
+                                        "type": "integer"
+                                      },
+                                      "IN_REVIEW": {
+                                        "type": "integer"
+                                      },
+                                      "ON_HOLD": {
+                                        "type": "integer"
+                                      },
+                                      "BLOCKED": {
+                                        "type": "integer"
+                                      },
+                                      "RESOLVED": {
+                                        "type": "integer"
+                                      },
+                                      "CLOSED": {
+                                        "type": "integer"
+                                      },
+                                      "REJECTED": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  }
+                                },
+                                "description": "Agrégat calculé à partir des WorkItems contenus"
+                              },
+                              "work_items": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "project_id",
+                                    "story_id",
+                                    "type",
+                                    "status",
+                                    "priority",
+                                    "title",
+                                    "progress",
+                                    "position",
+                                    "start_date",
+                                    "due_date",
+                                    "estimate",
+                                    "spent",
+                                    "balance",
+                                    "created_at",
+                                    "updated_at",
+                                    "span"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 2147483647,
+                                      "description": "#ID public, cité dans les messages de commit"
+                                    },
+                                    "project_id": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 2147483647
+                                    },
+                                    "story_id": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 2147483647
+                                    },
+                                    "type": {
+                                      "enum": [
+                                        "FEATURE",
+                                        "TASK",
+                                        "BUG"
+                                      ],
+                                      "type": "string",
+                                      "description": "FEATURE | TASK | BUG"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "OPEN",
+                                        "IN_PROGRESS",
+                                        "IN_REVIEW",
+                                        "ON_HOLD",
+                                        "BLOCKED",
+                                        "RESOLVED",
+                                        "CLOSED",
+                                        "REJECTED"
+                                      ],
+                                      "type": "string",
+                                      "description": "Un des 8 statuts du workflow"
+                                    },
+                                    "priority": {
+                                      "enum": [
+                                        "LOW",
+                                        "NORMAL",
+                                        "HIGH",
+                                        "IMMEDIATE"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "progress": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100,
+                                      "description": "Avancement déclaré, en %"
+                                    },
+                                    "position": {
+                                      "type": "integer"
+                                    },
+                                    "start_date": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date",
+                                          "description": "Date calendaire AAAA-MM-JJ",
+                                          "examples": [
+                                            "2026-10-18"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "due_date": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date",
+                                          "description": "Date calendaire AAAA-MM-JJ",
+                                          "examples": [
+                                            "2026-10-18"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "estimate": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "hours",
+                                            "days"
+                                          ],
+                                          "properties": {
+                                            "hours": {
+                                              "type": "number"
+                                            },
+                                            "days": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "spent": {
+                                      "type": "object",
+                                      "required": [
+                                        "hours",
+                                        "days"
+                                      ],
+                                      "properties": {
+                                        "hours": {
+                                          "type": "number"
+                                        },
+                                        "days": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                                    },
+                                    "balance": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "delta"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "enum": [
+                                                "UNDER",
+                                                "ON_BUDGET",
+                                                "OVER",
+                                                "REMAINING"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "delta": {
+                                              "type": "object",
+                                              "required": [
+                                                "hours",
+                                                "days"
+                                              ],
+                                              "properties": {
+                                                "hours": {
+                                                  "type": "number"
+                                                },
+                                                "days": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                                            }
+                                          },
+                                          "description": "Bilan : UNDER / ON_BUDGET / OVER = réalisé − estimé d’un élément terminé (ou dépassement en cours) ; REMAINING = reste à consommer"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "created_at": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "examples": [
+                                        "2026-10-18T14:30:00.000Z"
+                                      ]
+                                    },
+                                    "updated_at": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "examples": [
+                                        "2026-10-18T14:30:00.000Z"
+                                      ]
+                                    },
+                                    "span": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "start",
+                                            "end"
+                                          ],
+                                          "properties": {
+                                            "start": {
+                                              "type": "string",
+                                              "format": "date",
+                                              "description": "Date calendaire AAAA-MM-JJ",
+                                              "examples": [
+                                                "2026-10-18"
+                                              ]
+                                            },
+                                            "end": {
+                                              "type": "string",
+                                              "format": "date",
+                                              "description": "Date calendaire AAAA-MM-JJ",
+                                              "examples": [
+                                                "2026-10-18"
+                                              ]
+                                            }
+                                          },
+                                          "description": "Plage de dates (bornes incluses)"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "milestones": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "project_id",
+                        "phase_id",
+                        "title",
+                        "description",
+                        "date",
+                        "reached_at",
+                        "reached",
+                        "created_at",
+                        "updated_at"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "project_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "phase_id": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "date": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "Date calendaire AAAA-MM-JJ",
+                          "examples": [
+                            "2026-10-18"
+                          ]
+                        },
+                        "reached_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "examples": [
+                                "2026-10-18T14:30:00.000Z"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reached": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "examples": [
+                            "2026-10-18T14:30:00.000Z"
+                          ]
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "examples": [
+                            "2026-10-18T14:30:00.000Z"
+                          ]
+                        }
+                      },
+                      "description": "Jalon (◆ sur le Gantt) ; phaseId null = jalon de niveau projet"
+                    }
+                  }
+                }
+              }
+            },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "project_id",
+                  "phase_id",
+                  "title",
+                  "description",
+                  "date",
+                  "reached_at",
+                  "reached",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "project_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "phase_id": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  "reached_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reached": {
+                    "type": "boolean"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  }
+                },
+                "description": "Jalon (◆ sur le Gantt) ; phaseId null = jalon de niveau projet"
+              },
+              "description": "Jalons de niveau projet (sans phase)"
+            },
+            "dependencies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "predecessor_id",
+                  "successor_id",
+                  "slack_days",
+                  "conflict"
+                ],
+                "properties": {
+                  "predecessor_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "successor_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "conflict": {
+                    "type": "boolean",
+                    "description": "Le successeur commence avant la fin du prédécesseur"
+                  }
+                }
+              },
+              "description": "Dépendances « fin → début » (flèches du Gantt)"
+            },
+            "critical_path": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "Éléments du chemin critique : tout retard retarde la fin du projet"
+            }
+          },
+          "description": "Arborescence Phase > Epic > Story > Élément, agrégats, jalons et dépendances"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "work_items.list",
+      "label": "Lister les éléments d’un projet",
+      "description": "Éléments (FEATURE, TASK, BUG) filtrés par statut, type, story, recherche ou date de modification.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/projects/{project_id}/work-items"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS",
+                "IN_REVIEW",
+                "ON_HOLD",
+                "BLOCKED",
+                "RESOLVED",
+                "CLOSED",
+                "REJECTED"
+              ],
+              "type": "string",
+              "description": "Un des 8 statuts du workflow"
+            },
+            "description": "Un ou plusieurs statuts"
+          },
+          "type": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "FEATURE",
+                "TASK",
+                "BUG"
+              ],
+              "type": "string",
+              "description": "FEATURE | TASK | BUG"
+            },
+            "description": "FEATURE, TASK, BUG"
+          },
+          "story_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "q": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Recherche dans le titre (sans casse ni accents), ou #ID"
+          },
+          "updated_since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Éléments modifiés depuis cet horodatage (inclus)"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object",
+          "required": [
+            "format",
+            "name",
+            "label",
+            "columns",
+            "rows",
+            "total",
+            "truncated"
+          ],
+          "properties": {
+            "format": {
+              "type": "string",
+              "const": "atelier-table/1"
+            },
+            "name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "label",
+                  "type"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "snake_case sans accent, unique dans la table"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Libellé français"
+                  },
+                  "type": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "date",
+                      "datetime",
+                      "boolean"
+                    ],
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre complet de lignes"
+            },
+            "truncated": {
+              "type": "boolean",
+              "description": "true quand rows ne contient pas toutes les lignes"
+            }
+          },
+          "description": "Table d’échange atelier-table/1 : date → AAAA-MM-JJ, datetime → ISO 8601, valeur absente → null"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "work_items.get",
+      "label": "Lire un élément",
+      "description": "Fiche complète d’un élément : description, journal, temps, commits et dépendances.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/work-items/{work_item_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "work_item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "work_item_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "project_id",
+            "story_id",
+            "type",
+            "status",
+            "priority",
+            "title",
+            "progress",
+            "position",
+            "start_date",
+            "due_date",
+            "estimate",
+            "spent",
+            "balance",
+            "created_at",
+            "updated_at",
+            "description",
+            "implementation_log",
+            "project",
+            "path",
+            "time_entries",
+            "commits",
+            "pull_requests",
+            "predecessors",
+            "successors"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "description": "#ID public, cité dans les messages de commit"
+            },
+            "project_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "story_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "type": {
+              "enum": [
+                "FEATURE",
+                "TASK",
+                "BUG"
+              ],
+              "type": "string",
+              "description": "FEATURE | TASK | BUG"
+            },
+            "status": {
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS",
+                "IN_REVIEW",
+                "ON_HOLD",
+                "BLOCKED",
+                "RESOLVED",
+                "CLOSED",
+                "REJECTED"
+              ],
+              "type": "string",
+              "description": "Un des 8 statuts du workflow"
+            },
+            "priority": {
+              "enum": [
+                "LOW",
+                "NORMAL",
+                "HIGH",
+                "IMMEDIATE"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Avancement déclaré, en %"
+            },
+            "position": {
+              "type": "integer"
+            },
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "due_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimate": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "hours",
+                    "days"
+                  ],
+                  "properties": {
+                    "hours": {
+                      "type": "number"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spent": {
+              "type": "object",
+              "required": [
+                "hours",
+                "days"
+              ],
+              "properties": {
+                "hours": {
+                  "type": "number"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+            },
+            "balance": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "delta"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "UNDER",
+                        "ON_BUDGET",
+                        "OVER",
+                        "REMAINING"
+                      ],
+                      "type": "string"
+                    },
+                    "delta": {
+                      "type": "object",
+                      "required": [
+                        "hours",
+                        "days"
+                      ],
+                      "properties": {
+                        "hours": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                    }
+                  },
+                  "description": "Bilan : UNDER / ON_BUDGET / OVER = réalisé − estimé d’un élément terminé (ou dépassement en cours) ; REMAINING = reste à consommer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "description": "Onglet 1 « Description (À faire) » — Markdown"
+            },
+            "implementation_log": {
+              "type": "string",
+              "description": "Onglet 2 « Journal d’avancement » — Markdown horodaté"
+            },
+            "project": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "hours_per_day"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                },
+                "hours_per_day": {
+                  "type": "number"
+                }
+              }
+            },
+            "path": {
+              "type": "object",
+              "required": [
+                "phase",
+                "epic",
+                "story"
+              ],
+              "properties": {
+                "phase": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "epic": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "story": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "time_entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "work_item_id",
+                  "spent_on",
+                  "duration",
+                  "comment",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "work_item_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "spent_on": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  "duration": {
+                    "type": "object",
+                    "required": [
+                      "hours",
+                      "days"
+                    ],
+                    "properties": {
+                      "hours": {
+                        "type": "number"
+                      },
+                      "days": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  }
+                },
+                "description": "Saisie de temps sur un élément"
+              }
+            },
+            "commits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "hash",
+                  "short_hash",
+                  "message",
+                  "author_name",
+                  "author_email",
+                  "committed_at",
+                  "branch",
+                  "keyword"
+                ],
+                "properties": {
+                  "hash": {
+                    "type": "string"
+                  },
+                  "short_hash": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "author_name": {
+                    "type": "string"
+                  },
+                  "author_email": {
+                    "type": "string"
+                  },
+                  "committed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "branch": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "keyword": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Mot-clé détecté : feature, task, bug, fix, feat, ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "pull_requests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "number",
+                  "title",
+                  "state",
+                  "draft",
+                  "status",
+                  "url",
+                  "head_branch",
+                  "base_branch",
+                  "author_login",
+                  "opened_at",
+                  "merged_at",
+                  "closed_at",
+                  "source"
+                ],
+                "properties": {
+                  "number": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "OPEN",
+                      "MERGED",
+                      "CLOSED"
+                    ],
+                    "type": "string"
+                  },
+                  "draft": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Statut du workflow affiché : brouillon → IN_PROGRESS, ouverte → IN_REVIEW, fusionnée → CLOSED, fermée → REJECTED"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "head_branch": {
+                    "type": "string"
+                  },
+                  "base_branch": {
+                    "type": "string"
+                  },
+                  "author_login": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "opened_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "merged_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "closed_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "enum": [
+                      "title",
+                      "body",
+                      "branch"
+                    ],
+                    "type": "string",
+                    "description": "Où le #ID a été détecté"
+                  }
+                }
+              }
+            },
+            "predecessors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui doivent finir avant celui-ci"
+            },
+            "successors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui attendent la fin de celui-ci"
+            }
+          },
+          "description": "Fiche complète de l’élément"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "work_items.create",
+      "label": "Créer un élément",
+      "description": "Crée une FEATURE, une TASK ou un BUG en fin de story.",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/stories/{story_id}/work-items"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "type": {
+            "enum": [
+              "FEATURE",
+              "TASK",
+              "BUG"
+            ],
+            "type": "string",
+            "description": "FEATURE | TASK | BUG"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "ON_HOLD",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "REJECTED"
+            ],
+            "type": "string",
+            "description": "Un des 8 statuts du workflow"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "IMMEDIATE"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 100000,
+            "description": "Texte Markdown"
+          },
+          "estimated_hours": {
+            "minimum": 0,
+            "maximum": 1000000,
+            "description": "Durée en heures",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "due_date": {
+            "format": "date",
+            "description": "Date calendaire AAAA-MM-JJ",
+            "examples": [
+              "2026-10-18"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_date": {
+            "format": "date",
+            "description": "Date calendaire AAAA-MM-JJ",
+            "examples": [
+              "2026-10-18"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "story_id",
+          "type",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "project_id",
+            "story_id",
+            "type",
+            "status",
+            "priority",
+            "title",
+            "progress",
+            "position",
+            "start_date",
+            "due_date",
+            "estimate",
+            "spent",
+            "balance",
+            "created_at",
+            "updated_at",
+            "description",
+            "implementation_log",
+            "project",
+            "path",
+            "time_entries",
+            "commits",
+            "pull_requests",
+            "predecessors",
+            "successors"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "description": "#ID public, cité dans les messages de commit"
+            },
+            "project_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "story_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "type": {
+              "enum": [
+                "FEATURE",
+                "TASK",
+                "BUG"
+              ],
+              "type": "string",
+              "description": "FEATURE | TASK | BUG"
+            },
+            "status": {
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS",
+                "IN_REVIEW",
+                "ON_HOLD",
+                "BLOCKED",
+                "RESOLVED",
+                "CLOSED",
+                "REJECTED"
+              ],
+              "type": "string",
+              "description": "Un des 8 statuts du workflow"
+            },
+            "priority": {
+              "enum": [
+                "LOW",
+                "NORMAL",
+                "HIGH",
+                "IMMEDIATE"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Avancement déclaré, en %"
+            },
+            "position": {
+              "type": "integer"
+            },
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "due_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimate": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "hours",
+                    "days"
+                  ],
+                  "properties": {
+                    "hours": {
+                      "type": "number"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spent": {
+              "type": "object",
+              "required": [
+                "hours",
+                "days"
+              ],
+              "properties": {
+                "hours": {
+                  "type": "number"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+            },
+            "balance": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "delta"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "UNDER",
+                        "ON_BUDGET",
+                        "OVER",
+                        "REMAINING"
+                      ],
+                      "type": "string"
+                    },
+                    "delta": {
+                      "type": "object",
+                      "required": [
+                        "hours",
+                        "days"
+                      ],
+                      "properties": {
+                        "hours": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                    }
+                  },
+                  "description": "Bilan : UNDER / ON_BUDGET / OVER = réalisé − estimé d’un élément terminé (ou dépassement en cours) ; REMAINING = reste à consommer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "description": "Onglet 1 « Description (À faire) » — Markdown"
+            },
+            "implementation_log": {
+              "type": "string",
+              "description": "Onglet 2 « Journal d’avancement » — Markdown horodaté"
+            },
+            "project": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "hours_per_day"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                },
+                "hours_per_day": {
+                  "type": "number"
+                }
+              }
+            },
+            "path": {
+              "type": "object",
+              "required": [
+                "phase",
+                "epic",
+                "story"
+              ],
+              "properties": {
+                "phase": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "epic": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "story": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "time_entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "work_item_id",
+                  "spent_on",
+                  "duration",
+                  "comment",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "work_item_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "spent_on": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  "duration": {
+                    "type": "object",
+                    "required": [
+                      "hours",
+                      "days"
+                    ],
+                    "properties": {
+                      "hours": {
+                        "type": "number"
+                      },
+                      "days": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  }
+                },
+                "description": "Saisie de temps sur un élément"
+              }
+            },
+            "commits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "hash",
+                  "short_hash",
+                  "message",
+                  "author_name",
+                  "author_email",
+                  "committed_at",
+                  "branch",
+                  "keyword"
+                ],
+                "properties": {
+                  "hash": {
+                    "type": "string"
+                  },
+                  "short_hash": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "author_name": {
+                    "type": "string"
+                  },
+                  "author_email": {
+                    "type": "string"
+                  },
+                  "committed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "branch": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "keyword": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Mot-clé détecté : feature, task, bug, fix, feat, ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "pull_requests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "number",
+                  "title",
+                  "state",
+                  "draft",
+                  "status",
+                  "url",
+                  "head_branch",
+                  "base_branch",
+                  "author_login",
+                  "opened_at",
+                  "merged_at",
+                  "closed_at",
+                  "source"
+                ],
+                "properties": {
+                  "number": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "OPEN",
+                      "MERGED",
+                      "CLOSED"
+                    ],
+                    "type": "string"
+                  },
+                  "draft": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Statut du workflow affiché : brouillon → IN_PROGRESS, ouverte → IN_REVIEW, fusionnée → CLOSED, fermée → REJECTED"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "head_branch": {
+                    "type": "string"
+                  },
+                  "base_branch": {
+                    "type": "string"
+                  },
+                  "author_login": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "opened_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "merged_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "closed_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "enum": [
+                      "title",
+                      "body",
+                      "branch"
+                    ],
+                    "type": "string",
+                    "description": "Où le #ID a été détecté"
+                  }
+                }
+              }
+            },
+            "predecessors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui doivent finir avant celui-ci"
+            },
+            "successors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui attendent la fin de celui-ci"
+            }
+          },
+          "description": "Fiche complète de l’élément"
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "work_items.update",
+      "label": "Modifier un élément",
+      "description": "Change le statut, l’avancement, la priorité, l’échéance ou le titre d’un élément.",
+      "kind": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/api/atelier/work-items/{work_item_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "work_item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "ON_HOLD",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "REJECTED"
+            ],
+            "type": "string",
+            "description": "Un des 8 statuts du workflow"
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Avancement en %"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "IMMEDIATE"
+            ],
+            "type": "string"
+          },
+          "due_date": {
+            "format": "date",
+            "description": "Date calendaire AAAA-MM-JJ",
+            "examples": [
+              "2026-10-18"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "work_item_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "project_id",
+            "story_id",
+            "type",
+            "status",
+            "priority",
+            "title",
+            "progress",
+            "position",
+            "start_date",
+            "due_date",
+            "estimate",
+            "spent",
+            "balance",
+            "created_at",
+            "updated_at",
+            "description",
+            "implementation_log",
+            "project",
+            "path",
+            "time_entries",
+            "commits",
+            "pull_requests",
+            "predecessors",
+            "successors"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "description": "#ID public, cité dans les messages de commit"
+            },
+            "project_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "story_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "type": {
+              "enum": [
+                "FEATURE",
+                "TASK",
+                "BUG"
+              ],
+              "type": "string",
+              "description": "FEATURE | TASK | BUG"
+            },
+            "status": {
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS",
+                "IN_REVIEW",
+                "ON_HOLD",
+                "BLOCKED",
+                "RESOLVED",
+                "CLOSED",
+                "REJECTED"
+              ],
+              "type": "string",
+              "description": "Un des 8 statuts du workflow"
+            },
+            "priority": {
+              "enum": [
+                "LOW",
+                "NORMAL",
+                "HIGH",
+                "IMMEDIATE"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Avancement déclaré, en %"
+            },
+            "position": {
+              "type": "integer"
+            },
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "due_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date calendaire AAAA-MM-JJ",
+                  "examples": [
+                    "2026-10-18"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimate": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "hours",
+                    "days"
+                  ],
+                  "properties": {
+                    "hours": {
+                      "type": "number"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spent": {
+              "type": "object",
+              "required": [
+                "hours",
+                "days"
+              ],
+              "properties": {
+                "hours": {
+                  "type": "number"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+            },
+            "balance": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "delta"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "UNDER",
+                        "ON_BUDGET",
+                        "OVER",
+                        "REMAINING"
+                      ],
+                      "type": "string"
+                    },
+                    "delta": {
+                      "type": "object",
+                      "required": [
+                        "hours",
+                        "days"
+                      ],
+                      "properties": {
+                        "hours": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                    }
+                  },
+                  "description": "Bilan : UNDER / ON_BUDGET / OVER = réalisé − estimé d’un élément terminé (ou dépassement en cours) ; REMAINING = reste à consommer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "description": "Onglet 1 « Description (À faire) » — Markdown"
+            },
+            "implementation_log": {
+              "type": "string",
+              "description": "Onglet 2 « Journal d’avancement » — Markdown horodaté"
+            },
+            "project": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "hours_per_day"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                },
+                "hours_per_day": {
+                  "type": "number"
+                }
+              }
+            },
+            "path": {
+              "type": "object",
+              "required": [
+                "phase",
+                "epic",
+                "story"
+              ],
+              "properties": {
+                "phase": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "epic": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "story": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "time_entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "work_item_id",
+                  "spent_on",
+                  "duration",
+                  "comment",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "work_item_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "spent_on": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date calendaire AAAA-MM-JJ",
+                    "examples": [
+                      "2026-10-18"
+                    ]
+                  },
+                  "duration": {
+                    "type": "object",
+                    "required": [
+                      "hours",
+                      "days"
+                    ],
+                    "properties": {
+                      "hours": {
+                        "type": "number"
+                      },
+                      "days": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  }
+                },
+                "description": "Saisie de temps sur un élément"
+              }
+            },
+            "commits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "hash",
+                  "short_hash",
+                  "message",
+                  "author_name",
+                  "author_email",
+                  "committed_at",
+                  "branch",
+                  "keyword"
+                ],
+                "properties": {
+                  "hash": {
+                    "type": "string"
+                  },
+                  "short_hash": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "author_name": {
+                    "type": "string"
+                  },
+                  "author_email": {
+                    "type": "string"
+                  },
+                  "committed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "branch": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "keyword": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Mot-clé détecté : feature, task, bug, fix, feat, ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "pull_requests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "number",
+                  "title",
+                  "state",
+                  "draft",
+                  "status",
+                  "url",
+                  "head_branch",
+                  "base_branch",
+                  "author_login",
+                  "opened_at",
+                  "merged_at",
+                  "closed_at",
+                  "source"
+                ],
+                "properties": {
+                  "number": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "OPEN",
+                      "MERGED",
+                      "CLOSED"
+                    ],
+                    "type": "string"
+                  },
+                  "draft": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Statut du workflow affiché : brouillon → IN_PROGRESS, ouverte → IN_REVIEW, fusionnée → CLOSED, fermée → REJECTED"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "head_branch": {
+                    "type": "string"
+                  },
+                  "base_branch": {
+                    "type": "string"
+                  },
+                  "author_login": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "opened_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                      "2026-10-18T14:30:00.000Z"
+                    ]
+                  },
+                  "merged_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "closed_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2026-10-18T14:30:00.000Z"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "enum": [
+                      "title",
+                      "body",
+                      "branch"
+                    ],
+                    "type": "string",
+                    "description": "Où le #ID a été détecté"
+                  }
+                }
+              }
+            },
+            "predecessors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui doivent finir avant celui-ci"
+            },
+            "successors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "title",
+                  "status",
+                  "slack_days"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "type": {
+                    "enum": [
+                      "FEATURE",
+                      "TASK",
+                      "BUG"
+                    ],
+                    "type": "string",
+                    "description": "FEATURE | TASK | BUG"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "OPEN",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "ON_HOLD",
+                      "BLOCKED",
+                      "RESOLVED",
+                      "CLOSED",
+                      "REJECTED"
+                    ],
+                    "type": "string",
+                    "description": "Un des 8 statuts du workflow"
+                  },
+                  "slack_days": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Marge en jours : 0 = enchaînement serré, négative = conflit, null si non planifié"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Élément lié par une dépendance « fin → début »"
+              },
+              "description": "Éléments qui attendent la fin de celui-ci"
+            }
+          },
+          "description": "Fiche complète de l’élément"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "work_items.log",
+      "label": "Écrire dans le journal d’avancement",
+      "description": "Ajoute une entrée horodatée en fin de journal d’avancement d’un élément.",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/work-items/{work_item_id}/log-entries"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "work_item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000,
+            "pattern": "\\S",
+            "description": "Texte Markdown de l’entrée"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "examples": [
+              "2026-10-18T14:30:00.000Z"
+            ]
+          },
+          "hours": {
+            "minimum": 0,
+            "maximum": 24,
+            "description": "Temps mentionné dans l’en-tête (informatif)",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "work_item_id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "work_item_id",
+            "at",
+            "entry"
+          ],
+          "properties": {
+            "work_item_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "entry": {
+              "type": "string",
+              "description": "Entrée ajoutée au journal (Markdown, « > **18 Oct 2026 - 16h30 :** … »)"
+            }
+          },
+          "description": "Entrée ajoutée en fin de journal d’avancement"
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "time_entries.create",
+      "label": "Saisir du temps",
+      "description": "Saisit des heures passées sur un élément (date du jour par défaut).",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/work-items/{work_item_id}/time-entries"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "work_item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 24,
+            "description": "Heures passées (de 0.01 à 24)"
+          },
+          "spent_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Date calendaire AAAA-MM-JJ",
+            "examples": [
+              "2026-10-18"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "work_item_id",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "work_item_id",
+            "spent_on",
+            "duration",
+            "comment",
+            "created_at",
+            "updated_at"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "work_item_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "spent_on": {
+              "type": "string",
+              "format": "date",
+              "description": "Date calendaire AAAA-MM-JJ",
+              "examples": [
+                "2026-10-18"
+              ]
+            },
+            "duration": {
+              "type": "object",
+              "required": [
+                "hours",
+                "days"
+              ],
+              "properties": {
+                "hours": {
+                  "type": "number"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "description": "Durée exprimée en heures et en jours (1 jour = hoursPerDay heures)"
+            },
+            "comment": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            }
+          },
+          "description": "Saisie de temps créée"
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "milestones.list",
+      "label": "Lister les jalons d’un projet",
+      "description": "Jalons d’un projet : phase, date cible et atteinte.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/projects/{project_id}/milestones"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object",
+          "required": [
+            "format",
+            "name",
+            "label",
+            "columns",
+            "rows",
+            "total",
+            "truncated"
+          ],
+          "properties": {
+            "format": {
+              "type": "string",
+              "const": "atelier-table/1"
+            },
+            "name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "label",
+                  "type"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "snake_case sans accent, unique dans la table"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Libellé français"
+                  },
+                  "type": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "date",
+                      "datetime",
+                      "boolean"
+                    ],
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre complet de lignes"
+            },
+            "truncated": {
+              "type": "boolean",
+              "description": "true quand rows ne contient pas toutes les lignes"
+            }
+          },
+          "description": "Table d’échange atelier-table/1 : date → AAAA-MM-JJ, datetime → ISO 8601, valeur absente → null"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "milestones.reach",
+      "label": "Marquer un jalon atteint",
+      "description": "Pose la date d’atteinte d’un jalon (maintenant par défaut) ; sans effet s’il est déjà atteint.",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/milestones/{milestone_id}/reach"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "milestone_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "reached_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date d’atteinte (maintenant par défaut, jamais dans le futur)"
+          }
+        },
+        "required": [
+          "milestone_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "project_id",
+            "phase_id",
+            "title",
+            "description",
+            "date",
+            "reached_at",
+            "reached",
+            "created_at",
+            "updated_at"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "project_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "phase_id": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "description": "Date calendaire AAAA-MM-JJ",
+              "examples": [
+                "2026-10-18"
+              ]
+            },
+            "reached_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "examples": [
+                    "2026-10-18T14:30:00.000Z"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reached": {
+              "type": "boolean"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "examples": [
+                "2026-10-18T14:30:00.000Z"
+              ]
+            }
+          },
+          "description": "Jalon"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "tables.get",
+      "label": "Lire une table de Projets",
+      "description": "Éléments de travail, saisies de temps ou jalons (tous les projets ou un seul) au format atelier-table/1.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/tables/{name}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "enum": [
+              "work-items",
+              "time-entries",
+              "milestones"
+            ],
+            "type": "string",
+            "description": "work-items | time-entries | milestones"
+          },
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Un seul projet (tous par défaut)"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object",
+          "required": [
+            "format",
+            "name",
+            "label",
+            "columns",
+            "rows",
+            "total",
+            "truncated"
+          ],
+          "properties": {
+            "format": {
+              "type": "string",
+              "const": "atelier-table/1"
+            },
+            "name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "label",
+                  "type"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "snake_case sans accent, unique dans la table"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Libellé français"
+                  },
+                  "type": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "date",
+                      "datetime",
+                      "boolean"
+                    ],
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre complet de lignes"
+            },
+            "truncated": {
+              "type": "boolean",
+              "description": "true quand rows ne contient pas toutes les lignes"
+            }
+          },
+          "description": "Table d’échange atelier-table/1 : date → AAAA-MM-JJ, datetime → ISO 8601, valeur absente → null"
+        }
+      },
+      "idempotency": "none"
+    },
+    {
+      "id": "imports.atelier_tab",
+      "label": "Importer une table d’Atelier Tab",
+      "description": "Importe une enveloppe DataFlow v2.1.0 : crée ou met à jour les éléments (réimport sans doublon).",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/imports/atelier-tab"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "description": "Enveloppe DataFlow v2.1.0 d’Atelier Tab (target_system « atelier_projets », schema_version « 2.1.0 », workspace, project.columns_schema, project.records) : docs/SUITE.md §4.1"
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "description": "Réponse de l’import (camelCase, route existante) : { projectId, storyId, created, updated, unchanged, skipped, warnings, items }"
+        }
+      },
+      "idempotency": "header"
+    }
+  ],
+  "events": [
+    {
+      "type": "projets.work_item.created",
+      "label": "Élément créé",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "story_id",
+          "type",
+          "status"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "story_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "type": {
+            "enum": [
+              "FEATURE",
+              "TASK",
+              "BUG"
+            ],
+            "type": "string",
+            "description": "FEATURE | TASK | BUG"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "ON_HOLD",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "REJECTED"
+            ],
+            "type": "string",
+            "description": "Un des 8 statuts du workflow"
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.work_item.updated",
+      "label": "Élément modifié",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "fields"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Champs changés (snake_case) : status, progress, due_date, implementation_log…"
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.work_item.status_changed",
+      "label": "Statut d’un élément changé",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "from": {
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "ON_HOLD",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "REJECTED"
+            ],
+            "type": "string",
+            "description": "Un des 8 statuts du workflow"
+          },
+          "to": {
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "ON_HOLD",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "REJECTED"
+            ],
+            "type": "string",
+            "description": "Un des 8 statuts du workflow"
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.work_item.deleted",
+      "label": "Élément supprimé",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.time_entry.created",
+      "label": "Temps saisi",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "time_entry_id",
+          "hours",
+          "spent_on"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "time_entry_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "hours": {
+            "type": "number"
+          },
+          "spent_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Date calendaire AAAA-MM-JJ",
+            "examples": [
+              "2026-10-18"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.milestone.reached",
+      "label": "Jalon atteint",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "date",
+          "reached_at"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant (chaîne)"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date cible du jalon"
+          },
+          "reached_at": {
+            "type": "string",
+            "format": "date-time",
+            "examples": [
+              "2026-10-18T14:30:00.000Z"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "projets.import.completed",
+      "label": "Import Atelier Tab terminé",
+      "data_schema": {
+        "type": "object",
+        "required": [
+          "source",
+          "created",
+          "updated",
+          "unchanged",
+          "skipped"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "const": "atelier-tab"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "unchanged": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  ]
+}

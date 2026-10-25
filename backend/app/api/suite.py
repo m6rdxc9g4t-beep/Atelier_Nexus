@@ -3,7 +3,7 @@
 - `GET /api/suite/map` : pour chaque application, actions et événements de son manifeste,
   outils Nexus qui la touchent, agents qui l'utilisent ; échanges entre applications ;
   workflows qui la touchent.
-- `GET /api/suite/events` : derniers événements de Viz, Projets et Tab (contrat §7.3).
+- `GET /api/suite/events` : derniers événements de Viz, Projets, Tab et Convert (contrat §7.3).
 Ne lève jamais pour une application en panne : son statut le dit.
 """
 
@@ -41,6 +41,8 @@ FIXED_FLOWS = (
     ("tab", "projets", "Import DataFlow", "webhook"),
     ("tab", "viz", "Instantanés", "fichiers"),
     ("projets", "viz", "Jeux de données", "HTTP"),
+    # Convert écrit la table (tables/<id>.json) directement dans le dossier de données de Tab
+    ("convert", "tab", "Nouvelle table", "fichiers"),
 )
 
 

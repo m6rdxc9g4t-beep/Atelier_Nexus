@@ -3,7 +3,8 @@
 - Workflow d'un agent : les outils de ses boîtes (`agent.toolsets`).
 - Workflow de suite (`agent: null`) : l'union des boîtes non internes ; seules les boîtes
   configurées sont disponibles. Aucun modèle n'est appelé : les outils `sensitive` sont permis.
-- Actions `node:<app>/<action_id>` des manifestes de Viz, Projets et Tab, quel que soit l'agent.
+- Actions `node:<app>/<action_id>` des manifestes de Viz, Projets, Tab et Convert, quel que
+  soit l'agent.
 
 `delegate_to_agent` et `current_datetime` ne sont jamais proposés (`NOT_REPLAYABLE`).
 """

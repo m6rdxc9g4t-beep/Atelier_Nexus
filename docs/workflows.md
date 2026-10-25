@@ -104,7 +104,7 @@ applications : [`apps/noeud-atelier.md`](apps/noeud-atelier.md) (lecture des nœ
 
 Un workflow v2 est un **graphe** d'étapes. Chaque étape utilise un outil Nexus (`tool:<nom>`) ou
 une action déclarée par le manifeste d'une application (`node:<app>/<action_id>`, Viz, Projets,
-Tab). Les étapes se citent par gabarits : `{{steps.lire.data.rows[0].titre}}` passe une valeur
+Tab ou Convert). Les étapes se citent par gabarits : `{{steps.lire.data.rows[0].titre}}` passe une valeur
 d'une application à l'autre, sans modèle.
 
 ## 5. Schéma
@@ -114,15 +114,20 @@ d'une application à l'autre, sans modèle.
   "version": 2, "agent": null, "title": "Planning Tab → tâches Projets → jeu Viz",
   "params": [{"name": "table", "label": "Table", "default": "tbl_planning_lots"}],
   "steps": [
-    {"id": "lire", "uses": "node:tab/tables.query", "input": {"table_id": "{{params.table}}"}, "needs": []},
+    {"id": "lire", "uses": "node:tab/tables.query", "input": {"table": "{{params.table}}"}, "needs": []},
     {"id": "creer", "uses": "node:projets/work_items.create", "needs": ["lire"],
-     "input": {"story_id": 2, "type": "TASK", "title": "{{steps.lire.data.rows[0].task_name}}"}},
-    {"id": "publier", "uses": "node:viz/datasets.upsert_rows", "needs": ["lire"],
+     "input": {"story_id": 2, "type": "TASK", "title": "{{steps.lire.data.rows[0].lot_tache}}"}},
+    {"id": "publier", "uses": "node:viz/datasets.upsert_table", "needs": ["lire"],
      "when": {"left": "{{steps.lire.data.total}}", "op": "gt", "right": 0},
-     "input": {"name": "lots", "table": "{{steps.lire.data}}"}, "on_error": "continue"}
+     "input": {"name": "Lots", "key": "nexus:lots", "table": "{{steps.lire.data}}"},
+     "on_error": "continue"}
   ]
 }
 ```
+
+Identifiants et champs des actions : ceux des manifestes réels (`node:tab/tables.query` prend
+`table`, id ou nom exact ; `node:viz/datasets.upsert_table` exige une `key` stable, même clé = même
+jeu). Le catalogue (`GET /api/workflows/catalog`) les donne tels que l'application les publie.
 
 - `agent: null` = **workflow de suite** : toutes les boîtes non internes, seules les configurées
   sont disponibles. Un workflow d'agent n'a que les outils de ses boîtes. Les actions `node:` sont
@@ -156,7 +161,9 @@ d'une application à l'autre, sans modèle.
   `sensitive` sont permis (aucune donnée ne part vers un modèle) ; rien des données des étapes
   n'est journalisé.
 - **Nœuds** : adresses de bouclage uniquement, redirections refusées, réponse ≤ 10 Mo, délai
-  `APPS_TIMEOUT`, entrée validée contre `input_schema` (JSON Schema 2020-12).
+  `APPS_TIMEOUT` (`CONVERT_TIMEOUT`, 120 s, pour les seules actions d'Atelier Convert : une
+  conversion avec OCR est longue ; ses événements gardent `APPS_TIMEOUT`, son manifeste 5 s),
+  entrée validée contre `input_schema` (JSON Schema 2020-12).
 - Erreur : `on_error: stop` → `failed`, la suite `skipped` ; `continue` → on poursuit (une étape qui
   lit la `data` absente échoue en `REF_NOT_FOUND`). Refus → `refused`, exécution `stopped`.
 - Sortie conservée : `content` ≤ 4000 caractères, table ≤ 1000 lignes (`truncated: true`), JSON
@@ -182,6 +189,7 @@ application indisponible, une entrée incomplète ou une condition inachevée so
 | Méthode | Chemin | Rôle |
 |---|---|---|
 | GET | `/api/workflows/catalog?agent=` | Étapes disponibles (outils + actions des manifestes), statut des applications |
+| GET | `/api/workflows/library` | Modèles de workflows de la suite, avec `available` / `missing` pour cette machine |
 | POST | `/api/workflows/validate` | Validation (codes ci-dessus) et ordre d'exécution |
 | POST / PUT | `/api/workflows`, `/api/workflows/{id}` | Corps v2 (`version: 2`) ou v1 |
 | POST | `/api/workflows/{id}/convert` | v1 → v2 enregistré (ids `s1..sn`, chaîne de `needs`, `{{nom}}` → `{{params.nom}}`) |
@@ -192,7 +200,7 @@ application indisponible, une entrée incomplète ou une condition inachevée so
 
 Base : migration `0006_workflow_runs` (table `workflow_runs`, colonne `workflows.version` à 1 par
 défaut, `agent` facultatif ; la descente retire les workflows v2). Code : `app/workflows_v2/`
-(`templates`, `graph`, `steps`, `validation`, `engine`), `app/suite/` (nœuds),
+(`templates`, `graph`, `steps`, `validation`, `engine`, `library`), `app/suite/` (nœuds),
 `app/schemas/workflows_v2.py`, `app/api/workflows.py`, `app/api/suite.py`.
 
 Sortie structurée des outils (`ToolOutput.data`, jamais envoyée au modèle) : `atelier-table/1` pour
@@ -201,13 +209,43 @@ Sortie structurée des outils (`ToolOutput.data`, jamais envoyée au modèle) : 
 fiches pour `data_via_describe_dataset`, `projets_work_item`, les écritures Projets (`{id, …}`) et
 le pont Tab → Projets (résumé de l'import).
 
+### Modèles de la suite
+
+`GET /api/workflows/library` (contrat : [`workflows-v2-api.md`](workflows-v2-api.md) §5) fournit
+des enchaînements prêts à copier dans un brouillon de workflow de suite. Un modèle n'est jamais
+lancé tel quel : copié, relu, enregistré puis lancé, et chaque étape attend sa validation
+(`every_step`). `missing` dit en clair ce qui manque sur cette machine (« node:convert/
+conversions.list : Atelier Convert injoignable »). Aucun modèle ne demande de fichier en base64 :
+un relevé se convertit dans Convert, le workflow part de son historique.
+
+| Modèle (`slug`) | Étapes | Prérequis | Déclencheur conseillé |
+|---|---|---|---|
+| Dernière conversion Convert → Tab → Viz (`convert-derniere-conversion-tab-viz`) | `node:convert/conversions.list` → `conversions.send_to_tab` et `conversions.table` → `node:viz/datasets.upsert_table` (clé `convert:<id>`, un jeu par conversion) → `node:viz/datasets.query` (débits et crédits par mois) | Convert, Viz ; projet Tab (id `proj_…`) | Manuel |
+| Relevé converti → budget consolidé Tab → Viz (`convert-releve-budget-tab-viz`) | `node:convert/conversions.table` → `node:tab/rows.add` → `node:tab/tables.query` → `node:viz/datasets.upsert_table` → `node:viz/datasets.query` | Convert, `TAB_MCP_COMMAND`, Viz ; table de budget aux colonnes Date, Libellé, Débit, Crédit, Montant | Manuel, ou `convert.conversion.created` (voir ci-dessous) |
+| Planning Tab → tâches Projets (`tab-planning-vers-projets`) | `tool:tab_check_table` → `tool:projets_preview_tab_import` → `tool:projets_import_tab_table` → `node:projets/work_items.list` et `node:projets/milestones.list` | Instantané Tab, Projets, `PROJETS_IMPORT_TOKEN` si l'import est protégé | Manuel (relire l'aperçu) |
+| Temps passés Projets → jeux Viz hebdomadaires (`projets-temps-hebdo-viz`) | `node:projets/tables.get` (temps, éléments) → deux `node:viz/datasets.upsert_table` → deux `node:viz/datasets.query` | Projets, Viz | Horaire : lundi 08:00 |
+| Contrôle qualité d'une table Tab → journal et tâche Projets (`tab-controle-qualite-projets`) | `tool:tab_check_table` et `node:tab/tables.query` (lignes sans titre) → `node:projets/work_items.log` et `node:projets/work_items.create` (si des lignes sont sans titre) | Instantané Tab, `TAB_MCP_COMMAND`, Projets | `tab.table.changed`, attente 600 s |
+| Synchronisation Tab → Projets → Viz (`tab-projets-viz-synchro`) | `tool:projets_import_tab_table` → `node:projets/tables.get` et `node:projets/work_items.list` (bloqués) → `node:viz/datasets.upsert_table` → `node:viz/datasets.query` (par statut) | Instantané Tab, Projets, Viz | `tab.table.changed`, attente 300 s |
+| Alerte Viz → tâche de suivi Projets (`viz-alerte-tache-projets`) | `node:viz/datasets.get` → `node:projets/work_items.create` → `node:projets/work_items.log` | Viz, Projets ; une story pour les tâches | `viz.alert.triggered` |
+
+Exemple de déclencheur « Relevé → Tab » pour le budget consolidé : événement
+`convert.conversion.created`, filtre `data.statement` `eq` `true` (seulement les relevés bancaires
+reconnus), paramètre `conversion` = `{{event.subject.id}}`. Lancée par l'événement, l'exécution
+s'arrête dès la lecture de la conversion sur « À valider ».
+
+Les modèles sont validés par le moteur contre les manifestes réels enregistrés
+(`tests/test_workflow_library.py`) : identifiants d'étapes, `needs` sans cycle, gabarits vers des
+ancêtres seulement, paramètres déclarés et tous utilisés, actions connues, et porte de contrôle du
+lancement avec des valeurs plausibles. Ajouter un modèle : `app/workflows_v2/library.py`
+(`TEMPLATES`), positions calculées en couches par `layered()`.
+
 ---
 
 # Déclencheurs — Étape 20
 
 Contrat d'API figé avec le frontend : [`declencheurs-api.md`](declencheurs-api.md). Un
-**déclencheur** lance un workflow v2 tout seul : à heure fixe (**horaire**) ou quand Viz, Projets ou
-Tab publie un **événement** (`atelier-node/1`, [`apps/noeud-atelier.md`](apps/noeud-atelier.md)
+**déclencheur** lance un workflow v2 tout seul : à heure fixe (**horaire**) ou quand Viz, Projets,
+Tab ou Convert publie un **événement** (`atelier-node/1`, [`apps/noeud-atelier.md`](apps/noeud-atelier.md)
 §7.3 et §7.7).
 
 ## 9. Règles

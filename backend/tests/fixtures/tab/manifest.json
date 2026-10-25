@@ -1,0 +1,1085 @@
+{
+  "contract": "atelier-node/1",
+  "app": "tab",
+  "name": "Atelier Tab",
+  "version": "0.6.0",
+  "transport": "mcp",
+  "actions": [
+    {
+      "id": "tables.list",
+      "label": "Lister les tables",
+      "description": "Espaces de travail, projets et tables (ids, nombre de colonnes et de lignes), et collaborateurs.",
+      "kind": "read",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "tables": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "columns": {
+                                "type": "integer"
+                              },
+                              "rows": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "collaborators": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "workspaces",
+            "collaborators"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "list_tables",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "tables.query",
+      "label": "Interroger une table",
+      "description": "Lignes d’une table avec leurs valeurs calculées (formules évaluées), filtrées et paginées, au format atelier-table/1.",
+      "kind": "read",
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "const": "atelier-table/1"
+            },
+            "name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9_]+$"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "date",
+                      "datetime",
+                      "boolean"
+                    ]
+                  }
+                },
+                "required": [
+                  "key",
+                  "label",
+                  "type"
+                ]
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "total": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "format",
+            "name",
+            "label",
+            "columns",
+            "rows",
+            "total",
+            "truncated"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "query_table",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "columns": {
+            "description": "Colonnes à renvoyer : key (cout_ht), lettre (C), libellé (Coût HT) ou id. _ligne et _id sont toujours inclus. Par défaut : toutes.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Colonne : key, lettre, libellé ou id"
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "eq",
+                    "ne",
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "contains",
+                    "empty",
+                    "not_empty"
+                  ]
+                },
+                "value": {
+                  "description": "Valeur comparée à la valeur calculée (inutile pour empty / not_empty). Date : AAAA-MM-JJ ou JJ/MM/AAAA. contains : texte, sans tenir compte de la casse ni des accents.",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "column",
+                "op"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "offset": {
+            "description": "Lignes à sauter (défaut 0)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "description": "Nombre maximum de lignes (défaut 200, au plus 1000)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "tables.create",
+      "label": "Créer une table",
+      "description": "Crée une table dans un projet, avec ses colonnes typées.",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "table_id": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "table_id",
+            "columns"
+          ]
+        }
+      },
+      "idempotency": "field",
+      "http": null,
+      "mcp_tool": "create_table",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Projet : id ou nom"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number",
+                    "currency",
+                    "percent",
+                    "select",
+                    "date",
+                    "checkbox",
+                    "owner",
+                    "formula"
+                  ]
+                },
+                "formula": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "number",
+                    "currency",
+                    "percent",
+                    "text"
+                  ]
+                },
+                "choices": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "preset": {
+                  "description": "Pour type=select : \"atelier\" applique le préréglage « Statuts Atelier », les 8 statuts communs de la Suite Atelier (À faire, En cours, En revue, En attente, Bloquée, Résolue, Terminée, Rejetée), affichés avec leurs couleurs officielles. Remplace `choices`.",
+                  "type": "string",
+                  "enum": [
+                    "atelier"
+                  ]
+                },
+                "mapping": {
+                  "type": "string",
+                  "enum": [
+                    "entity_title",
+                    "workflow_state",
+                    "financial_ht",
+                    "financial_ttc",
+                    "assignee",
+                    "due_date",
+                    "start_date",
+                    "quantity",
+                    "description",
+                    "flag",
+                    "custom",
+                    "item_type",
+                    "time_spent"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "idempotency_key": {
+            "description": "Clé d’idempotence (1 à 200 caractères, ex. nexus:<exécution>:<étape>) : rejouer la même clé avec la même entrée renvoie la même réponse sans rien refaire ; avec une autre entrée, l’appel est refusé (IDEMPOTENCY_KEY_REUSED). Conservée 30 jours.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "project",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "rows.add",
+      "label": "Ajouter des lignes",
+      "description": "Ajoute des lignes à une table (valeurs saisies comme dans la grille), au-dessus de la ligne de total.",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "row": {
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "cells": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "added"
+          ]
+        }
+      },
+      "idempotency": "field",
+      "http": null,
+      "mcp_tool": "add_rows",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "rows": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "description": "Valeur comme on la taperait : \"45 000\", \"=SUM(C1:C3)\", \"En cours\", \"30/11/2026\", true. null vide la cellule.",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          },
+          "before_row": {
+            "description": "Insérer avant cette ligne (numéro affiché). Par défaut : avant la ligne de total, sinon à la fin.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "idempotency_key": {
+            "description": "Clé d’idempotence (1 à 200 caractères, ex. nexus:<exécution>:<étape>) : rejouer la même clé avec la même entrée renvoie la même réponse sans rien refaire ; avec une autre entrée, l’appel est refusé (IDEMPOTENCY_KEY_REUSED). Conservée 30 jours.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "table",
+          "rows"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "tables.import_csv",
+      "label": "Importer un CSV",
+      "description": "Importe le contenu d’un CSV dans une nouvelle table ou une table existante (types déduits, formats français, mise à jour par colonne clé).",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "table_id": {
+              "type": "string"
+            },
+            "inserted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "updated": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "new_columns": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "rejected_values": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "table_id",
+            "inserted",
+            "updated",
+            "new_columns"
+          ]
+        }
+      },
+      "idempotency": "field",
+      "http": null,
+      "mcp_tool": "import_csv",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000000,
+            "description": "Contenu du fichier CSV, première ligne = en-têtes"
+          },
+          "table": {
+            "description": "Table existante où importer (sinon : `project`)",
+            "type": "string"
+          },
+          "project": {
+            "description": "Projet (id ou nom) où créer une nouvelle table avec ces données",
+            "type": "string"
+          },
+          "name": {
+            "description": "Nom de la nouvelle table (défaut : Import CSV)",
+            "type": "string",
+            "minLength": 1
+          },
+          "delimiter": {
+            "description": "Séparateur ; par défaut détecté",
+            "type": "string",
+            "enum": [
+              "semicolon",
+              "comma",
+              "tab",
+              "pipe",
+              "dot"
+            ]
+          },
+          "has_header": {
+            "description": "false si la première ligne contient déjà des données",
+            "type": "boolean"
+          },
+          "key_column": {
+            "description": "Table existante : en-tête de la colonne qui identifie une ligne (ex. Référence). Les lignes dont la valeur existe déjà sont mises à jour au lieu d’être ajoutées.",
+            "type": "string"
+          },
+          "columns": {
+            "description": "Type imposé à une nouvelle colonne, par en-tête CSV (ex. {\"Code postal\": \"text\"}), ou \"skip\" pour l’ignorer",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "text",
+                "number",
+                "currency",
+                "percent",
+                "select",
+                "date",
+                "checkbox",
+                "owner",
+                "skip"
+              ]
+            }
+          },
+          "idempotency_key": {
+            "description": "Clé d’idempotence (1 à 200 caractères, ex. nexus:<exécution>:<étape>) : rejouer la même clé avec la même entrée renvoie la même réponse sans rien refaire ; avec une autre entrée, l’appel est refusé (IDEMPOTENCY_KEY_REUSED). Conservée 30 jours.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cells.set",
+      "label": "Modifier des cellules",
+      "description": "Écrit des valeurs ou des formules dans des cellules ; renvoie les valeurs recalculées.",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "updated": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "updated"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "set_cells",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "cells": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "Ligne : numéro affiché (1 = première ligne) ou id de ligne (rec_…)"
+                },
+                "column": {
+                  "type": "string",
+                  "description": "Colonne : sa lettre (C), son libellé (Coût HT) ou son id"
+                },
+                "value": {
+                  "description": "Valeur comme on la taperait : \"45 000\", \"=SUM(C1:C3)\", \"En cours\", \"30/11/2026\", true. null vide la cellule.",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "row",
+                "column",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "table",
+          "cells"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "rows.delete",
+      "label": "Supprimer des lignes",
+      "description": "Supprime des lignes (numéros affichés ou ids) ; les formules qui les lisaient sont ajustées.",
+      "kind": "destructive",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "deleted": {
+              "type": "integer"
+            },
+            "remaining_rows": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "deleted",
+            "remaining_rows"
+          ]
+        }
+      },
+      "idempotency": "none",
+      "http": null,
+      "mcp_tool": "delete_rows",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "rows": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Ligne : numéro affiché (1 = première ligne) ou id de ligne (rec_…)"
+            }
+          }
+        },
+        "required": [
+          "table",
+          "rows"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "columns.add",
+      "label": "Ajouter une colonne",
+      "description": "Ajoute une colonne typée (texte, nombre, devise, statut, date, formule…).",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "added"
+          ]
+        }
+      },
+      "idempotency": "field",
+      "http": null,
+      "mcp_tool": "add_column",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "currency",
+              "percent",
+              "select",
+              "date",
+              "checkbox",
+              "owner",
+              "formula"
+            ]
+          },
+          "formula": {
+            "description": "Obligatoire pour type=formula : formule de la ligne 1",
+            "type": "string"
+          },
+          "format": {
+            "description": "Affichage du résultat d’une formule (défaut number)",
+            "type": "string",
+            "enum": [
+              "number",
+              "currency",
+              "percent",
+              "text"
+            ]
+          },
+          "choices": {
+            "description": "Pour type=select : libellés des statuts, dans l’ordre",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preset": {
+            "description": "Pour type=select : \"atelier\" applique le préréglage « Statuts Atelier », les 8 statuts communs de la Suite Atelier (À faire, En cours, En revue, En attente, Bloquée, Résolue, Terminée, Rejetée), affichés avec leurs couleurs officielles. Remplace `choices`.",
+            "type": "string",
+            "enum": [
+              "atelier"
+            ]
+          },
+          "position": {
+            "description": "Insérer avant cette colonne. Par défaut : à la fin.",
+            "type": "string"
+          },
+          "mapping": {
+            "description": "Rôle de la colonne dans atelier_projets",
+            "type": "string",
+            "enum": [
+              "entity_title",
+              "workflow_state",
+              "financial_ht",
+              "financial_ttc",
+              "assignee",
+              "due_date",
+              "start_date",
+              "quantity",
+              "description",
+              "flag",
+              "custom",
+              "item_type",
+              "time_spent"
+            ]
+          },
+          "idempotency_key": {
+            "description": "Clé d’idempotence (1 à 200 caractères, ex. nexus:<exécution>:<étape>) : rejouer la même clé avec la même entrée renvoie la même réponse sans rien refaire ; avec une autre entrée, l’appel est refusé (IDEMPOTENCY_KEY_REUSED). Conservée 30 jours.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "table",
+          "label",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "columns.update",
+      "label": "Modifier une colonne",
+      "description": "Change le libellé, la formule, les statuts, le format ou le rôle d’export d’une colonne.",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "updated": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "updated"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "update_column",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "column": {
+            "type": "string",
+            "description": "Colonne : sa lettre (C), son libellé (Coût HT) ou son id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "formula": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preset": {
+            "description": "Pour type=select : \"atelier\" applique le préréglage « Statuts Atelier », les 8 statuts communs de la Suite Atelier (À faire, En cours, En revue, En attente, Bloquée, Résolue, Terminée, Rejetée), affichés avec leurs couleurs officielles. Remplace `choices`.",
+            "type": "string",
+            "enum": [
+              "atelier"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "number",
+              "currency",
+              "percent",
+              "text"
+            ]
+          },
+          "mapping": {
+            "type": "string",
+            "enum": [
+              "entity_title",
+              "workflow_state",
+              "financial_ht",
+              "financial_ttc",
+              "assignee",
+              "due_date",
+              "start_date",
+              "quantity",
+              "description",
+              "flag",
+              "custom",
+              "item_type",
+              "time_spent"
+            ]
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "formula.evaluate",
+      "label": "Calculer une formule",
+      "description": "Calcule une formule sur une table sans rien modifier (ex. =SUM(C1:C3)).",
+      "kind": "read",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "formula": {
+              "type": "string"
+            },
+            "value": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "formula",
+            "value"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "evaluate",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "table",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "export.to_projets",
+      "label": "Envoyer à Atelier Projets",
+      "description": "Envoie une table (DataFlow v2.1.0) à l’adresse d’import configurée, Atelier Projets local par défaut ; un nouvel envoi met à jour les éléments déjà importés.",
+      "kind": "write",
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "atelier_projets": {
+              "type": "object"
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "message",
+            "warnings"
+          ]
+        }
+      },
+      "idempotency": "natural",
+      "http": null,
+      "mcp_tool": "export_table",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table : son id (ex. tbl_planning_lots) ou son nom exact"
+          },
+          "format": {
+            "type": "string",
+            "const": "webhook",
+            "default": "webhook",
+            "description": "Toujours \"webhook\" : envoi direct au webhook configuré."
+          },
+          "rows": {
+            "description": "Lignes à exporter. Par défaut : toutes (hors total).",
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Ligne : numéro affiché (1 = première ligne) ou id de ligne (rec_…)"
+            }
+          }
+        },
+        "required": [
+          "table",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "events": [
+    {
+      "type": "tab.table.changed",
+      "label": "Table modifiée",
+      "data_schema": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "project": {
+            "type": "string",
+            "description": "Nom du projet de la table"
+          }
+        },
+        "required": [
+          "revision",
+          "rows",
+          "project"
+        ]
+      }
+    },
+    {
+      "type": "tab.table.deleted",
+      "label": "Table supprimée",
+      "data_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

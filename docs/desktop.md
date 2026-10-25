@@ -166,6 +166,12 @@ clé : avant ce correctif, Atelier Projets ouvert depuis Nexus recevait la base 
 (`Lanceur`, le `.lnk` du menu Démarrer, **toujours** démarré par `explorer.exe "<Lanceur>"`, §9.6), sinon l'adresse dans le navigateur
 (`rundll32 url.dll,FileProtocolHandler`). Au lancement, Nexus ignore un `DATABASE_URL` ou un `FRONTEND_DIST` hérités.
 
+Ports reconnus (`SUITE_APPS` de `app/desktop.py`) : 8000 Viz, 4175 Tab, 4174 Projets, 5050 Trésorerie, 4000 et 47321
+Ciné, 5051 Savoir, 8010 **Atelier Convert** (API et interface d'aperçu sur le même port ; macOS
+`fr.atelier-convert.app`, Windows `HKCU\Software\Atelier\Apps\convert`). Si l'app de bureau de Convert a pris un
+autre port (8010 occupé), son adresse est à reporter dans `CONVERT_BASE_URL` (Réglages de Nexus) ; le sélecteur, lui,
+ne reconnaît que 8010 (`NEXT_PUBLIC_ATELIER_CONVERT_URL` pour l'interface web).
+
 ## Vérifier
 
 ```bash
