@@ -1,21 +1,28 @@
 "use client";
 
-import { Check, Eye, PenLine, ShieldQuestion, Users, X } from "lucide-react";
+import { Check, Eye, PenLine, Users, X } from "lucide-react";
 import { useId, useState } from "react";
 
+import { AppChip } from "@/components/layout/AppChip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DecisionCard, DecisionDetails, DecisionRow } from "@/components/ui/decision-card";
 import { CALL_KIND_LABEL, callKind } from "@/lib/approval";
-import { cn } from "@/lib/utils";
 import type { CallKind, PendingCall } from "@/types/api";
 
+import { toolApp } from "./agentApps";
 import type { ApprovalPart } from "./conversation";
-import { toolLabel } from "./ToolCall";
+import { formatParams } from "./thread";
+import { actionLabel } from "./ToolActivity";
 
 interface ApprovalCardProps {
+  /** Validation en attente (une fois envoyée, elle rejoint la ligne d'activité du tour) */
   part: ApprovalPart;
   disabled: boolean;
   onSubmit: (decisions: Record<string, boolean>) => void;
+  agentLabel: (name: string) => string;
+  /** Élément de la carte, suivi par le dock de décision (visibilité, « Voir ») */
+  anchorRef?: (el: HTMLElement | null) => void;
 }
 
 const KIND_ICON = { read: Eye, write: PenLine, delegation: Users } as const;
@@ -38,16 +45,19 @@ function CallKindBadge({ kind }: { kind: CallKind }) {
 }
 
 /**
- * Validation humaine des actions d'un agent : une carte par appel, chacune avec son « Autoriser » /
- * « Refuser » (jamais de « tout autoriser »). Un seul appel : la décision part directement.
- * Plusieurs : on décide de chacun, puis on envoie.
+ * Validation humaine des actions d'un agent : une ligne par appel (résumé, nature, application,
+ * paramètres dans « Détails »), chacune avec son « Refuser » / « Autoriser » — jamais de « tout
+ * autoriser », jamais de focus automatique. Un seul appel : la décision part directement.
+ * Plusieurs : on décide de chacun, puis « Envoyer mes choix ». Le titre reçoit le focus quand le
+ * dock de décision y ramène (« Voir »).
  */
-export function ApprovalCard({ part, disabled, onSubmit }: ApprovalCardProps) {
+export function ApprovalCard({ part, disabled, onSubmit, agentLabel, anchorRef }: ApprovalCardProps) {
   const [decisions, setDecisions] = useState<Record<string, boolean>>({});
-  const single = part.calls.length === 1;
-  const decided = part.submitted ? part.decisions : decisions;
-  const count = part.calls.filter((c) => decided[c.id] !== undefined).length;
-  const complete = count === part.calls.length;
+  const titleId = useId();
+  const total = part.calls.length;
+  const single = total === 1;
+  const count = part.calls.filter((c) => decisions[c.id] !== undefined).length;
+  const complete = count === total;
 
   const choose = (id: string, value: boolean) => {
     if (single) {
@@ -58,82 +68,74 @@ export function ApprovalCard({ part, disabled, onSubmit }: ApprovalCardProps) {
   };
 
   return (
-    <section
+    <DecisionCard
+      ref={anchorRef}
       aria-label={single ? "Action à valider" : "Actions à valider"}
-      className={cn(
-        "rounded-lg border p-3",
-        part.submitted ? "border-atelier-border bg-card shadow-glow" : "border-warning/50 bg-warning/8",
-      )}
+      heading={
+        <span id={titleId} data-decision-title tabIndex={-1} className="rounded-sm">
+          Votre accord est nécessaire
+          {!single && <span className="font-normal text-muted-foreground"> · {total} actions, décidez de chacune</span>}
+        </span>
+      }
+      footer={
+        single ? undefined : (
+          <>
+            <span className="mr-auto text-xs text-muted-foreground" aria-live="polite">
+              {count} / {total} décidée{count >= 2 ? "s" : ""}
+            </span>
+            <Button size="sm" disabled={!complete || disabled} onClick={() => onSubmit(decisions)}>
+              Envoyer mes choix
+            </Button>
+          </>
+        )
+      }
     >
-      <header className="mb-2 flex items-center gap-2 text-sm font-medium">
-        <ShieldQuestion className="size-4 text-warning" aria-hidden />
-        {part.submitted
-          ? "Votre décision"
-          : single
-            ? "L'agent veut effectuer cette action"
-            : `L'agent veut effectuer ${part.calls.length} actions : décidez de chacune`}
-      </header>
-      <ul className="flex flex-col gap-2">
-        {part.calls.map((call) => (
-          <CallCard
-            key={call.id}
-            call={call}
-            choice={decided[call.id]}
-            submitted={part.submitted}
-            single={single}
-            disabled={disabled}
-            onChoose={(value) => choose(call.id, value)}
-          />
-        ))}
-      </ul>
-      {!single && !part.submitted && (
-        <div className="mt-2 flex items-center justify-end gap-2">
-          <span className="text-xs text-muted-foreground" aria-live="polite">
-            {count} / {part.calls.length} décidée{count >= 2 ? "s" : ""}
-          </span>
-          <Button size="sm" disabled={!complete || disabled} onClick={() => onSubmit(decisions)}>
-            Envoyer mes choix
-          </Button>
-        </div>
-      )}
-    </section>
+      {part.calls.map((call) => (
+        <CallRow
+          key={call.id}
+          call={call}
+          label={actionLabel(call, agentLabel)}
+          choice={decisions[call.id]}
+          single={single}
+          disabled={disabled}
+          onChoose={(value) => choose(call.id, value)}
+        />
+      ))}
+    </DecisionCard>
   );
 }
 
-function CallCard({
+function CallRow({
   call,
+  label,
   choice,
-  submitted,
   single,
   disabled,
   onChoose,
 }: {
   call: PendingCall;
+  label: string;
   choice: boolean | undefined;
-  submitted: boolean;
   single: boolean;
   disabled: boolean;
   onChoose: (value: boolean) => void;
 }) {
   const summaryId = useId();
-  const kind = callKind(call.kind);
+  const app = toolApp(call.name);
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border border-atelier-line bg-card px-3 py-2 shadow-glow sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <div className="min-w-0">
-        <p className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          <CallKindBadge kind={kind} />
-          <span className="min-w-0 truncate">{toolLabel(call.name)}</span>
-        </p>
-        <p id={summaryId} className="text-sm break-words">
-          {call.summary}
-        </p>
-      </div>
-      {submitted ? (
-        <Badge variant={choice ? "success" : "destructive"} className="justify-self-start sm:justify-self-end">
-          {choice ? "Autorisée" : "Refusée"}
-        </Badge>
-      ) : (
-        <div className="flex gap-1.5 justify-self-end">
+    <DecisionRow
+      summary={call.summary}
+      summaryId={summaryId}
+      meta={
+        <>
+          <CallKindBadge kind={callKind(call.kind)} />
+          {app && <AppChip app={app} />}
+          <span className="min-w-0 truncate">{label}</span>
+        </>
+      }
+      details={<DecisionDetails label="Détails">{formatParams(call.input)}</DecisionDetails>}
+      actions={
+        <>
           <Button
             type="button"
             size="sm"
@@ -158,8 +160,8 @@ function CallCard({
             <Check />
             Autoriser
           </Button>
-        </div>
-      )}
-    </li>
+        </>
+      }
+    />
   );
 }

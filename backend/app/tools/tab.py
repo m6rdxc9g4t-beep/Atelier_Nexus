@@ -18,7 +18,7 @@ import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -35,6 +35,7 @@ from app.schemas.tab import (
     TableInfo,
 )
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.clock import DEFAULT_TIMEZONE, local_today
 from app.tools.formatting import (
     TableType,
     atelier_table,
@@ -78,15 +79,21 @@ class TabSnapshots:
     app = "tab"
     label = "Atelier Tab"
 
-    def __init__(self, folder: str, *, max_mb: int = 50) -> None:
+    def __init__(self, folder: str, *, max_mb: int = 50, timezone: str = DEFAULT_TIMEZONE) -> None:
         self.folder_setting = folder
         self.max_bytes = max_mb * 1024 * 1024
+        #: Fuseau de l'utilisateur (`TIMEZONE`) : « aujourd'hui » des contrôles d'échéance
+        self.timezone = timezone
 
     @classmethod
     def from_settings(cls, settings: Settings) -> TabSnapshots | None:
         if not settings.tab_exports_dir:
             return None
-        return cls(settings.tab_exports_dir, max_mb=settings.tab_max_snapshot_mb)
+        return cls(
+            settings.tab_exports_dir,
+            max_mb=settings.tab_max_snapshot_mb,
+            timezone=settings.timezone,
+        )
 
     async def aclose(self) -> None:
         return None
@@ -550,7 +557,8 @@ class AggregateTool(_TabTool[AggregateInput]):
 class CheckInput(ToolInput):
     table_id: str = Field(pattern=TABLE_ID)
     as_of: date | None = Field(
-        default=None, description="Date de référence (aujourd'hui par défaut)."
+        default=None,
+        description="Date de référence (par défaut : aujourd'hui, dans le fuseau de l'utilisateur).",
     )
 
 
@@ -565,7 +573,7 @@ class CheckTableTool(_TabTool[CheckInput]):
 
     async def run(self, params: CheckInput, ctx: ToolContext) -> ToolOutput:
         env, info = await self.snapshots.table(params.table_id)
-        today = params.as_of or datetime.now(UTC).date()
+        today = params.as_of or local_today(self.snapshots.timezone)
         cols = env.project.columns_schema
         records = sorted_records(env.project.records)
         findings: list[str] = []

@@ -104,6 +104,9 @@ class BaseTool[InputT: ToolInput](ABC):
     output_format: ClassVar[Literal["atelier-table/1", "json", "text"]] = "text"
     # Colonnes (`{key, label, type}`) ou champs attendus, quand ils sont connus d'avance
     output_hint: ClassVar[dict[str, Any] | None] = None
+    # L'outil lit le contexte reconstruit d'après l'historique (`restore`) : la relecture n'a
+    # lieu que juste avant un tel outil, jamais avant un outil sans rapport
+    uses_restored_state: ClassVar[bool] = False
 
     @abstractmethod
     async def run(self, params: InputT, ctx: ToolContext) -> ToolOutput:
@@ -133,6 +136,33 @@ class BaseTool[InputT: ToolInput](ABC):
             description=self.description,
             input_schema=portable_schema(self.input_model),
         )
+
+    # Crochets facultatifs de la boucle d'agent (par défaut : sans effet) -------------
+
+    def spec_for(self, ctx: ToolContext) -> ToolSpec:
+        """Spécification montrée au modèle à chaque appel d'un tour, selon le contexte (moteur
+        courant…). Par défaut `spec()` ; la délégation la surcharge (agents joignables)."""
+        return self.spec()
+
+    async def restore(self, params: InputT, ctx: ToolContext) -> None:
+        """Reconstruit `ctx.state` d'après un appel RÉUSSI de l'historique.
+
+        Chaque validation relance l'agent dans une nouvelle requête, avec un contexte vide :
+        avant d'exécuter le premier outil de la requête, l'agent rejoue ce crochet pour chaque
+        appel déjà exécuté avec succès (ex. Data Via : profil d'un jeu déjà décrit). Rien n'est
+        renvoyé au modèle, rien n'est stocké côté serveur. Lecture seule : ce crochet s'exécute
+        sans nouvelle validation, il ne modifie donc jamais une application."""
+        return  # par défaut : rien à reconstruire (`replay` ne l'appelle même pas)
+
+    async def replay(self, raw_input: dict[str, Any], ctx: ToolContext) -> None:
+        """Rejoue `restore` pour un appel brut de l'historique. Ne lève jamais : un contexte
+        non reconstruit fait seulement redemander l'étape préalable par l'outil."""
+        if type(self).restore is BaseTool.restore:
+            return
+        try:
+            await self.restore(self.input_model.model_validate(raw_input), ctx)
+        except Exception as exc:
+            logger.info("Contexte de %s non restauré : %s", self.name, exc)
 
     async def invoke(self, raw_input: dict[str, Any], ctx: ToolContext) -> ToolOutput:
         """Valide l'entrée brute du modèle puis exécute. Ne lève jamais : le modèle

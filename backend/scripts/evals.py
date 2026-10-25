@@ -7,9 +7,12 @@
     python -m scripts.evals --cas data-mesure-dax --model qwen2.5:14b
     python -m scripts.evals --apps reelles --env-file "$HOME/Library/Application Support/Atelier Nexus/.env"
 
-Applications **simulées** par défaut (Data Via, Projets, Trésorerie : résultats reproductibles,
-rien à lancer). `--apps reelles` utilise les applications configurées et lancées sur la machine.
-Aucune écriture n'est exécutée : aucune validation n'est jamais donnée.
+Applications **simulées** par défaut (Data Via, Projets, Trésorerie, Tab, Ciné, Savoir, Cuisine,
+GitHub : résultats reproductibles, rien à lancer). `--apps reelles` utilise les applications
+configurées et lancées sur la machine, avec le mode de validation de l'utilisateur.
+Aucune écriture n'est exécutée : aucune écriture n'est jamais validée. Un cas
+`approval_mode = "every_step"` voit ses lectures autorisées requête par requête, sur
+applications simulées seulement (docs/evaluations.md §2).
 
 Rapport : `evals/resultats/<date>_<moteur>.md` (et `.json`, comparé à la campagne précédente).
 Code de sortie 1 si un cas joué n'a pas réussi tous ses essais.
@@ -21,6 +24,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from app.agents import AgentCatalog
@@ -87,7 +91,8 @@ async def main(args: argparse.Namespace) -> int:
     if args.liste:
         for case in cases:
             apps = f" [{', '.join(case.apps)}]" if case.apps else ""
-            print(f"{case.id:45} {case.agent:16}{apps}  {case.prompt[:60]}")
+            mode = " (every_step)" if case.approval_mode == "every_step" else ""
+            print(f"{case.id:45} {case.agent:16}{apps}{mode}  {case.prompt[:60]}")
         print(f"\n{len(cases)} cas.")
         return 0
     if not cases:
@@ -96,11 +101,24 @@ async def main(args: argparse.Namespace) -> int:
 
     settings: Settings = Settings(_env_file=args.env_file) if args.env_file else get_settings()
     router = LLMRouter.from_settings(settings)
+    env_factory: Callable[[], ToolEnvironment]
     if args.apps == "simulees":
         available: set[str] = set(SIMULATED_APPS)
-        env_factory = simulated_environment
+        env_factory = simulated_environment  # mode de validation de chaque cas : le runner
     else:
         available = configured_apps(settings)
+        if settings.approval_mode == "every_step":
+            # Jamais assoupli sur des données réelles (CLAUDE.md, « Validation ») : aucune
+            # validation n'est donnée, un tour arrêté sur une lecture fait ignorer le cas
+            print(
+                "⚠️  APPROVAL_MODE=every_step (réglage de l'utilisateur, conservé) : chaque appel, "
+                "lecture comprise, attend une validation qu'une évaluation sur données réelles ne "
+                "donne jamais. Seule la première décision de l'agent est mesurée ; les cas "
+                "arrêtés sur une lecture sont ignorés. Pour suivre des tours complets, utilisez "
+                "un .env de test en APPROVAL_MODE=writes_only (--env-file), ou les applications "
+                "simulées.",
+                file=sys.stderr,
+            )
 
         def env_factory() -> ToolEnvironment:
             return ToolEnvironment(settings)

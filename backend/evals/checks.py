@@ -10,7 +10,7 @@ from typing import Any, Literal
 from app.agents.base import AgentResult, PendingCall
 from app.db.search import normalize as _normalize
 from app.tools.base import Artifact
-from evals.cases import EvalCase, Expect
+from evals.cases import ArtifactExpectation, EvalCase, Expect, ToolArgsExpectation
 
 Severity = Literal["required", "advisory"]
 
@@ -31,7 +31,11 @@ class ToolCallRecord:
 
 @dataclass
 class Transcript:
-    """Ce qu'a fait l'agent pendant un tour (rempli à partir du flux d'événements)."""
+    """Ce qu'a fait l'agent pendant un tour (rempli à partir du flux d'événements).
+
+    En `every_step`, un tour s'étale sur plusieurs requêtes (une par validation) : `calls` et
+    `artifacts` les cumulent, `pending` est ce qui attend encore à la fin, `result` le résultat
+    de la dernière requête (étapes et jetons additionnés)."""
 
     prompt: str
     calls: list[ToolCallRecord] = field(default_factory=list)
@@ -40,6 +44,12 @@ class Transcript:
     result: AgentResult | None = None
     #: Échec du tour : (code, message)
     error: tuple[str, str] | None = None
+    #: Mode de validation joué (`writes_only` ou `every_step`)
+    approval_mode: str = "writes_only"
+    #: Appels autorisés par l'évaluation (lectures et délégations simulées, jamais une écriture)
+    approved: list[str] = field(default_factory=list)
+    #: Requêtes envoyées à l'agent (1 + une reprise par validation simulée)
+    requests: int = 0
 
     @property
     def text(self) -> str:
@@ -147,7 +157,12 @@ def _is_subsequence(wanted: list[str], seen: list[str]) -> bool:
     return all(any(name == s for s in it) for name in wanted)
 
 
-def _artifact_matches(artifact: Artifact, exp: Any) -> bool:
+def _notes(artifact: Artifact) -> str:
+    notes = artifact.metadata.get("notes")
+    return notes if isinstance(notes, str) else ""
+
+
+def _artifact_matches(artifact: Artifact, exp: ArtifactExpectation) -> bool:
     if exp.kind and artifact.kind != exp.kind:
         return False
     if exp.title_contains and normalize(exp.title_contains) not in normalize(artifact.title):
@@ -155,10 +170,56 @@ def _artifact_matches(artifact: Artifact, exp: Any) -> bool:
     content = normalize(artifact.content)
     if any(normalize(t) not in content for t in exp.content_contains):
         return False
+    if any(normalize(t) in content for t in exp.content_not_contains):
+        return False
+    notes = normalize(_notes(artifact))
+    if any(normalize(t) not in notes for t in exp.notes_contains):
+        return False
     return not (exp.content_regex and not re.search(exp.content_regex, artifact.content, re.S))
 
 
-def _describe(exp: Any) -> str:
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip().replace(",", "."))
+        except ValueError:
+            return None
+    return None
+
+
+def value_equals(got: Any, want: Any) -> bool:
+    """Égalité d'une valeur d'entrée d'outil : nombres en valeur (2 = 2.0 = "2", 2 ≠ 20),
+    booléens stricts, textes sans accents ni casse ni espaces autour, le reste à l'identique."""
+    if isinstance(want, bool) or isinstance(got, bool):
+        return isinstance(got, bool) and isinstance(want, bool) and got == want
+    if isinstance(want, int | float):
+        number = _number(got)
+        return number is not None and number == float(want)
+    if isinstance(want, str) and isinstance(got, str):
+        return normalize(got).strip() == normalize(want).strip()
+    return bool(got == want)
+
+
+def args_match(call: ToolCallRecord, exp: ToolArgsExpectation) -> bool:
+    """L'appel est celui de l'outil attendu, contient chaque texte et vaut chaque valeur."""
+    if call.name != exp.tool:
+        return False
+    text = normalize(json.dumps(call.input, ensure_ascii=False))
+    if any(normalize(t) not in text for t in exp.contains):
+        return False
+    return all(k in call.input and value_equals(call.input[k], v) for k, v in exp.equals.items())
+
+
+def _args_label(exp: ToolArgsExpectation) -> str:
+    parts = [*(repr(t) for t in exp.contains), *(f"{k} = {v!r}" for k, v in exp.equals.items())]
+    return ", ".join(parts)
+
+
+def _describe(exp: ArtifactExpectation) -> str:
     parts = [f"{k}={v!r}" for k, v in exp.model_dump(exclude_defaults=True).items()]
     return ", ".join(parts) or "un artefact"
 
@@ -219,13 +280,12 @@ def evaluate(case: EvalCase, transcript: Transcript) -> list[CheckResult]:
     if exp.tools_forbidden:
         add("outils interdits", not forbidden, f"appelés : {', '.join(forbidden)}")
     for args in exp.tool_args:
-        inputs = [
-            normalize(json.dumps(c.input, ensure_ascii=False))
-            for c in transcript.calls
-            if c.name == args.tool
-        ]
-        ok = any(all(normalize(t) in i for t in args.contains) for i in inputs)
-        add(f"paramètres de {args.tool}", ok, f"aucun appel avec {args.contains}")
+        ok = any(args_match(c, args) for c in transcript.calls)
+        add(f"paramètres de {args.tool}", ok, f"aucun appel avec {_args_label(args)}")
+    for args in exp.tool_args_forbidden:
+        bad = [c for c in transcript.calls if args_match(c, args)]
+        shown = json.dumps(bad[0].input, ensure_ascii=False)[:200] if bad else ""
+        add(f"paramètres interdits de {args.tool}", not bad, f"appel avec {shown}")
     if exp.tool_errors_max is not None:
         errors = [c.name for c in transcript.calls if c.is_error]
         add(
@@ -263,12 +323,32 @@ def evaluate(case: EvalCase, transcript: Transcript) -> list[CheckResult]:
             bool(re.search(exp.text_regex, transcript.text, re.S | re.I)),
             exp.text_regex,
         )
+    # Livrable : la réponse et chaque artefact (contenu et notes), séparés pour qu'un texte
+    # ne se forme pas à cheval sur deux morceaux
+    output = [text, *(normalize(f"{a.content}\n{_notes(a)}") for a in transcript.artifacts)]
+
+    def in_output(t: str) -> bool:
+        return any(normalize(t) in part for part in output)
+
+    absent_output = [t for t in exp.output_contains if not in_output(t)]
+    if exp.output_contains:
+        add(
+            "livrable contient",
+            not absent_output,
+            f"absent (réponse et artefacts) : {absent_output}",
+        )
     if exp.output_contains_any:
-        output = " ".join([text, *(normalize(a.content) for a in transcript.artifacts)])
         add(
             "livrable contient l'un de",
-            any(normalize(t) in output for t in exp.output_contains_any),
+            any(in_output(t) for t in exp.output_contains_any),
             f"aucun de {exp.output_contains_any} (réponse et artefacts)",
+        )
+    present_output = [t for t in exp.output_not_contains if in_output(t)]
+    if exp.output_not_contains:
+        add(
+            "livrable ne contient pas",
+            not present_output,
+            f"présent (réponse ou artefact) : {present_output}",
         )
     if exp.grounded_numbers != "off":
         loose = ungrounded_numbers(transcript)

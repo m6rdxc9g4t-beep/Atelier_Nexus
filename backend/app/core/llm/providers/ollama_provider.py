@@ -140,10 +140,16 @@ class OllamaProvider(LLMProvider):
         base_url: str,
         default_model: str,
         timeout: float = 300.0,
+        num_ctx: int | None = None,
         client: ollama.AsyncClient | None = None,
     ) -> None:
         super().__init__(default_model)
         self.base_url = base_url
+        #: Fenêtre de contexte demandée (`options.num_ctx`, réglage OLLAMA_NUM_CTX). Sans elle,
+        #: Ollama applique la sienne (quelques milliers de jetons sur une machine courante) et
+        #: écarte en silence le début de la conversation : consignes, résultats d'outils.
+        #: None ou 0 = fenêtre du serveur (OLLAMA_CONTEXT_LENGTH).
+        self.num_ctx = num_ctx or None
         self._client = client or ollama.AsyncClient(
             host=base_url,
             timeout=timeout,
@@ -176,10 +182,14 @@ class OllamaProvider(LLMProvider):
             raise ProviderRequestError(f"Ollama : {exc.error}{hint}", provider=self.name) from exc
 
     def _params(self, request: LLMRequest) -> dict[str, Any]:
+        options: dict[str, Any] = {"num_predict": request.max_tokens}
+        if self.num_ctx:
+            # Toujours la même valeur : un changement ferait recharger le modèle par Ollama
+            options["num_ctx"] = self.num_ctx
         params: dict[str, Any] = {
             "model": self.resolve_model(request),
             "messages": to_ollama_messages(request.system, request.messages),
-            "options": {"num_predict": request.max_tokens},
+            "options": options,
         }
         if request.tools:
             params["tools"] = [to_ollama_tool(t) for t in request.tools]

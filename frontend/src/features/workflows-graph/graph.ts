@@ -287,6 +287,8 @@ export type StepNode = Node<StepNodeData, "step">;
 
 export interface GraphContext {
   catalog: Map<string, CatalogEntry>;
+  /** false tant que le catalogue se charge : aucune étape n'est encore dite « inconnue » */
+  catalogReady?: boolean;
   apps?: Map<string, { name: string; color: string }>;
   errors?: ValidationError[];
   run?: Record<string, StepRunView>;
@@ -310,13 +312,31 @@ export function stepNodeData(step: WorkflowStepV2, ctx: GraphContext): StepNodeD
     color: meta?.color ?? null,
     kind: entry?.kind ?? null,
     outputFormat: entry?.output_format ?? null,
-    unknown: !entry,
+    unknown: !entry && ctx.catalogReady !== false,
     unavailable: entry && !entry.available ? (entry.unavailable_reason ?? "indisponible") : null,
     conditional: !!step.when,
     continueOnError: step.on_error === "continue",
     errors: (ctx.errors ?? []).filter((e) => e.step_id === step.id),
     run: ctx.run?.[step.id] ?? null,
   };
+}
+
+/**
+ * Apparence d'un nœud : UNE teinte de bordure, l'état d'exécution d'abord, puis la validation.
+ * La sélection (halo) et l'étape absente du catalogue (trait pointillé) s'y ajoutent sans
+ * empiler d'anneaux ; l'icône d'état dit la même chose que la teinte (jamais la couleur seule).
+ */
+export type NodeTone = "awaiting" | "running" | "failed" | "invalid" | "done" | "faded" | "idle";
+
+export function nodeTone(data: Pick<StepNodeData, "run" | "errors">): NodeTone {
+  const status = data.run?.status;
+  if (status === "awaiting_approval") return "awaiting";
+  if (status === "running") return "running";
+  if (status === "error") return "failed";
+  if (data.errors.length > 0) return "invalid";
+  if (status === "ok") return "done";
+  if (status === "refused" || status === "skipped") return "faded";
+  return "idle";
 }
 
 /** Étapes → nœuds (position enregistrée, sinon mise en page en couches). */

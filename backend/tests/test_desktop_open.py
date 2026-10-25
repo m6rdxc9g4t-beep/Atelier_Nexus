@@ -139,6 +139,10 @@ def test_open_suite_app_macos_clean_env(leaky_env: None, monkeypatch: pytest.Mon
     assert run.calls[1][0][-1] == "local.atelier-projets.desktop"
     assert_clean(run.calls[1][1])
 
+    assert desktop_open.open_suite_app("convert") is True
+    assert run.calls[2][0] == ["/usr/bin/open", "-b", "fr.atelier-convert.app"]
+    assert_clean(run.calls[2][1])
+
     run.returncode = 1  # app absente : False, le navigateur prend le relais
     assert desktop_open.open_suite_app("viz") is False
     assert desktop_open.open_suite_app("inconnue") is False

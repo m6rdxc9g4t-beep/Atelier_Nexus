@@ -1,7 +1,8 @@
 """Connecteur Atelier Projets — point d'entrée unique vers son API (`:3000/api`).
 
-Lecture libre ; écritures (créer un élément, saisir du temps, changer un statut,
-journaliser) marquées `requires_approval` : l'agent attend la validation de l'utilisateur.
+Lecture libre ; écritures (créer une story ou un élément, modifier un élément, saisir du temps,
+journaliser) marquées `requires_approval` : l'agent attend la validation de l'utilisateur, sur un
+résumé qui décrit exactement ce qui sera envoyé.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ from app.schemas.projets import (
     Project,
     ProjectTree,
     Status,
+    Story,
+    StoryCreate,
     TimeEntry,
     TimeEntryCreate,
     Timesheet,
@@ -37,6 +40,7 @@ from app.schemas.projets import (
     WorkItemUpdate,
 )
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.clock import DEFAULT_TIMEZONE, local_today
 from app.tools.formatting import (
     TableType,
     atelier_table,
@@ -73,10 +77,13 @@ class ProjetsClient(AppClient):
         client = cls(settings.projets_base_url, timeout=settings.apps_timeout, transport=transport)
         token = settings.projets_import_token
         client.import_token = token.get_secret_value() if token else None
+        client.timezone = settings.timezone
         return client
 
     #: Jeton ATELIER_IMPORT_TOKEN d'Atelier Projets (import depuis Tab), s'il est configuré
     import_token: str | None = None
+    #: Fuseau de l'utilisateur (`TIMEZONE`) : « aujourd'hui » des retards et des jalons
+    timezone: str = DEFAULT_TIMEZONE
 
     async def health(self) -> Health:
         return self.parse(Health, await self.request("GET", "health"))
@@ -169,6 +176,14 @@ class ProjetsClient(AppClient):
 
     # ─── Écritures (appelées seulement après validation) ──────────
 
+    async def create_story(self, epic_id: int, body: StoryCreate) -> Story:
+        data = await self.request(
+            "POST",
+            f"epics/{safe_id(epic_id)}/stories",
+            json_body=body.model_dump(mode="json", exclude_none=True),
+        )
+        return self.parse(Story, data)
+
     async def create_work_item(self, story_id: int, body: WorkItemCreate) -> WorkItemDetail:
         data = await self.request(
             "POST",
@@ -205,8 +220,22 @@ class ProjetsClient(AppClient):
 # ═══ Mise en forme ════════════════════════════════════════════════
 
 
+#: Statuts terminés : un élément dans l'un d'eux n'est jamais « en retard »
+DONE_STATUSES = frozenset({"RESOLVED", "CLOSED", "REJECTED"})
+
+
 def hours(d: Duration | None) -> float | None:
     return None if d is None else d.hours
+
+
+def is_over_budget(item: WorkItem) -> bool:
+    """Temps passé au-delà de l'estimation (écart calculé par Atelier Projets)."""
+    return item.balance is not None and item.balance.kind == "OVER"
+
+
+def is_overdue(item: WorkItem, today: date) -> bool:
+    """Échéance dépassée et élément non terminé."""
+    return item.dueDate is not None and item.dueDate < today and item.status not in DONE_STATUSES
 
 
 def balance_text(item: WorkItem) -> str:
@@ -456,13 +485,23 @@ class ListWorkItemsInput(ToolInput):
     types: list[WorkItemType] = Field(default_factory=list, description="FEATURE, TASK, BUG.")
     story_id: int | None = None
     query: str | None = Field(default=None, max_length=200, description="Texte du titre ou #id.")
+    over_budget: bool = Field(
+        default=False, description="Seulement les éléments en dépassement (passé > estimé)."
+    )
+    overdue: bool = Field(
+        default=False,
+        description="Seulement les éléments en retard (échéance passée, non terminés).",
+    )
 
 
 class ListWorkItemsTool(_ProjetsTool[ListWorkItemsInput]):
     name = "projets_list_work_items"
     description = (
         "Liste les éléments (FEATURE / TASK / BUG) d'un projet avec statut, priorité, avancement, "
-        "estimé, temps passé, écart au budget et échéance. Filtres : statuts, types, story, texte."
+        "estimé, temps passé, écart au budget et échéance. Filtres, cumulés : statuts, types, "
+        "story, texte, over_budget (en dépassement), overdue (en retard). Ex. éléments bloqués : "
+        '{"project_id": 1, "status": ["BLOCKED"]} ; en dépassement : {"project_id": 1, '
+        '"over_budget": true}.'
     )
     input_model = ListWorkItemsInput
     output_format = "atelier-table/1"
@@ -476,11 +515,25 @@ class ListWorkItemsTool(_ProjetsTool[ListWorkItemsInput]):
             story_id=params.story_id,
             q=params.query,
         )
+        # Dépassement et retard : calculés ici (l'API ne les filtre pas), d'après l'écart
+        # d'Atelier Projets et la date du jour de l'utilisateur
+        today = local_today(self.client.timezone)
+        if params.over_budget:
+            items = [i for i in items if is_over_budget(i)]
+        if params.overdue:
+            items = [i for i in items if is_overdue(i, today)]
         data = work_items_table(items, f"Éléments du projet {params.project_id}")
         if not items:
             return ToolOutput(content="Aucun élément ne correspond.", data=data)
         headers, rows = work_item_rows(items)
-        text, _ = table_for_model(headers, rows, noun="élément")
+        text, truncated = table_for_model(headers, rows, noun="élément")
+        if params.overdue:
+            text = f"En retard au {today.isoformat()} : {text}"
+        if truncated:  # le modèle ne lit pas l'artefact : il affine plutôt que de deviner
+            text += (
+                "\nListe coupée : affine avec status, types, story_id, over_budget ou overdue "
+                "pour lire les autres éléments."
+            )
         artifact = data_artifact(
             f"Éléments du projet {params.project_id}",
             headers,
@@ -604,7 +657,7 @@ class MilestonesTool(_ProjetsTool[ProjectInput]):
         )
         if not ms:
             return ToolOutput(content="Aucun jalon.", data=data)
-        today = date.today()
+        today = local_today(self.client.timezone)
         lines = [
             f"- {m.date.isoformat()} « {m.title} » : "
             + ("atteint" if m.reached else ("en retard" if m.date < today else "à venir"))
@@ -616,15 +669,87 @@ class MilestonesTool(_ProjetsTool[ProjectInput]):
 # ═══ Outils d'écriture (validation requise) ═══════════════════════
 
 
+#: Titre d'Atelier Projets (`Title` de schemas/common.ts) : au moins un caractère visible, refusé
+#: avant la carte de validation plutôt qu'après (« »)
+TITLE = r"\S"
+
+
+def _preview(text: str, size: int = 80) -> str:
+    """Début d'un texte, sur une ligne, pour un résumé de validation."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= size else flat[: size - 1].rstrip() + "…"
+
+
+class CreateStoryInput(ToolInput):
+    epic_id: int = Field(description="Epic parent (identifiant « id » vu par projets_structure).")
+    title: str = Field(
+        min_length=1, max_length=200, pattern=TITLE, description="Livrable attendu de la story."
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=20_000,
+        description="Markdown : objectif, périmètre, hors périmètre.",
+    )
+    start_date: date | None = Field(default=None, description="Début prévu, AAAA-MM-JJ.")
+    due_date: date | None = Field(default=None, description="Échéance, AAAA-MM-JJ.")
+
+
+class CreateStoryTool(_ProjetsTool[CreateStoryInput]):
+    name = "projets_create_story"
+    description = (
+        "Crée une story (conteneur de Projets) dans un epic, pour y ranger ensuite ses FEATURE / "
+        "TASK / BUG avec projets_create_work_item. Action soumise à validation."
+    )
+    input_model = CreateStoryInput
+    requires_approval = True
+    output_format = "json"
+    output_hint = {"fields": ["id", "epic_id", "title", "start_date", "due_date"]}
+
+    def approval_summary(self, params: CreateStoryInput) -> str:
+        extra = []
+        if params.start_date:
+            extra.append(f"début {params.start_date.isoformat()}")
+        if params.due_date:
+            extra.append(f"échéance {params.due_date.isoformat()}")
+        if params.description:
+            extra.append(f"description « {_preview(params.description, 60)} »")
+        more = f" ({', '.join(extra)})" if extra else ""
+        return f"Créer la story « {params.title} » dans l'epic {params.epic_id}{more}"
+
+    async def run(self, params: CreateStoryInput, ctx: ToolContext) -> ToolOutput:
+        story = await self.client.create_story(
+            params.epic_id,
+            StoryCreate(
+                title=params.title,
+                description=params.description,
+                startDate=params.start_date,
+                dueDate=params.due_date,
+            ),
+        )
+        return ToolOutput(
+            content=f"Story #{story.id} « {story.title} » créée dans l'epic {story.epicId}. Ses "
+            f"éléments se créent avec projets_create_work_item (story_id {story.id}).",
+            data={
+                "id": story.id,
+                "epic_id": story.epicId,
+                "title": story.title,
+                "start_date": story.startDate.isoformat() if story.startDate else None,
+                "due_date": story.dueDate.isoformat() if story.dueDate else None,
+            },
+        )
+
+
 class CreateWorkItemInput(ToolInput):
     story_id: int = Field(description="Story parente (voir projets_structure).")
     type: WorkItemType
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=200, pattern=TITLE)
     description: str | None = Field(
         default=None, description="Markdown : objectif + critères d'acceptation."
     )
     priority: Priority | None = None
-    estimated_hours: float | None = Field(default=None, gt=0, le=10_000)
+    estimated_hours: float | None = Field(
+        default=None, gt=0, le=10_000, description="Nouvelle estimation, en heures."
+    )
     due_date: date | None = None
 
 
@@ -636,8 +761,14 @@ class CreateWorkItemTool(_ProjetsTool[CreateWorkItemInput]):
     output_format = "json"
 
     def approval_summary(self, params: CreateWorkItemInput) -> str:
-        est = f", {params.estimated_hours:g} h estimées" if params.estimated_hours else ""
-        return f"Créer la {params.type} « {params.title} » dans la story {params.story_id}{est}"
+        extra = ""
+        if params.estimated_hours:
+            extra += f", {params.estimated_hours:g} h estimées"
+        if params.priority:
+            extra += f", priorité {PRIORITY_LABELS[params.priority]}"
+        if params.due_date:
+            extra += f", échéance {params.due_date.isoformat()}"
+        return f"Créer la {params.type} « {params.title} » dans la story {params.story_id}{extra}"
 
     async def run(self, params: CreateWorkItemInput, ctx: ToolContext) -> ToolOutput:
         body = WorkItemCreate(
@@ -657,17 +788,31 @@ class CreateWorkItemTool(_ProjetsTool[CreateWorkItemInput]):
 
 class UpdateWorkItemInput(ToolInput):
     work_item_id: int
+    title: str | None = Field(
+        default=None, min_length=1, max_length=200, pattern=TITLE, description="Nouveau titre."
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=20_000,
+        description="Nouvelle description Markdown COMPLÈTE (remplace l'actuelle).",
+    )
     status: Status | None = None
     progress: int | None = Field(default=None, ge=0, le=100)
     priority: Priority | None = None
+    estimated_hours: float | None = Field(default=None, gt=0, le=10_000)
     due_date: date | None = None
+
+
+#: Statuts qui imposent 100 % d'avancement (Nexus l'impose même si un autre avancement est donné)
+FULL_PROGRESS = frozenset({"RESOLVED", "CLOSED"})
 
 
 class UpdateWorkItemTool(_ProjetsTool[UpdateWorkItemInput]):
     name = "projets_update_work_item"
     description = (
-        "Modifie le statut, l'avancement, la priorité ou l'échéance d'un élément. "
-        "RESOLVED et CLOSED imposent 100 %. Action soumise à validation."
+        "Modifie un élément : titre, description, statut, avancement, priorité, estimation ou "
+        "échéance (seuls les champs donnés changent). RESOLVED et CLOSED imposent 100 %. "
+        "Action soumise à validation."
     )
     input_model = UpdateWorkItemInput
     requires_approval = True
@@ -675,12 +820,30 @@ class UpdateWorkItemTool(_ProjetsTool[UpdateWorkItemInput]):
 
     def approval_summary(self, params: UpdateWorkItemInput) -> str:
         changes = []
+        if params.title:
+            changes.append(f"titre « {params.title} »")
+        if params.description is not None and not params.description.strip():
+            changes.append("description effacée")
+        elif params.description is not None:
+            changes.append(
+                f"description remplacée ({len(params.description)} caractères : "
+                f"« {_preview(params.description, 60)} »)"
+            )
         if params.status:
             changes.append(f"statut « {STATUS_LABELS[params.status]} »")
-        if params.progress is not None:
+        if params.status in FULL_PROGRESS and params.progress not in (None, 100):
+            changes.append(
+                f"avancement 100 % (imposé par « {STATUS_LABELS[params.status]} », "
+                f"au lieu de {params.progress} %)"
+            )
+        elif params.progress is not None:
             changes.append(f"avancement {params.progress} %")
+        elif params.status in FULL_PROGRESS:
+            changes.append("avancement 100 % (fixé par Atelier Projets pour ce statut)")
         if params.priority:
             changes.append(f"priorité {PRIORITY_LABELS[params.priority]}")
+        if params.estimated_hours:
+            changes.append(f"estimation {params.estimated_hours:g} h")
         if params.due_date:
             changes.append(f"échéance {params.due_date.isoformat()}")
         return f"Modifier l'élément #{params.work_item_id} : " + (
@@ -689,12 +852,15 @@ class UpdateWorkItemTool(_ProjetsTool[UpdateWorkItemInput]):
 
     async def run(self, params: UpdateWorkItemInput, ctx: ToolContext) -> ToolOutput:
         progress = params.progress
-        if params.status in {"RESOLVED", "CLOSED"} and progress not in (None, 100):
-            progress = 100  # règle d'Atelier Projets
+        if params.status in FULL_PROGRESS and progress not in (None, 100):
+            progress = 100  # règle d'Atelier Projets, annoncée dans le résumé de validation
         body = WorkItemUpdate(
+            title=params.title,
+            description=params.description,
             status=params.status,
             progress=progress,
             priority=params.priority,
+            estimatedHours=params.estimated_hours,
             dueDate=params.due_date,
         )
         if not body.model_dump(exclude_none=True):
@@ -722,7 +888,8 @@ class AddTimeEntryTool(_ProjetsTool[AddTimeEntryInput]):
 
     def approval_summary(self, params: AddTimeEntryInput) -> str:
         day = params.spent_on.isoformat() if params.spent_on else "aujourd'hui"
-        return f"Saisir {params.hours:g} h sur #{params.work_item_id} ({day})"
+        note = f" — « {_preview(params.comment)} »" if params.comment else ""
+        return f"Saisir {params.hours:g} h sur #{params.work_item_id} ({day}){note}"
 
     async def run(self, params: AddTimeEntryInput, ctx: ToolContext) -> ToolOutput:
         entry = await self.client.add_time_entry(
@@ -744,7 +911,12 @@ class AddTimeEntryTool(_ProjetsTool[AddTimeEntryInput]):
 class AddLogEntryInput(ToolInput):
     work_item_id: int
     text: str = Field(min_length=1, max_length=20_000, description="Ce qui a été fait (Markdown).")
-    hours: float | None = Field(default=None, ge=0, le=24)
+    hours: float | None = Field(
+        default=None,
+        ge=0,
+        le=24,
+        description="Heures citées dans l'en-tête de l'entrée (ne saisit pas de temps).",
+    )
 
 
 class AddLogEntryTool(_ProjetsTool[AddLogEntryInput]):
@@ -755,8 +927,8 @@ class AddLogEntryTool(_ProjetsTool[AddLogEntryInput]):
     output_format = "json"
 
     def approval_summary(self, params: AddLogEntryInput) -> str:
-        preview = params.text if len(params.text) < 80 else params.text[:77] + "…"
-        return f"Ajouter au journal de #{params.work_item_id} : « {preview} »"
+        mention = f" ({params.hours:g} h mentionnées)" if params.hours is not None else ""
+        return f"Ajouter au journal de #{params.work_item_id}{mention} : « {_preview(params.text, 120)} »"
 
     async def run(self, params: AddLogEntryInput, ctx: ToolContext) -> ToolOutput:
         updated = await self.client.add_log_entry(
@@ -781,6 +953,7 @@ def projets_read_tools(client: ProjetsClient) -> list[BaseTool[Any]]:
 
 def projets_write_tools(client: ProjetsClient) -> list[BaseTool[Any]]:
     return [
+        CreateStoryTool(client),
         CreateWorkItemTool(client),
         UpdateWorkItemTool(client),
         AddTimeEntryTool(client),

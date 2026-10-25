@@ -6,6 +6,7 @@ from collections.abc import Callable
 from functools import lru_cache
 
 from app.agents import AgentCatalog
+from app.agents.delegation import roster_entry
 from app.core.config import get_settings
 from app.core.llm.router import LLMRouter
 from app.db.attachments import AttachmentRepository
@@ -59,12 +60,14 @@ def get_env_factory() -> Callable[[], ToolEnvironment]:
 async def prepare_environment(
     env: ToolEnvironment, router: LLMRouter, catalog: AgentCatalog
 ) -> ToolEnvironment:
-    """Branche la délégation : routeur, catalogue et liste des agents délégables."""
+    """Branche la délégation : routeur, catalogue et liste des agents délégables (lue aussi par
+    l'annuaire de l'Assistant)."""
     env.router = router
     env.catalog = catalog
     agents = await catalog.agents(router, env, delegated=True)
-    env.delegation_roster = [
-        (a.name, a.description, a.local_only) for a in agents if "delegation" not in a.toolsets
-    ]
+    # Un agent doté de la délégation (Orchestrateur, agent personnalisé) n'est pas délégable :
+    # jamais de délégation en chaîne. L'annuaire de l'Assistant le liste quand même
+    # (`agent_directory` : registre, ou description générique pour un agent personnalisé)
+    env.delegation_roster = [roster_entry(a) for a in agents if "delegation" not in a.toolsets]
     env.delegation_names = {a.name: a.display_name for a in agents}
     return env

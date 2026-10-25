@@ -31,7 +31,7 @@ from app.suite.nodes import clear_manifest_cache
 from app.triggers import service as service_module
 from app.triggers.service import GAP_WARNING, TriggerDeps, TriggerService
 from main import app
-from tests.fake_suite import event
+from tests.fake_suite import RELEVE_ID, convert_event, event
 from tests.fakes import make_router
 from tests.test_suite_nodes import Suite
 
@@ -535,7 +535,7 @@ def test_deleting_a_workflow_deletes_its_triggers(api: TestClient) -> None:
 def test_events_catalog(api: TestClient, suite: Suite) -> None:
     suite.viz.mode = "down"
     apps = {a["app"]: a for a in api.get("/api/triggers/events-catalog").json()["apps"]}
-    assert set(apps) == {"viz", "tab", "projets"}
+    assert set(apps) == {"viz", "tab", "projets", "convert"}
     projets = apps["projets"]
     assert projets["status"] == "ok" and projets["color"] == "#94D82D"
     status = next(e for e in projets["events"] if e["type"] == STATUS)
@@ -546,6 +546,63 @@ def test_events_catalog(api: TestClient, suite: Suite) -> None:
     assert deleted["fields"] == ["subject.id", "subject.label"]
     assert apps["viz"]["status"] == "unreachable" and apps["viz"]["events"] == []
     assert apps["tab"]["events"][0]["type"] == "tab.table.changed"
+    # Convert : champs de `data` lus dans son manifeste réel
+    convert = apps["convert"]
+    assert convert["name"] == "Atelier Convert" and convert["color"] == "#C9951D"
+    created = next(e for e in convert["events"] if e["type"] == "convert.conversion.created")
+    assert created["fields"] == ["data.name", "data.format", "data.rows", "data.columns",
+                                 "data.statement", "data.ocr", "data.origin", "subject.id",
+                                 "subject.label"]  # fmt: skip
+
+
+async def test_convert_event_trigger_runs_and_waits(
+    api: TestClient, service: TriggerService, suite: Suite
+) -> None:
+    """Relevé reconnu dans Convert → workflow lancé avec l'identifiant de la conversion ; la
+    première étape attend une validation (every_step) ; curseur de Convert distinct de Projets."""
+    steps = [
+        {"id": "lire", "label": "", "uses": "node:convert/conversions.table",
+         "input": {"conversion_id": "{{params.conversion}}", "limit": 100}, "needs": [],
+         "on_error": "stop"},
+    ]  # fmt: skip
+    body = {"version": 2, "agent": None, "title": "Relevé", "description": "",
+            "params": [{"name": "conversion", "label": "Conversion", "default": ""}],
+            "steps": steps}  # fmt: skip
+    created = api.post("/api/workflows", json=body)
+    assert created.status_code == 201, created.text
+    wf = created.json()["id"]
+    trigger = add(
+        api,
+        wf,
+        {"kind": "event", "app": "convert", "types": ["convert.conversion.created"],
+         "filters": [{"path": "data.statement", "op": "eq", "value": True}],
+         "params": {"conversion": "{{event.subject.id}}"}},
+    )  # fmt: skip
+    projets = add(api, workflow(api, READ, title="Autre"), on_event())
+    assert trigger["state"]["cursor"] == 3 and projets["state"]["cursor"] == 5
+    suite.convert.events += [
+        convert_event(4, "ffffffffffff", statement=False),  # pas un relevé : filtré
+        convert_event(5),
+    ]
+    await service.tick()
+    [run] = runs(api, wf)
+    assert run["trigger"] == "event" and run["status"] == "awaiting_approval"
+    assert run["params"] == {"conversion": RELEVE_ID}
+    assert run["trigger_event"]["app"] == "convert" and run["trigger_event"]["seq"] == 5
+    assert run["pending"][0]["input"] == {"conversion_id": RELEVE_ID, "limit": 100}
+    assert not [r for r in suite.convert.requests if r.url.path.endswith("/table")]
+    state = get(api, trigger)["state"]
+    assert state["cursor"] == 5 and state["counters"]["filtered"] == 1
+    assert get(api, projets)["state"]["cursor"] == 5  # curseur de Projets inchangé
+    assert approve(api, run)["status"] == "completed"
+    assert [r for r in suite.convert.requests if r.url.path.endswith("/table")]
+
+    refused = api.post(
+        f"/api/workflows/{wf}/triggers",
+        json={"kind": "event", "app": "convert", "types": ["convert.table.nope"]},
+    )
+    assert refused.status_code == 422
+    assert "non déclaré(s) par Atelier Convert" in str(refused.json()["detail"])
 
 
 # ─── Validation (422, texte français) ─────────────────────────────

@@ -58,7 +58,7 @@ async for event in router.stream(request):  # TextDelta…, puis ResponseComplet
 
 - **Choix du provider** : par requête (`provider=`), sinon `LLM_DEFAULT_PROVIDER`.
 - **Modèle** : `LLMRequest.model`, sinon `ANTHROPIC_MODEL` / `OLLAMA_MODEL`.
-- **Repli** (`LLM_FALLBACK_PROVIDER`) : uniquement sur panne transitoire (réseau, timeout, 429, 5xx, surcharge) et, en streaming, seulement si aucun événement n'a encore été émis. Le nom de modèle est alors réinitialisé (non portable). Un agent qui a basculé reste sur le provider de secours jusqu'à la fin de son tour.
+- **Repli** (`LLM_FALLBACK_PROVIDER`) : uniquement sur panne transitoire (réseau, timeout, 429, 5xx, surcharge) et, en streaming, seulement si aucun événement n'a encore été émis. Le nom de modèle est alors réinitialisé (non portable). Un agent qui a basculé reste sur le provider de secours jusqu'à la fin de son tour ; le moteur réellement utilisé est tenu à jour dans `ToolContext.state` (la délégation s'y fie). Jamais de repli pour un agent 100 % local, ni pour une conversation qui contient la réponse d'un agent local ([`agents.md`](agents.md) §3). Le provider de secours reçoit la **même** requête : une spécification d'outil qui dépend du moteur (`spec_for`, ex. agents joignables par délégation) doit rester vraie sur les deux ; la boucle pose donc aussi le repli possible du prochain appel dans `ToolContext.state`.
 - **Erreurs** (`app/core/llm/errors.py`) :
 
 | Exception | Cause | HTTP |
@@ -69,26 +69,30 @@ async for event in router.stream(request):  # TextDelta…, puis ResponseComplet
 
 ## 4. Écrire un agent
 
+Un agent déclare ses **boîtes à outils** (`toolsets`) et compose son prompt avec `prompt()`, qui ajoute les règles
+communes (`app/agents/experts/common.py`). Il ne surcharge pas `default_tools()` : les boîtes portent la
+disponibilité (application configurée ou non) et le verrou des données sensibles.
+
 ```python
-# app/agents/mon_agent.py
-from typing import Any
+# backend/app/agents/experts/mon_domaine.py  (puis l'importer dans experts/__init__.py)
 from app.agents.base import BaseAgent
+from app.agents.experts.common import prompt
 from app.agents.registry import register_agent
-from app.tools import BaseTool, PublishArtifactTool
 
 @register_agent
 class MonAgent(BaseAgent):
     name = "mon_agent"                 # identifiant d'URL
     display_name = "Mon agent"
     description = "Ce que fait l'agent."
-    system_prompt = "Tu es…"
-    max_iterations = 8                 # garde-fou de la boucle d'outils
-
-    def default_tools(self) -> list[BaseTool[Any]]:
-        return [PublishArtifactTool()]  # déclaration explicite
+    icon = "lightbulb"
+    category = "Métiers"
+    toolsets = ("core", "data_via")    # boîtes déclarées (app/tools/toolsets.py)
+    max_iterations = 10                # appels au modèle par tour, reprises après validation comprises
+    starters = ("Une question type.",)
+    system_prompt = prompt("""Tu es…""")
 ```
 
-Puis l'importer dans `app/agents/__init__.py` pour l'enregistrer.
+Détail (icônes, cas d'évaluation, documentation) : [`agents.md`](agents.md) §7 et le skill `/nouvel-agent`.
 
 ## 5. Écrire un outil
 
@@ -111,6 +115,11 @@ class MonOutil(BaseTool[MonInput]):
 - Le JSON Schema est rendu **portable** (`portable_schema`) : `$ref`/`$defs` déroulés, titres retirés → accepté par Claude comme par Ollama. Les modèles récursifs sont refusés.
 - Une entrée invalide ou une exception ne fait **jamais** planter l'agent : le modèle reçoit un `tool_result` en erreur et peut corriger son appel.
 - `ToolOutput.artifacts` : livrables envoyés au panneau Artefacts (`useArtifactStore`).
+- Écriture : `requires_approval = True` et un `approval_summary()` lisible ; données financières ou personnelles :
+  `sensitive = True` (agent verrouillé sur Ollama).
+- Crochets facultatifs : `restore(params, ctx)` reconstruit `ToolContext.state` d'après un appel réussi de
+  l'historique (chaque validation relance l'agent dans une nouvelle requête, contexte vide ; ex. profil Data Via
+  déjà décrit) ; `spec_for(ctx)` adapte la spécification au contexte du tour (ex. agents joignables selon le moteur).
 
 Outils fournis : `current_datetime`, `publish_artifact` (types : `sql`, `dax`, `powerquery`, `python`, `react`, `code`, `markdown`, `json`, `data_preview`).
 
@@ -132,10 +141,17 @@ Agents enregistrés et leurs outils.
   "messages": [{"role": "user", "content": [{"type": "text", "text": "Bonjour"}]}],
   "provider": "ollama",
   "model": null,
-  "conversation_id": "conv-42"
+  "conversation_id": "conv-42",
+  "approvals": null
 }
 ```
-Le dernier message doit être `user`. Réponse `AgentResult` : `text`, `provider`, `model`, `stop_reason` (`end_turn`, `max_tokens`, `max_iterations`…), `iterations`, `usage`, `artifacts`, `new_messages` (à ajouter à l'historique côté client pour le tour suivant).
+Le dernier message est `user` (nouvelle question), ou le message `assistant` qui contient les appels d'outils en
+attente, accompagné de `approvals: {"<id>": true|false}` (reprise après validation, [`agents.md`](agents.md) §3).
+Réponse `AgentResult` : `text`, `provider`, `model`, `stop_reason` (`end_turn`, `max_tokens`, `max_iterations`,
+`awaiting_approval`…), `iterations` (étapes depuis le dernier message de l'utilisateur, reprises comprises),
+`usage` (sous-agents compris), `artifacts`, `new_messages` (à ajouter à l'historique côté client pour le tour
+suivant), `pending_approvals` (appels à valider : `id`, `name`, `input`, `summary`, `kind`). 403
+`provider_not_allowed` si Claude est demandé pour un agent local ou pour une conversation verrouillée.
 
 ### `POST /api/agents/{agent_name}/stream`
 Même corps ; réponse **Server-Sent Events**. Champ `data` en JSON :
@@ -146,12 +162,14 @@ Même corps ; réponse **Server-Sent Events**. Champ `data` en JSON :
 | `tool_call` | `{"id", "name", "input"}` |
 | `artifact` | `{"artifact": {"kind", "title", "content", "language", "metadata"}}` → `useArtifactStore` |
 | `tool_result` | `{"id", "name", "content", "is_error"}` |
+| `approval_required` | `{"calls": [{"id", "name", "input", "summary", "kind"}]}` → cartes « Autoriser / Refuser » |
 | `done` | `{"result": AgentResult}` |
+| `saved` / `save_error` | historique enregistré (`conversation_id`) ou message d'échec |
 | `error` | `{"code", "message", "provider"}` |
 
 Exemple :
 ```bash
-curl -N -X POST localhost:8000/api/agents/assistant/stream \
+curl -N -X POST localhost:8100/api/agents/assistant/stream \
   -H 'content-type: application/json' \
   -d '{"messages":[{"role":"user","content":[{"type":"text","text":"Quel jour sommes-nous ?"}]}]}'
 ```

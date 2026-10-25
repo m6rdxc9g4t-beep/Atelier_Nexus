@@ -1,0 +1,4680 @@
+{
+  "contract": "atelier-node/1",
+  "app": "viz",
+  "name": "Atelier Viz",
+  "version": "0.1.0",
+  "transport": "http",
+  "actions": [
+    {
+      "id": "datasets.list",
+      "label": "Lister les jeux de données",
+      "description": "Jeux de données importés dans Atelier Viz, du plus récent au plus ancien (sans leurs lignes).",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/datasets"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Action sans paramètre.",
+        "properties": {},
+        "title": "NoInput",
+        "type": "object",
+        "required": []
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "$defs": {
+            "AtelierTableOrigin": {
+              "description": "Jeu alimenté par un nœud de workflow (docs/SUITE.md §7, `datasets.upsert_table`) : pas de source à relire.\n\n`key` est la clé externe stable choisie par l'appelant (Atelier Nexus) : un nouvel envoi avec la même clé\nremplace les données du jeu au lieu d'en créer un autre.",
+              "properties": {
+                "kind": {
+                  "const": "atelier-table",
+                  "default": "atelier-table",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "key": {
+                  "pattern": "^[a-z0-9][a-z0-9_.:-]{0,99}$",
+                  "title": "Key",
+                  "type": "string"
+                },
+                "table_name": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "`name` de la table reçue.",
+                  "title": "Table Name"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "refreshed_at"
+              ],
+              "title": "AtelierTableOrigin",
+              "type": "object"
+            },
+            "DatasetOrigin": {
+              "description": "Provenance d'un jeu importé depuis une connexion : permet de l'actualiser.",
+              "properties": {
+                "connection_id": {
+                  "title": "Connection Id",
+                  "type": "string"
+                },
+                "connection_name": {
+                  "title": "Connection Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "sqlserver",
+                    "postgres",
+                    "mysql",
+                    "sqlite",
+                    "file",
+                    "sharepoint",
+                    "atelier_tab",
+                    "atelier_projets"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "table": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TableRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "query": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Query"
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Url"
+                },
+                "project_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Project Id"
+                },
+                "max_rows": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Max Rows"
+                },
+                "truncated": {
+                  "default": false,
+                  "description": "Limite de lignes atteinte au dernier chargement.",
+                  "title": "Truncated",
+                  "type": "boolean"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "connection_id",
+                "connection_name",
+                "kind",
+                "refreshed_at"
+              ],
+              "title": "DatasetOrigin",
+              "type": "object"
+            },
+            "DatasetSummary": {
+              "description": "Résumé d'un jeu de données (liste).",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "format": {
+                  "enum": [
+                    "csv",
+                    "xlsx",
+                    "json",
+                    "sqlserver",
+                    "postgres",
+                    "mysql",
+                    "sqlite",
+                    "sharepoint",
+                    "atelier_tab",
+                    "atelier_projets",
+                    "atelier_table"
+                  ],
+                  "title": "Format",
+                  "type": "string"
+                },
+                "rows": {
+                  "title": "Rows",
+                  "type": "integer"
+                },
+                "columns_count": {
+                  "title": "Columns Count",
+                  "type": "integer"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "title": "Created At",
+                  "type": "string"
+                },
+                "origin": {
+                  "anyOf": [
+                    {
+                      "discriminator": {
+                        "mapping": {
+                          "atelier-table": "#/$defs/AtelierTableOrigin",
+                          "atelier_projets": "#/$defs/DatasetOrigin",
+                          "atelier_tab": "#/$defs/DatasetOrigin",
+                          "file": "#/$defs/DatasetOrigin",
+                          "mysql": "#/$defs/DatasetOrigin",
+                          "postgres": "#/$defs/DatasetOrigin",
+                          "sharepoint": "#/$defs/DatasetOrigin",
+                          "sqlite": "#/$defs/DatasetOrigin",
+                          "sqlserver": "#/$defs/DatasetOrigin"
+                        },
+                        "propertyName": "kind"
+                      },
+                      "oneOf": [
+                        {
+                          "$ref": "#/$defs/DatasetOrigin"
+                        },
+                        {
+                          "$ref": "#/$defs/AtelierTableOrigin"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Connexion d'origine (jeu actualisable), ou clé de la table reçue d'un workflow (`atelier-table`).",
+                  "title": "Origin"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "format",
+                "rows",
+                "columns_count",
+                "created_at"
+              ],
+              "title": "DatasetSummary",
+              "type": "object"
+            },
+            "TableRef": {
+              "description": "Table ou vue d'une base, feuille d'un classeur Excel (`schema` vide), table publiée par Atelier Tab\n(`snapshot`, `schema` = projet) ou jeu de données d'Atelier Projets (`dataset`).",
+              "properties": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Schema"
+                },
+                "name": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "table",
+                  "enum": [
+                    "table",
+                    "view",
+                    "sheet",
+                    "list",
+                    "snapshot",
+                    "dataset"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Identifiant stable dans la source (fichier d'Atelier Tab, nom du jeu d'Atelier Projets).",
+                  "title": "Id"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "maxLength": 500,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Description"
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Date de publication (Atelier Tab).",
+                  "title": "Updated At"
+                },
+                "rows": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Nombre de lignes annoncé par la source.",
+                  "title": "Rows"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "title": "TableRef",
+              "type": "object"
+            }
+          },
+          "items": {
+            "$ref": "#/$defs/DatasetSummary"
+          },
+          "type": "array"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "datasets.get",
+      "label": "Lire le profil d'un jeu",
+      "description": "Colonnes typées, statistiques et premières lignes d'un jeu de données.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/datasets/{dataset_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Un jeu de données, par son identifiant.",
+        "properties": {
+          "dataset_id": {
+            "description": "Identifiant du jeu (12 caractères hexadécimaux).",
+            "pattern": "^[0-9a-f]{12}$",
+            "title": "Dataset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "DatasetIdInput",
+        "type": "object"
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "$defs": {
+            "AtelierTableOrigin": {
+              "description": "Jeu alimenté par un nœud de workflow (docs/SUITE.md §7, `datasets.upsert_table`) : pas de source à relire.\n\n`key` est la clé externe stable choisie par l'appelant (Atelier Nexus) : un nouvel envoi avec la même clé\nremplace les données du jeu au lieu d'en créer un autre.",
+              "properties": {
+                "kind": {
+                  "const": "atelier-table",
+                  "default": "atelier-table",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "key": {
+                  "pattern": "^[a-z0-9][a-z0-9_.:-]{0,99}$",
+                  "title": "Key",
+                  "type": "string"
+                },
+                "table_name": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "`name` de la table reçue.",
+                  "title": "Table Name"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "refreshed_at"
+              ],
+              "title": "AtelierTableOrigin",
+              "type": "object"
+            },
+            "CalculatedColumn": {
+              "description": "Colonne calculée ligne à ligne (ex. `prix_unitaire * 1.2`).",
+              "properties": {
+                "name": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "expression": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "title": "Expression",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "expression"
+              ],
+              "title": "CalculatedColumn",
+              "type": "object"
+            },
+            "CalculatedMeasure": {
+              "description": "Mesure calculée à partir d'agrégats (ex. `SUM(ca) - SUM(cout)`).",
+              "properties": {
+                "name": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "expression": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "title": "Expression",
+                  "type": "string"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "maxLength": 300,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Description"
+                }
+              },
+              "required": [
+                "name",
+                "expression"
+              ],
+              "title": "CalculatedMeasure",
+              "type": "object"
+            },
+            "CastStep": {
+              "description": "Change le type d'une colonne (valeurs non convertibles → vides).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "cast",
+                  "default": "cast",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "to": {
+                  "enum": [
+                    "number",
+                    "string",
+                    "date",
+                    "boolean"
+                  ],
+                  "title": "To",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "to"
+              ],
+              "title": "CastStep",
+              "type": "object"
+            },
+            "ColumnProfile": {
+              "description": "Profil statistique d'une colonne.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "number",
+                    "string",
+                    "date",
+                    "boolean"
+                  ],
+                  "title": "Type",
+                  "type": "string"
+                },
+                "nulls": {
+                  "description": "Nombre de valeurs manquantes.",
+                  "title": "Nulls",
+                  "type": "integer"
+                },
+                "distinct": {
+                  "description": "Nombre de valeurs distinctes (hors manquantes).",
+                  "title": "Distinct",
+                  "type": "integer"
+                },
+                "min": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Min"
+                },
+                "max": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Max"
+                },
+                "mean": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Moyenne (colonnes numériques).",
+                  "title": "Mean"
+                },
+                "top_values": {
+                  "description": "Valeurs les plus fréquentes.",
+                  "items": {
+                    "$ref": "#/$defs/ValueCount"
+                  },
+                  "title": "Top Values",
+                  "type": "array"
+                },
+                "calculated": {
+                  "default": false,
+                  "description": "Colonne calculée (définie dans le modèle).",
+                  "title": "Calculated",
+                  "type": "boolean"
+                },
+                "expression": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Expression d'une colonne calculée.",
+                  "title": "Expression"
+                },
+                "related": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Relation d'origine d'une colonne liée (« magasins »).",
+                  "title": "Related"
+                }
+              },
+              "required": [
+                "name",
+                "type",
+                "nulls",
+                "distinct"
+              ],
+              "title": "ColumnProfile",
+              "type": "object"
+            },
+            "DatasetModel": {
+              "description": "Modèle d'un jeu de données : relations, colonnes et mesures calculées (évaluées par DuckDB).",
+              "properties": {
+                "columns": {
+                  "items": {
+                    "$ref": "#/$defs/CalculatedColumn"
+                  },
+                  "maxItems": 50,
+                  "title": "Columns",
+                  "type": "array"
+                },
+                "measures": {
+                  "items": {
+                    "$ref": "#/$defs/CalculatedMeasure"
+                  },
+                  "maxItems": 100,
+                  "title": "Measures",
+                  "type": "array"
+                },
+                "relations": {
+                  "items": {
+                    "$ref": "#/$defs/Relation"
+                  },
+                  "maxItems": 10,
+                  "title": "Relations",
+                  "type": "array"
+                }
+              },
+              "title": "DatasetModel",
+              "type": "object"
+            },
+            "DatasetOrigin": {
+              "description": "Provenance d'un jeu importé depuis une connexion : permet de l'actualiser.",
+              "properties": {
+                "connection_id": {
+                  "title": "Connection Id",
+                  "type": "string"
+                },
+                "connection_name": {
+                  "title": "Connection Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "sqlserver",
+                    "postgres",
+                    "mysql",
+                    "sqlite",
+                    "file",
+                    "sharepoint",
+                    "atelier_tab",
+                    "atelier_projets"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "table": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TableRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "query": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Query"
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Url"
+                },
+                "project_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Project Id"
+                },
+                "max_rows": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Max Rows"
+                },
+                "truncated": {
+                  "default": false,
+                  "description": "Limite de lignes atteinte au dernier chargement.",
+                  "title": "Truncated",
+                  "type": "boolean"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "connection_id",
+                "connection_name",
+                "kind",
+                "refreshed_at"
+              ],
+              "title": "DatasetOrigin",
+              "type": "object"
+            },
+            "DedupeStep": {
+              "description": "Supprime les lignes en double (sur toutes les colonnes ou certaines).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "dedupe",
+                  "default": "dedupe",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Columns"
+                }
+              },
+              "title": "DedupeStep",
+              "type": "object"
+            },
+            "FillStep": {
+              "description": "Remplit les valeurs manquantes (valeur fixe, ou valeur de la ligne précédente).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "fill",
+                  "default": "fill",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Value"
+                },
+                "down": {
+                  "default": false,
+                  "description": "Recopier la valeur précédente (« remplir vers le bas »).",
+                  "title": "Down",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "title": "FillStep",
+              "type": "object"
+            },
+            "FilterStep": {
+              "description": "Garde les lignes qui vérifient une condition.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "filter",
+                  "default": "filter",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "op": {
+                  "enum": [
+                    "eq",
+                    "neq",
+                    "in",
+                    "not_in",
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "contains",
+                    "not_contains",
+                    "is_null",
+                    "not_null"
+                  ],
+                  "title": "Op",
+                  "type": "string"
+                },
+                "values": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxItems": 1000,
+                  "title": "Values",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "column",
+                "op"
+              ],
+              "title": "FilterStep",
+              "type": "object"
+            },
+            "Relation": {
+              "description": "Relation plusieurs-à-un vers un autre jeu (« ventes.region → regions.region »).\n\nLes colonnes du jeu lié deviennent des colonnes du jeu, nommées `<nom>.<colonne>` : axes, filtres,\nsegments, mesures et colonnes calculées les utilisent comme les autres. Les segments et sélections\nposés sur le jeu lié filtrent aussi ce jeu (sens unique, comme dans Power BI).",
+              "properties": {
+                "name": {
+                  "description": "Préfixe des colonnes liées.",
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "dataset_id": {
+                  "description": "Jeu lié (côté « un »).",
+                  "pattern": "^[0-9a-f]{12}$",
+                  "title": "Dataset Id",
+                  "type": "string"
+                },
+                "from_column": {
+                  "description": "Colonne de ce jeu (clé étrangère).",
+                  "minLength": 1,
+                  "title": "From Column",
+                  "type": "string"
+                },
+                "to_column": {
+                  "description": "Colonne du jeu lié (clé, valeurs uniques).",
+                  "minLength": 1,
+                  "title": "To Column",
+                  "type": "string"
+                },
+                "columns": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 200,
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Colonnes reprises (toutes si absent).",
+                  "title": "Columns"
+                }
+              },
+              "required": [
+                "name",
+                "dataset_id",
+                "from_column",
+                "to_column"
+              ],
+              "title": "Relation",
+              "type": "object"
+            },
+            "RemoveStep": {
+              "description": "Supprime des colonnes.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "remove",
+                  "default": "remove",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500,
+                  "minItems": 1,
+                  "title": "Columns",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "columns"
+              ],
+              "title": "RemoveStep",
+              "type": "object"
+            },
+            "RenameStep": {
+              "description": "Renomme une colonne.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "rename",
+                  "default": "rename",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "to": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "To",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "to"
+              ],
+              "title": "RenameStep",
+              "type": "object"
+            },
+            "ReplaceStep": {
+              "description": "Remplace une valeur (cellule entière) ou un morceau de texte.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "replace",
+                  "default": "replace",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "find": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Find"
+                },
+                "replace": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Replace"
+                },
+                "whole": {
+                  "default": true,
+                  "description": "Cellule entière ; sinon remplacement dans le texte.",
+                  "title": "Whole",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "column",
+                "find",
+                "replace"
+              ],
+              "title": "ReplaceStep",
+              "type": "object"
+            },
+            "SplitStep": {
+              "description": "Fractionne une colonne texte selon un séparateur (« Nom Prénom » → deux colonnes).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "split",
+                  "default": "split",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "separator": {
+                  "maxLength": 10,
+                  "minLength": 1,
+                  "title": "Separator",
+                  "type": "string"
+                },
+                "into": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "minItems": 2,
+                  "title": "Into",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "column",
+                "separator",
+                "into"
+              ],
+              "title": "SplitStep",
+              "type": "object"
+            },
+            "TableRef": {
+              "description": "Table ou vue d'une base, feuille d'un classeur Excel (`schema` vide), table publiée par Atelier Tab\n(`snapshot`, `schema` = projet) ou jeu de données d'Atelier Projets (`dataset`).",
+              "properties": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Schema"
+                },
+                "name": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "table",
+                  "enum": [
+                    "table",
+                    "view",
+                    "sheet",
+                    "list",
+                    "snapshot",
+                    "dataset"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Identifiant stable dans la source (fichier d'Atelier Tab, nom du jeu d'Atelier Projets).",
+                  "title": "Id"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "maxLength": 500,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Description"
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Date de publication (Atelier Tab).",
+                  "title": "Updated At"
+                },
+                "rows": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Nombre de lignes annoncé par la source.",
+                  "title": "Rows"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "title": "TableRef",
+              "type": "object"
+            },
+            "TextStep": {
+              "description": "Nettoie un texte : espaces, majuscules, minuscules, première lettre en majuscule.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "text",
+                  "default": "text",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "mode": {
+                  "enum": [
+                    "trim",
+                    "upper",
+                    "lower",
+                    "capitalize"
+                  ],
+                  "title": "Mode",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "mode"
+              ],
+              "title": "TextStep",
+              "type": "object"
+            },
+            "UnpivotStep": {
+              "description": "Dépivote des colonnes : « janvier, février… » → lignes (attribut, valeur).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "unpivot",
+                  "default": "unpivot",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500,
+                  "minItems": 1,
+                  "title": "Columns",
+                  "type": "array"
+                },
+                "attribute": {
+                  "default": "attribut",
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Attribute",
+                  "type": "string"
+                },
+                "value": {
+                  "default": "valeur",
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Value",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "columns"
+              ],
+              "title": "UnpivotStep",
+              "type": "object"
+            },
+            "ValueCount": {
+              "description": "Une valeur fréquente et son nombre d'occurrences.",
+              "properties": {
+                "value": {
+                  "title": "Value",
+                  "type": "string"
+                },
+                "count": {
+                  "title": "Count",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value",
+                "count"
+              ],
+              "title": "ValueCount",
+              "type": "object"
+            }
+          },
+          "description": "Jeu de données profilé : colonnes typées + échantillon.",
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "csv",
+                "xlsx",
+                "json",
+                "sqlserver",
+                "postgres",
+                "mysql",
+                "sqlite",
+                "sharepoint",
+                "atelier_tab",
+                "atelier_projets",
+                "atelier_table"
+              ],
+              "title": "Format",
+              "type": "string"
+            },
+            "rows": {
+              "title": "Rows",
+              "type": "integer"
+            },
+            "columns_count": {
+              "title": "Columns Count",
+              "type": "integer"
+            },
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "discriminator": {
+                    "mapping": {
+                      "atelier-table": "#/$defs/AtelierTableOrigin",
+                      "atelier_projets": "#/$defs/DatasetOrigin",
+                      "atelier_tab": "#/$defs/DatasetOrigin",
+                      "file": "#/$defs/DatasetOrigin",
+                      "mysql": "#/$defs/DatasetOrigin",
+                      "postgres": "#/$defs/DatasetOrigin",
+                      "sharepoint": "#/$defs/DatasetOrigin",
+                      "sqlite": "#/$defs/DatasetOrigin",
+                      "sqlserver": "#/$defs/DatasetOrigin"
+                    },
+                    "propertyName": "kind"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/DatasetOrigin"
+                    },
+                    {
+                      "$ref": "#/$defs/AtelierTableOrigin"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Connexion d'origine (jeu actualisable), ou clé de la table reçue d'un workflow (`atelier-table`).",
+              "title": "Origin"
+            },
+            "columns": {
+              "items": {
+                "$ref": "#/$defs/ColumnProfile"
+              },
+              "title": "Columns",
+              "type": "array"
+            },
+            "sample": {
+              "description": "Premières lignes, valeurs sérialisées en JSON.",
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Sample",
+              "type": "array"
+            },
+            "model": {
+              "$ref": "#/$defs/DatasetModel",
+              "description": "Colonnes et mesures calculées."
+            },
+            "steps": {
+              "description": "Étapes de préparation, rejouées sur la source à chaque actualisation.",
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "cast": "#/$defs/CastStep",
+                    "dedupe": "#/$defs/DedupeStep",
+                    "fill": "#/$defs/FillStep",
+                    "filter": "#/$defs/FilterStep",
+                    "remove": "#/$defs/RemoveStep",
+                    "rename": "#/$defs/RenameStep",
+                    "replace": "#/$defs/ReplaceStep",
+                    "split": "#/$defs/SplitStep",
+                    "text": "#/$defs/TextStep",
+                    "unpivot": "#/$defs/UnpivotStep"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/RenameStep"
+                  },
+                  {
+                    "$ref": "#/$defs/RemoveStep"
+                  },
+                  {
+                    "$ref": "#/$defs/CastStep"
+                  },
+                  {
+                    "$ref": "#/$defs/FilterStep"
+                  },
+                  {
+                    "$ref": "#/$defs/ReplaceStep"
+                  },
+                  {
+                    "$ref": "#/$defs/FillStep"
+                  },
+                  {
+                    "$ref": "#/$defs/TextStep"
+                  },
+                  {
+                    "$ref": "#/$defs/DedupeStep"
+                  },
+                  {
+                    "$ref": "#/$defs/UnpivotStep"
+                  },
+                  {
+                    "$ref": "#/$defs/SplitStep"
+                  }
+                ]
+              },
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "format",
+            "rows",
+            "columns_count",
+            "created_at",
+            "columns",
+            "sample"
+          ],
+          "title": "DatasetProfile",
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "datasets.table",
+      "label": "Lire les lignes d'un jeu",
+      "description": "Page de lignes d'un jeu (colonnes calculées et liées comprises), au plus 5 000 par appel.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/datasets/{dataset_id}/table"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Page de lignes d'un jeu, au format `atelier-table/1`.",
+        "properties": {
+          "dataset_id": {
+            "description": "Identifiant du jeu (12 caractères hexadécimaux).",
+            "pattern": "^[0-9a-f]{12}$",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Première ligne (0 = début).",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 1000,
+            "description": "Nombre de lignes.",
+            "maximum": 5000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "TablePageInput",
+        "type": "object"
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "$defs": {
+            "AtelierColumn": {
+              "description": "Colonne d'une table d'échange : clé `snake_case` sans accent, libellé en français.",
+              "properties": {
+                "key": {
+                  "description": "Clé snake_case, unique dans la table.",
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "title": "Key",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Libellé affiché (français, avec accents).",
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "title": "Label",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "string",
+                    "number",
+                    "date",
+                    "datetime",
+                    "boolean"
+                  ],
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type"
+              ],
+              "title": "AtelierColumn",
+              "type": "object"
+            }
+          },
+          "description": "Table qui passe d'une étape de workflow à l'autre (`rows` utilise les `key` des colonnes).",
+          "properties": {
+            "format": {
+              "const": "atelier-table/1",
+              "default": "atelier-table/1",
+              "title": "Format",
+              "type": "string"
+            },
+            "name": {
+              "description": "Identifiant de la table (« work-items »).",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Nom affiché de la table.",
+              "title": "Label"
+            },
+            "columns": {
+              "items": {
+                "$ref": "#/$defs/AtelierColumn"
+              },
+              "maxItems": 200,
+              "minItems": 1,
+              "title": "Columns",
+              "type": "array"
+            },
+            "rows": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "maxItems": 100000,
+              "title": "Rows",
+              "type": "array"
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Nombre complet de lignes, si connu.",
+              "title": "Total"
+            },
+            "truncated": {
+              "default": false,
+              "description": "Vrai quand `rows` ne contient pas toutes les lignes.",
+              "title": "Truncated",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "columns"
+          ],
+          "title": "AtelierTable",
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "datasets.query",
+      "label": "Interroger un jeu de données",
+      "description": "Regroupe, agrège, filtre et trie un jeu avec le moteur de requêtes des visuels (aucun SQL accepté).",
+      "kind": "read",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/query"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "$defs": {
+          "Dimension": {
+            "description": "Champ de regroupement, éventuellement tronqué à une période (dates).",
+            "properties": {
+              "field": {
+                "title": "Field",
+                "type": "string"
+              },
+              "bin": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "year",
+                      "quarter",
+                      "month",
+                      "week",
+                      "day"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Bin"
+              }
+            },
+            "required": [
+              "field"
+            ],
+            "title": "Dimension",
+            "type": "object"
+          },
+          "Filter": {
+            "description": "Condition sur un champ (ou sur sa période si `bin` est fourni).",
+            "properties": {
+              "field": {
+                "title": "Field",
+                "type": "string"
+              },
+              "op": {
+                "default": "in",
+                "enum": [
+                  "in",
+                  "not_in",
+                  "eq",
+                  "neq",
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "between",
+                  "contains",
+                  "is_null",
+                  "not_null"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Values",
+                "type": "array"
+              },
+              "bin": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "year",
+                      "quarter",
+                      "month",
+                      "week",
+                      "day"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Bin"
+              }
+            },
+            "required": [
+              "field"
+            ],
+            "title": "Filter",
+            "type": "object"
+          },
+          "Measure": {
+            "description": "Agrégat calculé ; `field` vide = nombre de lignes ; `show` = calcul rapide (cumul, N-1…).",
+            "properties": {
+              "field": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Field"
+              },
+              "agg": {
+                "default": "sum",
+                "enum": [
+                  "sum",
+                  "avg",
+                  "min",
+                  "max",
+                  "count",
+                  "count_distinct",
+                  "median",
+                  "calc"
+                ],
+                "title": "Agg",
+                "type": "string"
+              },
+              "show": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ShowAs"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "title": "Measure",
+            "type": "object"
+          },
+          "ShowAs": {
+            "description": "Calcul rapide appliqué à une mesure, selon un champ date (sauf `pct_total`).",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "ytd",
+                  "running",
+                  "prev_year",
+                  "yoy_diff",
+                  "yoy_pct",
+                  "moving_avg",
+                  "pct_total"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Champ date de référence.",
+                "title": "Date"
+              },
+              "window": {
+                "default": 3,
+                "description": "Périodes de la moyenne mobile.",
+                "maximum": 60,
+                "minimum": 2,
+                "title": "Window",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "title": "ShowAs",
+            "type": "object"
+          },
+          "Sort": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "desc": {
+                "default": false,
+                "title": "Desc",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "title": "Sort",
+            "type": "object"
+          }
+        },
+        "description": "Requête d'agrégation sur un jeu de données.",
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/$defs/Dimension"
+            },
+            "maxItems": 8,
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/$defs/Measure"
+            },
+            "maxItems": 12,
+            "title": "Measures",
+            "type": "array"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/$defs/Filter"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/$defs/Sort"
+            },
+            "title": "Sort",
+            "type": "array"
+          },
+          "limit": {
+            "default": 5000,
+            "maximum": 50000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "grouping_sets": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Clés de dimensions par ensemble (sous-totaux des matrices). Ajoute la colonne __grouping.",
+            "title": "Grouping Sets"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "QueryRequest",
+        "type": "object"
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "$defs": {
+            "AtelierColumn": {
+              "description": "Colonne d'une table d'échange : clé `snake_case` sans accent, libellé en français.",
+              "properties": {
+                "key": {
+                  "description": "Clé snake_case, unique dans la table.",
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "title": "Key",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Libellé affiché (français, avec accents).",
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "title": "Label",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "string",
+                    "number",
+                    "date",
+                    "datetime",
+                    "boolean"
+                  ],
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type"
+              ],
+              "title": "AtelierColumn",
+              "type": "object"
+            }
+          },
+          "description": "Table qui passe d'une étape de workflow à l'autre (`rows` utilise les `key` des colonnes).",
+          "properties": {
+            "format": {
+              "const": "atelier-table/1",
+              "default": "atelier-table/1",
+              "title": "Format",
+              "type": "string"
+            },
+            "name": {
+              "description": "Identifiant de la table (« work-items »).",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Nom affiché de la table.",
+              "title": "Label"
+            },
+            "columns": {
+              "items": {
+                "$ref": "#/$defs/AtelierColumn"
+              },
+              "maxItems": 200,
+              "minItems": 1,
+              "title": "Columns",
+              "type": "array"
+            },
+            "rows": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "maxItems": 100000,
+              "title": "Rows",
+              "type": "array"
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Nombre complet de lignes, si connu.",
+              "title": "Total"
+            },
+            "truncated": {
+              "default": false,
+              "description": "Vrai quand `rows` ne contient pas toutes les lignes.",
+              "title": "Truncated",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "columns"
+          ],
+          "title": "AtelierTable",
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "datasets.upsert_table",
+      "label": "Créer ou remplacer un jeu à partir d'une table",
+      "description": "Crée un jeu à partir d'une table atelier-table/1, ou remplace les données du jeu qui porte déjà cette clé (le modèle et les rapports branchés sont conservés et revalidés).",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/datasets"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "$defs": {
+          "AtelierColumn": {
+            "description": "Colonne d'une table d'échange : clé `snake_case` sans accent, libellé en français.",
+            "properties": {
+              "key": {
+                "description": "Clé snake_case, unique dans la table.",
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "label": {
+                "description": "Libellé affiché (français, avec accents).",
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Label",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "date",
+                  "datetime",
+                  "boolean"
+                ],
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "label",
+              "type"
+            ],
+            "title": "AtelierColumn",
+            "type": "object"
+          },
+          "AtelierTable": {
+            "description": "Table qui passe d'une étape de workflow à l'autre (`rows` utilise les `key` des colonnes).",
+            "properties": {
+              "format": {
+                "const": "atelier-table/1",
+                "default": "atelier-table/1",
+                "title": "Format",
+                "type": "string"
+              },
+              "name": {
+                "description": "Identifiant de la table (« work-items »).",
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Nom affiché de la table.",
+                "title": "Label"
+              },
+              "columns": {
+                "items": {
+                  "$ref": "#/$defs/AtelierColumn"
+                },
+                "maxItems": 200,
+                "minItems": 1,
+                "title": "Columns",
+                "type": "array"
+              },
+              "rows": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "maxItems": 100000,
+                "title": "Rows",
+                "type": "array"
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Nombre complet de lignes, si connu.",
+                "title": "Total"
+              },
+              "truncated": {
+                "default": false,
+                "description": "Vrai quand `rows` ne contient pas toutes les lignes.",
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "columns"
+            ],
+            "title": "AtelierTable",
+            "type": "object"
+          }
+        },
+        "description": "Crée un jeu à partir d'une table d'échange, ou remplace les données du jeu qui porte déjà cette clé.",
+        "properties": {
+          "name": {
+            "description": "Nom du jeu à sa création (inchangé ensuite).",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "key": {
+            "description": "Clé externe stable choisie par l'appelant (ex. « nexus:rapport-hebdo ») : même clé = même jeu.",
+            "pattern": "^[a-z0-9][a-z0-9_.:-]{0,99}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "table": {
+            "$ref": "#/$defs/AtelierTable"
+          }
+        },
+        "required": [
+          "name",
+          "key",
+          "table"
+        ],
+        "title": "UpsertTableInput",
+        "type": "object"
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "description": "Résultat de `datasets.upsert_table`.",
+          "properties": {
+            "dataset_id": {
+              "title": "Dataset Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "rows": {
+              "title": "Rows",
+              "type": "integer"
+            },
+            "action": {
+              "enum": [
+                "created",
+                "updated"
+              ],
+              "title": "Action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "dataset_id",
+            "name",
+            "rows",
+            "action"
+          ],
+          "title": "UpsertTableResult",
+          "type": "object"
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "datasets.refresh",
+      "label": "Actualiser un jeu",
+      "description": "Relit la source d'un jeu importé depuis une connexion (même identifiant : les rapports suivent).",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/datasets/{dataset_id}/refresh"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Un jeu de données, par son identifiant.",
+        "properties": {
+          "dataset_id": {
+            "description": "Identifiant du jeu (12 caractères hexadécimaux).",
+            "pattern": "^[0-9a-f]{12}$",
+            "title": "Dataset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "DatasetIdInput",
+        "type": "object"
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "$defs": {
+            "AtelierTableOrigin": {
+              "description": "Jeu alimenté par un nœud de workflow (docs/SUITE.md §7, `datasets.upsert_table`) : pas de source à relire.\n\n`key` est la clé externe stable choisie par l'appelant (Atelier Nexus) : un nouvel envoi avec la même clé\nremplace les données du jeu au lieu d'en créer un autre.",
+              "properties": {
+                "kind": {
+                  "const": "atelier-table",
+                  "default": "atelier-table",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "key": {
+                  "pattern": "^[a-z0-9][a-z0-9_.:-]{0,99}$",
+                  "title": "Key",
+                  "type": "string"
+                },
+                "table_name": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "`name` de la table reçue.",
+                  "title": "Table Name"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "refreshed_at"
+              ],
+              "title": "AtelierTableOrigin",
+              "type": "object"
+            },
+            "CalculatedColumn": {
+              "description": "Colonne calculée ligne à ligne (ex. `prix_unitaire * 1.2`).",
+              "properties": {
+                "name": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "expression": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "title": "Expression",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "expression"
+              ],
+              "title": "CalculatedColumn",
+              "type": "object"
+            },
+            "CalculatedMeasure": {
+              "description": "Mesure calculée à partir d'agrégats (ex. `SUM(ca) - SUM(cout)`).",
+              "properties": {
+                "name": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "expression": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "title": "Expression",
+                  "type": "string"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "maxLength": 300,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Description"
+                }
+              },
+              "required": [
+                "name",
+                "expression"
+              ],
+              "title": "CalculatedMeasure",
+              "type": "object"
+            },
+            "CastStep": {
+              "description": "Change le type d'une colonne (valeurs non convertibles → vides).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "cast",
+                  "default": "cast",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "to": {
+                  "enum": [
+                    "number",
+                    "string",
+                    "date",
+                    "boolean"
+                  ],
+                  "title": "To",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "to"
+              ],
+              "title": "CastStep",
+              "type": "object"
+            },
+            "ColumnProfile": {
+              "description": "Profil statistique d'une colonne.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "number",
+                    "string",
+                    "date",
+                    "boolean"
+                  ],
+                  "title": "Type",
+                  "type": "string"
+                },
+                "nulls": {
+                  "description": "Nombre de valeurs manquantes.",
+                  "title": "Nulls",
+                  "type": "integer"
+                },
+                "distinct": {
+                  "description": "Nombre de valeurs distinctes (hors manquantes).",
+                  "title": "Distinct",
+                  "type": "integer"
+                },
+                "min": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Min"
+                },
+                "max": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Max"
+                },
+                "mean": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Moyenne (colonnes numériques).",
+                  "title": "Mean"
+                },
+                "top_values": {
+                  "description": "Valeurs les plus fréquentes.",
+                  "items": {
+                    "$ref": "#/$defs/ValueCount"
+                  },
+                  "title": "Top Values",
+                  "type": "array"
+                },
+                "calculated": {
+                  "default": false,
+                  "description": "Colonne calculée (définie dans le modèle).",
+                  "title": "Calculated",
+                  "type": "boolean"
+                },
+                "expression": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Expression d'une colonne calculée.",
+                  "title": "Expression"
+                },
+                "related": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Relation d'origine d'une colonne liée (« magasins »).",
+                  "title": "Related"
+                }
+              },
+              "required": [
+                "name",
+                "type",
+                "nulls",
+                "distinct"
+              ],
+              "title": "ColumnProfile",
+              "type": "object"
+            },
+            "DatasetModel": {
+              "description": "Modèle d'un jeu de données : relations, colonnes et mesures calculées (évaluées par DuckDB).",
+              "properties": {
+                "columns": {
+                  "items": {
+                    "$ref": "#/$defs/CalculatedColumn"
+                  },
+                  "maxItems": 50,
+                  "title": "Columns",
+                  "type": "array"
+                },
+                "measures": {
+                  "items": {
+                    "$ref": "#/$defs/CalculatedMeasure"
+                  },
+                  "maxItems": 100,
+                  "title": "Measures",
+                  "type": "array"
+                },
+                "relations": {
+                  "items": {
+                    "$ref": "#/$defs/Relation"
+                  },
+                  "maxItems": 10,
+                  "title": "Relations",
+                  "type": "array"
+                }
+              },
+              "title": "DatasetModel",
+              "type": "object"
+            },
+            "DatasetOrigin": {
+              "description": "Provenance d'un jeu importé depuis une connexion : permet de l'actualiser.",
+              "properties": {
+                "connection_id": {
+                  "title": "Connection Id",
+                  "type": "string"
+                },
+                "connection_name": {
+                  "title": "Connection Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "sqlserver",
+                    "postgres",
+                    "mysql",
+                    "sqlite",
+                    "file",
+                    "sharepoint",
+                    "atelier_tab",
+                    "atelier_projets"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "table": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TableRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "query": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Query"
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Url"
+                },
+                "project_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Project Id"
+                },
+                "max_rows": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Max Rows"
+                },
+                "truncated": {
+                  "default": false,
+                  "description": "Limite de lignes atteinte au dernier chargement.",
+                  "title": "Truncated",
+                  "type": "boolean"
+                },
+                "refreshed_at": {
+                  "format": "date-time",
+                  "title": "Refreshed At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "connection_id",
+                "connection_name",
+                "kind",
+                "refreshed_at"
+              ],
+              "title": "DatasetOrigin",
+              "type": "object"
+            },
+            "DedupeStep": {
+              "description": "Supprime les lignes en double (sur toutes les colonnes ou certaines).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "dedupe",
+                  "default": "dedupe",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Columns"
+                }
+              },
+              "title": "DedupeStep",
+              "type": "object"
+            },
+            "FillStep": {
+              "description": "Remplit les valeurs manquantes (valeur fixe, ou valeur de la ligne précédente).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "fill",
+                  "default": "fill",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Value"
+                },
+                "down": {
+                  "default": false,
+                  "description": "Recopier la valeur précédente (« remplir vers le bas »).",
+                  "title": "Down",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "title": "FillStep",
+              "type": "object"
+            },
+            "FilterStep": {
+              "description": "Garde les lignes qui vérifient une condition.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "filter",
+                  "default": "filter",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "op": {
+                  "enum": [
+                    "eq",
+                    "neq",
+                    "in",
+                    "not_in",
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "contains",
+                    "not_contains",
+                    "is_null",
+                    "not_null"
+                  ],
+                  "title": "Op",
+                  "type": "string"
+                },
+                "values": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxItems": 1000,
+                  "title": "Values",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "column",
+                "op"
+              ],
+              "title": "FilterStep",
+              "type": "object"
+            },
+            "Relation": {
+              "description": "Relation plusieurs-à-un vers un autre jeu (« ventes.region → regions.region »).\n\nLes colonnes du jeu lié deviennent des colonnes du jeu, nommées `<nom>.<colonne>` : axes, filtres,\nsegments, mesures et colonnes calculées les utilisent comme les autres. Les segments et sélections\nposés sur le jeu lié filtrent aussi ce jeu (sens unique, comme dans Power BI).",
+              "properties": {
+                "name": {
+                  "description": "Préfixe des colonnes liées.",
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "dataset_id": {
+                  "description": "Jeu lié (côté « un »).",
+                  "pattern": "^[0-9a-f]{12}$",
+                  "title": "Dataset Id",
+                  "type": "string"
+                },
+                "from_column": {
+                  "description": "Colonne de ce jeu (clé étrangère).",
+                  "minLength": 1,
+                  "title": "From Column",
+                  "type": "string"
+                },
+                "to_column": {
+                  "description": "Colonne du jeu lié (clé, valeurs uniques).",
+                  "minLength": 1,
+                  "title": "To Column",
+                  "type": "string"
+                },
+                "columns": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 200,
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Colonnes reprises (toutes si absent).",
+                  "title": "Columns"
+                }
+              },
+              "required": [
+                "name",
+                "dataset_id",
+                "from_column",
+                "to_column"
+              ],
+              "title": "Relation",
+              "type": "object"
+            },
+            "RemoveStep": {
+              "description": "Supprime des colonnes.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "remove",
+                  "default": "remove",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500,
+                  "minItems": 1,
+                  "title": "Columns",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "columns"
+              ],
+              "title": "RemoveStep",
+              "type": "object"
+            },
+            "RenameStep": {
+              "description": "Renomme une colonne.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "rename",
+                  "default": "rename",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "to": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "To",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "to"
+              ],
+              "title": "RenameStep",
+              "type": "object"
+            },
+            "ReplaceStep": {
+              "description": "Remplace une valeur (cellule entière) ou un morceau de texte.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "replace",
+                  "default": "replace",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "find": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Find"
+                },
+                "replace": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Replace"
+                },
+                "whole": {
+                  "default": true,
+                  "description": "Cellule entière ; sinon remplacement dans le texte.",
+                  "title": "Whole",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "column",
+                "find",
+                "replace"
+              ],
+              "title": "ReplaceStep",
+              "type": "object"
+            },
+            "SplitStep": {
+              "description": "Fractionne une colonne texte selon un séparateur (« Nom Prénom » → deux colonnes).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "split",
+                  "default": "split",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "separator": {
+                  "maxLength": 10,
+                  "minLength": 1,
+                  "title": "Separator",
+                  "type": "string"
+                },
+                "into": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "minItems": 2,
+                  "title": "Into",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "column",
+                "separator",
+                "into"
+              ],
+              "title": "SplitStep",
+              "type": "object"
+            },
+            "TableRef": {
+              "description": "Table ou vue d'une base, feuille d'un classeur Excel (`schema` vide), table publiée par Atelier Tab\n(`snapshot`, `schema` = projet) ou jeu de données d'Atelier Projets (`dataset`).",
+              "properties": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Schema"
+                },
+                "name": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "table",
+                  "enum": [
+                    "table",
+                    "view",
+                    "sheet",
+                    "list",
+                    "snapshot",
+                    "dataset"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "maxLength": 255,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Identifiant stable dans la source (fichier d'Atelier Tab, nom du jeu d'Atelier Projets).",
+                  "title": "Id"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "maxLength": 500,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Description"
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Date de publication (Atelier Tab).",
+                  "title": "Updated At"
+                },
+                "rows": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Nombre de lignes annoncé par la source.",
+                  "title": "Rows"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "title": "TableRef",
+              "type": "object"
+            },
+            "TextStep": {
+              "description": "Nettoie un texte : espaces, majuscules, minuscules, première lettre en majuscule.",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "text",
+                  "default": "text",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "column": {
+                  "title": "Column",
+                  "type": "string"
+                },
+                "mode": {
+                  "enum": [
+                    "trim",
+                    "upper",
+                    "lower",
+                    "capitalize"
+                  ],
+                  "title": "Mode",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column",
+                "mode"
+              ],
+              "title": "TextStep",
+              "type": "object"
+            },
+            "UnpivotStep": {
+              "description": "Dépivote des colonnes : « janvier, février… » → lignes (attribut, valeur).",
+              "properties": {
+                "note": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Commentaire libre de l'étape.",
+                  "title": "Note"
+                },
+                "kind": {
+                  "const": "unpivot",
+                  "default": "unpivot",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500,
+                  "minItems": 1,
+                  "title": "Columns",
+                  "type": "array"
+                },
+                "attribute": {
+                  "default": "attribut",
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Attribute",
+                  "type": "string"
+                },
+                "value": {
+                  "default": "valeur",
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "title": "Value",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "columns"
+              ],
+              "title": "UnpivotStep",
+              "type": "object"
+            },
+            "ValueCount": {
+              "description": "Une valeur fréquente et son nombre d'occurrences.",
+              "properties": {
+                "value": {
+                  "title": "Value",
+                  "type": "string"
+                },
+                "count": {
+                  "title": "Count",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value",
+                "count"
+              ],
+              "title": "ValueCount",
+              "type": "object"
+            }
+          },
+          "description": "Jeu de données profilé : colonnes typées + échantillon.",
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "csv",
+                "xlsx",
+                "json",
+                "sqlserver",
+                "postgres",
+                "mysql",
+                "sqlite",
+                "sharepoint",
+                "atelier_tab",
+                "atelier_projets",
+                "atelier_table"
+              ],
+              "title": "Format",
+              "type": "string"
+            },
+            "rows": {
+              "title": "Rows",
+              "type": "integer"
+            },
+            "columns_count": {
+              "title": "Columns Count",
+              "type": "integer"
+            },
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "discriminator": {
+                    "mapping": {
+                      "atelier-table": "#/$defs/AtelierTableOrigin",
+                      "atelier_projets": "#/$defs/DatasetOrigin",
+                      "atelier_tab": "#/$defs/DatasetOrigin",
+                      "file": "#/$defs/DatasetOrigin",
+                      "mysql": "#/$defs/DatasetOrigin",
+                      "postgres": "#/$defs/DatasetOrigin",
+                      "sharepoint": "#/$defs/DatasetOrigin",
+                      "sqlite": "#/$defs/DatasetOrigin",
+                      "sqlserver": "#/$defs/DatasetOrigin"
+                    },
+                    "propertyName": "kind"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/DatasetOrigin"
+                    },
+                    {
+                      "$ref": "#/$defs/AtelierTableOrigin"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Connexion d'origine (jeu actualisable), ou clé de la table reçue d'un workflow (`atelier-table`).",
+              "title": "Origin"
+            },
+            "columns": {
+              "items": {
+                "$ref": "#/$defs/ColumnProfile"
+              },
+              "title": "Columns",
+              "type": "array"
+            },
+            "sample": {
+              "description": "Premières lignes, valeurs sérialisées en JSON.",
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Sample",
+              "type": "array"
+            },
+            "model": {
+              "$ref": "#/$defs/DatasetModel",
+              "description": "Colonnes et mesures calculées."
+            },
+            "steps": {
+              "description": "Étapes de préparation, rejouées sur la source à chaque actualisation.",
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "cast": "#/$defs/CastStep",
+                    "dedupe": "#/$defs/DedupeStep",
+                    "fill": "#/$defs/FillStep",
+                    "filter": "#/$defs/FilterStep",
+                    "remove": "#/$defs/RemoveStep",
+                    "rename": "#/$defs/RenameStep",
+                    "replace": "#/$defs/ReplaceStep",
+                    "split": "#/$defs/SplitStep",
+                    "text": "#/$defs/TextStep",
+                    "unpivot": "#/$defs/UnpivotStep"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/RenameStep"
+                  },
+                  {
+                    "$ref": "#/$defs/RemoveStep"
+                  },
+                  {
+                    "$ref": "#/$defs/CastStep"
+                  },
+                  {
+                    "$ref": "#/$defs/FilterStep"
+                  },
+                  {
+                    "$ref": "#/$defs/ReplaceStep"
+                  },
+                  {
+                    "$ref": "#/$defs/FillStep"
+                  },
+                  {
+                    "$ref": "#/$defs/TextStep"
+                  },
+                  {
+                    "$ref": "#/$defs/DedupeStep"
+                  },
+                  {
+                    "$ref": "#/$defs/UnpivotStep"
+                  },
+                  {
+                    "$ref": "#/$defs/SplitStep"
+                  }
+                ]
+              },
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "format",
+            "rows",
+            "columns_count",
+            "created_at",
+            "columns",
+            "sample"
+          ],
+          "title": "DatasetProfile",
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "reports.list",
+      "label": "Lister les rapports",
+      "description": "Rapports d'Atelier Viz (nom, pages, visuels, date de modification).",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/reports"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Action sans paramètre.",
+        "properties": {},
+        "title": "NoInput",
+        "type": "object",
+        "required": []
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "$defs": {
+            "ReportSummary": {
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "pages": {
+                  "title": "Pages",
+                  "type": "integer"
+                },
+                "visuals": {
+                  "title": "Visuals",
+                  "type": "integer"
+                },
+                "bookmarks": {
+                  "default": 0,
+                  "title": "Bookmarks",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "title": "Updated At",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "pages",
+                "visuals",
+                "updated_at"
+              ],
+              "title": "ReportSummary",
+              "type": "object"
+            }
+          },
+          "items": {
+            "$ref": "#/$defs/ReportSummary"
+          },
+          "type": "array"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "alerts.list",
+      "label": "Lister les alertes",
+      "description": "Alertes sur seuil (règle, état, historique des évaluations), éventuellement d'un seul jeu.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/alerts"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "description": "Alertes, éventuellement limitées à un jeu.",
+        "properties": {
+          "dataset_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Jeu de données (facultatif).",
+            "title": "Dataset Id"
+          }
+        },
+        "title": "AlertsListInput",
+        "type": "object",
+        "required": []
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "$defs": {
+            "Alert": {
+              "description": "Alerte enregistrée (`data/alerts.json`) avec son état d'anti-rebond et son historique.",
+              "properties": {
+                "name": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "title": "Name",
+                  "type": "string"
+                },
+                "dataset_id": {
+                  "pattern": "^[0-9a-f]{12}$",
+                  "title": "Dataset Id",
+                  "type": "string"
+                },
+                "measure": {
+                  "$ref": "#/$defs/Measure"
+                },
+                "filters": {
+                  "items": {
+                    "$ref": "#/$defs/Filter"
+                  },
+                  "maxItems": 20,
+                  "title": "Filters",
+                  "type": "array"
+                },
+                "comparison": {
+                  "default": "gt",
+                  "enum": [
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "eq",
+                    "neq"
+                  ],
+                  "title": "Comparison",
+                  "type": "string"
+                },
+                "threshold": {
+                  "title": "Threshold",
+                  "type": "number"
+                },
+                "basis": {
+                  "default": "value",
+                  "description": "value : la mesure ; change_pct / change_abs : sa variation (%, ou écart) depuis l'évaluation précédente.",
+                  "enum": [
+                    "value",
+                    "change_pct",
+                    "change_abs"
+                  ],
+                  "title": "Basis",
+                  "type": "string"
+                },
+                "split_by": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Dimension : l'alerte est évaluée pour chaque valeur (« pour chaque région »).",
+                  "title": "Split By"
+                },
+                "enabled": {
+                  "default": true,
+                  "title": "Enabled",
+                  "type": "boolean"
+                },
+                "notify": {
+                  "default": true,
+                  "description": "Notification dans l'application.",
+                  "title": "Notify",
+                  "type": "boolean"
+                },
+                "system": {
+                  "default": true,
+                  "description": "Notification système (macOS, Linux) quand l'application tourne.",
+                  "title": "System",
+                  "type": "boolean"
+                },
+                "webhook": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/AlertWebhook"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "title": "Created At",
+                  "type": "string"
+                },
+                "met": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Condition remplie à la dernière évaluation (anti-rebond).",
+                  "title": "Met"
+                },
+                "last_value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Last Value"
+                },
+                "last_raw": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Dernière mesure (référence d'une alerte sur variation).",
+                  "title": "Last Raw"
+                },
+                "groups": {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/AlertGroupState"
+                  },
+                  "description": "État par valeur de la dimension.",
+                  "title": "Groups",
+                  "type": "object"
+                },
+                "last_evaluated_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Last Evaluated At"
+                },
+                "last_fired_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Last Fired At"
+                },
+                "history": {
+                  "description": "Le plus récent en premier.",
+                  "items": {
+                    "$ref": "#/$defs/AlertEvent"
+                  },
+                  "title": "History",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "name",
+                "dataset_id",
+                "measure",
+                "threshold",
+                "id",
+                "created_at"
+              ],
+              "title": "Alert",
+              "type": "object"
+            },
+            "AlertEvent": {
+              "description": "Une évaluation (historique) : valeur mesurée, condition remplie, déclenchement, actions.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Identifiant (complété par le résultat du webhook).",
+                  "title": "Id"
+                },
+                "at": {
+                  "format": "date-time",
+                  "title": "At",
+                  "type": "string"
+                },
+                "trigger": {
+                  "enum": [
+                    "refresh",
+                    "manual",
+                    "created"
+                  ],
+                  "title": "Trigger",
+                  "type": "string"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Valeur comparée (sans dimension).",
+                  "title": "Value"
+                },
+                "raw": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Mesure, quand la valeur comparée est une variation.",
+                  "title": "Raw"
+                },
+                "met": {
+                  "default": false,
+                  "title": "Met",
+                  "type": "boolean"
+                },
+                "fired": {
+                  "default": false,
+                  "description": "Franchissement du seuil : actions lancées.",
+                  "title": "Fired",
+                  "type": "boolean"
+                },
+                "groups": {
+                  "description": "Alerte « pour chaque » : valeurs qui remplissent la condition (50 au plus).",
+                  "items": {
+                    "$ref": "#/$defs/AlertGroupEvent"
+                  },
+                  "title": "Groups",
+                  "type": "array"
+                },
+                "groups_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Nombre de valeurs évaluées (alerte « pour chaque »).",
+                  "title": "Groups Count"
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Error"
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Information (première mesure d'une variation…).",
+                  "title": "Note"
+                },
+                "webhook_status": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Webhook Status"
+                },
+                "webhook_error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Webhook Error"
+                }
+              },
+              "required": [
+                "at",
+                "trigger"
+              ],
+              "title": "AlertEvent",
+              "type": "object"
+            },
+            "AlertGroupEvent": {
+              "description": "Résultat d'une valeur de la dimension lors d'une évaluation.",
+              "properties": {
+                "key": {
+                  "title": "Key",
+                  "type": "string"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Value"
+                },
+                "raw": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Raw"
+                },
+                "met": {
+                  "default": false,
+                  "title": "Met",
+                  "type": "boolean"
+                },
+                "fired": {
+                  "default": false,
+                  "title": "Fired",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key"
+              ],
+              "title": "AlertGroupEvent",
+              "type": "object"
+            },
+            "AlertGroupState": {
+              "description": "État d'anti-rebond d'une valeur de la dimension (alerte « pour chaque »).",
+              "properties": {
+                "met": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Met"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Valeur comparée au seuil (mesure ou variation).",
+                  "title": "Value"
+                },
+                "raw": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Mesure (référence de la prochaine variation).",
+                  "title": "Raw"
+                }
+              },
+              "title": "AlertGroupState",
+              "type": "object"
+            },
+            "AlertWebhook": {
+              "description": "Webhook appelé au déclenchement (via `app/services/actions.py` : externe seulement en ligne).",
+              "properties": {
+                "url": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "title": "Url",
+                  "type": "string"
+                },
+                "method": {
+                  "default": "POST",
+                  "enum": [
+                    "GET",
+                    "POST"
+                  ],
+                  "title": "Method",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "AlertWebhook",
+              "type": "object"
+            },
+            "Filter": {
+              "description": "Condition sur un champ (ou sur sa période si `bin` est fourni).",
+              "properties": {
+                "field": {
+                  "title": "Field",
+                  "type": "string"
+                },
+                "op": {
+                  "default": "in",
+                  "enum": [
+                    "in",
+                    "not_in",
+                    "eq",
+                    "neq",
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "between",
+                    "contains",
+                    "is_null",
+                    "not_null"
+                  ],
+                  "title": "Op",
+                  "type": "string"
+                },
+                "values": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": "Values",
+                  "type": "array"
+                },
+                "bin": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "year",
+                        "quarter",
+                        "month",
+                        "week",
+                        "day"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Bin"
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "title": "Filter",
+              "type": "object"
+            },
+            "Measure": {
+              "description": "Agrégat calculé ; `field` vide = nombre de lignes ; `show` = calcul rapide (cumul, N-1…).",
+              "properties": {
+                "field": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Field"
+                },
+                "agg": {
+                  "default": "sum",
+                  "enum": [
+                    "sum",
+                    "avg",
+                    "min",
+                    "max",
+                    "count",
+                    "count_distinct",
+                    "median",
+                    "calc"
+                  ],
+                  "title": "Agg",
+                  "type": "string"
+                },
+                "show": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ShowAs"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "title": "Measure",
+              "type": "object"
+            },
+            "ShowAs": {
+              "description": "Calcul rapide appliqué à une mesure, selon un champ date (sauf `pct_total`).",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "ytd",
+                    "running",
+                    "prev_year",
+                    "yoy_diff",
+                    "yoy_pct",
+                    "moving_avg",
+                    "pct_total"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Champ date de référence.",
+                  "title": "Date"
+                },
+                "window": {
+                  "default": 3,
+                  "description": "Périodes de la moyenne mobile.",
+                  "maximum": 60,
+                  "minimum": 2,
+                  "title": "Window",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "title": "ShowAs",
+              "type": "object"
+            }
+          },
+          "items": {
+            "$ref": "#/$defs/Alert"
+          },
+          "type": "array"
+        }
+      },
+      "idempotency": "natural"
+    }
+  ],
+  "events": [
+    {
+      "type": "viz.dataset.created",
+      "label": "Jeu de données créé",
+      "data_schema": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "origin": {
+            "description": "Provenance : « file » (fichier ou exemple), type de connexion (« sqlite », « atelier_tab »…) ou « atelier-table » (table reçue d'un workflow).",
+            "title": "Origin",
+            "type": "string"
+          },
+          "format": {
+            "description": "Format enregistré du jeu (csv, xlsx, json, type de connexion, atelier_table).",
+            "title": "Format",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Clé externe d'une table reçue d'un workflow.",
+            "title": "Key"
+          }
+        },
+        "required": [
+          "name",
+          "rows",
+          "origin",
+          "format"
+        ],
+        "title": "DatasetCreatedData",
+        "type": "object"
+      }
+    },
+    {
+      "type": "viz.dataset.refreshed",
+      "label": "Jeu actualisé",
+      "data_schema": {
+        "properties": {
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "trigger": {
+            "enum": [
+              "manual",
+              "schedule"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          },
+          "source": {
+            "default": "connection",
+            "description": "Connexion relue, ou table reçue d'un workflow (`datasets.upsert_table`).",
+            "enum": [
+              "connection",
+              "atelier-table"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rows",
+          "trigger"
+        ],
+        "title": "DatasetRefreshedData",
+        "type": "object"
+      }
+    },
+    {
+      "type": "viz.dataset.refresh_failed",
+      "label": "Actualisation en échec",
+      "data_schema": {
+        "properties": {
+          "trigger": {
+            "enum": [
+              "manual",
+              "schedule"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "default": "error",
+            "description": "error : échec ; skipped : non exécutée (ex. hors ligne) ; interrupted : arrêt de l'application.",
+            "enum": [
+              "error",
+              "skipped",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trigger",
+          "message"
+        ],
+        "title": "DatasetRefreshFailedData",
+        "type": "object"
+      }
+    },
+    {
+      "type": "viz.dataset.deleted",
+      "label": "Jeu de données supprimé",
+      "data_schema": {
+        "properties": {},
+        "title": "DatasetDeletedData",
+        "type": "object",
+        "required": []
+      }
+    },
+    {
+      "type": "viz.alert.triggered",
+      "label": "Alerte déclenchée",
+      "data_schema": {
+        "$defs": {
+          "AlertValue": {
+            "properties": {
+              "key": {
+                "description": "Valeur de la dimension.",
+                "title": "Key",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "title": "AlertValue",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "comparison": {
+            "enum": [
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "eq",
+              "neq"
+            ],
+            "title": "Comparison",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "basis": {
+            "default": "value",
+            "enum": [
+              "value",
+              "change_pct",
+              "change_abs"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Alerte « pour chaque » : dimension évaluée.",
+            "title": "Dimension"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/AlertValue"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Alerte « pour chaque » : valeurs déclenchées.",
+            "title": "Values"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "value",
+          "comparison",
+          "threshold"
+        ],
+        "title": "AlertTriggeredData",
+        "type": "object"
+      }
+    },
+    {
+      "type": "viz.report.saved",
+      "label": "Rapport enregistré",
+      "data_schema": {
+        "properties": {
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "title": "ReportSavedData",
+        "type": "object"
+      }
+    }
+  ]
+}

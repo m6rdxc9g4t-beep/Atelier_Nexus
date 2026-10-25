@@ -550,7 +550,12 @@ class StockInput(ToolInput):
         le=14,
         description="« À finir en premier » : périmés et produits qui arrivent à échéance d'ici N jours.",
     )
-    limit: int = Field(default=80, ge=1, le=300)
+    limit: int = Field(
+        default=80,
+        ge=1,
+        le=300,
+        description="Lignes de l'inventaire affichées (ce qui presse est toujours listé en entier).",
+    )
 
 
 class StockTool(_CuisineTool[StockInput]):
@@ -654,7 +659,7 @@ class MealPlanInput(ToolInput):
         default=None,
         description="Premier jour (AAAA-MM-JJ) ; par défaut le lundi de cette semaine.",
     )
-    days: int = Field(default=7, ge=1, le=31)
+    days: int = Field(default=7, ge=1, le=31, description="Nombre de jours affichés (1 à 31).")
 
 
 class MealPlanTool(_CuisineTool[MealPlanInput]):

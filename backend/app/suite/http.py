@@ -1,4 +1,4 @@
-"""Client HTTP d'un nœud de la suite (Viz, Projets) : manifeste, actions, événements.
+"""Client HTTP d'un nœud de la suite (Viz, Projets, Convert) : manifeste, actions, événements.
 
 Même infrastructure que les connecteurs (`AppClient` : transport injectable en test, jamais de
 redirection suivie), avec les gardes du contrat `atelier-node/1` :
@@ -86,11 +86,15 @@ class NodeHttpClient(AppClient):
         params: list[tuple[str, str]] | None = None,
         json_body: Any = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None = None,
     ) -> NodeResponse:
-        """Appel brut : statut ≥ 300 → `NodeActionError` (code de l'application si fourni)."""
+        """Appel brut : statut ≥ 300 → `NodeActionError` (code de l'application si fourni).
+        `timeout` remplace le délai du client pour CET appel (action longue de Convert)."""
         kwargs: dict[str, Any] = {"params": params, "headers": headers}
         if json_body is not None:
             kwargs["json"] = json_body
+        if timeout is not None:
+            kwargs["timeout"] = timeout
         try:
             async with self._http.stream(method, path.lstrip("/"), **kwargs) as response:
                 raw = bytearray()

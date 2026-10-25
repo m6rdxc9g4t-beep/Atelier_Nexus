@@ -291,6 +291,7 @@ SUITE_APPS = {
     4000: "cine",
     47321: "cine",
     5051: "savoir",
+    8010: "convert",  # Atelier Convert : API et interface d'aperçu sur le même port
 }
 #: Apps en ligne de la suite (adresse HTTPS hébergée) → app de bureau qui l'enveloppe
 SUITE_ONLINE_APPS = {

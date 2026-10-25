@@ -16,10 +16,12 @@ export const APP_COLORS: Record<string, string> = {
   tresorerie: "#3B5BDB",
   cuisine: "#E056E2",
   dates: "#E03131",
+  convert: "#C9951D",
 };
 
-/** Applications dont la marque (atelier-brand.css) connaît la signature : `data-atelier-app` suffit. */
-const BRAND_APPS = new Set(Object.keys(APP_COLORS));
+/** Applications dont la marque (atelier-brand.css) connaît la signature : `data-atelier-app` suffit.
+ * Les autres (Convert, apps des extensions) reçoivent leur couleur en signature locale. */
+const BRAND_APPS = new Set(["viz", "tab", "projets", "nexus", "cine", "savoir", "tresorerie", "cuisine", "dates"]);
 
 /** Outil système (app null) : couleur de Nexus. */
 export const SYSTEM_APP = "nexus";
@@ -50,7 +52,7 @@ export function appTheme(
 ): { "data-atelier-app": string; style?: Record<string, string> } {
   const key = appKey(app);
   if (BRAND_APPS.has(key)) return { "data-atelier-app": key };
-  const signature = color && /^#[0-9a-f]{3,8}$/i.test(color) ? color : APP_COLORS[SYSTEM_APP]!;
+  const signature = color && /^#[0-9a-f]{3,8}$/i.test(color) ? color : (APP_COLORS[key] ?? APP_COLORS[SYSTEM_APP]!);
   return { "data-atelier-app": key, style: { "--atelier-signature": signature } };
 }
 

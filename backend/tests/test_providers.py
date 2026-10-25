@@ -184,9 +184,11 @@ async def test_anthropic_rejected_key_has_a_readable_message() -> None:
 # ─── Ollama ───────────────────────────────────────────────────────
 
 
-def _ollama(handler: Any) -> OllamaProvider:
+def _ollama(handler: Any, *, num_ctx: int | None = None) -> OllamaProvider:
     client = ollama.AsyncClient(host="http://ollama.test", transport=httpx.MockTransport(handler))
-    return OllamaProvider(base_url="http://ollama.test", default_model="llama-test", client=client)
+    return OllamaProvider(
+        base_url="http://ollama.test", default_model="llama-test", num_ctx=num_ctx, client=client
+    )
 
 
 async def test_ollama_complete_generates_tool_call_ids() -> None:
@@ -261,3 +263,93 @@ async def test_ollama_missing_model_suggests_pull() -> None:
 
     with pytest.raises(ProviderRequestError, match="ollama pull llama-test"):
         await _ollama(handler).complete(LLMRequest(messages=CONVERSATION[:1]))
+
+
+def _ollama_echo(sent: list[dict[str, Any]]) -> Any:
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "model": "llama-test",
+                "message": {"role": "assistant", "content": "ok"},
+                "done": True,
+                "done_reason": "stop",
+            },
+        )
+
+    return handler
+
+
+async def test_ollama_context_window_is_requested_when_configured() -> None:
+    """OLLAMA_NUM_CTX : sans fenêtre demandée, Ollama tronque en silence le début des longues
+    conversations outillées (consignes, résultats d'outils) ; 0 ou vide = celle du serveur."""
+    sent: list[dict[str, Any]] = []
+    provider = _ollama(_ollama_echo(sent), num_ctx=16384)
+    await provider.complete(LLMRequest(messages=CONVERSATION, tools=[TOOL]))
+    await provider.complete(LLMRequest(messages=CONVERSATION[:1], max_tokens=512))
+    assert [s["options"] for s in sent] == [
+        {"num_predict": 4096, "num_ctx": 16384},
+        {"num_predict": 512, "num_ctx": 16384},  # toujours la même fenêtre : pas de rechargement
+    ]
+
+    sent.clear()
+    for value in (None, 0):
+        await _ollama(_ollama_echo(sent), num_ctx=value).complete(
+            LLMRequest(messages=CONVERSATION[:1])
+        )
+    assert [s["options"] for s in sent] == [{"num_predict": 4096}] * 2
+
+
+async def test_ollama_stream_sends_the_same_context_window() -> None:
+    sent: list[dict[str, Any]] = []
+    out = [
+        e
+        async for e in _ollama(_ollama_echo(sent), num_ctx=8192).stream(
+            LLMRequest(messages=CONVERSATION[:1])
+        )
+    ]
+    assert isinstance(out[-1], ResponseComplete)
+    assert sent[0]["options"] == {"num_predict": 4096, "num_ctx": 8192}
+
+
+def test_ollama_num_ctx_setting_has_a_reasonable_default() -> None:
+    from app.core.config import Settings
+
+    assert Settings(_env_file=None).ollama_num_ctx == 8192  # type: ignore[call-arg]
+    blank = Settings(_env_file=None, ollama_num_ctx="")  # type: ignore[call-arg]
+    assert blank.ollama_num_ctx is None  # « OLLAMA_NUM_CTX= » : fenêtre du serveur
+    assert Settings(_env_file=None, ollama_num_ctx=0).ollama_num_ctx == 0  # type: ignore[call-arg]
+    for wrong in (-1, 1000):  # 1000 : consignes et outils d'un agent local ne tiennent plus
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, ollama_num_ctx=wrong)  # type: ignore[call-arg]
+
+
+def test_ollama_num_ctx_is_editable_and_checked_in_settings() -> None:
+    from app.core.config import Settings
+    from app.core.settings_editor import BY_KEY, SettingsError, SettingsUpdate, validate_changes
+
+    assert BY_KEY["OLLAMA_NUM_CTX"].group == "Modèles"
+    current = Settings(_env_file=None)  # type: ignore[call-arg]
+    for value, saved in (("16384", "16384"), ("0", "0"), ("", None)):
+        update = SettingsUpdate(values={"OLLAMA_NUM_CTX": value})
+        assert validate_changes(update, current) == {"OLLAMA_NUM_CTX": saved}
+    for wrong in ("beaucoup", "-5", "1024", "999999"):
+        with pytest.raises(SettingsError) as refused:
+            validate_changes(SettingsUpdate(values={"OLLAMA_NUM_CTX": wrong}), current)
+        assert "OLLAMA_NUM_CTX" in refused.value.fields
+
+
+def test_router_passes_the_ollama_context_window() -> None:
+    """OLLAMA_NUM_CTX arrive jusqu'au fournisseur construit par le routeur (sinon Ollama garde
+    sa petite fenêtre par défaut et tronque les consignes des agents locaux)."""
+    from app.core.config import Settings
+    from app.core.llm.router import LLMRouter
+
+    def ollama_of(settings: Settings) -> OllamaProvider:
+        provider = LLMRouter.from_settings(settings)._providers["ollama"]
+        assert isinstance(provider, OllamaProvider)
+        return provider
+
+    assert ollama_of(Settings(_env_file=None, ollama_num_ctx=16384)).num_ctx == 16384  # type: ignore[call-arg]
+    assert ollama_of(Settings(_env_file=None, ollama_num_ctx="")).num_ctx is None  # type: ignore[call-arg]

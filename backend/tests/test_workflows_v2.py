@@ -1,12 +1,13 @@
 """Workflows v2 (docs/workflows-v2-api.md) : gabarits, graphe, validation, exécution persistée
 multi-applications, validations humaines, conversion v1 → v2, catalogue, carte de la suite.
 
-Viz et Projets : httpx.MockTransport ; Tab : dossier `_atelier/` et faux serveur MCP. Aucun
-appel réseau ni modèle.
+Viz, Projets et Convert : httpx.MockTransport ; Tab : dossier `_atelier/` et faux serveur MCP.
+Aucun appel réseau ni modèle.
 """
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from fastapi.testclient import TestClient
 from app.db.workflows import WorkflowRepository
 from app.schemas.workflows import WorkflowCreate, WorkflowStep
 from app.schemas.workflows_v2 import WorkflowStepV2
+from app.suite.nodes import clear_manifest_cache
 from app.tools.tab_mcp import tab_write_tools
 from app.tools.toolsets import build_tools
 from app.workflows_v2.engine import approval_token, bound_data
@@ -33,6 +35,7 @@ from app.workflows_v2.templates import (
     resolve,
 )
 from tests.fake_data_via import DATASET_ID
+from tests.fake_suite import RELEVE_ID, FakeConvertNode
 from tests.test_suite_nodes import Suite
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -596,6 +599,89 @@ def test_catalog_of_the_suite_and_of_an_agent(client: TestClient, suite: Suite) 
     agent = client.get("/api/workflows/catalog", params={"agent": "tableur"}).json()
     tools = {e["uses"] for e in agent["entries"] if e["source"] == "tool"}
     assert "tool:tab_add_rows" in tools and "tool:data_via_query" not in tools
+
+
+def test_catalog_lists_the_convert_node(client: TestClient, suite: Suite) -> None:
+    catalog = client.get("/api/workflows/catalog").json()
+    apps = {a["app"]: a for a in catalog["apps"]}
+    assert apps["convert"] == {"app": "convert", "name": "Atelier Convert", "status": "ok",
+                               "color": "#C9951D"}  # fmt: skip
+    entries = {e["uses"]: e for e in catalog["entries"]}
+    table = entries["node:convert/conversions.table"]
+    assert table["output_format"] == "atelier-table/1" and table["available"] is True
+    assert table["input_schema"]["required"] == ["conversion_id"] and table["app"] == "convert"
+    assert entries["node:convert/conversions.delete"]["kind"] == "destructive"
+    assert entries["node:convert/conversions.send_to_tab"]["kind"] == "write"
+
+    suite.convert.mode = "down"
+    clear_manifest_cache()  # sinon le manifeste lu plus haut resterait 60 s en cache
+    catalog = client.get("/api/workflows/catalog").json()
+    apps = {a["app"]: a for a in catalog["apps"]}
+    assert apps["convert"]["status"] == "unreachable"
+    assert not any(e["uses"].startswith("node:convert/") for e in catalog["entries"])
+
+
+def test_convert_to_tab_run_waits_at_each_step(
+    client: TestClient, suite: Suite, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    steps = [
+        s("lire", "node:convert/conversions.table",
+          {"conversion_id": "{{params.conversion}}", "limit": 100}),
+        s("ajouter", "node:tab/rows.add",
+          {"table": "{{params.table}}", "rows": "{{steps.lire.data.rows}}"}, ["lire"]),
+    ]  # fmt: skip
+    wf = create(
+        client,
+        steps,
+        params=[
+            {"name": "table", "label": "Table", "default": "tbl_planning_lots"},
+            {"name": "conversion", "label": "Conversion", "default": RELEVE_ID},
+        ],
+    )
+    run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
+    # every_step : la lecture de Convert attend une validation, rien n'est lu avant
+    assert run["status"] == "awaiting_approval" and run["pending"][0]["step_id"] == "lire"
+    assert run["pending"][0]["input"] == {"conversion_id": RELEVE_ID, "limit": 100}
+    assert "Atelier Convert · Lire la table d'une conversion" in run["pending"][0]["summary"]
+    assert not [r for r in suite.convert.requests if r.url.path.endswith("/table")]
+    run = decide(client, run)
+    assert run["status"] == "awaiting_approval" and run["pending"][0]["step_id"] == "ajouter"
+    # Entrée résolue montrée avant d'écrire : les lignes réelles de la conversion
+    assert run["pending"][0]["input"] == {
+        "table": "tbl_planning_lots",
+        "rows": FakeConvertNode.ROWS,
+    }
+    assert run["pending"][0]["kind"] == "write"
+    assert not [c for c in suite.mcp_calls() if c["name"] == "add_rows"]
+    run = decide(client, run)
+    assert run["status"] == "completed", run["message"]
+    call = next(c for c in suite.mcp_calls() if c["name"] == "add_rows")
+    assert call["arguments"]["rows"] == FakeConvertNode.ROWS
+    assert call["arguments"]["idempotency_key"] == f"nexus:{run['id']}:ajouter"
+    # Relevé bancaire : aucune donnée des étapes dans les journaux de Nexus (tous niveaux) ni
+    # dans ceux des bibliothèques à partir d'INFO (aiosqlite trace ses requêtes en DEBUG)
+    logged = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name.startswith(("app", "main")) or r.levelno >= logging.INFO
+    ]
+    assert logged and not any("Loyer" in m or "Salaire" in m for m in logged)
+
+
+def test_convert_send_to_tab_carries_the_idempotency_key(client: TestClient, suite: Suite) -> None:
+    steps = [
+        s("vers_tab", "node:convert/conversions.send_to_tab",
+          {"conversion_id": RELEVE_ID, "project_id": "proj_budget", "table_name": "Octobre"}),
+    ]  # fmt: skip
+    wf = create(client, steps)
+    run = client.post(f"/api/workflows/{wf['id']}/run", json={}).json()
+    assert run["pending"][0]["kind"] == "write" and not suite.convert.sent
+    run = decide(client, run)
+    assert run["status"] == "completed" and run["steps"][0]["data"]["table_id"] == "tbl_001"
+    post = next(r for r in suite.convert.requests if r.method == "POST")
+    assert post.headers["idempotency-key"] == f"nexus:{run['id']}:vers_tab"
+    assert post.url.path == f"/api/atelier/conversions/{RELEVE_ID}/send-to-tab"
 
 
 def test_tab_destructive_tools_require_approval(suite: Suite) -> None:

@@ -11,7 +11,7 @@ Les cas vivent dans `evals/cases/*.toml` :
 
     [case.expect]
     tools_in_order = ["data_via_describe_dataset", "data_via_query"]
-    artifacts = [{ kind = "data_preview" }]
+    artifacts = [{ kind = "data_preview", title_contains = "Requete" }]
     grounded_numbers = "warn"
 
 On évalue l'**état final** (outils appelés, livrables, validations demandées, réponse), pas
@@ -22,10 +22,11 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from app.core.config import ApprovalMode
 from app.core.llm.types import ProviderName
 from app.tools.base import ArtifactKind
 
@@ -47,14 +48,30 @@ class ArtifactExpectation(_Strict):
     kind: ArtifactKind | None = None
     title_contains: str | None = None
     content_contains: list[str] = Field(default_factory=list)
+    #: Aucun de ces textes dans le contenu (ex. un critère discriminatoire écarté de l'annonce)
+    content_not_contains: list[str] = Field(default_factory=list)
     content_regex: str | None = None
+    #: Instructions d'intégration (`notes` de `publish_artifact`, ex. étapes dans Power BI Desktop)
+    notes_contains: list[str] = Field(default_factory=list)
 
 
 class ToolArgsExpectation(_Strict):
-    """Au moins un appel de `tool` dont l'entrée (JSON) contient chaque texte de `contains`."""
+    """Un appel de `tool` dont l'entrée (JSON) contient chaque texte de `contains` ET dont chaque
+    clé de premier niveau de `equals` vaut exactement la valeur donnée.
+
+    `contains` (sans accents ni casse) convient aux textes libres (titre, message) ; `equals`
+    aux identifiants et aux valeurs fermées : `story_id = 2` refuse 20 ou 21, que `contains`
+    accepterait. Nombres comparés en valeur (2 = 2.0 = "2"), textes sans accents ni casse."""
 
     tool: str
-    contains: list[str] = Field(min_length=1)
+    contains: list[str] = Field(default_factory=list)
+    equals: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _something_to_check(self) -> Self:
+        if not (self.contains or self.equals):
+            raise ValueError(f"{self.tool} : renseigner `contains` ou `equals`")
+        return self
 
 
 class Expect(_Strict):
@@ -65,6 +82,8 @@ class Expect(_Strict):
     tools_in_order: list[str] = Field(default_factory=list)
     tools_forbidden: list[str] = Field(default_factory=list)
     tool_args: list[ToolArgsExpectation] = Field(default_factory=list)
+    #: Contrôle négatif : AUCUN appel de l'outil ne correspond (ex. un commit demandé sur main)
+    tool_args_forbidden: list[ToolArgsExpectation] = Field(default_factory=list)
     #: Nombre maximal d'appels d'outils en erreur (entrée invalide, refus de validation locale…)
     tool_errors_max: int | None = None
     #: Outils en attente de validation à la fin du tour (et donc jamais exécutés)
@@ -75,10 +94,14 @@ class Expect(_Strict):
     #: Au moins un de ces textes figure dans la réponse finale
     text_contains_any: list[str] = Field(default_factory=list)
     text_not_contains: list[str] = Field(default_factory=list)
+    #: Motif (expression régulière) sur le texte BRUT de la réponse : insensible à la casse,
+    #: accents conservés
     text_regex: str | None = None
-    #: Au moins un de ces textes figure dans la réponse OU dans un artefact publié (un livrable
-    #: peut arriver dans le chat s'il est court, ou dans le panneau s'il est long)
+    #: Comme `text_*`, mais sur la réponse ET les artefacts publiés (contenu et notes) : un
+    #: livrable peut arriver dans le chat s'il est court, ou dans le panneau s'il est long
+    output_contains: list[str] = Field(default_factory=list)
     output_contains_any: list[str] = Field(default_factory=list)
+    output_not_contains: list[str] = Field(default_factory=list)
     #: Les nombres de la réponse viennent des outils (« pas de chiffre inventé »)
     grounded_numbers: Grounding = "off"
     max_iterations: int | None = None
@@ -97,6 +120,11 @@ class EvalCase(_Strict):
     apps: list[AppId] = Field(default_factory=list)
     #: Moteur imposé pour ce cas (sinon celui de la ligne de commande)
     provider: ProviderName | None = None
+    #: Mode de validation joué. `writes_only` (défaut) : seules les écritures arrêtent le tour.
+    #: `every_step` (mode par défaut de l'interface) : chaque appel attend « Autoriser » ; sur les
+    #: applications simulées, l'évaluation autorise les lectures et délégations par des requêtes
+    #: séparées, comme l'interface, et ne valide JAMAIS une écriture (docs/evaluations.md §2).
+    approval_mode: ApprovalMode = "writes_only"
     tags: list[str] = Field(default_factory=list)
     expect: Expect = Field(default_factory=Expect)
     #: Critère jugé par un modèle (option --judge), en une ou deux phrases

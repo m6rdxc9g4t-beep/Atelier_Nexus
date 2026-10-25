@@ -1,6 +1,6 @@
 # Nœud Atelier — copie du contrat commun
 
-Copie de la section 7 de `docs/SUITE.md` (identique dans Atelier_Viz, atelier-tab et Atelier_Projets). Ne pas l'éditer ici : la modifier dans les trois dépôts puis recopier.
+Copie de la section 7 de `docs/SUITE.md` (identique dans Atelier_Viz, atelier-tab, Atelier_Projets et Atelier_Convert ; recopiée depuis Atelier_Convert, qui ajoute Convert au §7.1 et au §7.3). Ne pas l'éditer ici : la modifier dans les dépôts de la suite puis recopier.
 
 ---
 
@@ -18,6 +18,7 @@ sous les gardes existantes (`local-only`, §5.1). Aucune action du manifeste ne 
 | Atelier Viz | `GET http://127.0.0.1:8000/api/atelier/manifest` |
 | Atelier Projets | `GET http://127.0.0.1:3000/api/atelier/manifest` |
 | Atelier Tab | outil MCP `atelier_manifest` (sans argument, lecture seule) **et** fichier `~/Atelier_Tab/exports/_atelier/manifest.json` réécrit au démarrage de l'app |
+| Atelier Convert | `GET http://127.0.0.1:8010/api/atelier/manifest` (`app: "convert"`) |
 
 ```json
 {
@@ -123,6 +124,14 @@ Format unique des tables qui passent d'une étape à l'autre (même forme que le
 | Projets | `projets.import.completed` | `project` | `source`, `created`, `updated`, `skipped` |
 | Tab | `tab.table.changed` | `table` | `revision`, `rows`, `project` |
 | Tab | `tab.table.deleted` | `table` | — |
+| Convert | `convert.conversion.created` | `conversion` | `name`, `format`, `rows`, `columns`, `statement`, `origin` (`interface` / `workflow` / `ai`) |
+| Convert | `convert.conversion.updated` | `conversion` | `rows`, `columns`, `reason` (`options` / `columns` / `ai` / `rename`) |
+| Convert | `convert.conversion.sent_to_tab` | `conversion` | `table_id`, `table_name`, `project_id`, `rows` |
+| Convert | `convert.conversion.deleted` | `conversion` | — |
+
+Actions de Convert : `conversions.list`, `conversions.table` (`atelier-table/1`), `conversions.convert_file`
+(fichier en base64, jamais un chemin ; `Idempotency-Key`), `tab.projects`, `conversions.send_to_tab` (`Idempotency-Key`),
+`conversions.delete` (`destructive`).
 
 Un changement de statut émet `status_changed` **et** `updated`. Un import émet un seul `import.completed` (pas un événement par ligne).
 

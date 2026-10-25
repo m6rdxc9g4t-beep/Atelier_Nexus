@@ -122,6 +122,7 @@ MACOS_BUNDLES = {
     "cine": "fr.ateliercine.app",
     "savoir": "fr.ateliersavoir.app",
     "cuisine": "fr.ateliercuisine.app",
+    "convert": "fr.atelier-convert.app",
 }
 
 

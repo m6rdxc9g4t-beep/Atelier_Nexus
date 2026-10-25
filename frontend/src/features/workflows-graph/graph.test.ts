@@ -16,6 +16,7 @@ import {
   mergeRunState,
   newStepId,
   nextPosition,
+  nodeTone,
   removeSteps,
   renameStep,
   stepsToEdges,
@@ -149,6 +150,25 @@ describe("étapes ↔ nœuds et arêtes", () => {
     expect(nodes[1]!.data).toMatchObject({ unknown: true, app: "inconnue" });
     expect(nodes[1]!.data.errors).toHaveLength(1);
     expect(nodes.map((n) => n.selected)).toEqual([false, true]);
+  });
+
+  it("ne dit aucune étape inconnue tant que le catalogue se charge", () => {
+    const steps = [step("a", "node:projets/milestones.list")];
+    expect(stepsToNodes(steps, { catalog: new Map(), catalogReady: false })[0]!.data.unknown).toBe(false);
+    expect(stepsToNodes(steps, { catalog: new Map() })[0]!.data.unknown).toBe(true);
+  });
+
+  it("une seule teinte de nœud : exécution d'abord, puis validation", () => {
+    const bad = [{ step_id: "a", field: null, code: "CYCLE", message: "" }];
+    const run = (status: NonNullable<Parameters<typeof nodeTone>[0]["run"]>["status"]) => ({ status, errorCode: null });
+    expect(nodeTone({ run: null, errors: [] })).toBe("idle");
+    expect(nodeTone({ run: null, errors: bad })).toBe("invalid");
+    expect(nodeTone({ run: run("awaiting_approval"), errors: bad })).toBe("awaiting");
+    expect(nodeTone({ run: run("running"), errors: [] })).toBe("running");
+    expect(nodeTone({ run: run("error"), errors: [] })).toBe("failed");
+    expect(nodeTone({ run: run("ok"), errors: bad })).toBe("invalid");
+    expect(nodeTone({ run: run("ok"), errors: [] })).toBe("done");
+    expect(nodeTone({ run: run("skipped"), errors: [] })).toBe("faded");
   });
 
   it("garde les dimensions mesurées des nœuds affichés", () => {

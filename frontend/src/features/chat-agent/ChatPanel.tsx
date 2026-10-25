@@ -1,22 +1,28 @@
 "use client";
 
-import { Lock, RotateCcw, TriangleAlert } from "lucide-react";
+import { Lock, Settings, SquarePen } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { emptyConversation } from "@/features/chat-agent/conversation";
+import { Callout } from "@/components/ui/callout";
+import { emptyConversation, pendingApproval } from "@/features/chat-agent/conversation";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
+import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
 import { useChatStore } from "@/stores/useChatStore";
+import { useUiStore } from "@/stores/useUiStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
-import type { AgentInfo, AttachmentBlock } from "@/types/api";
+import type { AgentInfo, AttachmentBlock, ProviderStatus } from "@/types/api";
 
-import { AgentIcon } from "./agentMeta";
+import { AgentTile } from "./AgentTile";
+import { AgentWelcome, ThreadSkeleton } from "./AgentWelcome";
 import { Composer } from "./Composer";
 import { ConversationHistory } from "./ConversationHistory";
+import { DecisionDock } from "./DecisionDock";
 import { MessageList } from "./MessageList";
-import { toolLabel } from "./ToolCall";
+import { ProviderPicker } from "./ProviderPicker";
+import { type LiveSnapshot, liveMessage } from "./thread";
 
 /** Exemples proposés quand l'agent n'en fournit pas. */
 const FALLBACK_STARTERS = [
@@ -27,11 +33,13 @@ const FALLBACK_STARTERS = [
 export function ChatPanel({
   agent,
   agents,
+  providers,
   blocked,
 }: {
   agent: AgentInfo | undefined;
-  /** Catalogue : noms affichés des agents dans les résultats de recherche */
+  /** Catalogue : noms affichés des agents (recherche, délégations) */
   agents: AgentInfo[];
+  providers: ProviderStatus[];
   blocked: string | null;
 }) {
   const agentName = useChatStore((s) => s.agent);
@@ -44,10 +52,15 @@ export function ChatPanel({
   const restore = useChatStore((s) => s.restore);
   const opening = useChatStore((s) => s.opening);
   const saveError = useChatStore((s) => s.saveError);
+  const choice = useChatStore((s) => s.provider);
   const conversationId = useChatStore((s) => s.conversationIds[agentName] ?? null);
+  const openSettings = useUiStore((s) => s.openSettings);
   // Workflows : fenêtre d'enregistrement du dernier tour ; les listes se rechargent après un ajout
   const [capturing, setCapturing] = useState(false);
   const bumpWorkflows = useWorkflowStudioStore((s) => s.bump);
+  // Dock de décision : conteneur qui défile et carte de validation en attente
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [pendingCard, setPendingCard] = useState<HTMLElement | null>(null);
 
   // Premier passage sur l'agent : rouvrir sa dernière conversation enregistrée
   useEffect(() => {
@@ -60,99 +73,115 @@ export function ChatPanel({
   const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
   const empty = conversation.turns.length === 0;
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
+  const agentLabel = (name: string) => agents.find((a) => a.name === name)?.display_name ?? name;
+  const pending = pendingApproval(conversation);
+  const pendingKey = pending ? pending.calls.map((c) => c.id).join("-") : null;
+  // Blocage dû au moteur choisi (et non au serveur) : on propose les Réglages
+  const engine = providers.find((p) => p.name === effectiveProvider(agent, choice, providers));
+  const engineMissing = !!blocked && !!engine && !engine.configured;
 
   return (
     <section aria-label={`Conversation avec ${label}`} className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-atelier-line px-4">
-        <AgentIcon icon={agent?.icon} className="size-4 text-accent-ink" aria-hidden />
-        <h1 className="truncate text-sm font-semibold">{label}</h1>
-        {localOnly && (
-          <Badge variant="secondary" title="Données traitées uniquement par le modèle local (Ollama)">
-            <Lock aria-hidden />
-            100 % local
-          </Badge>
-        )}
-        <div className="ml-auto flex items-center gap-1">
+      {/* Sous lg, la barre mobile (AppHeader) montre déjà l'agent : ici, seulement ses badges et
+          les actions de la conversation (le titre reste pour les lecteurs d'écran) */}
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-atelier-line px-4 lg:h-14">
+        <AgentTile icon={agent?.icon} className="hidden lg:grid" />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="sr-only min-w-0 text-[15px] font-semibold tracking-tight lg:not-sr-only">
+              <span className="block truncate">{label}</span>
+            </h1>
+            {localOnly && (
+              <Badge variant="signature" title="Données traitées uniquement par le modèle local (Ollama)">
+                <Lock aria-hidden />
+                100 % local
+              </Badge>
+            )}
+          </div>
+          {agent?.description && (
+            <p className="hidden truncate text-xs text-muted-foreground lg:block">{agent.description}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           {agent && <WorkflowsDialog agent={agent} />}
           <ConversationHistory agent={agentName} label={label} agents={agents} />
           {!empty && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               onClick={reset}
               disabled={streaming}
               aria-label="Nouvelle conversation"
+              title="Nouvelle conversation"
             >
-              <RotateCcw />
-              <span className="hidden sm:inline">Nouvelle conversation</span>
+              <SquarePen />
             </Button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {opening && empty ? (
-          <p role="status" className="px-6 py-10 text-center text-sm text-muted-foreground">
-            Ouverture de la conversation…
-          </p>
-        ) : empty ? (
-          <div className="mx-auto flex h-full max-w-xl flex-col justify-center gap-6 px-6 py-10">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-shadow-glow">{label}</h2>
-              <p className="mt-1.5 text-muted-foreground">{agent?.description}</p>
-              {agent && agent.tools.length > 0 && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Outils : {agent.tools.map((t) => toolLabel(t.name)).join(", ")}.
-                </p>
-              )}
-              {localOnly && (
-                <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
-                  <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  Cet agent travaille sur des données qui ne quittent pas la machine : il utilise
-                  uniquement le modèle local (Ollama).
-                </p>
-              )}
-              {agent?.unavailable_toolsets?.length ? (
-                <p className="mt-3 flex items-start gap-2 text-sm text-warning">
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  Non configuré : {agent.unavailable_toolsets.join(", ")}. Renseignez l&apos;adresse
-                  correspondante dans backend/.env.
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-2">
-              {starters.map((starter) => (
-                <button
-                  key={starter}
-                  type="button"
-                  disabled={!!blocked}
-                  onClick={() => void send(starter)}
-                  className="rounded-md border border-atelier-border bg-card px-3.5 py-2.5 text-left text-sm shadow-glow transition-colors hover:border-primary hover:bg-atelier-surface-2 disabled:opacity-50"
-                >
-                  {starter}
-                </button>
-              ))}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={setScroller} aria-busy={opening} className="min-h-0 flex-1 overflow-y-auto">
+          {opening && empty ? (
+            <ThreadSkeleton />
+          ) : empty ? (
+            <AgentWelcome
+              agent={agent}
+              label={label}
+              starters={starters}
+              disabled={!!blocked}
+              onStart={(text) => void send(text)}
+            />
+          ) : (
+            <MessageList
+              turns={conversation.turns}
+              streaming={streaming}
+              agent={agent}
+              agentLabel={agentLabel}
+              onDecide={decide}
+              onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
+              pendingRef={setPendingCard}
+              scroller={scroller}
+            />
+          )}
+        </div>
+        {/* Validation en attente hors de vue : rappel au-dessus du composer (jamais d'« Autoriser » ici) */}
+        {pending && !empty && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10">
+            <div className="mx-auto w-full max-w-3xl px-4">
+              <DecisionDock key={pendingKey} target={pendingCard} root={scroller} count={pending.calls.length} />
             </div>
           </div>
-        ) : (
-          <MessageList
-            turns={conversation.turns}
-            streaming={streaming}
-            onDecide={decide}
-            onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
-          />
         )}
       </div>
 
-      {saveError && !blocked && (
-        <p role="status" className="mx-auto w-full max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
-          {saveError}
-        </p>
-      )}
-      {blocked && (
-        <p role="status" className="mx-auto w-full max-w-3xl px-4 pb-2 text-sm text-destructive">
-          {blocked}
-        </p>
+      {(blocked || saveError) && (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-2">
+          {blocked && engineMissing && engine ? (
+            <Callout
+              tone="warning"
+              role="status"
+              action={
+                <Button size="sm" variant="outline" onClick={openSettings}>
+                  <Settings />
+                  Ouvrir les réglages
+                </Button>
+              }
+            >
+              {localOnly
+                ? `${PROVIDER_SHORT[engine.name]} n'est pas configuré : cet agent n'utilise que le modèle local, renseignez-le dans les Réglages.`
+                : `${PROVIDER_SHORT[engine.name]} n'est pas configuré : choisissez un autre moteur en bas de la zone de saisie, ou renseignez-le dans les Réglages.`}
+            </Callout>
+          ) : blocked ? (
+            <Callout tone="destructive" role="status">
+              {blocked}
+            </Callout>
+          ) : (
+            <p role="status" className="text-xs text-muted-foreground">
+              {saveError}
+            </p>
+          )}
+        </div>
       )}
       {capturing && agent && (
         <WorkflowEditor
@@ -168,7 +197,39 @@ export function ChatPanel({
         disabled={!!blocked}
         onSend={(text, attachments) => void send(text, attachments)}
         onStop={stop}
+        engine={<ProviderPicker agent={agent} providers={providers} />}
+      />
+      <LiveRegion
+        streaming={streaming}
+        pending={pendingKey}
+        failed={!!conversation.turns.at(-1)?.error}
       />
     </section>
+  );
+}
+
+/**
+ * Région lue par les lecteurs d'écran : « Réponse terminée », « Validation demandée »…
+ * L'état précédent est gardé d'un rendu à l'autre (mise à jour pendant le rendu, sans effet) ;
+ * chaque annonce est un nouveau nœud, pour qu'un même texte soit relu. La région reste montée
+ * d'un agent et d'une conversation à l'autre : une validation en attente dans une conversation
+ * rouverte depuis l'historique (même d'un autre agent) est annoncée comme en direct.
+ */
+function LiveRegion(snapshot: LiveSnapshot) {
+  const { streaming, pending, failed } = snapshot;
+  const [state, setState] = useState({ before: snapshot, message: "", seq: 0 });
+  const { before } = state;
+  if (before.streaming !== streaming || before.pending !== pending || before.failed !== failed) {
+    const message = liveMessage(before, snapshot);
+    setState({
+      before: { streaming, pending, failed },
+      message: message ?? state.message,
+      seq: message ? state.seq + 1 : state.seq,
+    });
+  }
+  return (
+    <div role="status" aria-live="polite" className="sr-only">
+      <span key={state.seq}>{state.message}</span>
+    </div>
   );
 }

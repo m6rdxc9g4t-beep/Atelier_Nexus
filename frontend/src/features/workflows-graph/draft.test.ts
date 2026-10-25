@@ -1,18 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import type { WorkflowV2 } from "@/types/api";
+import type { TemplateSeed } from "@/stores/useWorkflowStudioStore";
+import type { WorkflowStepV2, WorkflowV2 } from "@/types/api";
 
 import {
+  SAVE_STATE_LABEL,
   declareMissingParams,
+  draftFromTemplate,
   draftFromWorkflow,
   draftSignature,
   emptyDraft,
   mergeErrors,
   saveBlockers,
+  saveState,
   toBody,
   undeclaredParams,
 } from "./draft";
 import { diamondSteps, step } from "./fixtures";
+import { LAYOUT } from "./graph";
 
 const workflow: WorkflowV2 = {
   id: "wf_1",
@@ -71,5 +76,78 @@ describe("brouillon ↔ API", () => {
     ];
     const merged = mergeErrors(local, server);
     expect(merged.map((e) => e.message)).toEqual(["serveur", ""]);
+  });
+});
+
+describe("brouillon copié d'un modèle de la suite", () => {
+  const seed = (steps: WorkflowStepV2[], extra: Partial<TemplateSeed> = {}): TemplateSeed => ({
+    slug: "conversions-tab",
+    title: " Conversions → Tab ",
+    description: "Copie les conversions du jour dans Tab. ",
+    params: [{ name: "table", label: "Table", default: "conversions" }],
+    steps,
+    ...extra,
+  });
+
+  it("prérempli mais jamais enregistré : titre, description, paramètres, étapes", () => {
+    const draft = draftFromTemplate(seed(diamondSteps));
+    expect(draft).toMatchObject({
+      id: null,
+      agent: null,
+      title: "Conversions → Tab",
+      description: "Copie les conversions du jour dans Tab.",
+      sourceConversationId: null,
+    });
+    expect(draft.params).toEqual([{ name: "table", label: "Table", default: "conversions" }]);
+    expect(draft.steps.map((s) => s.id)).toEqual(["lire", "taches", "creer", "ajouter"]);
+    expect(saveState(draft, true)).toBe("draft");
+    expect(toBody(draft)).toMatchObject({ version: 2, source_conversation_id: null });
+  });
+
+  it("garde les positions du modèle quand toutes les étapes en ont une", () => {
+    const placed = diamondSteps.map((s, i) => ({ ...s, position: { x: i * 10, y: 5 } }));
+    const draft = draftFromTemplate(seed(placed));
+    expect(draft.steps.map((s) => s.position)).toEqual(placed.map((s) => s.position));
+  });
+
+  it("recalcule toute la mise en page s'il manque une position", () => {
+    const partial = diamondSteps.map((s, i) => (i === 0 ? { ...s, position: { x: 999, y: 999 } } : s));
+    const draft = draftFromTemplate(seed(partial));
+    const byId = Object.fromEntries(draft.steps.map((s) => [s.id, s.position]));
+    expect(byId.lire).toEqual({ x: 0, y: expect.any(Number) });
+    expect(byId.creer!.x).toBe(LAYOUT.columnWidth);
+    expect(draft.steps.every((s) => s.position)).toBe(true);
+  });
+
+  it("normalise on_error, needs et when reçus du serveur", () => {
+    const loose = [
+      { id: "a", uses: "tool:x" },
+      { id: "b", uses: "tool:y", needs: ["a", "a", "b"], on_error: "ignore", when: "si…", label: 3, input: [1] },
+      { id: "c", uses: "tool:z", needs: ["b"], on_error: "continue", when: { left: "{{steps.b.data}}", op: "not_empty" } },
+    ] as unknown as WorkflowStepV2[];
+    const [a, b, c] = draftFromTemplate(seed(loose)).steps;
+    expect(a).toMatchObject({ needs: [], on_error: "stop", when: null, label: "", input: {} });
+    expect(b).toMatchObject({ needs: ["a"], on_error: "stop", when: null, label: "", input: {} });
+    expect(c).toMatchObject({ needs: ["b"], on_error: "continue", when: { left: "{{steps.b.data}}", op: "not_empty" } });
+  });
+
+  it("copie les entrées : modifier le brouillon ne touche pas le modèle", () => {
+    const original = seed([step("lire", "tool:data_via_query", [], { filtre: { mois: "{{params.mois}}" } })], {
+      params: [{ name: "mois" } as TemplateSeed["params"][number]],
+    });
+    const draft = draftFromTemplate(original, "data_analyst");
+    (draft.steps[0]!.input.filtre as Record<string, string>).mois = "juin";
+    expect(original.steps[0]!.input).toEqual({ filtre: { mois: "{{params.mois}}" } });
+    expect(draft.agent).toBe("data_analyst");
+    expect(draft.params).toEqual([{ name: "mois", label: "", default: "" }]);
+  });
+});
+
+describe("état d'enregistrement", () => {
+  it("brouillon, modifié ou enregistré", () => {
+    expect(saveState({ id: null }, false)).toBe("draft");
+    expect(saveState({ id: "wf_1" }, true)).toBe("modified");
+    expect(saveState({ id: "wf_1" }, false)).toBe("saved");
+    expect(SAVE_STATE_LABEL.saved).toBe("Enregistré");
   });
 });

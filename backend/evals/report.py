@@ -126,8 +126,15 @@ def to_markdown(report: EvalReport, previous: EvalReport | None = None) -> str:
         lines += [f"### `{case.id}` — {case.agent}", "", f"> {case.prompt}", ""]
         for index, attempt in enumerate(case.attempts, start=1):
             status = "réussi" if attempt.passed else "échoué"
+            # En every_step, les validations données par l'évaluation (lectures, délégations)
+            mode = (
+                f", every_step : {attempt.requests} requête(s), "
+                f"{len(attempt.approved)} validation(s) simulée(s)"
+                if attempt.approval_mode == "every_step"
+                else ""
+            )
             lines.append(
-                f"**Essai {index}** ({status}, {attempt.provider or '?'} · {attempt.model or '?'}) — "
+                f"**Essai {index}** ({status}, {attempt.provider or '?'} · {attempt.model or '?'}{mode}) — "
                 f"outils : {' → '.join(attempt.tools) or 'aucun'}"
             )
             for check in attempt.failures + attempt.warnings:

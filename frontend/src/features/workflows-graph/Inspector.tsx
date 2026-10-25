@@ -4,8 +4,10 @@ import { Plus, Trash2, Unlink } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/section-label";
 import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
@@ -39,14 +41,10 @@ const OPS: { value: ConditionOp; label: string }[] = [
   { value: "not_empty", label: "n'est pas vide" },
 ];
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{children}</h3>;
-}
-
 function Errors({ errors }: { errors: ValidationError[] | undefined }) {
   if (!errors?.length) return null;
   return (
-    <ul role="alert" className="grid grid-cols-[minmax(0,1fr)] gap-0.5 text-[11px] text-destructive">
+    <ul role="alert" className="grid grid-cols-[minmax(0,1fr)] gap-0.5 text-xs text-destructive-ink">
       {errors.map((e, i) => (
         <li key={`${e.code}-${i}`}>{e.message}</li>
       ))}
@@ -60,6 +58,7 @@ export function StepInspector({
   step,
   draft,
   catalog,
+  catalogReady = true,
   apps,
   errors,
   onChange,
@@ -71,6 +70,8 @@ export function StepInspector({
   step: WorkflowStepV2;
   draft: WorkflowDraftV2;
   catalog: Map<string, CatalogEntry>;
+  /** false sans catalogue (lecture en cours ou panne) : aucune étape n'est dite hors catalogue */
+  catalogReady?: boolean;
   apps: Map<string, { name: string; color: string; status?: keyof typeof APP_STATUS_LABEL }>;
   errors: ValidationError[];
   onChange: (patch: Partial<WorkflowStepV2>) => void;
@@ -99,32 +100,42 @@ export function StepInspector({
   };
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      <div className="flex items-start gap-2.5">
-        <AppTile app={app} color={meta?.color} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm leading-tight font-semibold">{usesLabel(step.uses, entry)}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {meta?.name ?? (app === "nexus" ? "Outil Nexus" : app)} · <code className="font-mono">{step.uses}</code>
-          </p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {entry && <KindBadge kind={entry.kind} />}
-            {entry && <span className="text-[11px] text-muted-foreground">sortie : {entry.output_format}</span>}
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
+        <div className="flex items-start gap-2.5">
+          <AppTile app={app} color={meta?.color} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-tight font-semibold">{usesLabel(step.uses, entry)}</p>
+            <p className="truncate text-xs text-muted-foreground" title={step.uses}>
+              {meta?.name ?? (app === "nexus" ? "Outil Nexus" : app)} · <code className="font-mono">{step.uses}</code>
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {entry && <KindBadge kind={entry.kind} />}
+              {entry && <span className="text-xs text-muted-foreground">sortie : {entry.output_format}</span>}
+            </div>
           </div>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={`Supprimer l'étape ${step.id}`} onClick={onRemove}>
+            <Trash2 />
+          </Button>
         </div>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={`Supprimer l'étape ${step.id}`} onClick={onRemove}>
-          <Trash2 />
-        </Button>
+        {entry?.description && <p className="text-sm text-muted-foreground">{entry.description}</p>}
+        {!entry &&
+          (catalogReady ? (
+            <Callout tone="warning">Cette étape n&apos;est pas dans le catalogue : son entrée est éditée en JSON.</Callout>
+          ) : (
+            // Comme sur le graphe : rien n'est dit « inconnu » sans catalogue (lecture ou panne)
+            <Callout tone="info" role="status">
+              Catalogue pas encore disponible : en attendant, l&apos;entrée est éditée en JSON.
+            </Callout>
+          ))}
+        {entry && !entry.available && <Callout tone="warning">{entry.unavailable_reason ?? "Indisponible pour le moment."}</Callout>}
+        <Errors errors={byField.get(null)} />
       </div>
-      {entry?.description && <p className="text-xs text-muted-foreground">{entry.description}</p>}
-      {!entry && <p className="text-xs text-warning">Cette étape n&apos;est pas dans le catalogue : son entrée est éditée en JSON.</p>}
-      {entry && !entry.available && <p className="text-xs text-warning">{entry.unavailable_reason ?? "Indisponible pour le moment."}</p>}
-      <Errors errors={byField.get(null)} />
 
-      <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-general`}>
-        <h3 id={`${ids}-general`} className="sr-only">
-          Réglages de l&apos;étape
-        </h3>
+      <section className="grid grid-cols-[minmax(0,1fr)] gap-3" aria-labelledby={`${ids}-general`}>
+        <SectionLabel as="h3" id={`${ids}-general`}>
+          Réglages
+        </SectionLabel>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
           <label htmlFor={`${ids}-id`} className="text-xs font-medium">
             Identifiant
@@ -142,11 +153,11 @@ export function StepInspector({
               if (e.key === "Enter") commitId();
             }}
           />
-          <p id={`${ids}-id-help`} className="text-[11px] text-muted-foreground">
+          <p id={`${ids}-id-help`} className="text-xs text-muted-foreground">
             Cité dans les gabarits : <code className="font-mono">{`{{steps.${step.id}.data}}`}</code>
           </p>
           {idProblem && (
-            <p role="alert" className="text-[11px] text-destructive">
+            <p role="alert" className="text-xs text-destructive-ink">
               {idProblem}
             </p>
           )}
@@ -191,9 +202,9 @@ export function StepInspector({
       <ConditionEditor when={step.when ?? null} templates={templates} errors={byField.get("when")} onChange={(when) => onChange({ when })} />
 
       <section className="grid grid-cols-[minmax(0,1fr)] gap-3" aria-labelledby={`${ids}-input`}>
-        <SectionTitle>
-          <span id={`${ids}-input`}>Entrée</span>
-        </SectionTitle>
+        <SectionLabel as="h3" id={`${ids}-input`}>
+          Entrée
+        </SectionLabel>
         {fields.length === 0 && entry && extras.length === 0 && (
           <p className="text-xs text-muted-foreground">Cette étape ne prend aucun paramètre.</p>
         )}
@@ -247,14 +258,14 @@ function NeedsList({
     <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
       <p className="text-xs font-medium">Attend</p>
       {step.needs.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Rien : l&apos;étape démarre tout de suite. Reliez la sortie d&apos;une étape à son entrée pour la faire attendre.
         </p>
       ) : (
         <ul className="flex flex-wrap gap-1">
           {step.needs.map((need) => (
-            <li key={need} className="inline-flex items-center gap-1 rounded-sm border border-atelier-line bg-sunken py-0.5 pr-0.5 pl-1.5">
-              <code className="font-mono text-[11px]">{need}</code>
+            <li key={need} className="inline-flex items-center gap-1 rounded-md border border-atelier-line bg-sunken py-0.5 pr-0.5 pl-1.5">
+              <code className="font-mono text-xs">{need}</code>
               <Button
                 type="button"
                 variant="ghost"
@@ -321,9 +332,9 @@ function ConditionEditor({
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-title`}>
       <div className="flex items-center gap-2">
-        <SectionTitle>
-          <span id={`${ids}-title`}>Condition</span>
-        </SectionTitle>
+        <SectionLabel as="h3" id={`${ids}-title`}>
+          Condition
+        </SectionLabel>
         <label className="ml-auto flex items-center gap-1.5 text-xs">
           <Checkbox
             checked={!!when}
@@ -333,9 +344,9 @@ function ConditionEditor({
         </label>
       </div>
       {when && (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-atelier-line bg-sunken p-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-lg border border-atelier-line bg-sunken p-2.5">
           <div className="flex items-center gap-1">
-            <label htmlFor={`${ids}-left`} className="flex-1 text-[11px] text-muted-foreground">
+            <label htmlFor={`${ids}-left`} className="flex-1 text-xs text-muted-foreground">
               Valeur testée
             </label>
             <TemplateMenu groups={templates} label="la valeur testée" onPick={(tpl) => onChange({ ...when, left: tpl })} />
@@ -439,7 +450,7 @@ function RawInput({
         onChange={(e) => apply(e.target.value)}
       />
       {problem && (
-        <p role="status" className="text-[11px] text-muted-foreground">
+        <p role="status" className="text-xs text-muted-foreground">
           {problem}
         </p>
       )}
@@ -450,6 +461,7 @@ function RawInput({
 
 // ─── Workflow (aucune étape sélectionnée) ────────────────────────
 
+/** Réglages du workflow ; le titre se modifie sur place dans l'en-tête de l'éditeur. */
 export function WorkflowSettings({
   draft,
   agents,
@@ -471,32 +483,27 @@ export function WorkflowSettings({
     onChange({ params: draft.params.map((p, i) => (i === index ? { ...p, ...patch } : p)) });
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
-        <SectionTitle>Workflow</SectionTitle>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
-          <label htmlFor={`${ids}-title`} className="text-xs font-medium">
-            Titre
-          </label>
-          <Input
-            id={`${ids}-title`}
-            className="h-8"
-            value={draft.title}
-            maxLength={120}
-            aria-required
-            placeholder="ex. CA du mois → tâches Projets"
-            onChange={(e) => onChange({ title: e.target.value })}
-          />
-        </div>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      {global.length > 0 && (
+        <Callout tone="destructive" title="À corriger">
+          <Errors errors={global} />
+        </Callout>
+      )}
+
+      <section className="grid grid-cols-[minmax(0,1fr)] gap-3" aria-labelledby={`${ids}-wf`}>
+        <SectionLabel as="h3" id={`${ids}-wf`}>
+          Workflow
+        </SectionLabel>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
           <label htmlFor={`${ids}-desc`} className="text-xs font-medium">
             Description <span className="font-normal text-muted-foreground">(facultatif)</span>
           </label>
           <Textarea
             id={`${ids}-desc`}
-            rows={2}
+            rows={3}
             maxLength={500}
             className="text-sm"
+            placeholder="Ce que fait ce workflow, en une ou deux phrases"
             value={draft.description}
             onChange={(e) => onChange({ description: e.target.value })}
           />
@@ -509,6 +516,7 @@ export function WorkflowSettings({
             id={`${ids}-agent`}
             className="w-full"
             value={draft.agent ?? ""}
+            aria-describedby={`${ids}-agent-help`}
             onChange={(e) => onChange({ agent: e.target.value || null })}
           >
             <option value="">Workflow de suite (toutes les boîtes configurées)</option>
@@ -519,17 +527,17 @@ export function WorkflowSettings({
             ))}
             {draft.agent && !agents.some((a) => a.name === draft.agent) && <option value={draft.agent}>{draft.agent}</option>}
           </NativeSelect>
-          <p className="text-[11px] text-muted-foreground">
+          <p id={`${ids}-agent-help`} className="text-xs text-muted-foreground">
             Un agent limite le catalogue à ses boîtes à outils ; un workflow de suite peut tout enchaîner.
           </p>
         </div>
       </section>
 
-      <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-params`}>
+      <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-params`}>
         <div className="flex items-center gap-2">
-          <SectionTitle>
-            <span id={`${ids}-params`}>Paramètres</span>
-          </SectionTitle>
+          <SectionLabel as="h3" id={`${ids}-params`}>
+            Paramètres
+          </SectionLabel>
           <Button
             type="button"
             variant="ghost"
@@ -546,26 +554,35 @@ export function WorkflowSettings({
             Ajouter
           </Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Demandés à chaque lancement ; dans une étape : <code className="font-mono">{"{{params.nom}}"}</code> via « Utiliser… ».
         </p>
         {undeclared.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/8 px-2 py-1.5 text-xs">
-            <span className="min-w-0 flex-1">Cités sans être déclarés : {undeclared.join(", ")}.</span>
-            <Button type="button" size="sm" variant="outline" className="h-7" onClick={onDeclareMissing}>
-              Déclarer
-            </Button>
-          </div>
+          <Callout
+            tone="warning"
+            action={
+              <Button type="button" size="sm" variant="outline" className="h-7" onClick={onDeclareMissing}>
+                Déclarer
+              </Button>
+            }
+          >
+            Cités sans être déclarés : {undeclared.join(", ")}.
+          </Callout>
+        )}
+        {draft.params.length === 0 && (
+          <p className="rounded-xl border border-dashed border-atelier-line px-3 py-3 text-center text-xs text-muted-foreground">
+            Aucun paramètre : le workflow part toujours avec les mêmes valeurs.
+          </p>
         )}
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
           {draft.params.map((param, index) => {
             const bad = !STEP_ID.test(param.name);
             return (
-              <li key={index} className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-atelier-line bg-card p-2">
+              <li key={index} className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-xl border border-atelier-line bg-card p-2.5">
                 <div className="flex items-center gap-1">
                   <Input
                     aria-label={`Nom du paramètre ${index + 1}`}
-                    className="h-7 flex-1 font-mono text-xs"
+                    className="h-8 flex-1 font-mono text-xs"
                     value={param.name}
                     maxLength={40}
                     aria-invalid={bad}
@@ -574,43 +591,37 @@ export function WorkflowSettings({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon-sm"
-                    className="size-7"
+                    size="icon-xs"
                     aria-label={`Retirer le paramètre ${param.name}`}
                     onClick={() => onChange({ params: draft.params.filter((_, i) => i !== index) })}
                   >
                     <Trash2 />
                   </Button>
                 </div>
-                <Input
-                  aria-label={`Libellé de ${param.name}`}
-                  className="h-7"
-                  placeholder="Libellé (ex. Jeu de données)"
-                  maxLength={80}
-                  value={param.label}
-                  onChange={(e) => setParam(index, { label: e.target.value })}
-                />
-                <Input
-                  aria-label={`Valeur par défaut de ${param.name}`}
-                  className="h-7"
-                  placeholder="Valeur par défaut"
-                  maxLength={500}
-                  value={param.default}
-                  onChange={(e) => setParam(index, { default: e.target.value })}
-                />
-                {bad && <p className="text-[11px] text-destructive">Nom : minuscule en tête, puis a-z, 0-9 ou _.</p>}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Input
+                    aria-label={`Libellé de ${param.name}`}
+                    className="h-8"
+                    placeholder="Libellé (ex. Jeu de données)"
+                    maxLength={80}
+                    value={param.label}
+                    onChange={(e) => setParam(index, { label: e.target.value })}
+                  />
+                  <Input
+                    aria-label={`Valeur par défaut de ${param.name}`}
+                    className="h-8"
+                    placeholder="Valeur par défaut"
+                    maxLength={500}
+                    value={param.default}
+                    onChange={(e) => setParam(index, { default: e.target.value })}
+                  />
+                </div>
+                {bad && <p className="text-xs text-destructive-ink">Nom : minuscule en tête, puis a-z, 0-9 ou _.</p>}
               </li>
             );
           })}
         </ul>
       </section>
-
-      {global.length > 0 && (
-        <section className="grid grid-cols-[minmax(0,1fr)] gap-1">
-          <SectionTitle>À corriger</SectionTitle>
-          <Errors errors={global} />
-        </section>
-      )}
     </div>
   );
 }

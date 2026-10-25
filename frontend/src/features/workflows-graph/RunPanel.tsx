@@ -1,11 +1,14 @@
 "use client";
 
 import { ChevronRight, History, Layers, Play, RefreshCw, Save } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Input } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/section-label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatWhen } from "@/features/chat-agent/formatWhen";
 import { OriginBadge } from "@/features/workflow-triggers/OriginBadge";
 import { originText } from "@/features/workflow-triggers/origin";
@@ -23,12 +26,22 @@ import { StepStatusIcon } from "./StepBadges";
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
+/** Commande exposée à l'en-tête de l'éditeur (bouton « Lancer »). */
+export interface RunPanelHandle {
+  /**
+   * Lance comme le bouton du panneau (enregistrement d'abord si besoin) ; un paramètre sans
+   * valeur ni défaut reçoit d'abord le focus : on le renseigne, puis on lance d'ici.
+   */
+  start: () => void;
+}
+
 /**
  * Lancement et suivi d'une exécution : paramètres, interrogation tant que le moteur avance,
  * carte de validation de l'étape en attente (résultat de l'étape précédente juste au-dessus),
  * détail des étapes, livrables et historique.
  */
 export function RunPanel({
+  ref,
   workflowId,
   dirty,
   params,
@@ -39,6 +52,7 @@ export function RunPanel({
   onSave,
   onShowArtifacts,
 }: {
+  ref?: React.Ref<RunPanelHandle>;
   /** null : pas encore enregistré */
   workflowId: string | null;
   dirty: boolean;
@@ -57,10 +71,14 @@ export function RunPanel({
   const values = launchValues(params, typed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Nom du paramètre vide signalé par « Lancer » de l'en-tête */
+  const [missing, setMissing] = useState<string | null>(null);
   const [history, setHistory] = useState<WorkflowRun[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const attempt = useRef(0);
   const seen = useRef(new Set<string>());
+  // Garde contre un double lancement (double clic, en-tête + panneau) avant le rendu suivant
+  const launching = useRef(false);
   const addArtifact = useArtifactStore((s) => s.add);
   const bumpInbox = useWorkflowStudioStore((s) => s.bumpInbox);
   const runStatus = run?.status;
@@ -115,8 +133,11 @@ export function RunPanel({
   }, [workflowId, runStatus, run?.id]);
 
   const launch = async () => {
+    if (launching.current) return;
+    launching.current = true;
     setBusy(true);
     setError(null);
+    setMissing(null);
     try {
       const id = dirty || !workflowId ? await onSave() : workflowId;
       if (!id) return;
@@ -125,9 +146,29 @@ export function RunPanel({
     } catch (err) {
       setError(message(err, "Lancement impossible."));
     } finally {
+      launching.current = false;
       setBusy(false);
     }
   };
+
+  const active = isRunActive(run);
+  const awaiting = run?.status === "awaiting_approval";
+  // Paramètre retiré entre-temps : plus rien à signaler
+  const missingParam = missing ? params.find((p) => p.name === missing) : undefined;
+
+  useImperativeHandle(ref, () => ({
+    start: () => {
+      if (active || awaiting) return;
+      const empty = params.find((p) => !(values[p.name] ?? "").trim());
+      if (empty) {
+        setMissing(empty.name);
+        // Le panneau vient d'être affiché : focus au rendu suivant
+        window.requestAnimationFrame(() => document.getElementById(`${ids}-${empty.name}`)?.focus());
+        return;
+      }
+      void launch();
+    },
+  }));
 
   const decide = async (pending: PendingApproval, allow: boolean) => {
     if (!run) return;
@@ -153,41 +194,50 @@ export function RunPanel({
     }
   };
 
-  const active = isRunActive(run);
-  const awaiting = run?.status === "awaiting_approval";
   const label = (id: string) => {
     const step = steps.find((s) => s.id === id);
     return step ? step.label || usesLabel(step.uses, catalog.get(step.uses)) : id;
   };
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      {!workflowId && (
-        <p className="rounded-md border border-atelier-line bg-sunken px-3 py-2 text-xs text-muted-foreground">
-          Le workflow sera enregistré avant son premier lancement.
-        </p>
-      )}
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      {!workflowId && <Callout tone="info">Le workflow sera enregistré avant son premier lancement.</Callout>}
 
       {!awaiting && (
-        <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-launch`}>
-          <h3 id={`${ids}-launch`} className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-launch`}>
+          <SectionLabel as="h3" id={`${ids}-launch`}>
             Lancement
-          </h3>
-          {params.map((param) => (
-            <div key={param.name} className="grid grid-cols-[minmax(0,1fr)] gap-1">
-              <label htmlFor={`${ids}-${param.name}`} className="text-xs font-medium">
-                {param.label || param.name}
-              </label>
-              <Input
-                id={`${ids}-${param.name}`}
-                className="h-8"
-                value={values[param.name] ?? ""}
-                placeholder={param.default}
-                maxLength={500}
-                onChange={(e) => setValues((v) => ({ ...v, [param.name]: e.target.value }))}
-              />
+          </SectionLabel>
+          {params.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Aucun paramètre : le workflow part tel qu&apos;il est.</p>
+          ) : (
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-xl border border-atelier-line bg-card p-3">
+              {params.map((param) => (
+                <div key={param.name} className="grid grid-cols-[minmax(0,1fr)] gap-1">
+                  <label htmlFor={`${ids}-${param.name}`} className="text-xs font-medium">
+                    {param.label || param.name}
+                  </label>
+                  <Input
+                    id={`${ids}-${param.name}`}
+                    className="h-8"
+                    value={values[param.name] ?? ""}
+                    placeholder={param.default}
+                    maxLength={500}
+                    aria-describedby={missing === param.name ? `${ids}-missing` : undefined}
+                    onChange={(e) => {
+                      setMissing(null);
+                      setValues((v) => ({ ...v, [param.name]: e.target.value }));
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          {missingParam && (
+            <p id={`${ids}-missing`} role="status" className="text-xs text-warning-ink">
+              « {missingParam.label || missingParam.name} » est vide : renseignez-le, ou lancez tel quel avec le bouton ci-dessous.
+            </p>
+          )}
           <Button type="button" disabled={busy || active || steps.length === 0} onClick={() => void launch()}>
             {dirty || !workflowId ? <Save /> : <Play />}
             {busy ? "Lancement…" : active ? "Exécution en cours…" : dirty || !workflowId ? "Enregistrer et lancer" : run ? "Relancer" : "Lancer"}
@@ -196,25 +246,30 @@ export function RunPanel({
       )}
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 text-sm text-destructive">
-          <span className="min-w-0 flex-1">{error}</span>
-          {run && (
-            <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => void reopen(run.id)}>
-              <RefreshCw />
-              Réessayer
-            </Button>
-          )}
-        </div>
+        <Callout
+          tone="destructive"
+          role="alert"
+          action={
+            run && (
+              <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => void reopen(run.id)}>
+                <RefreshCw />
+                Réessayer
+              </Button>
+            )
+          }
+        >
+          {error}
+        </Callout>
       )}
 
       {run && (
-        <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-run`} aria-live="polite">
+        <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-run`} aria-live="polite">
           <div className="flex items-center gap-2">
-            <h3 id={`${ids}-run`} className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <SectionLabel as="h3" id={`${ids}-run`}>
               Exécution
-            </h3>
+            </SectionLabel>
             <Badge variant={RUN_STATUS[run.status].variant}>{RUN_STATUS[run.status].label}</Badge>
-            <span className="ml-auto text-[11px] text-muted-foreground">{formatWhen(run.created_at)}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{formatWhen(run.created_at)}</span>
           </div>
           <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
             <OriginBadge trigger={run.trigger} />
@@ -229,21 +284,23 @@ export function RunPanel({
                 key={pending.token}
                 pending={pending}
                 label={label(pending.step_id)}
+                app={catalog.get(pending.uses)?.app}
                 previous={before && { step: before, label: label(before.id) }}
                 busy={busy}
+                stacked
                 onDecide={decide}
               />
             );
           })}
 
-          <ol className="grid grid-cols-[minmax(0,1fr)] gap-1">
+          <ol aria-label="Étapes de l'exécution" className="grid grid-cols-[minmax(0,1fr)] divide-y divide-atelier-line overflow-hidden rounded-xl border border-atelier-line bg-card">
             {run.steps.map((step) => (
               <StepRunLine key={step.id} step={step} label={label(step.id)} />
             ))}
           </ol>
 
           {run.artifacts.length > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={onShowArtifacts}>
+            <Button type="button" variant="soft" size="sm" onClick={onShowArtifacts}>
               <Layers />
               Voir les livrables ({run.artifacts.length})
             </Button>
@@ -252,14 +309,25 @@ export function RunPanel({
       )}
 
       {workflowId && (
-        <section className="grid grid-cols-[minmax(0,1fr)] gap-1.5" aria-labelledby={`${ids}-history`}>
-          <h3 id={`${ids}-history`} className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-history`}>
+          <SectionLabel as="h3" id={`${ids}-history`} className="flex items-center gap-1.5">
             <History className="size-3.5" aria-hidden />
             Historique
-          </h3>
-          {historyError && <p className="text-xs text-destructive">{historyError}</p>}
+          </SectionLabel>
+          {historyError && (
+            <Callout tone="destructive" role="alert">
+              {historyError}
+            </Callout>
+          )}
+          {history === null && !historyError && (
+            <div role="status" className="grid gap-1.5">
+              <span className="sr-only">Lecture de l&apos;historique…</span>
+              <Skeleton className="h-9" />
+              <Skeleton className="h-9" />
+            </div>
+          )}
           {history?.length === 0 && <p className="text-xs text-muted-foreground">Jamais lancé.</p>}
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
             {history?.map((item) => (
               <li key={item.id}>
                 <button
@@ -268,13 +336,13 @@ export function RunPanel({
                   aria-current={item.id === run?.id}
                   title={originText(item)}
                   className={cn(
-                    "grid w-full grid-cols-[minmax(0,1fr)] gap-1 rounded-md border border-atelier-line px-2 py-1.5 text-left text-xs hover:bg-accent focus-visible:shadow-focus",
+                    "grid w-full grid-cols-[minmax(0,1fr)] gap-1 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none",
                     item.id === run?.id && "atelier-nav-active",
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
                     <Badge variant={RUN_STATUS[item.status].variant}>{RUN_STATUS[item.status].label}</Badge>
-                    <OriginBadge trigger={item.trigger} />
+                    <OriginBadge trigger={item.trigger} compact />
                     <span className="min-w-0 flex-1 truncate text-muted-foreground">
                       {item.trigger_event ? "" : item.message || `${item.steps.length} étape(s)`}
                     </span>
@@ -282,7 +350,7 @@ export function RunPanel({
                   </span>
                   {/* Événement source sur sa propre ligne : il reste lisible dans le panneau étroit */}
                   {item.trigger_event && (
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    <span className="block truncate font-mono text-xs text-muted-foreground">
                       {item.trigger_event.type} · {item.trigger_event.subject.label || item.trigger_event.subject.id}
                     </span>
                   )}
@@ -302,22 +370,22 @@ function StepRunLine({ step, label }: { step: StepRun; label: string }) {
   const data = step.data === null || step.data === undefined ? null : JSON.stringify(step.data, null, 2);
   const detail = !!(step.content || data || step.input);
   return (
-    <li className="rounded-md border border-atelier-border-soft bg-sunken text-xs">
+    <li className="text-sm">
       <button
         type="button"
         aria-expanded={open}
         disabled={!detail}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-2 py-1.5 text-left enabled:hover:text-foreground"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left enabled:hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none"
       >
-        <ChevronRight className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90", !detail && "invisible")} aria-hidden />
+        <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90", !detail && "invisible")} aria-hidden />
         <StepStatusIcon status={step.status} />
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {step.error_code && <code className="font-mono text-[10px] text-destructive">{step.error_code}</code>}
-        {took && <span className="shrink-0 text-muted-foreground tabular-nums">{took}</span>}
+        {step.error_code && <code className="font-mono text-xs text-destructive-ink">{step.error_code}</code>}
+        {took && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{took}</span>}
       </button>
       {open && (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 border-t border-atelier-line px-2 py-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2 border-t border-atelier-line bg-sunken px-3 py-2.5">
           {step.input && <Detail title="Entrée">{JSON.stringify(step.input, null, 2)}</Detail>}
           {step.content && <Detail title="Texte">{step.content}</Detail>}
           {data && <Detail title="Sortie structurée">{data.length > 4000 ? `${data.slice(0, 4000)}\n…` : data}</Detail>}
@@ -330,8 +398,8 @@ function StepRunLine({ step, label }: { step: StepRun; label: string }) {
 function Detail({ title, children }: { title: string; children: string }) {
   return (
     <div>
-      <p className="mb-0.5 text-[11px] text-muted-foreground">{title}</p>
-      <pre className="max-h-40 overflow-auto rounded-sm border border-atelier-line bg-card p-1.5 font-mono text-[11px] whitespace-pre-wrap">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">{title}</p>
+      <pre className="max-h-40 overflow-auto rounded-md border border-atelier-line bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
         {children}
       </pre>
     </div>

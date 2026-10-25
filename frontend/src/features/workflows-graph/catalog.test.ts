@@ -76,6 +76,12 @@ describe("thème d'application", () => {
     expect(appTheme("ailleurs", "red; x")).toMatchObject({ style: { "--atelier-signature": "#E8590C" } });
   });
 
+  it("donne à Convert sa signature locale (absente de la marque copiée)", () => {
+    const convert = { "data-atelier-app": "convert", style: { "--atelier-signature": "#C9951D" } };
+    expect(appTheme("convert")).toEqual(convert);
+    expect(appTheme("convert", "#C9951D")).toEqual(convert);
+  });
+
   it("indexe le catalogue et replie les accents", () => {
     expect(catalogIndex(catalogFixture).get("tool:data_via_query")?.label).toBe("Interroger un jeu");
     expect(catalogIndex(null).size).toBe(0);

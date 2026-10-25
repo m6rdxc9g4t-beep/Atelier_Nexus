@@ -31,6 +31,9 @@ export NEXUS_HOME="$SUPPORT" NEXUS_LOG_DIR="$LOG_DIR"
 
 PREPARE=0
 for arg in "$@"; do [[ "$arg" == "--preparer" ]] && PREPARE=1; done
+# Messages dans le terminal plutôt qu'en fenêtre : mise à jour seule, ou NEXUS_NO_DIALOG=1 (tests)
+QUIET="$PREPARE"
+[[ "${NEXUS_NO_DIALOG:-}" == 1 ]] && QUIET=1
 
 # Outils utiles aux agents et à la mise à jour (node/npm, ollama, claude…)
 export PATH="$HOME/.homebrew/bin:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -43,7 +46,7 @@ echo "--- $(date '+%F %T') : lancement ($REPO)" >>"$LOG"
 
 # Messages : arguments d'osascript (jamais de script construit avec du texte) ; terminal sinon
 alert() {
-  if [[ "$PREPARE" == 1 ]] || ! /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'OSA'; then
+  if [[ "$QUIET" == 1 ]] || ! /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'OSA'; then
 on run argv
   display alert "Atelier Nexus" message (item 1 of argv) as critical
 end run
@@ -52,7 +55,7 @@ OSA
   fi
 }
 notify() {
-  if [[ "$PREPARE" == 1 ]]; then echo "$1"; return; fi
+  if [[ "$QUIET" == 1 ]]; then echo "$1"; return; fi
   /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'OSA' || true
 on run argv
   display notification (item 1 of argv) with title "Atelier Nexus"
@@ -62,7 +65,7 @@ OSA
 # Vrai si l'utilisateur choisit d'ouvrir l'app avec la version précédente
 choose_previous() {
   local answer
-  [[ "$PREPARE" == 1 ]] && { echo "Atelier Nexus : $1" >&2; return 1; }
+  [[ "$QUIET" == 1 ]] && { echo "Atelier Nexus : $1" >&2; return 1; }
   answer="$(/usr/bin/osascript - "$1" 2>/dev/null <<'OSA'
 on run argv
   display dialog (item 1 of argv) with title "Atelier Nexus" with icon caution buttons {"Quitter", "Ouvrir quand même avec la version précédente"} default button 2

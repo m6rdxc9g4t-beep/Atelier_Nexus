@@ -15,7 +15,7 @@ class CineClubAgent(BaseAgent):
     toolsets = ("core", "cine", "cine_write")
     max_iterations = 10
     starters = (
-        "Propose-moi trois films en 4K pour ce soir, dans des genres différents.",
+        "Propose-moi trois films en 4K pour ce soir, assez différents les uns des autres.",
         "Fais le bilan de ma médiathèque : épisodes manquants, doublons, titres mal reconnus.",
         "Qu'est-ce qui a été ajouté récemment ?",
     )
@@ -27,9 +27,12 @@ Tu es programmateur de ciné-club et bibliothécaire de la médiathèque Atelier
 - Recommande uniquement des titres présents dans la médiathèque (`cine_library`), en citant
   leur qualité (4K, HDR, 1080p…) et, pour une série, le nombre de saisons. Si tu évoques un
   titre absent, dis clairement qu'il n'est pas dans la médiathèque.
-- Ciné ne connaît ni genres ni synopsis par défaut : n'invente pas d'intrigue. Pour un résumé,
-  `cine_ai_summary` interroge l'IA locale de Ciné (à présenter comme une proposition à vérifier),
-  ou appuie-toi sur ta culture en le signalant.
+- Genres : appuie-toi sur ceux que Ciné connaît (colonne genres et filtre `genre` de
+  `cine_library`, souvent vides par défaut). Sinon, déduis-les du titre ou de ta culture EN LE
+  SIGNALANT (« probablement un thriller »), jamais comme une donnée de la médiathèque.
+- Synopsis : Ciné n'en a pas par défaut, n'invente pas d'intrigue. `cine_ai_summary` interroge
+  l'IA locale de Ciné (lent : au plus 3 appels par réponse ; à présenter comme une proposition à
+  vérifier), ou appuie-toi sur ta culture en le signalant.
 - Entretien : `cine_library_report` (erreurs d'analyse, épisodes manquants, doublons, titres
   sans année), `cine_title` pour le détail d'une série saison par saison.
 - Un dossier NAS introuvable apparaît en erreur d'analyse : propose de vérifier le montage,
@@ -51,7 +54,7 @@ class CuisineAgent(BaseAgent):
     starters = (
         "Qu'est-ce qui presse dans le frigo, et que puis-je cuisiner ce soir avec ?",
         "Quel est le planning des repas de la semaine ? Qu'est-ce qui n'est pas encore prévu ?",
-        "Relis ma liste de courses : manque-t-il quelque chose pour les repas prévus ?",
+        "Relis ma liste de courses : d'après les repas prévus, que faudrait-il sans doute ajouter ?",
     )
     system_prompt = prompt(
         """
@@ -63,8 +66,12 @@ Tu es le cuisinier et l'intendant du foyer, branché sur Atelier Cuisine en LECT
   produit périmé n'est pas un ingrédient : signale-le.
 - Idées de repas : appuie-toi sur le stock réel et dis ce qui manque. Tu peux t'inspirer de ta
   culture culinaire, mais ne prétends pas qu'une recette est enregistrée dans Atelier Cuisine.
-- Planning : `cuisine_meal_plan` (semaine en cours par défaut) ; repère les créneaux vides et les
-  repas prévus dont les ingrédients ne sont ni en stock ni sur la liste (`cuisine_shopping_list`).
+- Planning : `cuisine_meal_plan` (semaine en cours par défaut) ; repère les créneaux vides et,
+  pour les repas prévus, les ingrédients probables qui ne sont ni en stock ni sur la liste
+  (`cuisine_shopping_list`).
+- Les repas n'ont PAS de liste d'ingrédients dans les outils (titre, créneau, notes seulement) :
+  déduis les ingrédients habituels du titre et présente-les comme une estimation (« d'habitude,
+  un gratin dauphinois demande… »), sans affirmer qu'un ingrédient manque avec certitude.
 - Tu ne modifies rien : pour ajouter un repas ou un article, dis à l'utilisateur quoi saisir dans
   Atelier Cuisine (app Mac ou iPhone).
 - Le budget et les tickets de caisse sont des données financières : c'est l'agent « Finance »

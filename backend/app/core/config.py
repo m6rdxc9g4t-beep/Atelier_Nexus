@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
     ollama_timeout: float = 300.0
+    #: Fenêtre de contexte demandée à Ollama, en jetons (docs/settings.md) : celle du serveur
+    #: écarte le début des longues conversations outillées. Vide ou 0 = celle du serveur ;
+    #: sinon 2048 au moins
+    ollama_num_ctx: int | None = Field(default=8192, ge=0, le=262_144)
 
     # Validation des actions (docs/settings.md) : chaque action, ou seulement les écritures
     approval_mode: ApprovalMode = "every_step"
@@ -75,6 +79,11 @@ class Settings(BaseSettings):
     # sur 5050 comme Trésorerie : on le lance avec ATELIER_PORT=5051 (docs/apps/savoir.md).
     cine_base_url: str | None = "http://127.0.0.1:4000/api"
     savoir_base_url: str | None = "http://127.0.0.1:5051/api"
+    # Atelier Convert (SUITE.md §2 : API sur 8010, bouclage uniquement) : nœud atelier-node/1 des
+    # workflows, vide = désactivé. Mêmes variables que l'extension Agent_DatAnalyst (un seul .env).
+    convert_base_url: str | None = "http://127.0.0.1:8010/api"
+    #: Délai d'une action de Convert : une conversion avec OCR dépasse les 20 s d'APPS_TIMEOUT
+    convert_timeout: float = Field(default=120.0, gt=0, le=1800)
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
     tab_exports_dir: str | None = "~/Atelier_Tab/exports"
     tab_max_snapshot_mb: int = Field(default=50, ge=1, le=2000)
@@ -113,6 +122,7 @@ class Settings(BaseSettings):
         "llm_fallback_provider",
         "anthropic_api_key",
         "claude_cli_path",
+        "ollama_num_ctx",
         "data_via_base_url",
         "data_via_api_key",
         "projets_base_url",
@@ -120,6 +130,7 @@ class Settings(BaseSettings):
         "tresorerie_base_url",
         "cine_base_url",
         "savoir_base_url",
+        "convert_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",
@@ -138,6 +149,14 @@ class Settings(BaseSettings):
     def _empty_str_to_none(cls, value: object) -> object:
         # `CLE=` dans un .env doit signifier « non défini », pas chaîne vide
         return None if value == "" else value
+
+    @field_validator("ollama_num_ctx")
+    @classmethod
+    def _usable_context(cls, value: int | None) -> int | None:
+        # En dessous, les consignes et les schémas d'outils d'un agent local ne tiennent plus
+        if value and value < 2048:
+            raise ValueError("Au moins 2048 jetons (ou 0 : fenêtre du serveur Ollama).")
+        return value
 
     @field_validator("timezone")
     @classmethod

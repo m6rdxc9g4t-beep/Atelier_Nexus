@@ -14,6 +14,7 @@ APP_COLORS: dict[str, str] = {
     "tresorerie": "#3B5BDB",
     "cuisine": "#E056E2",
     "dates": "#E03131",
+    "convert": "#C9951D",
 }
 
 APP_NAMES: dict[str, str] = {
@@ -26,11 +27,21 @@ APP_NAMES: dict[str, str] = {
     "tresorerie": "Atelier Trésorerie",
     "cuisine": "Atelier Cuisine",
     "dates": "Atelier Dates",
+    "convert": "Atelier Convert",
     "github": "GitHub",
 }
 
-#: Applications qui implémentent le contrat `atelier-node/1`
-NODE_APPS = ("viz", "tab", "projets")
+#: Applications qui implémentent le contrat `atelier-node/1` (ordre de la carte et du catalogue)
+NODE_APPS = ("viz", "tab", "projets", "convert")
+
+#: Nœuds joints en HTTP : app → (attribut de `Settings` qui donne l'adresse, clé du transport
+#: simulé en test). Tab passe par ses fichiers et son serveur MCP (`app/suite/nodes.py`).
+#: Clé « convert » : la même que le client de l'extension Agent_DatAnalyst (un seul double).
+HTTP_NODES: dict[str, tuple[str, str]] = {
+    "viz": ("data_via_base_url", "data_via"),
+    "projets": ("projets_base_url", "projets"),
+    "convert": ("convert_base_url", "convert"),
+}
 
 
 def app_color(app: str | None) -> str:

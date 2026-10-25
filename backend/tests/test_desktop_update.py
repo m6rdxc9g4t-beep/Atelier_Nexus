@@ -628,7 +628,8 @@ def run_script(
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", str(script), *args],
-        env={**os.environ, **env},
+        # Jamais de vraie fenêtre macOS (alerte osascript) pendant les tests
+        env={**os.environ, "NEXUS_NO_DIALOG": "1", **env},
         capture_output=True,
         text=True,
         timeout=180,

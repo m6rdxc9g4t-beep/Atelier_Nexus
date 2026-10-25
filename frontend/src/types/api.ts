@@ -433,6 +433,30 @@ export interface StepPosition {
   y: number;
 }
 
+/**
+ * Modèle de workflow de suite fourni par Nexus (GET /api/workflows/library) : un enchaînement
+ * prêt à copier (Convert → Tab → Viz…), jamais exécuté tel quel.
+ */
+export interface WorkflowTemplate {
+  slug: string;
+  title: string;
+  description: string;
+  /** Bénéfice pour l'utilisateur, une phrase */
+  value: string;
+  /** Applications enchaînées, dans l'ordre (puces colorées) */
+  apps: string[];
+  params: WorkflowParam[];
+  steps: WorkflowStepV2[];
+  /** Prérequis en clair (« Atelier Convert lancé », « serveur MCP de Tab »…) */
+  requirements: string[];
+  /** Déclencheur conseillé, en clair ; null si manuel */
+  trigger_hint: string | null;
+  /** Toutes les étapes sont connues et leurs applications joignables */
+  available: boolean;
+  /** Étapes ou applications manquantes (« node:convert/conversions.list : Atelier Convert injoignable ») */
+  missing: string[];
+}
+
 export interface WorkflowStepV2 {
   /** ^[a-z][a-z0-9_]{0,39}$, unique dans le workflow */
   id: string;
@@ -502,7 +526,7 @@ export interface OutputHint {
 export interface CatalogEntry {
   uses: StepUses;
   source: "tool" | "node";
-  /** "viz" | "tab" | "projets" | "cine" | … | null (outil système) */
+  /** "viz" | "tab" | "projets" | "convert" | "cine" | … | null (outil système) */
   app: string | null;
   label: string;
   description: string;
@@ -720,7 +744,7 @@ export interface EventFilter {
 }
 
 /** Applications qui publient des événements (atelier-node/1 §7.3). */
-export type TriggerApp = "viz" | "projets" | "tab";
+export type TriggerApp = "viz" | "projets" | "tab" | "convert";
 
 export interface TriggerCounters {
   fired: number;

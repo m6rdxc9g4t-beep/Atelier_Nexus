@@ -59,6 +59,9 @@ def test_configure_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 def test_suite_links_open_installed_apps() -> None:
     assert desktop.suite_bundle_for("http://127.0.0.1:8000/") == "fr.atelier-viz.app"
     assert desktop.suite_bundle_for("http://localhost:5051") == "fr.ateliersavoir.app"
+    # Atelier Convert : interface d'aperçu servie sur le port de son API (8010)
+    assert desktop.suite_bundle_for("http://127.0.0.1:8010") == "fr.atelier-convert.app"
+    assert desktop.suite_app_for("http://localhost:8010/") == "convert"
     assert desktop.suite_bundle_for("https://example.org:8000") is None
     assert desktop.suite_bundle_for("http://127.0.0.1") is None
     # Atelier Cuisine : app en ligne enveloppée par une app Tauri

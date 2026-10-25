@@ -2,7 +2,8 @@
 
 v1 (étape 18) : étapes `{tool, input, label}` d'un agent, réponse `WorkflowRunResult`.
 v2 (étape 19, docs/workflows-v2-api.md) : graphe d'étapes outils et actions d'applications,
-catalogue, validation, conversion, exécutions persistées (`/api/workflow-runs`).
+catalogue, validation, conversion, exécutions persistées (`/api/workflow-runs`), bibliothèque de
+modèles de la suite (`/api/workflows/library`).
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ from app.schemas.workflows_v2 import (
     ValidationResult,
     WorkflowRun,
     WorkflowStepV2,
+    WorkflowTemplate,
     WorkflowV2,
     WorkflowV2Create,
     WorkflowV2Fields,
@@ -54,6 +56,7 @@ from app.tools.toolsets import declared_tool_names
 from app.workflows import NOT_REPLAYABLE, WorkflowError, capture, run_workflow
 from app.workflows_v2.engine import resume_run
 from app.workflows_v2.launch import build_agent, launch_run, step_registry
+from app.workflows_v2.library import library
 from app.workflows_v2.validation import blocking, validate_workflow
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -172,9 +175,20 @@ async def workflow_catalog(
     agent: Annotated[str | None, Query(max_length=41)] = None,
 ) -> Catalog:
     """Étapes disponibles : outils de l'agent (sans `agent` : de toute la suite) et actions des
-    manifestes de Viz, Projets et Tab."""
+    manifestes de Viz, Projets, Tab et Convert."""
     async with _registry(agent, llm, catalog, make_env) as (registry, _):
         return registry.catalog()
+
+
+@router.get("/library", response_model=list[WorkflowTemplate])
+async def workflow_library(
+    llm: LLMDep, catalog: CatalogDep, make_env: EnvFactoryDep
+) -> list[WorkflowTemplate]:
+    """Modèles de workflows de la suite (Convert, Tab, Viz, Projets) à copier dans un brouillon.
+    `available` et `missing` disent, avec le catalogue réel de cette machine, ce qui manque pour
+    lancer chacun ; une application arrêtée ne fait jamais échouer la route."""
+    async with _registry(None, llm, catalog, make_env) as (registry, _):
+        return library(registry)
 
 
 @router.post("/validate", response_model=ValidationResult)

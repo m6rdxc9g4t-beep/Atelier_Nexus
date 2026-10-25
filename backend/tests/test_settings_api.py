@@ -93,6 +93,22 @@ def test_invalid_values_are_refused_and_file_untouched(client: TestClient, tmp_p
     assert (tmp_path / ".env").read_text() == original
 
 
+def test_convert_address_is_editable(client: TestClient, tmp_path: Path) -> None:
+    convert = field(client.get("/api/settings").json(), "CONVERT_BASE_URL")
+    assert convert["group"] == "Applications Atelier" and convert["kind"] == "url"
+    assert convert["source"] == "défaut" and convert["value"] == "http://127.0.0.1:8010/api"
+    original = (tmp_path / ".env").read_text()
+    refused = client.put("/api/settings", json={"values": {"CONVERT_BASE_URL": "localhost:8010"}})
+    assert refused.status_code == 422 and "CONVERT_BASE_URL" in refused.json()["error"]["fields"]
+    assert (tmp_path / ".env").read_text() == original
+    response = client.put(
+        "/api/settings", json={"values": {"CONVERT_BASE_URL": "http://127.0.0.1:8011/api"}}
+    )
+    assert response.status_code == 200, response.text
+    assert "CONVERT_BASE_URL=http://127.0.0.1:8011/api" in (tmp_path / ".env").read_text()
+    assert get_settings().convert_base_url == "http://127.0.0.1:8011/api"  # rechargé à chaud
+
+
 def test_foreign_origin_is_refused(client: TestClient) -> None:
     assert client.get("/api/settings", headers={"Origin": "https://exemple.com"}).status_code == 403
     assert (

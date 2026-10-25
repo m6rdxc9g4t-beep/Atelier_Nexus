@@ -18,37 +18,49 @@ import {
 import {
   CircleCheck,
   LayoutGrid,
+  LayoutTemplate,
   Monitor,
   Play,
   Save,
   ShieldCheck,
+  ShieldQuestion,
   SlidersHorizontal,
   TriangleAlert,
   Workflow as WorkflowIcon,
+  X,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TriggersPanel } from "@/features/workflow-triggers/TriggersPanel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ApiError, api, isWorkflowV2 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useArtifactStore } from "@/stores/useArtifactStore";
 import { type EditorTarget, type TriggerPreset, useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 import type { AgentInfo, Catalog, CatalogEntry, ValidationError, WorkflowRun, WorkflowStepV2, WorkflowV2 } from "@/types/api";
 
 import { catalogIndex } from "./catalog";
 import {
+  SAVE_STATE_LABEL,
+  type SaveState,
   type WorkflowDraftV2,
   declareMissingParams,
+  draftFromTemplate,
   draftFromWorkflow,
   draftSignature,
   emptyDraft,
   mergeErrors,
   saveBlockers,
+  saveState,
   toBody,
   undeclaredParams,
 } from "./draft";
@@ -59,6 +71,7 @@ import {
   connect,
   createStep,
   disconnect,
+  isRunActive,
   mergeRunState,
   nextPosition,
   removeSteps,
@@ -67,10 +80,11 @@ import {
   stepsToNodes,
 } from "./graph";
 import { StepInspector, WorkflowSettings } from "./Inspector";
+import { type EditorExit, leaveEditor } from "./leave";
 import { DRAG_MIME, Palette } from "./Palette";
-import { RunPanel } from "./RunPanel";
+import { RunPanel, type RunPanelHandle } from "./RunPanel";
 import { StepNode } from "./StepNode";
-import { validateLocal } from "./validate";
+import { displayedErrors, firstErrorStep, problemsText, validateLocal } from "./validate";
 
 const NODE_TYPES = { step: StepNode };
 const DEFAULT_EDGE = { markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } };
@@ -104,24 +118,29 @@ export function WorkflowGraphDialog({ agents }: { agents: AgentInfo[] }) {
   const editor = useWorkflowStudioStore((s) => s.editor);
   const editorKey = useWorkflowStudioStore((s) => s.editorKey);
   const close = useWorkflowStudioStore((s) => s.closeEditor);
+  const openTemplates = useWorkflowStudioStore((s) => s.openTemplates);
   const dirty = useWorkflowStudioStore((s) => s.editorDirty);
   const wide = useMediaQuery("(min-width: 1024px)");
-  const [confirming, setConfirming] = useState(false);
+  /** Sortie en attente de confirmation (modifications non enregistrées) */
+  const [confirming, setConfirming] = useState<EditorExit | null>(null);
   if (!editor) return null;
-  const requestClose = () => (dirty ? setConfirming(true) : close());
+  const leave = (to: EditorExit) => leaveEditor({ closeEditor: close, openTemplates }, to);
+  // Fermer ou partir d'un modèle : même confirmation s'il y a des modifications
+  const requestLeave = (to: EditorExit) => (dirty ? setConfirming(to) : leave(to));
   return (
     <>
-      <Dialog open onOpenChange={(open) => !open && requestClose()}>
+      <Dialog open onOpenChange={(open) => !open && requestLeave("close")}>
         <DialogContent
           className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
           onEscapeKeyDown={(e) => {
-            // Échap dans le graphe annule une sélection : on ne ferme pas la fenêtre par erreur
-            if ((e.target as HTMLElement | null)?.closest(".react-flow")) e.preventDefault();
+            // Échap dans le graphe annule une sélection, dans le titre il quitte le champ : on ne
+            // ferme pas la fenêtre par erreur
+            if ((e.target as HTMLElement | null)?.closest(".react-flow, [data-escape-local]")) e.preventDefault();
           }}
         >
           {wide ? (
             <ReactFlowProvider>
-              <GraphEditor key={editorKey} target={editor} agents={agents} />
+              <GraphEditor key={editorKey} target={editor} agents={agents} onShowTemplates={() => requestLeave("templates")} />
             </ReactFlowProvider>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
@@ -138,19 +157,24 @@ export function WorkflowGraphDialog({ agents }: { agents: AgentInfo[] }) {
           )}
         </DialogContent>
       </Dialog>
-      <Dialog open={confirming} onOpenChange={setConfirming}>
+      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-sm">
           <DialogTitle>Quitter sans enregistrer ?</DialogTitle>
-          <DialogDescription>Les modifications de ce workflow seront perdues.</DialogDescription>
+          <DialogDescription>
+            {confirming === "templates"
+              ? "Les modifications de ce workflow seront perdues ; les modèles de la suite s'ouvriront ensuite."
+              : "Les modifications de ce workflow seront perdues."}
+          </DialogDescription>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirming(false)}>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
               Continuer l&apos;édition
             </Button>
             <Button
               variant="destructive"
               onClick={() => {
-                setConfirming(false);
-                close();
+                const to = confirming ?? "close";
+                setConfirming(null);
+                leave(to);
               }}
             >
               Quitter
@@ -162,10 +186,24 @@ export function WorkflowGraphDialog({ agents }: { agents: AgentInfo[] }) {
   );
 }
 
-function GraphEditor({ target, agents }: { target: EditorTarget; agents: AgentInfo[] }) {
-  const [loaded, setLoaded] = useState<Loaded>(() =>
-    target.kind === "new" ? { status: "ready", draft: emptyDraft(target.agent), saved: null } : { status: "loading" },
-  );
+function GraphEditor({
+  target,
+  agents,
+  onShowTemplates,
+}: {
+  target: EditorTarget;
+  agents: AgentInfo[];
+  /** « Partir d'un modèle de la suite » : quitte l'éditeur (confirmé si modifié) pour les modèles */
+  onShowTemplates: () => void;
+}) {
+  const [loaded, setLoaded] = useState<Loaded>(() => {
+    if (target.kind !== "new") return { status: "loading" };
+    // Copie d'un modèle de la suite : brouillon prérempli, jamais enregistré tant qu'on ne le fait pas
+    if (target.template) return { status: "ready", draft: draftFromTemplate(target.template, target.agent), saved: null };
+    // Brouillon vierge : rien à perdre tant qu'on n'y touche pas (fermeture sans confirmation)
+    const blank = emptyDraft(target.agent);
+    return { status: "ready", draft: blank, saved: draftSignature(blank) };
+  });
   const openEditor = useWorkflowStudioStore((s) => s.openEditor);
   const bump = useWorkflowStudioStore((s) => s.bump);
 
@@ -186,15 +224,19 @@ function GraphEditor({ target, agents }: { target: EditorTarget; agents: AgentIn
   if (loaded.status === "loading")
     return (
       <Centered title="Ouverture du workflow…">
-        <span />
+        <div aria-hidden className="flex items-center gap-6">
+          <Skeleton className="h-16 w-44" />
+          <Skeleton className="h-16 w-44" />
+          <Skeleton className="h-16 w-44" />
+        </div>
       </Centered>
     );
   if (loaded.status === "error")
     return (
       <Centered title="Impossible d'ouvrir le workflow">
-        <p role="alert" className="text-sm text-destructive">
+        <Callout tone="destructive" role="alert" className="max-w-md text-left">
           {loaded.message}
-        </p>
+        </Callout>
       </Centered>
     );
   if (loaded.status === "v1")
@@ -218,7 +260,9 @@ function GraphEditor({ target, agents }: { target: EditorTarget; agents: AgentIn
       initialPanel={target.trigger ? "triggers" : target.kind === "open" && target.panel ? target.panel : "inspect"}
       initialRunId={target.kind === "open" ? (target.runId ?? null) : null}
       triggerPreset={target.trigger ?? null}
+      fromTemplate={target.kind === "new" ? (target.template?.title ?? null) : null}
       agents={agents}
+      onShowTemplates={onShowTemplates}
     />
   );
 }
@@ -260,9 +304,9 @@ export function ConvertPrompt({
           : "Les déclencheurs (horaire, événement) ne s'appliquent eux aussi qu'aux workflows v2."}
       </p>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <Callout tone="destructive" role="alert" className="max-w-md text-left">
           {error}
-        </p>
+        </Callout>
       )}
       <Button
         disabled={busy}
@@ -285,6 +329,17 @@ export function ConvertPrompt({
 
 type SidePanel = "inspect" | "run" | "triggers";
 
+type Notice = { tone: "ok" | "info" | "error"; text: string };
+
+const NOTICE_TONE = { ok: "success", info: "signature", error: "destructive" } as const;
+
+/** Pastille de la puce d'enregistrement (le libellé dit la même chose : jamais la couleur seule). */
+const SAVE_DOT: Record<SaveState, string> = {
+  draft: "bg-muted-foreground/50",
+  modified: "bg-warning",
+  saved: "bg-success",
+};
+
 function EditorBody({
   initial,
   savedSignature,
@@ -292,7 +347,9 @@ function EditorBody({
   initialPanel,
   initialRunId,
   triggerPreset,
+  fromTemplate,
   agents,
+  onShowTemplates,
 }: {
   initial: WorkflowDraftV2;
   savedSignature: string | null;
@@ -302,7 +359,10 @@ function EditorBody({
   initialRunId: string | null;
   /** Déclencheur événement à préremplir (carte de la suite) */
   triggerPreset: TriggerPreset | null;
+  /** Titre du modèle de la suite copié dans ce brouillon (message d'accueil) */
+  fromTemplate: string | null;
   agents: AgentInfo[];
+  onShowTemplates: () => void;
 }) {
   const [draft, setDraft] = useState(initial);
   const [saved, setSaved] = useState(savedSignature);
@@ -313,14 +373,24 @@ function EditorBody({
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({});
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
   const [checked, setChecked] = useState<{ ok: boolean; at: string } | null>(null);
-  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(() =>
+    fromTemplate
+      ? {
+          tone: "info",
+          text: `Copie du modèle « ${fromTemplate} » : vérifiez les étapes et leurs réglages, puis enregistrez. Rien n'est enregistré pour l'instant.`,
+        }
+      : null,
+  );
   const [busy, setBusy] = useState<"validate" | "save" | null>(null);
   const [panel, setPanel] = useState<SidePanel>(initialPanel);
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [preset, setPreset] = useState<TriggerPreset | null>(triggerPreset);
+  const [titleMissing, setTitleMissing] = useState(false);
   const clearPreset = useCallback(() => setPreset(null), []);
   const flow = useReactFlow();
   const seeded = useRef(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const runPanel = useRef<RunPanelHandle>(null);
   const bump = useWorkflowStudioStore((s) => s.bump);
   const setPanelOpen = useArtifactStore((s) => s.setPanelOpen);
   const closeEditor = useWorkflowStudioStore((s) => s.closeEditor);
@@ -355,6 +425,13 @@ function EditorBody({
     return () => ctrl.abort();
   }, [draft.agent]);
 
+  // Un succès (« Workflow enregistré. ») s'efface tout seul ; erreurs et informations restent
+  useEffect(() => {
+    if (notice?.tone !== "ok") return;
+    const timer = setTimeout(() => setNotice((n) => (n === notice ? null : n)), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   const index = useMemo(() => catalogIndex(catalog), [catalog]);
   const apps = useMemo(
     () => new Map((catalog?.apps ?? []).map((a) => [a.app, { name: a.name, color: a.color, status: a.status }])),
@@ -362,15 +439,17 @@ function EditorBody({
   );
   const localErrors = useMemo(() => validateLocal({ steps: draft.steps, params: draft.params, catalog: catalog ? index : null }), [draft, catalog, index]);
   const errors = useMemo(() => mergeErrors(localErrors, serverErrors), [localErrors, serverErrors]);
+  const shownErrors = useMemo(() => displayedErrors(errors), [errors]);
   const runView = useMemo(() => mergeRunState(draft.steps, run), [draft.steps, run]);
   const signature = draftSignature(draft);
   const dirty = signature !== saved;
+  const state = saveState(draft, dirty);
   const setEditorDirty = useWorkflowStudioStore((s) => s.setEditorDirty);
   useEffect(() => setEditorDirty(dirty), [dirty, setEditorDirty]);
 
   const nodes = useMemo(
-    () => stepsToNodes(draft.steps, { catalog: index, apps, errors, run: runView, selected, measured }),
-    [draft.steps, index, apps, errors, runView, selected, measured],
+    () => stepsToNodes(draft.steps, { catalog: index, catalogReady: !!catalog, apps, errors, run: runView, selected, measured }),
+    [draft.steps, index, catalog, apps, errors, runView, selected, measured],
   );
   const edges = useMemo(() => stepsToEdges(draft.steps, runView, selectedEdges), [draft.steps, runView, selectedEdges]);
 
@@ -485,6 +564,19 @@ function EditorBody({
     window.requestAnimationFrame(() => void flow.fitView({ padding: 0.2, duration: 250 }));
   };
 
+  /** Badge « n problèmes » : sélectionne la première étape en erreur et la centre ; sinon les réglages du workflow. */
+  const showFirstProblem = () => {
+    const id = firstErrorStep(draft.steps, shownErrors);
+    setSelectedEdges(new Set());
+    setPanel("inspect");
+    if (!id) {
+      setSelected(new Set());
+      return;
+    }
+    setSelected(new Set([id]));
+    window.requestAnimationFrame(() => void flow.fitView({ nodes: [{ id }], padding: 0.8, maxZoom: 1.1, duration: 250 }));
+  };
+
   const validate = async (): Promise<boolean> => {
     setBusy("validate");
     setNotice(null);
@@ -495,7 +587,7 @@ function EditorBody({
       setNotice(
         result.ok
           ? { tone: "ok", text: `Workflow valide. Ordre : ${result.order.join(" → ")}.` }
-          : { tone: "error", text: `${result.errors.length} problème(s) signalé(s) sur le graphe.` },
+          : { tone: "error", text: `${problemsText(result.errors.length)} signalé${result.errors.length > 1 ? "s" : ""} sur le graphe.` },
       );
       return result.ok;
     } catch (err) {
@@ -509,8 +601,9 @@ function EditorBody({
   const save = async (): Promise<string | null> => {
     const blockers = saveBlockers(draft);
     if (blockers.length) {
-      setSelected(new Set());
-      setPanel("inspect");
+      // Seul blocage propre à l'enregistrement : le titre, modifiable dans l'en-tête
+      setTitleMissing(true);
+      titleRef.current?.focus();
       setNotice({ tone: "error", text: blockers.join(" ") });
       return null;
     }
@@ -535,9 +628,24 @@ function EditorBody({
     }
   };
 
+  /** Valide puis enregistre (lancement, déclencheurs). */
+  const validateAndSave = async () => {
+    if (!(await validate())) return null;
+    return save();
+  };
+
+  /** « Lancer » de l'en-tête : onglet Exécution, puis le même lancement que le panneau. */
+  const startRun = () => {
+    setPanel("run");
+    runPanel.current?.start();
+  };
+
   const selectedStep = selected.size === 1 ? draft.steps.find((s) => selected.has(s.id)) : undefined;
   const undeclared = undeclaredParams(draft);
-  const errorCount = errors.length;
+  const errorCount = shownErrors.length;
+  const running = isRunActive(run);
+  const awaiting = run?.status === "awaiting_approval";
+  const agentName = draft.agent ? (agents.find((a) => a.name === draft.agent)?.display_name ?? draft.agent) : null;
 
   const rename = (step: WorkflowStepV2) => (to: string) => {
     if (!STEP_ID.test(to)) return "Identifiant invalide : minuscule en tête, puis a-z, 0-9 ou _ (40 au plus).";
@@ -553,53 +661,91 @@ function EditorBody({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-atelier-border-soft bg-sidebar/85 pr-12 pl-4">
-        <WorkflowIcon className="size-4 shrink-0 text-accent-ink" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <DialogTitle className="truncate text-base">{draft.title.trim() || "Nouveau workflow"}</DialogTitle>
-          <DialogDescription className="truncate text-xs">
-            {draft.agent ? `Workflow de ${agents.find((a) => a.name === draft.agent)?.display_name ?? draft.agent}` : "Workflow de suite"} ·{" "}
-            {draft.steps.length} étape(s)
-            {dirty ? " · modifié" : draft.id ? " · enregistré" : ""}
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-atelier-line bg-sidebar/85 pr-12 pl-3">
+        <WorkflowIcon className="ml-1 size-4 shrink-0 text-accent-ink" aria-hidden />
+        <DialogTitle className="sr-only">{draft.title.trim() || "Nouveau workflow"}</DialogTitle>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Input
+            ref={titleRef}
+            data-escape-local
+            aria-label="Titre du workflow"
+            aria-invalid={titleMissing && !draft.title.trim()}
+            maxLength={120}
+            size={Math.min(Math.max(draft.title.length + 2, 24), 48)}
+            placeholder="Nouveau workflow — titre"
+            value={draft.title}
+            onChange={(e) => {
+              setTitleMissing(false);
+              update((d) => ({ ...d, title: e.target.value }));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+            className="h-8 w-auto max-w-[28rem] min-w-0 border-transparent bg-transparent px-2 text-base font-semibold tracking-tight hover:border-atelier-line focus-visible:border-input aria-[invalid=true]:border-destructive"
+          />
+          <span role="status" className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-atelier-line px-2 py-0.5 text-xs text-muted-foreground">
+            <span aria-hidden className={cn("size-1.5 rounded-full", SAVE_DOT[state])} />
+            {SAVE_STATE_LABEL[state]}
+          </span>
+          <DialogDescription className="min-w-0 truncate text-xs">
+            {agentName ? `Workflow de ${agentName}` : "Workflow de suite"} · {draft.steps.length} étape(s)
           </DialogDescription>
         </div>
         {errorCount > 0 ? (
-          <Badge variant="destructive">
+          <button
+            type="button"
+            onClick={showFirstProblem}
+            title="Afficher le premier problème"
+            className={cn(
+              badgeVariants({ variant: "destructive" }),
+              "h-7 cursor-pointer px-2 transition-colors hover:bg-destructive/20 focus-visible:shadow-focus focus-visible:outline-none",
+            )}
+          >
             <TriangleAlert aria-hidden />
-            {errorCount} problème(s)
-          </Badge>
+            {problemsText(errorCount)}
+            <span className="sr-only"> : afficher le premier</span>
+          </button>
         ) : checked?.ok && checked.at === signature ? (
-          <Badge variant="success">
+          <Badge variant="success" className="h-7 px-2">
             <CircleCheck aria-hidden />
             valide
           </Badge>
         ) : null}
-        <Button variant="ghost" size="sm" onClick={relayout} disabled={draft.steps.length === 0}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={relayout}
+          disabled={draft.steps.length === 0}
+          aria-label="Mise en page automatique"
+          title="Mise en page automatique : les étapes rangées en colonnes, dans l'ordre d'exécution"
+        >
           <LayoutGrid />
-          Mise en page
         </Button>
         <Button variant="outline" size="sm" onClick={() => void validate()} disabled={busy !== null || draft.steps.length === 0}>
           <ShieldCheck />
           {busy === "validate" ? "Validation…" : "Valider"}
         </Button>
-        <Button size="sm" onClick={() => void save()} disabled={busy !== null || (!dirty && !!draft.id)}>
+        <Button variant="outline" size="sm" onClick={() => void save()} disabled={busy !== null || (!dirty && !!draft.id)}>
           <Save />
           {busy === "save" ? "Enregistrement…" : "Enregistrer"}
         </Button>
+        {awaiting ? (
+          // Une validation attend : on y mène (onglet Exécution), on n'autorise rien d'ici
+          <Button size="sm" onClick={() => setPanel("run")}>
+            <ShieldQuestion />À valider
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={startRun}
+            disabled={busy !== null || running || draft.steps.length === 0}
+            title={dirty || !draft.id ? "Enregistre puis lance le workflow" : "Lance le workflow"}
+          >
+            <Play />
+            {running ? "En cours…" : "Lancer"}
+          </Button>
+        )}
       </header>
-
-      {notice && (
-        <p
-          role={notice.tone === "error" ? "alert" : "status"}
-          className={
-            notice.tone === "error"
-              ? "border-b border-destructive/30 bg-destructive/8 px-4 py-1.5 text-sm text-destructive"
-              : "border-b border-success/30 bg-success/8 px-4 py-1.5 text-sm"
-          }
-        >
-          {notice.text}
-        </p>
-      )}
 
       <div className="flex min-h-0 flex-1">
         <Palette catalog={catalog} error={catalogError} onAdd={(entry) => addStep(entry)} />
@@ -635,21 +781,70 @@ function EditorBody({
             minZoom={0.2}
             maxZoom={2}
           >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
             <Controls position="bottom-left" showInteractive={false} />
             <MiniMap position="bottom-right" pannable zoomable ariaLabel="Mini-carte du workflow" />
           </ReactFlow>
+
+          {notice && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4">
+              <div className="pointer-events-auto w-full max-w-xl rounded-xl bg-card shadow-glow-strong">
+                <Callout
+                  tone={NOTICE_TONE[notice.tone]}
+                  role={notice.tone === "error" ? "alert" : "status"}
+                  action={
+                    <Button type="button" variant="ghost" size="icon-xs" aria-label="Masquer le message" onClick={() => setNotice(null)}>
+                      <X />
+                    </Button>
+                  }
+                >
+                  {notice.text}
+                </Callout>
+              </div>
+            </div>
+          )}
+
           {draft.steps.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-8">
-              <div className="max-w-sm rounded-lg border border-dashed border-atelier-border-soft bg-card/80 p-5 text-center text-sm text-muted-foreground backdrop-blur-sm">
-                <WorkflowIcon className="mx-auto mb-2 size-6 text-accent-ink" aria-hidden />
-                Glissez une action de la palette ici, puis reliez la sortie d&apos;une étape à l&apos;entrée de la suivante.
+              <div className="pointer-events-auto w-full max-w-md rounded-xl border border-dashed border-atelier-border-soft bg-card/90 backdrop-blur-sm">
+                <EmptyState
+                  icon={WorkflowIcon}
+                  title="Point de départ"
+                  className="py-7"
+                  actions={
+                    <Button type="button" variant="soft" size="sm" onClick={onShowTemplates}>
+                      <LayoutTemplate />
+                      Partir d&apos;un modèle de la suite
+                    </Button>
+                  }
+                >
+                  <ol className="mt-2 grid gap-1.5 text-left">
+                    {[
+                      "Glissez une action de la palette sur le graphe (ou « + »).",
+                      "Reliez la sortie d'une étape à l'entrée de la suivante.",
+                      "Validez, enregistrez, puis lancez.",
+                    ].map((text, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span aria-hidden className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-signature-faint text-xs font-semibold text-accent-ink tabular-nums">
+                          {i + 1}
+                        </span>
+                        <span>{text}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </EmptyState>
               </div>
             </div>
           )}
         </div>
 
-        <aside aria-label="Inspecteur" className="flex min-h-0 w-[22rem] shrink-0 flex-col border-l border-atelier-border-soft bg-card">
+        <aside
+          aria-label="Inspecteur"
+          className={cn(
+            "flex min-h-0 shrink-0 flex-col border-l border-atelier-line bg-card transition-[width] duration-200 ease-out",
+            panel === "triggers" ? "w-[30rem]" : "w-[24rem]",
+          )}
+        >
           <Tabs value={panel} onValueChange={(v) => setPanel(v as SidePanel)} className="min-h-0 flex-1 gap-0">
             <div className="border-b border-atelier-line px-3 py-2">
               <TabsList className="w-full">
@@ -660,6 +855,12 @@ function EditorBody({
                 <TabsTrigger value="run" className="flex-1">
                   <Play />
                   Exécution
+                  {(running || awaiting) && (
+                    <>
+                      <span aria-hidden className={cn("size-1.5 rounded-full", awaiting ? "bg-warning" : "animate-pulse bg-primary")} />
+                      <span className="sr-only">{awaiting ? "(validation demandée)" : "(en cours)"}</span>
+                    </>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="triggers"
@@ -678,6 +879,7 @@ function EditorBody({
                   step={selectedStep}
                   draft={draft}
                   catalog={index}
+                  catalogReady={!!catalog}
                   apps={apps}
                   errors={errors}
                   onChange={(patch) => setSteps((steps) => steps.map((s) => (s.id === selectedStep.id ? { ...s, ...patch } : s)))}
@@ -692,14 +894,14 @@ function EditorBody({
               ) : (
                 <>
                   {selected.size > 1 && (
-                    <p className="mb-3 text-xs text-muted-foreground">
+                    <Callout tone="info" className="mb-4">
                       {selected.size} étapes sélectionnées : Suppr pour les retirer, ou cliquez sur une seule pour la régler.
-                    </p>
+                    </Callout>
                   )}
                   <WorkflowSettings
                     draft={draft}
                     agents={agents}
-                    errors={errors}
+                    errors={shownErrors}
                     undeclared={undeclared}
                     onChange={(patch) => update((d) => ({ ...d, ...patch }))}
                     onDeclareMissing={() => update(declareMissingParams)}
@@ -709,6 +911,7 @@ function EditorBody({
             </TabsContent>
             <TabsContent value="run" className="overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "run"}>
               <RunPanel
+                ref={runPanel}
                 workflowId={draft.id}
                 dirty={dirty}
                 params={draft.params}
@@ -716,10 +919,7 @@ function EditorBody({
                 catalog={index}
                 run={run}
                 onRun={setRun}
-                onSave={async () => {
-                  if (!(await validate())) return null;
-                  return save();
-                }}
+                onSave={validateAndSave}
                 onShowArtifacts={() => {
                   setPanelOpen(true);
                   closeEditor();
@@ -734,10 +934,7 @@ function EditorBody({
                 params={draft.params}
                 preset={preset}
                 onPresetUsed={clearPreset}
-                onSave={async () => {
-                  if (!(await validate())) return null;
-                  return save();
-                }}
+                onSave={validateAndSave}
                 onRun={(next) => {
                   setRun(next);
                   setPanel("run");

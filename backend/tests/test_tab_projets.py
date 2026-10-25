@@ -118,6 +118,18 @@ async def test_import_needs_approval_and_replays_without_duplicates(
     assert fake.requests[0].url.params["projectId"] == "7"
 
 
+def test_import_summary_says_the_project_may_be_created(
+    bridge: tuple[dict[str, Any], FakeImport],
+) -> None:
+    """Sans projet cible, Projets crée le projet du même nom s'il n'existe pas : la carte le dit."""
+    tools, _ = bridge
+    tool = tools["projets_import_tab_table"]
+    assert tool.summarize({"table_id": "tbl_planning_lots", "type": "FEATURE"}) == (
+        "Importer toutes les lignes de la table tbl_planning_lots dans Atelier Projets (le projet "
+        "du même nom, créé s'il n'existe pas, éléments FEATURE)"
+    )
+
+
 def test_select_rows_recomputes_counts_and_totals() -> None:
     envelope = json.loads((FIX / "tab" / "tbl_planning_lots.json").read_text())
     picked = select_rows(envelope, [1, "rec_03"])

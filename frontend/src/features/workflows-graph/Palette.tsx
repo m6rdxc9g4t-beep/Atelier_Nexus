@@ -1,11 +1,13 @@
 "use client";
 
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronRight, GripVertical, Plus, Search, Table2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/select";
+import { Segmented, type SegmentedOption } from "@/components/ui/segmented";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { ActionKind, Catalog, CatalogEntry } from "@/types/api";
 
@@ -23,9 +25,15 @@ const KIND_FILTERS: Record<KindFilter, ActionKind[] | undefined> = {
   write: ["write", "destructive"],
 };
 
+const KIND_OPTIONS: SegmentedOption<KindFilter>[] = [
+  { value: "all", label: "Tout", ariaLabel: "Toutes les actions" },
+  { value: "read", label: "Lecture", ariaLabel: "Lecture seule" },
+  { value: "write", label: "Écriture", ariaLabel: "Écriture et destructif" },
+];
+
 /**
  * Palette des étapes, groupées par application : on glisse une entrée sur le graphe, ou on
- * clique « Ajouter » (à la suite de l'étape sélectionnée). Entrées indisponibles grisées.
+ * clique « + » (à la suite de l'étape sélectionnée). Entrées indisponibles grisées.
  */
 export function Palette({
   catalog,
@@ -49,7 +57,7 @@ export function Palette({
   const filtering = query.trim() !== "" || kind !== "all";
 
   return (
-    <aside aria-label="Étapes disponibles" className="flex min-h-0 w-72 shrink-0 flex-col border-r border-atelier-border-soft bg-sidebar">
+    <aside aria-label="Étapes disponibles" className="flex min-h-0 w-72 shrink-0 flex-col border-r border-atelier-line bg-sidebar">
       <div className="grid gap-2 border-b border-atelier-line p-3">
         <label htmlFor={`${ids}-q`} className="sr-only">
           Filtrer les étapes
@@ -65,31 +73,25 @@ export function Palette({
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <label htmlFor={`${ids}-kind`} className="sr-only">
-          Nature des actions
-        </label>
-        <NativeSelect id={`${ids}-kind`} value={kind} onChange={(e) => setKind(e.target.value as KindFilter)}>
-          <option value="all">Toutes les actions</option>
-          <option value="read">Lecture seule</option>
-          <option value="write">Écriture et destructif</option>
-        </NativeSelect>
+        <Segmented label="Nature des actions" value={kind} onChange={setKind} options={KIND_OPTIONS} className="w-full [&>button]:flex-1 [&>button]:justify-center" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {error && (
-          <p role="alert" className="p-2 text-sm text-destructive">
+          <Callout tone="destructive" role="alert" className="m-1">
             Catalogue indisponible : {error}
-          </p>
+          </Callout>
         )}
         {!catalog && !error && (
-          <p role="status" className="p-2 text-sm text-muted-foreground">
-            Chargement du catalogue…
-          </p>
+          <div role="status" className="grid gap-2 p-1">
+            <span className="sr-only">Chargement du catalogue…</span>
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-9" />
+            ))}
+          </div>
         )}
-        {catalog && groups.length === 0 && (
-          <p className="p-2 text-sm text-muted-foreground">Aucune étape ne correspond.</p>
-        )}
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+        {catalog && groups.length === 0 && <p className="p-2 text-sm text-muted-foreground">Aucune étape ne correspond.</p>}
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
           {groups.map((group) => {
             const open = filtering || !closed.has(group.key);
             const toggle = () =>
@@ -105,7 +107,7 @@ export function Palette({
                   type="button"
                   aria-expanded={open}
                   onClick={toggle}
-                  className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-accent focus-visible:shadow-focus"
+                  className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none"
                 >
                   <AppTile app={group.app} color={group.color} size="xs" />
                   <span className="min-w-0 flex-1">
@@ -118,7 +120,7 @@ export function Palette({
                   <ChevronRight className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-90")} aria-hidden />
                 </button>
                 {open && (
-                  <ul className="mt-1 grid grid-cols-[minmax(0,1fr)] gap-1 pl-1">
+                  <ul className="mt-0.5 mb-1.5 ml-[1.1rem] grid grid-cols-[minmax(0,1fr)] border-l border-atelier-line pl-1.5">
                     {group.entries.length === 0 && (
                       <li className="px-2 py-1 text-xs text-muted-foreground">
                         {group.status === "no_contract"
@@ -138,13 +140,14 @@ export function Palette({
           })}
         </ul>
       </div>
-      <p className="border-t border-atelier-line px-3 py-2 text-[11px] text-muted-foreground">
+      <p className="border-t border-atelier-line px-3 py-2 text-xs text-muted-foreground">
         Glissez une étape sur le graphe, ou « + » pour l&apos;ajouter après l&apos;étape sélectionnée.
       </p>
     </aside>
   );
 }
 
+/** Entrée sans boîte : survol en fond, poignée au survol, « + » pour l'ajouter au clavier. */
 function PaletteEntry({ entry, onAdd }: { entry: CatalogEntry; onAdd: (entry: CatalogEntry) => void }) {
   const disabled = !entry.available;
   return (
@@ -156,27 +159,34 @@ function PaletteEntry({ entry, onAdd }: { entry: CatalogEntry; onAdd: (entry: Ca
       }}
       title={disabled ? (entry.unavailable_reason ?? "Indisponible") : entry.description || entry.uses}
       className={cn(
-        "group flex min-w-0 items-start gap-2 rounded-md border border-atelier-line bg-card px-2 py-1.5",
-        disabled ? "cursor-not-allowed opacity-55" : "cursor-grab hover:border-atelier-border active:cursor-grabbing",
+        "group relative flex min-w-0 items-start gap-1 rounded-md py-1.5 pr-1 pl-4",
+        disabled ? "cursor-not-allowed opacity-55" : "cursor-grab hover:bg-accent active:cursor-grabbing",
       )}
     >
+      {!disabled && (
+        <GripVertical
+          className="absolute top-2 left-0 size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">{entry.label}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1">
-          <KindBadge kind={entry.kind} />
+        <p className="flex min-w-0 items-center gap-1.5 text-sm">
+          <span className="min-w-0 truncate">{entry.label}</span>
           {entry.output_format === "atelier-table/1" && (
-            <span className="text-[10px] text-muted-foreground">table</span>
+            <Table2 className="size-3.5 shrink-0 text-muted-foreground" role="img" aria-label="sortie en table" />
           )}
-        </div>
+        </p>
+        {entry.kind !== "read" && <KindBadge kind={entry.kind} className="mt-1" />}
         {disabled && entry.unavailable_reason && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{entry.unavailable_reason}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{entry.unavailable_reason}</p>
         )}
       </div>
+      {entry.kind === "read" && <KindBadge kind="read" compact className="mt-1" />}
       <Button
         type="button"
-        size="icon-sm"
+        size="icon-xs"
         variant="ghost"
-        className="size-7"
+        className="-my-0.5"
         disabled={disabled}
         aria-label={`Ajouter l'étape ${entry.label}`}
         onClick={() => onAdd(entry)}

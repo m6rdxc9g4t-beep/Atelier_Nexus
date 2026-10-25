@@ -35,6 +35,9 @@ from tests.winexe import console_exe
 
 #: Variables qu'un lanceur de Python ajoute lui-même (environnement virtuel sous Windows)
 WINDOWS_PROCESS_VARS = {"__PYVENV_LAUNCHER__"}
+#: Variable que macOS ajoute de lui-même à tout processus (encodage de CoreFoundation) : elle
+#: n'est pas transmise par Nexus, qui part d'une liste blanche
+MACOS_PROCESS_VARS = {"__CF_USER_TEXT_ENCODING"}
 
 FAKE = console_exe(str(Path(__file__).parent / "fake_claude_cli.py"))
 
@@ -90,6 +93,7 @@ async def test_plain_answer_and_safe_invocation(
         if n.upper() not in allowed
         and not n.upper().startswith("LC_")
         and n.upper() not in WINDOWS_PROCESS_VARS
+        and n.upper() not in MACOS_PROCESS_VARS
     ]
     assert leaked == [], leaked
 
@@ -111,7 +115,8 @@ async def test_agent_loop_with_tools(
     (pending,) = waiting.pending_approvals
     assert pending.name == "current_datetime" and pending.kind == "read"
     result = await agent.run([*question, *waiting.new_messages], approvals={pending.id: True})
-    assert result.text == "Nous sommes le 20 octobre." and result.iterations == 1
+    # Deux appels au modèle sur le tour (demande d'outil, puis réponse), reprise comprise
+    assert result.text == "Nous sommes le 20 octobre." and result.iterations == 2
     first, second = calls(tmp_path)
     schema = json.loads(first["args"][first["args"].index("--json-schema") + 1])
     assert (

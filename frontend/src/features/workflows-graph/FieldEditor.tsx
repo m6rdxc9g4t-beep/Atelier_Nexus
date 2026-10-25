@@ -36,8 +36,8 @@ export function TemplateMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-xs" aria-label={`Utiliser une valeur pour ${label}`}>
-          <Braces className="size-3" />
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" aria-label={`Utiliser une valeur pour ${label}`}>
+          <Braces className="size-3.5" />
           Utiliser…
         </Button>
       </DropdownMenuTrigger>
@@ -49,7 +49,7 @@ export function TemplateMenu({
             {group.options.map((option) => (
               <DropdownMenuItem key={option.value} onSelect={() => onPick(option.value)} className="flex-col items-start gap-0">
                 <span className="text-sm">{option.label}</span>
-                <span className="flex w-full items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
                   <code className="truncate font-mono">{option.value}</code>
                   {option.hint && <span className="ml-auto shrink-0">{option.hint}</span>}
                 </span>
@@ -58,7 +58,7 @@ export function TemplateMenu({
           </div>
         ))}
         {groups.length === 1 && (
-          <p className="px-2 pb-1.5 text-[11px] text-muted-foreground">
+          <p className="px-2 pb-1.5 text-xs text-muted-foreground">
             Reliez une étape en amont pour utiliser sa sortie.
           </p>
         )}
@@ -201,12 +201,12 @@ export function FieldEditor({
       </div>
       {control}
       {field.description && (
-        <p id={`${id}-desc`} className="text-[11px] text-muted-foreground">
+        <p id={`${id}-desc`} className="text-xs text-muted-foreground">
           {field.description}
         </p>
       )}
       {messages.length > 0 && (
-        <p id={`${id}-err`} role="alert" className="text-[11px] text-destructive">
+        <p id={`${id}-err`} role="alert" className="text-xs text-destructive-ink">
           {messages.join(" ")}
         </p>
       )}

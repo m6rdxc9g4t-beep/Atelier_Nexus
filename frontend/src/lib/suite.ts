@@ -8,6 +8,7 @@ export type SuiteAppId =
   | "viz"
   | "tab"
   | "projets"
+  | "convert"
   | "tresorerie"
   | "cine"
   | "savoir"
@@ -49,6 +50,8 @@ export function suiteApps(): SuiteApp[] {
   const projetsApi = clean(process.env.NEXT_PUBLIC_ATELIER_PROJETS_API_URL, "http://127.0.0.1:3000");
   const tresorerie = clean(process.env.NEXT_PUBLIC_ATELIER_TRESORERIE_URL, "http://127.0.0.1:5050");
   const viz = clean(process.env.NEXT_PUBLIC_ATELIER_VIZ_URL, "http://127.0.0.1:8000");
+  // Convert sert son interface d'aperçu sur le port de son API (8010, bouclage uniquement)
+  const convert = clean(process.env.NEXT_PUBLIC_ATELIER_CONVERT_URL, "http://127.0.0.1:8010");
   // Ciné sert son interface sur le port de son API en production (4000 ; app Mac : 47321)
   const cine = clean(process.env.NEXT_PUBLIC_ATELIER_CINE_URL, "http://127.0.0.1:4000");
   // Savoir écoute sur 5050 par défaut, comme Trésorerie : lancé sur 5051 (docs/apps/savoir.md)
@@ -90,6 +93,14 @@ export function suiteApps(): SuiteApp[] {
       description: "Projets agiles, Git, temps passé",
       url: clean(process.env.NEXT_PUBLIC_ATELIER_PROJETS_URL, "http://127.0.0.1:4174"),
       healthUrl: `${projetsApi}/api/health`,
+    },
+    {
+      id: "convert",
+      name: "Atelier Convert",
+      short: "Convert",
+      description: "Relevés et fichiers en tables",
+      url: convert,
+      healthUrl: `${convert}/api/health`,
     },
     {
       id: "tresorerie",

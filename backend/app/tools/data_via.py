@@ -4,17 +4,20 @@ Deux couches :
   - `DataViaClient` : client HTTP asynchrone typé (lecture seule), entrées/sorties
     validées par les schémas Pydantic de `app/schemas/data_via.py` ;
   - outils d'agent (`data_via_tools()`) : liste, exploration du schéma, requête
-    d'agrégation, vérification d'expression.
+    d'agrégation (calculs rapides de Viz compris : part du total, N-1, cumuls), lignes
+    brutes, vérification d'expression et de relation (modèle en étoile).
 
-Règle « exploration préalable » (CLAUDE.md §3) : `data_via_query` et
+Règle « exploration préalable » (CLAUDE.md §3) : `data_via_query`, `data_via_rows` et
 `data_via_check_expression` refusent un jeu dont le schéma n'a pas été consulté
-par `data_via_describe_dataset` pendant le tour en cours.
+par `data_via_describe_dataset` plus tôt dans la conversation (profil gardé dans
+`ToolContext.state`, reconstruit à chaque reprise après validation par `restore`).
 """
 
 from __future__ import annotations
 
 import difflib
 import json
+import re
 from typing import Any, ClassVar, Literal, Self
 
 import httpx
@@ -23,6 +26,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.core.config import Settings
 from app.core.net import use_env_proxy
 from app.schemas.data_via import (
+    PERCENT_SHOWS,
     DatasetProfile,
     DatasetRows,
     DatasetSummary,
@@ -35,6 +39,8 @@ from app.schemas.data_via import (
     Measure,
     QueryRequest,
     QueryResponse,
+    RelationCheck,
+    RelationDraft,
     Sort,
 )
 from app.tools.base import (
@@ -45,7 +51,11 @@ from app.tools.base import (
     ToolOutput,
     register_state_codec,
 )
-from app.tools.formatting import TableType, atelier_table, table_hint
+from app.tools.formatting import TableType, atelier_table, fmt, table_hint
+
+# Même rendu que les autres connecteurs (précision conservée, booléens oui / non) ; réexporté
+# d'ici pour l'extension Agent_DatAnalyst et les tests
+from app.tools.formatting import markdown_table as markdown_table
 
 # ═══ Erreurs ══════════════════════════════════════════════════════
 
@@ -178,6 +188,15 @@ class DataViaClient:
         )
         return _parse(ExpressionResult, data)
 
+    async def check_relation(self, dataset_id: str, draft: RelationDraft) -> RelationCheck:
+        """Correspondance des clés d'une relation fait → dimension ; rien n'est enregistré."""
+        data = await self._request(
+            "POST",
+            f"datasets/{_segment(dataset_id)}/relations/check",
+            json_body=draft.model_dump(mode="json"),
+        )
+        return _parse(RelationCheck, data)
+
     async def status(self) -> DataViaStatus:
         try:
             health = await self.health()
@@ -229,29 +248,10 @@ def _parse[T: BaseModel](model: type[T], data: Any) -> T:
 
 # ═══ Mise en forme pour le modèle ═════════════════════════════════
 
-_DESCRIBED = "data_via.described"
 _PROFILES = "data_via.profiles"
 MAX_ROWS_FOR_MODEL = 50
-
-
-def _fmt(value: Any) -> str:
-    if value is None:
-        return "∅"
-    if isinstance(value, float):
-        # Jamais de notation scientifique ni de chiffres perdus : le modèle cite ces valeurs
-        if value != value or value in (float("inf"), float("-inf")):
-            return str(value)
-        text = format(round(value, 4), "f") if abs(value) >= 1 else format(value, ".10f")
-        return text.rstrip("0").rstrip(".") or "0"
-    text = str(value).replace("|", "\\|").replace("\n", " ")
-    return text if len(text) <= 60 else text[:57] + "…"
-
-
-def markdown_table(headers: list[str], rows: list[list[Any]]) -> str:
-    head = "| " + " | ".join(_fmt(h) for h in headers) + " |"
-    sep = "|" + "---|" * len(headers)
-    body = ["| " + " | ".join(_fmt(v) for v in row) + " |" for row in rows]
-    return "\n".join([head, sep, *body])
+#: Lignes brutes renvoyées au modèle par appel de `data_via_rows`
+MAX_RAW_ROWS = 50
 
 
 def describe_for_model(profile: DatasetProfile) -> str:
@@ -267,16 +267,25 @@ def describe_for_model(profile: DatasetProfile) -> str:
         if col.nulls:
             stats.append(f"{col.nulls} vides")
         if col.min is not None or col.max is not None:
-            stats.append(f"min {_fmt(col.min)} · max {_fmt(col.max)}")
+            stats.append(f"min {fmt(col.min)} · max {fmt(col.max)}")
         if col.type == "string" and col.top_values:
-            stats.append("ex. " + ", ".join(_fmt(v.value) for v in col.top_values[:5]))
+            stats.append("ex. " + ", ".join(fmt(v.value) for v in col.top_values[:5]))
         calc = f" [calculée : {col.expression}]" if col.calculated else ""
-        lines.append(f"- `{col.name}` ({col.type}) : {' ; '.join(stats)}{calc}")
+        linked = f" [liée : relation {col.related}]" if col.related else ""
+        lines.append(f"- `{col.name}` ({col.type}) : {' ; '.join(stats)}{calc}{linked}")
     if profile.model.measures:
         lines += ["", "Mesures calculées (à utiliser avec agg = calc) :"]
         lines += [
             f"- `{m.name}` = {m.expression}" + (f" — {m.description}" if m.description else "")
             for m in profile.model.measures
+        ]
+    if profile.model.relations:
+        # Modèle en étoile déjà défini dans Viz : ce jeu (fait) → jeux liés (dimensions)
+        lines += ["", "Relations (plusieurs-à-un, ce jeu → jeu lié) :"]
+        lines += [
+            f"- `{r.name}` : {r.from_column} → jeu {r.dataset_id}.{r.to_column} ; colonnes "
+            f"liées `{r.name}.…`" + (f" ({', '.join(r.columns[:8])})" if r.columns else "")
+            for r in profile.model.relations
         ]
     if profile.sample:
         headers = [c.name for c in profile.columns]
@@ -315,10 +324,24 @@ def validate_query(request: QueryRequest, profile: DatasetProfile) -> list[str]:
             errors.append(f"Champ de mesure inconnu « {m.field} ».{_suggest(m.field, names)}")
         elif m.agg in {"sum", "avg", "median"} and columns[m.field].type != "number":
             errors.append(f"« {m.agg} » exige une colonne numérique ; « {m.field} » ne l'est pas.")
+        if m.show and m.show.date:
+            ref = columns.get(m.show.date)
+            if ref is None:
+                errors.append(
+                    f"Colonne date inconnue « {m.show.date} » pour `show`."
+                    f"{_suggest(m.show.date, names)}"
+                )
+            elif ref.type != "date":
+                errors.append(
+                    f"« {m.show.date} » n'est pas une date : calcul « {m.show.kind} » impossible."
+                )
     for f in request.filters:
         if f.field not in columns:
             errors.append(f"Champ de filtre inconnu « {f.field} ».{_suggest(f.field, names)}")
     keys = [d.key for d in request.dimensions] + [m.key for m in request.measures]
+    doubles = sorted({k for k in keys if keys.count(k) > 1})
+    if doubles:  # Viz les refuse aussi : une clé = une colonne du résultat
+        errors.append(f"Colonne demandée deux fois : {', '.join(doubles)}.")
     for s in request.sort:
         if s.key not in keys:
             errors.append(f"Tri sur « {s.key} » impossible ; clés disponibles : {', '.join(keys)}.")
@@ -419,12 +442,22 @@ class DescribeDatasetTool(_DataViaTool[DescribeDatasetInput]):
     output_format = "json"
     output_hint = {"fields": ["id", "name", "rows", "columns", "measures"]}
 
+    async def restore(self, params: DescribeDatasetInput, ctx: ToolContext) -> None:
+        """Schéma déjà consulté (et autorisé) plus tôt dans la conversation : relu sans rien
+        montrer au modèle, pour que la requête validée ensuite, dans une autre requête HTTP,
+        passe le contrôle « schéma consulté »."""
+        if params.dataset_id in ctx.state.get(_PROFILES, {}):
+            return
+        profile = await self.client.get_dataset(params.dataset_id)
+        ctx.state.setdefault(_PROFILES, {})[profile.id] = profile
+
     async def run(self, params: DescribeDatasetInput, ctx: ToolContext) -> ToolOutput:
         profile = await self.client.get_dataset(params.dataset_id)
         ctx.state.setdefault(_PROFILES, {})[profile.id] = profile
         preview = {
             "columns": [c.model_dump(mode="json") for c in profile.columns],
             "measures": [m.model_dump(mode="json") for m in profile.model.measures],
+            "relations": [r.model_dump(mode="json") for r in profile.model.relations],
             "sample": profile.sample[:20],
         }
         artifact = Artifact(
@@ -446,6 +479,15 @@ class DescribeDatasetTool(_DataViaTool[DescribeDatasetInput]):
             "measures": [
                 {"name": m.name, "expression": m.expression} for m in profile.model.measures
             ],
+            "relations": [
+                {
+                    "name": r.name,
+                    "dataset_id": r.dataset_id,
+                    "from_column": r.from_column,
+                    "to_column": r.to_column,
+                }
+                for r in profile.model.relations
+            ],
         }
         return ToolOutput(content=describe_for_model(profile), artifacts=[artifact], data=data)
 
@@ -458,20 +500,30 @@ class QueryInput(ToolInput):
     measures: list[Measure] = Field(
         default_factory=list,
         max_length=12,
-        description="Agrégats. Ex. {field: chiffre_affaires, agg: sum} ; {agg: count} = lignes.",
+        description='Agrégats. Ex. {"field": "chiffre_affaires", "agg": "sum"} ; {"agg": "count"} '
+        '= lignes ; {"field": "chiffre_affaires", "agg": "sum", "show": {"kind": "pct_total"}} '
+        "= part du total.",
     )
-    filters: list[Filter] = Field(default_factory=list)
+    filters: list[Filter] = Field(
+        default_factory=list,
+        description='Ex. {"field": "region", "op": "in", "values": ["Bretagne"]}.',
+    )
     sort: list[Sort] = Field(default_factory=list)
     limit: int = Field(default=500, ge=1, le=5000)
 
 
 class QueryTool(_DataViaTool[QueryInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_query"
     description = (
         "Exécute une requête d'agrégation sur un jeu Data Via (regrouper, agréger, filtrer, "
-        "trier), sans SQL. Clés des colonnes du résultat : `champ`, `champ|month`, `sum(champ)`. "
-        "Le résultat complet s'affiche dans le panneau Artefacts ; tu reçois au plus "
-        f"{MAX_ROWS_FOR_MODEL} lignes. Le schéma doit avoir été consulté avant."
+        "trier), sans SQL. Parts du total, évolutions et écarts vs N-1, cumuls, moyennes "
+        "mobiles : `show` d'une mesure, calculé par Viz (jamais de tête). Clés des colonnes du "
+        "résultat : `champ`, `champ|month`, `sum(champ)`, `sum(champ)@pct_total`. Exemple : "
+        '{"dataset_id": "…", "dimensions": [{"field": "region"}], "measures": [{"field": '
+        '"chiffre_affaires", "agg": "sum"}], "sort": [{"key": "sum(chiffre_affaires)", "desc": '
+        'true}], "limit": 10}. Le résultat complet s\'affiche dans le panneau Artefacts ; tu '
+        f"reçois au plus {MAX_ROWS_FOR_MODEL} lignes. Le schéma doit avoir été consulté avant."
     )
     input_model = QueryInput
     output_format = "atelier-table/1"
@@ -514,6 +566,9 @@ class QueryTool(_DataViaTool[QueryInput]):
             },
         )
         content = f"{summary}.\n{markdown_table(headers, [list(r) for r in shown])}"
+        percents = [m.key for m in request.measures if m.show and m.show.kind in PERCENT_SHOWS]
+        if percents:  # Viz renvoie des points de % : 12,5 = 12,5 %
+            content += f"\nEn points de pourcentage (12.5 = 12,5 %) : {', '.join(percents)}."
         data = atelier_table(
             "query",
             f"Requête — {profile.name}",
@@ -540,6 +595,7 @@ class CheckExpressionInput(ToolInput):
 
 
 class CheckExpressionTool(_DataViaTool[CheckExpressionInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
     name = "data_via_check_expression"
     description = (
         "Vérifie (sans rien enregistrer) une mesure ou une colonne calculée dans le langage "
@@ -558,8 +614,160 @@ class CheckExpressionTool(_DataViaTool[CheckExpressionInput]):
         if not result.ok:
             where = f" (caractère {result.position})" if result.position is not None else ""
             return ToolOutput(content=f"Expression invalide{where} : {result.error}", is_error=True)
-        preview = ", ".join(_fmt(v) for v in result.preview)
+        preview = ", ".join(fmt(v) for v in result.preview)
         return ToolOutput(content=f"Expression valide, type {result.type}. Aperçu : {preview}")
+
+
+class RowsInput(ToolInput):
+    dataset_id: str = Field(
+        description="Identifiant du jeu, décrit avant par data_via_describe_dataset."
+    )
+    offset: int = Field(default=0, ge=0, description="Lignes à sauter (0 = début du jeu).")
+    limit: int = Field(default=20, ge=1, le=MAX_RAW_ROWS, description="Nombre de lignes à lire.")
+    columns: list[str] = Field(
+        default_factory=list, max_length=20, description="Colonnes à garder (vide = toutes)."
+    )
+
+
+class RowsTool(_DataViaTool[RowsInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
+    name = "data_via_rows"
+    description = (
+        f"Lignes brutes d'un jeu Data Via, dans l'ordre du fichier (au plus {MAX_RAW_ROWS} par "
+        "appel, offset pour la suite) : exemples d'enregistrements, contrôle de qualité. Pour un "
+        "classement (les 10 plus grosses ventes) ou un total, utilise data_via_query (tri, "
+        "limit). Le schéma doit avoir été consulté avant."
+    )
+    input_model = RowsInput
+    output_format = "atelier-table/1"
+
+    async def run(self, params: RowsInput, ctx: ToolContext) -> ToolOutput:
+        profile = _require_described(ctx, params.dataset_id)
+        if profile is None:
+            return ToolOutput(content=_NOT_DESCRIBED.format(id=params.dataset_id), is_error=True)
+        names = [c.name for c in profile.columns]
+        unknown = [c for c in params.columns if c not in names]
+        if unknown:
+            hints = "".join(_suggest(c, names) for c in unknown)
+            return ToolOutput(
+                content=f"Colonne(s) inconnue(s) : {', '.join(unknown)}.{hints}", is_error=True
+            )
+        page = await self.client.get_rows(
+            params.dataset_id, offset=params.offset, limit=params.limit
+        )
+        headers = params.columns or page.columns
+        rows = [[r.get(h) for h in headers] for r in page.rows]
+        end = params.offset + len(rows)
+        lines = [f"Lignes {params.offset + 1} à {end} sur {page.total} de « {profile.name} » :"]
+        if not rows:
+            lines = [
+                f"Aucune ligne à partir de la ligne {params.offset + 1} ({page.total} au total)."
+            ]
+        else:
+            lines.append(markdown_table(headers, rows))
+        if end < page.total and rows:
+            lines.append(f"[{page.total - end} ligne(s) suivante(s) : offset={end}]")
+        types = {c.name: c.type for c in profile.columns}
+        kinds: dict[str, TableType] = {"number": "number", "date": "date", "boolean": "boolean"}
+        data = atelier_table(
+            "rows",
+            f"Lignes — {profile.name}",
+            [(h, h, kinds.get(types.get(h, ""), "string")) for h in headers],
+            rows,
+            total=page.total,
+            truncated=end < page.total or params.offset > 0,
+        )
+        return ToolOutput(content="\n".join(lines), data=data)
+
+
+#: Identifiant d'un jeu cible de relation (`Relation.dataset_id` de Viz)
+RELATED_ID = re.compile(r"[0-9a-f]{12}")
+
+
+class CheckRelationInput(ToolInput):
+    dataset_id: str = Field(description="Jeu de faits (côté « plusieurs », ex. les ventes).")
+    from_column: str = Field(min_length=1, description="Clé étrangère dans ce jeu.")
+    related_dataset_id: str = Field(description="Jeu de dimension (côté « un », ex. les régions).")
+    to_column: str = Field(min_length=1, description="Clé du jeu de dimension (valeurs uniques).")
+
+
+class CheckRelationTool(_DataViaTool[CheckRelationInput]):
+    uses_restored_state = True  # profil du jeu décrit plus tôt (schéma consulté)
+    name = "data_via_check_relation"
+    description = (
+        "Vérifie (sans rien enregistrer) une relation plusieurs-à-un d'un modèle en étoile, fait → "
+        "dimension : lignes du fait dont la clé est trouvée, clés en double côté dimension, "
+        "exemples de clés sans correspondance. À faire pour chaque clé avant de proposer un "
+        "modèle en étoile."
+    )
+    input_model = CheckRelationInput
+    output_format = "json"
+    output_hint = {"fields": ["ok", "rows", "matched", "unmatched", "duplicates", "sample"]}
+
+    async def run(self, params: CheckRelationInput, ctx: ToolContext) -> ToolOutput:
+        if not RELATED_ID.fullmatch(params.related_dataset_id):
+            # Viz refuserait le corps (422, message de validation en anglais) : dit ici, en clair
+            return ToolOutput(
+                content=f"Identifiant de jeu lié invalide « {params.related_dataset_id} » : 12 "
+                "caractères hexadécimaux, tels que les donne data_via_list_datasets.",
+                is_error=True,
+            )
+        # Schéma déjà lu : la colonne est contrôlée ici (avec suggestion) ; sinon Viz la vérifie
+        profile = _require_described(ctx, params.dataset_id)
+        if profile is not None and profile.column(params.from_column) is None:
+            hint = _suggest(params.from_column, [c.name for c in profile.columns])
+            return ToolOutput(
+                content=f"Colonne inconnue « {params.from_column} » dans « {profile.name} ».{hint}",
+                is_error=True,
+            )
+        draft = RelationDraft(
+            dataset_id=params.related_dataset_id,
+            from_column=params.from_column,
+            to_column=params.to_column,
+        )
+        result = await self.client.check_relation(params.dataset_id, draft)
+        link = (
+            f"{params.dataset_id}.{params.from_column} → "
+            f"{params.related_dataset_id}.{params.to_column}"
+        )
+        if not result.ok:
+            return ToolOutput(
+                content=f"Relation {link} impossible : {result.error or 'refusée par Viz'}",
+                is_error=True,
+            )
+        unmatched = result.rows - result.matched
+        share = f" ({fmt(round(100 * result.matched / result.rows, 1))} %)" if result.rows else ""
+        lines = [
+            f"Relation {link} : {result.matched} ligne(s) sur {result.rows} trouvent leur clé{share}."
+        ]
+        if unmatched:
+            # Viz compte les clés vides parmi les lignes sans correspondance, sans les citer
+            sample = ", ".join(f"« {v} »" for v in result.unmatched_sample)
+            examples = f", ex. {sample}" if sample else ""
+            lines.append(
+                f"- {unmatched} ligne(s) sans correspondance (clé vide ou absente du jeu de "
+                f"dimension){examples}."
+            )
+        if result.duplicates:
+            lines.append(
+                f"- {result.duplicates} clé(s) en double dans le jeu de dimension : la relation "
+                "n'est pas plusieurs-à-un (Viz retient la première ligne)."
+            )
+        verdict = not unmatched and not result.duplicates
+        lines.append(
+            "Clé valide pour un modèle en étoile."
+            if verdict
+            else "À corriger en amont (Viz ou Power Query) avant de s'appuyer sur cette relation."
+        )
+        data = {
+            "ok": verdict,
+            "rows": result.rows,
+            "matched": result.matched,
+            "unmatched": unmatched,
+            "duplicates": result.duplicates,
+            "sample": list(result.unmatched_sample),
+        }
+        return ToolOutput(content="\n".join(lines), data=data)
 
 
 def data_via_tools(client: DataViaClient) -> list[BaseTool[Any]]:
@@ -568,5 +776,7 @@ def data_via_tools(client: DataViaClient) -> list[BaseTool[Any]]:
         ListDatasetsTool(client),
         DescribeDatasetTool(client),
         QueryTool(client),
+        RowsTool(client),
         CheckExpressionTool(client),
+        CheckRelationTool(client),
     ]

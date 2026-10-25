@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -18,8 +21,26 @@ class DuplicateAgentError(Exception):
     pass
 
 
+logger = logging.getLogger(__name__)
+
+
 def _to_definition(row: CustomAgentRow) -> CustomAgentDefinition:
     return CustomAgentDefinition.model_validate(row)
+
+
+def _readable(row: CustomAgentRow) -> CustomAgentDefinition | None:
+    """Définition relue, ou None si elle ne passe plus la validation (schéma qui a évolué) :
+    l'agent fautif est écarté et nommé dans le journal, les autres restent disponibles. Une
+    boîte inconnue (extension retirée) ne l'écarte pas : elle est signalée à l'exécution."""
+    try:
+        return _to_definition(row)
+    except ValidationError as exc:
+        logger.warning(
+            "Agent personnalisé « %s » illisible, ignoré : %s erreur(s) de validation",
+            row.name,
+            exc.error_count(),
+        )
+        return None
 
 
 class CustomAgentRepository:
@@ -32,7 +53,7 @@ class CustomAgentRepository:
                 rows = (
                     await s.scalars(select(CustomAgentRow).order_by(CustomAgentRow.display_name))
                 ).all()
-                return [_to_definition(r) for r in rows]
+                return [d for d in map(_readable, rows) if d is not None]
         except SQLAlchemyError as exc:
             raise StorageError(_storage_message(exc)) from exc
         except OSError as exc:
@@ -42,7 +63,7 @@ class CustomAgentRepository:
         try:
             async with self.sessions() as s:
                 row = await s.scalar(select(CustomAgentRow).where(CustomAgentRow.name == name))
-                return _to_definition(row) if row else None
+                return _readable(row) if row else None
         except (SQLAlchemyError, OSError) as exc:
             raise StorageError(_storage_message(exc)) from exc
 

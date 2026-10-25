@@ -44,6 +44,19 @@ export function forcesLocal(form: AgentForm, toolsets: ToolsetInfo[]): boolean {
   return toolsets.some((t) => t.sensitive && form.toolsets.includes(t.id));
 }
 
+/** Boîtes d'un agent au plus, Essentiels compris (`max_length` de app/schemas/agents.py). */
+export const MAX_TOOLSETS = 12;
+
+/**
+ * Boîtes de la définition absentes du catalogue (extension retirée de NEXUS_PLUGINS ou non
+ * chargée) : le serveur les garde et les signale (`unavailable_toolsets`) ; l'éditeur les montre
+ * à part pour qu'on puisse les retirer. Dans l'ordre de la définition, sans doublon.
+ */
+export function missingToolsets(selected: string[], toolsets: ToolsetInfo[]): string[] {
+  const known = new Set(toolsets.map((t) => t.id));
+  return [...new Set(selected)].filter((id) => id !== "core" && !known.has(id));
+}
+
 export function validate(form: AgentForm, reserved: string[], editing: boolean): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!editing) {
@@ -55,6 +68,9 @@ export function validate(form: AgentForm, reserved: string[], editing: boolean):
   if (form.description.trim().length < 5) errors.description = "Décrivez son rôle en une phrase.";
   if (form.system_prompt.trim().length < 20)
     errors.system_prompt = "Écrivez au moins quelques phrases de consignes (20 caractères minimum).";
+  // Refusé sinon par le serveur, avec un message de validation brut
+  if (new Set(form.toolsets).size > MAX_TOOLSETS)
+    errors.toolsets = `${MAX_TOOLSETS} boîtes à outils au plus, Essentiels compris : décochez-en une.`;
   const starters = toStarters(form.startersText);
   if (starters.length > 6) errors.startersText = "Six exemples au maximum.";
   if (starters.some((s) => s.length > 200)) errors.startersText = "Chaque exemple fait au plus 200 caractères.";

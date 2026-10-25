@@ -1,4 +1,4 @@
-"""Réglages modifiables depuis l'interface : lecture et écriture du fichier `.env`.
+r"""Réglages modifiables depuis l'interface : lecture et écriture du fichier `.env`.
 
 Le `.env` lu par `Settings` est celui du dossier courant : `backend/.env` en développement,
 `~/Library/Application Support/Atelier Nexus/.env` (Windows : `%APPDATA%\Atelier Nexus\.env`)
@@ -59,6 +59,10 @@ FIELDS: tuple[EditableField, ...] = (
     EditableField("OLLAMA_BASE_URL", "Adresse d'Ollama", "Modèles", "url"),
     EditableField("OLLAMA_MODEL", "Modèle local (Ollama)", "Modèles", "text",
                   "Doit être installé : ollama pull <modèle>."),
+    EditableField("OLLAMA_NUM_CTX", "Mémoire de conversation d'Ollama (jetons)", "Modèles", "text",
+                  "Fenêtre de contexte, 8192 par défaut. 16384 pour de longues séances si l'ordinateur a "
+                  "16 Go de mémoire ou plus (plus grand = plus de mémoire), 2048 au moins ; 0 = valeur du "
+                  "serveur Ollama."),
     EditableField("LLM_DEFAULT_PROVIDER", "Moteur par défaut", "Modèles", "choice",
                   "Les agents « 100 % local » utilisent toujours Ollama.", ("anthropic", "ollama")),
     EditableField("LLM_FALLBACK_PROVIDER", "Moteur de secours", "Modèles", "choice",
@@ -72,6 +76,9 @@ FIELDS: tuple[EditableField, ...] = (
                   "Mode serveur : port 4000 ; app Mac : 47321."),
     EditableField("SAVOIR_BASE_URL", "Atelier Savoir", "Applications Atelier", "url",
                   "Lancez Savoir avec ATELIER_PORT=5051 (5050 est pris par Trésorerie)."),
+    EditableField("CONVERT_BASE_URL", "Atelier Convert", "Applications Atelier", "url",
+                  "Relevés et fichiers convertis en tables (API sur 8010). Adresse locale uniquement "
+                  "(127.0.0.1, localhost, ::1) : le contrat atelier-node/1 refuse toute autre adresse."),
     EditableField("TAB_EXPORTS_DIR", "Instantanés d'Atelier Tab", "Applications Atelier", "path",
                   "Dossier exports de Tab (par défaut ~/Atelier_Tab/exports)."),
     EditableField("CUISINE_SUPABASE_URL", "Adresse du projet Supabase", "Atelier Cuisine", "url",

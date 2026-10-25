@@ -97,6 +97,34 @@ class WorkflowV2(BaseModel):
     updated_at: datetime
 
 
+# ─── Bibliothèque de modèles (GET /api/workflows/library) ────────
+
+
+class WorkflowTemplate(BaseModel):
+    """Modèle de workflow de suite fourni par Nexus : un enchaînement prêt à copier dans un
+    brouillon (jamais exécuté tel quel). `available` / `missing` sont calculés à chaque lecture
+    avec le catalogue réel (applications joignables, boîtes configurées)."""
+
+    slug: str
+    title: str
+    description: str
+    #: Bénéfice pour l'utilisateur, une phrase
+    value: str
+    #: Applications enchaînées, dans l'ordre (puces colorées)
+    apps: list[str]
+    params: list[WorkflowParam]
+    steps: list[WorkflowStepV2]
+    #: Prérequis en clair (« Atelier Convert lancé », « TAB_MCP_COMMAND (serveur MCP de Tab) »…)
+    requirements: list[str]
+    #: Déclencheur conseillé, en clair ; None si manuel uniquement
+    trigger_hint: str | None = None
+    #: Toutes les étapes sont connues et leurs applications joignables
+    available: bool = False
+    #: Étapes ou applications manquantes (« node:convert/conversions.list : Atelier Convert
+    #: injoignable »)
+    missing: list[str] = Field(default_factory=list)
+
+
 # ─── Catalogue ────────────────────────────────────────────────────
 
 

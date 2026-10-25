@@ -11,11 +11,15 @@ LAUNCHER="$REPO/scripts/macos/launcher.sh"
 
 if [[ -z "$REPO" || ! -f "$LAUNCHER" ]]; then
   message="Le dépôt d'Atelier Nexus est introuvable (${REPO:-chemin non enregistré}). S'il a été déplacé, relancez scripts/macos/build_app.sh depuis son nouvel emplacement."
-  /usr/bin/osascript - "$message" >/dev/null 2>&1 <<'OSA' || echo "Atelier Nexus : $message" >&2
+  echo "Atelier Nexus : $message" >&2
+  # NEXUS_NO_DIALOG=1 (tests) : message sur la sortie d'erreur seulement, aucune fenêtre ouverte
+  if [[ "${NEXUS_NO_DIALOG:-}" != 1 ]]; then
+    /usr/bin/osascript - "$message" >/dev/null 2>&1 <<'OSA' || true
 on run argv
   display alert "Atelier Nexus" message (item 1 of argv) as critical
 end run
 OSA
+  fi
   exit 1
 fi
 
