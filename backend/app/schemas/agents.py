@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -28,6 +28,12 @@ Icon = Literal[
 class CustomAgentFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    #: Boîte inconnue refusée à la création (faute de frappe). Acceptée à la relecture et, si la
+    #: définition l'avait déjà (contrôlé par PUT /api/custom-agents/{name}), à la modification :
+    #: une extension retirée de NEXUS_PLUGINS ne doit ni faire disparaître l'agent, ni empêcher
+    #: de l'enregistrer ; la boîte est signalée (`unavailable_toolsets`)
+    strict_toolsets: ClassVar[bool] = True
+
     display_name: str = Field(min_length=2, max_length=60)
     description: str = Field(min_length=5, max_length=300)
     system_prompt: str = Field(
@@ -47,7 +53,7 @@ class CustomAgentFields(BaseModel):
 
         known = set(toolset_ids())
         unknown = [t for t in value if t not in known]
-        if unknown:
+        if unknown and cls.strict_toolsets:
             raise ValueError(f"Boîte(s) à outils inconnue(s) : {', '.join(unknown)}")
         ordered = ["core", *[t for t in dict.fromkeys(value) if t != "core"]]
         return ordered  # « Essentiels » toujours présents, en tête
@@ -66,11 +72,13 @@ class CustomAgentCreate(CustomAgentFields):
 
 
 class CustomAgentUpdate(CustomAgentFields):
-    pass
+    strict_toolsets = False  # boîtes inconnues comparées à la définition enregistrée par l'API
 
 
 class CustomAgentDefinition(CustomAgentCreate):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    strict_toolsets = False  # relue en base : voir CustomAgentFields
 
     id: str
     created_at: datetime

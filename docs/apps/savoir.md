@@ -36,13 +36,32 @@ Identité : il n'y a pas de route `/health`. `GET /api/stats` sert de contrôle 
 |---|---|---|
 | `savoir_read` | `savoir_overview` | Compteurs (cours, chapitres, cartes, maîtrisées, à réviser, révisions du jour) et liste des cours |
 | `savoir_read` | `savoir_course` | Un cours et ses chapitres |
-| `savoir_read` | `savoir_chapter` | Texte d'un chapitre, par extraits (`offset`, `max_chars` ≤ 20 000) |
-| `savoir_read` | `savoir_flashcards` | Cartes filtrées par cours, chapitre, statut, type |
-| `savoir_read` | `savoir_due_cards` | Séance du jour (`mode` dues ou toutes) |
+| `savoir_read` | `savoir_chapter` | Texte d'un chapitre, par extraits (`offset`, `max_chars` : 4 000 par défaut, ≤ 12 000) |
+| `savoir_read` | `savoir_flashcards` | Cartes filtrées par cours, chapitre, statut, type : questions seules par défaut (`with_answers` pour les réponses), 30 par défaut, ≤ 100 |
+| `savoir_read` | `savoir_due_cards` | Séance du jour (`mode` dues ou toutes), 10 cartes par défaut, ≤ 30 |
 | `savoir_write` | `savoir_create_course` | Crée un cours : **validation** |
-| `savoir_write` | `savoir_add_chapter` | Ajoute un chapitre (texte) : **validation** |
-| `savoir_write` | `savoir_add_flashcards` | Enregistre jusqu'à 60 cartes (origine « ia ») : **validation** |
+| `savoir_write` | `savoir_add_chapter` | Ajoute un chapitre : texte (`content`) **ou** fichier joint à la conversation (`file` : .md, .txt, .pdf, envoyé tel quel à Savoir qui en extrait le texte) : **validation** |
+| `savoir_write` | `savoir_add_flashcards` | Enregistre jusqu'à 15 cartes par appel (origine « ia ») : **validation** |
 | `savoir_write` | `savoir_record_reviews` | Enregistre les notes d'une interrogation (a_revoir, correct, maitrise) en **une seule validation** |
+
+## Modèle local : tailles et validations
+
+Le Tuteur tourne sur Ollama : sorties et entrées restent à la portée d'un petit modèle et de sa fenêtre de contexte
+(`OLLAMA_NUM_CTX`, [`settings.md`](../settings.md)).
+
+- Lecture bornée : extraits de chapitre de 4 000 caractères, liste de cartes sans les réponses (les questions
+  suffisent pour éviter les doublons), séance de 30 cartes au plus (`savoir_due_cards` donne les réponses, pour
+  corriger).
+- Écriture par lots : 15 cartes au plus par appel (un appel tronqué donnerait un JSON invalide). Un long document
+  n'est jamais recopié par le modèle : l'utilisateur le joint au chat et `savoir_add_chapter` l'importe par son nom
+  (`env.conversation_files()` : seulement les fichiers cités par la conversation ; hors conversation, message clair).
+  `content` et `file` sont exclusifs ; celui qu'un petit modèle envoie vide (`"content": ""`) compte comme absent.
+  Une extension visible autre que .md, .markdown, .txt ou .pdf est refusée dès les paramètres, avant la carte de
+  validation ; un nom sans extension est contrôlé une fois le fichier retrouvé, sans rien envoyer à Savoir.
+- La carte de validation n'affiche que le résumé : il dit tout ce qui sera écrit. Cartes : chaque question et le début
+  de sa réponse (« 1. « Énoncer le second principe » → « L'entropie… » ») ; notes : chaque carte et sa note
+  (« #12 → Correct, #15 → À revoir ») ; chapitre : le titre, le cours, la taille et les 200 premiers caractères, ou le
+  nom du fichier importé ; cours : titre, matière et début de la description.
 
 ## Confidentialité
 

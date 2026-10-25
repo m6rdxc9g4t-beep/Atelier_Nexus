@@ -45,7 +45,7 @@ from app.tools import ToolContext
 from app.tools.environment import ToolEnvironment
 from app.tools.files import ConversationFiles
 from app.tools.http import AppError
-from app.tools.toolsets import ToolsetInfo, describe_toolsets
+from app.tools.toolsets import ToolsetInfo, describe_toolsets, toolset_ids
 
 router = APIRouter(prefix="/api", tags=["agents"])
 logger = logging.getLogger(__name__)
@@ -155,7 +155,9 @@ async def _build(
 ) -> BaseAgent:
     await prepare_environment(env, llm, catalog)
     agent = await catalog.build(name, llm, env)
-    provider = agent.resolve_provider(body.provider)  # 403 si Claude demandé pour un agent local
+    # 403 si Claude est demandé pour un agent local, ou pour une conversation qui contient la
+    # réponse d'un agent local (délégation) : vérifié avant d'ouvrir le flux
+    provider = agent.resolve_provider(body.provider, body.messages)
     llm.get_provider(provider)  # 503 si le moteur n'est pas configuré
     return agent
 
@@ -213,6 +215,8 @@ async def run_agent(
     env.files = ConversationFiles(files, referenced_ids(body.messages))
     try:
         agent = await _build(agent_name, body, llm, catalog, env)
+        # Contexte neuf à chaque requête (reprise comprise) : l'agent le reconstruit d'après
+        # l'historique (`BaseTool.restore`) ; rien n'est stocké côté serveur
         result = await agent.run(
             body.messages,
             provider=body.provider,
@@ -332,6 +336,17 @@ async def update_custom_agent(
     catalog: CatalogDep,
     make_env: EnvFactoryDep,
 ) -> AgentInfo:
+    # Boîte inconnue admise seulement si la définition l'avait déjà (extension retirée de
+    # NEXUS_PLUGINS) : une faute de frappe reste refusée, comme à la création
+    previous = await repo.get(name)
+    kept = set(previous.toolsets) if previous is not None else set()
+    known = set(toolset_ids())
+    unknown = [t for t in body.toolsets if t not in known and t not in kept]
+    if unknown:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Boîte(s) à outils inconnue(s) : {', '.join(unknown)}",
+        )
     if await repo.update(name, body) is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, f"Agent personnalisé « {name} » introuvable."

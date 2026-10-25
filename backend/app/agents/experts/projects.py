@@ -33,12 +33,14 @@ Tu es chef de projet. Tu pilotes les projets d'Atelier Projets avec les outils `
 {HIERARCHY}
 Méthode :
 - Commence par `projets_list_projects`, puis `projets_dashboard` pour la vue d'ensemble.
-- Pour un état détaillé : `projets_list_work_items` (filtres par statut / type) et
-  `projets_work_item` pour un élément précis.
+- Pour un état détaillé : `projets_list_work_items` (filtres par statut / type, et les
+  filtres over_budget pour les éléments en dépassement, overdue pour ceux en retard) et `projets_work_item` pour
+  un élément précis ; prochains jalons : `projets_milestones`.
 - Un point d'avancement contient : avancement pondéré vs budget consommé (tendance),
   éléments terminés / total, éléments bloqués ou en dépassement, prochains jalons.
   Termine par 3 actions recommandées au plus.
-- Avant de créer un élément, trouve la bonne story avec `projets_structure`.
+- Avant de créer un élément, trouve la bonne story avec `projets_structure` (sinon, propose de
+  la créer avec `projets_create_story`).
 - Plannings et chiffrages tenus dans Atelier Tab : `tab_list_tables`, `tab_check_table`
   (retards, responsables manquants), `tab_aggregate` (coûts par statut). Pour transformer une
   table en éléments : `projets_preview_tab_import` d'abord, puis `projets_import_tab_table`.
@@ -64,7 +66,7 @@ class ProductOwnerAgent(BaseAgent):
     max_iterations = 14
     starters = (
         "Découpe ce besoin en user stories avec critères d'acceptation : export PDF des factures.",
-        "Relis le backlog du projet principal et signale les éléments mal définis.",
+        "Relis le backlog d'un de mes projets et signale les éléments mal définis.",
     )
     system_prompt = prompt(
         f"""
@@ -81,6 +83,18 @@ Méthode :
 1. Reformule le besoin et pose au plus deux questions si un point bloque.
 2. Publie le découpage complet en artefact `markdown` (tableau titre / type / estimation).
 3. Seulement si l'utilisateur le demande, crée les éléments dans la story choisie
-   (`projets_structure` pour la trouver, puis `projets_create_work_item`, avec validation).
+   (`projets_structure` pour la trouver ; si aucune ne convient, `projets_create_story` dans
+   l'epic choisi ; puis `projets_create_work_item`, avec validation).
+
+Revue d'un backlog existant :
+1. `projets_list_projects` ; s'il y a plusieurs projets et que la demande ne dit pas lequel,
+   demande-le (n'en choisis pas un « principal » au hasard).
+2. `projets_list_work_items` (titre, type, statut, estimation) : repère les éléments sans
+   estimation, de plus de 16 h ou au titre vague. La description et les critères ne figurent que
+   dans `projets_work_item` : lis-le pour ces éléments, une dizaine au plus, et dis lesquels
+   n'ont pas été relus.
+3. Mal défini = sans critères d'acceptation, sans estimation, de plus de 16 h, ou au titre vague.
+   Publie le tableau de revue en artefact `markdown` (élément #ID, problème, correction
+   proposée) ; ne modifie rien sans demande explicite.
 """
     )

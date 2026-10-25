@@ -75,6 +75,7 @@ class LLMRouter:
                 base_url=settings.ollama_base_url,
                 default_model=settings.ollama_model,
                 timeout=settings.ollama_timeout,
+                num_ctx=settings.ollama_num_ctx,
             ),
         }
         default = settings.llm_default_provider

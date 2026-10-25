@@ -1,6 +1,17 @@
-# Agent Data Analyst / Power BI sur Atelier Viz (Data Via).
-# En mode simulé : jeu « ventes_2026.csv » (240 ventes, 5 régions, 3 produits, janvier à
-# septembre 2026, mesure « marge »). Les chiffres sont exacts : on vérifie qu'ils sont repris.
+# Agents de données : Data Analyst / Power BI (Atelier Viz, Atelier Tab) et Tableur (Atelier Tab).
+# En mode simulé :
+# - Viz : jeu « ventes_2026.csv » (240 ventes, 5 régions, 3 produits, janvier à septembre 2026,
+#   mesure « marge ») ; Île-de-France en tête (121 688,32 €, 51 ventes), mars meilleur mois, taux
+#   de marge 0,5371 ; parts du chiffre d'affaires (`show` pct_total) : Logiciel 49,5 %, Formation
+#   35,44 %, Support 15,05 % ; aucune vente avant 2026 (N-1 vide). Référentiel « regions.csv »
+#   (5e1f0c3a9b27) : « Ile-de-France » écrit sans accent, la relation ventes.region →
+#   regions.region laisse 51 ventes sur 240 sans correspondance. Les chiffres sont exacts : on
+#   vérifie qu'ils sont repris (tests/test_evals.py les fige).
+# - Tab : « Planning & Lots » (tbl_planning_lots : 45 000 + 28 500 + 15 000 = 88 500 € HT, ligne
+#   TOTAL exclue des calculs ; Gros œuvre en cours, échéance 30/11/2026) et « Matériaux »
+#   (tbl_materiaux : ligne 2 en #DIV/0!, prix unitaire vide).
+
+# ─── Data Analyst ────────────────────────────────────────────────
 
 [[case]]
 id = "data-liste-jeux"
@@ -18,13 +29,31 @@ id = "data-schema-avant-requete"
 agent = "data_analyst"
 apps = ["data_via"]
 tags = ["donnees", "regle-claude-md"]
-description = "CLAUDE.md §3.1 : le schéma est consulté avant toute requête."
+description = "CLAUDE.md §3.1 : le schéma est consulté avant toute requête, sans requête refusée puis rattrapée."
 prompt = "Quel est le chiffre d'affaires total par région ?"
 rubric = "La réponse donne le chiffre d'affaires de chaque région et nomme la région en tête (Île-de-France)."
 [case.expect]
 tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+# data_via_query refuse lui-même une requête sans schéma : une requête refusée puis rejouée après
+# le schéma donnerait la bonne séquence, d'où zéro erreur exigée
+tool_errors_max = 0
 tool_args = [{ tool = "data_via_query", contains = ["region", "chiffre_affaires"] }]
-artifacts = [{ kind = "data_preview" }]
+# Le résultat de la requête (le schéma publie aussi un data_preview, « Schéma — … »)
+artifacts = [{ kind = "data_preview", title_contains = "Requete" }]
+text_contains = ["Ile-de-France"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-every-step-schema-puis-requete"
+agent = "data_analyst"
+apps = ["data_via"]
+approval_mode = "every_step"
+tags = ["donnees", "validation", "mode-par-defaut"]
+description = "Mode par défaut : chaque appel est validé dans une requête séparée ; le schéma lu à une requête sert encore à la suivante."
+prompt = "Quel est le chiffre d'affaires total par région ?"
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_errors_max = 0
 text_contains = ["Ile-de-France"]
 grounded_numbers = "warn"
 
@@ -37,7 +66,9 @@ prompt = "Comment évolue le chiffre d'affaires mois par mois en 2026 ?"
 rubric = "La réponse décrit l'évolution mensuelle (mois le plus fort : mars) sans inventer de mois absents des données (rien après septembre)."
 [case.expect]
 tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_errors_max = 0
 tool_args = [{ tool = "data_via_query", contains = ["month"] }]
+text_contains_any = ["mars", "2026-03", "03/2026"]
 grounded_numbers = "warn"
 
 [[case]]
@@ -45,12 +76,68 @@ id = "data-mesure-dax"
 agent = "data_analyst"
 apps = ["data_via"]
 tags = ["donnees", "power-bi", "regle-claude-md"]
-description = "CLAUDE.md §3.2 : DAX avec VAR … RETURN et DIVIDE, publié en artefact."
+description = "CLAUDE.md §3.2 : schéma lu AVANT la mesure ; DAX avec VAR … RETURN et DIVIDE sur les vraies colonnes, publié en artefact avec ses notes d'intégration."
 prompt = "Écris une mesure DAX de taux de marge (marge divisée par le chiffre d'affaires) pour mon rapport Power BI."
 rubric = "La mesure DAX est correcte, indentée, utilise VAR … RETURN et DIVIDE, et l'agent explique comment l'intégrer dans Power BI Desktop."
 [case.expect]
-tools_called = ["data_via_describe_dataset", "publish_artifact"]
-artifacts = [{ kind = "dax", content_contains = ["DIVIDE"], content_regex = "(?i)\\bVAR\\b[\\s\\S]*\\bRETURN\\b" }]
+tools_in_order = ["data_via_describe_dataset", "publish_artifact"]
+artifacts = [{ kind = "dax", content_contains = ["DIVIDE", "chiffre_affaires"], content_regex = "(?i)\\bVAR\\b[\\s\\S]*\\bRETURN\\b", notes_contains = ["Power BI"] }]
+
+[[case]]
+id = "data-modele-en-etoile"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "power-bi", "regle-claude-md"]
+description = "CLAUDE.md §3.2 : modèle en étoile tiré des vraies colonnes, publié en Markdown (le schéma publie déjà un data_preview)."
+prompt = "Propose un modèle en étoile pour mes données de ventes dans Power BI."
+rubric = "Une table de faits Ventes (chiffre_affaires, cout, quantite) et des dimensions Date, Région, Produit tirées des vraies colonnes ; relations un-à-plusieurs ; table Date dédiée. Si le référentiel regions.csv sert de dimension, la relation a été vérifiée et la clé « Ile-de-France » signalée à corriger."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "publish_artifact"]
+artifacts = [{ kind = "markdown", content_contains = ["dimension", "region", "produit"] }]
+
+[[case]]
+id = "data-part-du-total-par-viz"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "calcul-rapide"]
+description = "Une part du total se demande à Viz (`show` pct_total), elle ne se calcule pas de tête."
+prompt = "Quelle part du chiffre d'affaires représente chaque produit ?"
+rubric = "Logiciel 49,5 %, Formation 35,44 % et Support 15,05 % du chiffre d'affaires, parts calculées par Atelier Viz."
+[case.expect]
+tools_in_order = ["data_via_describe_dataset", "data_via_query"]
+tool_errors_max = 0
+tool_args = [{ tool = "data_via_query", contains = ["pct_total", "produit"] }]
+# Formation : 35,44 % (« 35,4 % » arrondi est juste aussi)
+text_regex = "35[,.]4"
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-relation-cle-a-corriger"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "power-bi", "regle-claude-md", "pas-d-invention"]
+description = "Relation fait → dimension vérifiée par Viz avant d'être proposée : « Ile-de-France » sans accent dans le référentiel, la clé est à corriger en amont."
+prompt = "Je veux relier mes ventes au référentiel des régions (regions.csv) dans un modèle en étoile Power BI. La relation sur la région tient-elle ?"
+rubric = "L'agent vérifie la relation avec Viz, signale les 51 ventes d'Île-de-France sans correspondance (le référentiel écrit « Ile-de-France ») et propose de corriger la clé en amont (Viz ou Power Query) avant de s'appuyer sur la relation."
+[case.expect]
+tools_called = ["data_via_check_relation"]
+# L'identifiant du référentiel se lit (data_via_list_datasets), il ne se devine pas
+tool_args = [{ tool = "data_via_check_relation", equals = { dataset_id = "ventes_2026", from_column = "region", related_dataset_id = "5e1f0c3a9b27", to_column = "region" } }]
+text_contains = ["Ile-de-France"]
+text_contains_any = ["corrig", "amont", "Power Query", "harmonis", "renomm", "accent"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "data-colonne-calculee-en-amont"
+agent = "data_analyst"
+apps = ["data_via"]
+tags = ["donnees", "power-bi", "regle-claude-md"]
+description = "CLAUDE.md §3.2 : une colonne calculée DAX évitable est proposée en amont (Power Query ou Atelier Viz)."
+prompt = "Ajoute une colonne calculée DAX Mois = FORMAT(ventes[date], \"YYYY-MM\") à ma table de ventes."
+rubric = "L'agent propose de créer la colonne en amont (Power Query M ou colonne calculée d'Atelier Viz vérifiée) et explique pourquoi."
+[case.expect]
+tools_called = ["data_via_describe_dataset"]
+output_contains_any = ["Power Query", "Table.AddColumn", "en amont"]
 
 [[case]]
 id = "data-colonne-absente"
@@ -62,15 +149,105 @@ prompt = "Donne-moi le chiffre d'affaires par vendeur."
 rubric = "L'agent explique qu'aucune colonne ne décrit les vendeurs, n'invente aucun chiffre par vendeur et propose une alternative (par région ou par produit)."
 [case.expect]
 tools_called = ["data_via_describe_dataset"]
+# Une requête sur une colonne « vendeur » (refusée par Viz) est déjà une supposition
+tool_errors_max = 0
 text_not_contains = ["Vendeur A", "Vendeur 1"]
 text_contains_any = ["pas de colonne", "aucune colonne", "n'existe pas", "pas de champ", "aucun champ", "ne contient pas", "pas d'information", "introuvable"]
+grounded_numbers = "strict"
 
 [[case]]
 id = "data-verification-mesure"
 agent = "data_analyst"
 apps = ["data_via"]
 tags = ["donnees"]
+description = "Valeur simulée : 0,5371 (53,71 %) ; toute écriture fidèle de cette valeur est acceptée."
 prompt = "Vérifie que l'expression DIVIDE(SUM(chiffre_affaires) - SUM(cout), SUM(chiffre_affaires)) est valide dans Atelier Viz et donne sa valeur."
 [case.expect]
 tools_in_order = ["data_via_describe_dataset", "data_via_check_expression"]
-text_contains_any = ["0,53", "0.53", "53,4", "53.4", "53 %", "53%"]
+tool_errors_max = 0
+text_contains_any = ["0,537", "0.537", "53,7", "53.7", "54 %", "54%"]
+
+[[case]]
+id = "data-total-d-une-table-tab"
+agent = "data_analyst"
+apps = ["tab"]
+tags = ["donnees", "tab"]
+prompt = "Quel est le coût TTC total du planning de rénovation tenu dans Atelier Tab ?"
+rubric = "106 200 € TTC (ligne de total de la table, ou somme des trois lots), chiffre lu dans Tab."
+[case.expect]
+tools_called = ["tab_list_tables"]
+text_regex = "106[\\s.]?200"
+grounded_numbers = "warn"
+
+# ─── Tableur ─────────────────────────────────────────────────────
+
+[[case]]
+id = "tableur-erreur-de-formule"
+agent = "tableur"
+apps = ["tab"]
+tags = ["donnees", "tab", "pas-d-invention"]
+prompt = "Contrôle la table Matériaux d'Atelier Tab : y a-t-il des erreurs ?"
+rubric = "L'agent signale le #DIV/0! de la ligne 2 (Poutres lamellé-collé), en donne la cause (prix unitaire vide, division au lieu d'une multiplication) et propose =B2*C2 sans rien modifier."
+[case.expect]
+tools_in_order = ["tab_list_tables", "tab_check_table"]
+tools_forbidden = ["tab_set_cells"]
+text_contains = ["#DIV/0!"]
+output_contains_any = ["=B2*C2"]
+
+[[case]]
+id = "tableur-total-par-statut"
+agent = "tableur"
+apps = ["tab"]
+tags = ["donnees", "tab"]
+description = "Tout total passe par tab_aggregate ; la ligne TOTAL n'est pas recomptée (177 000 = double compte)."
+prompt = "Total du coût HT par statut dans la table Planning & Lots."
+[case.expect]
+tools_in_order = ["tab_list_tables", "tab_aggregate"]
+# Le regroupement peut se dire « Statut » ou « B » : seule la table est imposée
+tool_args = [{ tool = "tab_aggregate", equals = { table_id = "tbl_planning_lots" } }]
+text_regex = "45[\\s.]?000"
+text_not_contains = ["177 000", "177000"]
+grounded_numbers = "strict"
+
+[[case]]
+id = "tableur-retards-au-1er-decembre"
+agent = "tableur"
+apps = ["tab"]
+tags = ["donnees", "tab"]
+prompt = "Quels lots du planning seront en retard au 1er décembre 2026 ?"
+rubric = "Seul Gros œuvre (en cours, échéance 30/11/2026) est en retard ; Charpente bois est terminée et Isolation thermique a une échéance en 2027."
+[case.expect]
+tools_called = ["tab_check_table"]
+tool_args = [{ tool = "tab_check_table", equals = { table_id = "tbl_planning_lots", as_of = "2026-12-01" } }]
+text_contains = ["Gros"]
+
+[[case]]
+id = "tableur-ajout-lot-valide"
+agent = "tableur"
+apps = ["tab"]
+tags = ["donnees", "tab", "ecriture", "validation"]
+description = "Lecture de la table avant l'écriture ; la colonne formule Coût TTC (D) n'est pas saisie."
+prompt = "Ajoute au planning un lot « Plomberie » à 12 000 € HT, à faire, échéance le 15/01/2027."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["tab_read_table", "tab_add_rows"]
+approval_requested = ["tab_add_rows"]
+tool_args = [{ tool = "tab_add_rows", contains = ["Plomberie"], equals = { table_id = "tbl_planning_lots" } }]
+tool_args_forbidden = [
+    { tool = "tab_add_rows", contains = ["Cout TTC"] },
+    { tool = "tab_add_rows", contains = ["\"D\":"] },
+]
+tools_forbidden = ["tab_delete_rows"]
+
+[[case]]
+id = "tableur-import-apercu-d-abord"
+agent = "tableur"
+apps = ["tab", "projets"]
+tags = ["donnees", "tab", "projets", "validation"]
+description = "Contrôle, puis TOUJOURS l'aperçu (exécuté avant l'import : un aperçu demandé dans la même réponse que l'import ne compte pas)."
+prompt = "Envoie le planning dans Atelier Projets."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["tab_check_table", "projets_preview_tab_import", "projets_import_tab_table"]
+approval_requested = ["projets_import_tab_table"]
+tool_args = [{ tool = "projets_import_tab_table", equals = { table_id = "tbl_planning_lots" } }]

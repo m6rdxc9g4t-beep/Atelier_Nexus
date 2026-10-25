@@ -2,11 +2,13 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api.data_via import get_data_via_client
-from app.schemas.data_via import Dimension, Measure, QueryRequest
+from app.schemas.data_via import Dimension, Measure, QueryRequest, ShowAs
 from app.tools import ToolContext
 from app.tools.data_via import (
     DataViaClient,
@@ -17,7 +19,7 @@ from app.tools.data_via import (
     validate_query,
 )
 from main import app
-from tests.fake_data_via import DATASET_ID, FakeDataVia
+from tests.fake_data_via import DATASET_ID, PROFILE, FakeDataVia
 
 
 @pytest.fixture
@@ -111,8 +113,6 @@ async def test_list_datasets_accepts_both_origin_shapes() -> None:
     """Viz renvoie deux formes d'origine : connexion, ou table publiée par un nœud de workflow
     (`kind = "atelier-table"`, sans connexion). Une seule forme reconnue faisait échouer
     toute la liste dès qu'un workflow ou une extension avait publié une table."""
-    import httpx
-
     from tests.fake_data_via import SUMMARY
 
     published = {
@@ -228,6 +228,199 @@ async def test_tool_reports_viz_down_without_crashing(
 def test_tool_schemas_are_portable(client: DataViaClient) -> None:
     for tool in data_via_tools(client):
         assert "$ref" not in json.dumps(tool.spec().input_schema)
+
+
+# ─── Calculs rapides (`show`), lignes brutes, relations ───────────
+
+
+def test_show_keys_mirror_viz() -> None:
+    """Clés des colonnes comme Viz (`ShowAs.suffix`) : elles servent au tri et à l'affichage."""
+    ytd = Measure(field="ca", agg="sum", show=ShowAs(kind="ytd", date="date"))
+    moving = Measure(field="ca", show=ShowAs(kind="moving_avg", date="date", window=6))
+    share = Measure(agg="count", show=ShowAs(kind="pct_total"))  # sans date : part du total
+    assert [ytd.key, moving.key, share.key] == [
+        "sum(ca)@ytd",
+        "sum(ca)@moving_avg6",
+        "count(*)@pct_total",
+    ]
+    with pytest.raises(ValidationError, match="demande une colonne date"):
+        ShowAs(kind="yoy_pct")
+
+
+async def test_validate_query_checks_show_dates_and_duplicates(client: DataViaClient) -> None:
+    profile = await client.get_dataset(DATASET_ID)
+    ca = {"field": "chiffre_affaires", "agg": "sum"}
+    req = QueryRequest.model_validate(
+        {
+            "dataset_id": DATASET_ID,
+            "dimensions": [{"field": "region"}],
+            "measures": [
+                ca,
+                ca,
+                {**ca, "show": {"kind": "yoy_pct", "date": "dat"}},
+                {**ca, "show": {"kind": "ytd", "date": "region"}},
+            ],
+        }
+    )
+    errors = validate_query(req, profile)
+    assert any("Colonne date inconnue « dat »" in e and "date" in e for e in errors)
+    assert any("« region » n'est pas une date" in e for e in errors)
+    assert any("deux fois : sum(chiffre_affaires)" in e for e in errors)
+    ok = QueryRequest.model_validate(
+        {
+            "dataset_id": DATASET_ID,
+            "dimensions": [{"field": "region"}],
+            "measures": [{**ca, "show": {"kind": "pct_total"}}],
+            "sort": [{"key": "sum(chiffre_affaires)@pct_total", "desc": True}],
+        }
+    )
+    assert validate_query(ok, profile) == []
+
+
+async def test_query_tool_sends_show_and_flags_percent_points(
+    client: DataViaClient, viz: FakeDataVia
+) -> None:
+    ctx = ToolContext()
+    t = tools(client)
+    await t["data_via_describe_dataset"].invoke({"dataset_id": DATASET_ID}, ctx)
+    out = await t["data_via_query"].invoke(
+        {
+            "dataset_id": DATASET_ID,
+            "dimensions": [{"field": "region"}],
+            "measures": [
+                {"field": "chiffre_affaires", "agg": "sum", "show": {"kind": "pct_total"}}
+            ],
+        },
+        ctx,
+    )
+    assert not out.is_error, out.content
+    sent = json.loads(viz.requests[-1].content)
+    assert sent["measures"][0]["show"] == {"kind": "pct_total", "date": None, "window": 3}
+    assert "points de pourcentage (12.5 = 12,5 %) : sum(chiffre_affaires)@pct_total" in out.content
+    assert "show" in t["data_via_query"].description  # le modèle sait que Viz fait ces calculs
+
+
+def viz_with(routes: dict[tuple[str, str], Any]) -> tuple[DataViaClient, list[httpx.Request]]:
+    """Faux Viz habituel, avec quelques routes remplacées : (méthode, chemin) → JSON."""
+    base = FakeDataVia()
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        key = (request.method, request.url.path.removeprefix("/api"))
+        if key in routes:
+            return httpx.Response(200, json=routes[key])
+        return base.handler(request)
+
+    return DataViaClient("http://viz.test/api", transport=httpx.MockTransport(handler)), seen
+
+
+async def test_describe_shows_the_star_schema_relations() -> None:
+    profile = {
+        **PROFILE,
+        "columns": [
+            *PROFILE["columns"],
+            {"name": "regions.population", "type": "number", "nulls": 0, "distinct": 5,
+             "top_values": [], "related": "regions"},
+        ],
+        "model": {
+            **PROFILE["model"],
+            "relations": [{"name": "regions", "dataset_id": "a1b2c3d4e5f6",
+                           "from_column": "region", "to_column": "nom", "columns": ["population"]}],
+        },
+    }  # fmt: skip
+    viz, _ = viz_with({("GET", f"/datasets/{DATASET_ID}"): profile})
+    out = await tools(viz)["data_via_describe_dataset"].invoke(
+        {"dataset_id": DATASET_ID}, ToolContext()
+    )
+    assert (
+        "`regions.population` (number)" in out.content
+        and "[liée : relation regions]" in out.content
+    )
+    assert "- `regions` : region → jeu a1b2c3d4e5f6.nom" in out.content
+    assert out.data["relations"] == [
+        {
+            "name": "regions",
+            "dataset_id": "a1b2c3d4e5f6",
+            "from_column": "region",
+            "to_column": "nom",
+        }
+    ]
+    await viz.aclose()
+
+
+async def test_rows_tool_pages_raw_lines_after_the_schema(
+    client: DataViaClient, viz: FakeDataVia
+) -> None:
+    ctx = ToolContext()
+    t = tools(client)
+    refused = await t["data_via_rows"].invoke({"dataset_id": DATASET_ID}, ctx)
+    assert refused.is_error and "data_via_describe_dataset" in refused.content
+    await t["data_via_describe_dataset"].invoke({"dataset_id": DATASET_ID}, ctx)
+    unknown = await t["data_via_rows"].invoke(
+        {"dataset_id": DATASET_ID, "columns": ["regoin"]}, ctx
+    )
+    assert unknown.is_error and "Vouliez-vous dire : region" in unknown.content
+    too_many = await t["data_via_rows"].invoke({"dataset_id": DATASET_ID, "limit": 500}, ctx)
+    assert too_many.is_error  # au plus 50 lignes par appel pour le modèle
+
+    out = await t["data_via_rows"].invoke(
+        {"dataset_id": DATASET_ID, "columns": ["region"], "limit": 10}, ctx
+    )
+    assert not out.is_error and "Lignes 1 à 1 sur 573" in out.content
+    assert "| Bretagne |" in out.content and "offset=1" in out.content
+    assert viz.requests[-1].url.params["limit"] == "10"
+    assert out.data["rows"] == [{"region": "Bretagne"}] and out.data["total"] == 573
+
+
+async def test_check_relation_reports_matches_orphans_and_duplicates() -> None:
+    check = {"ok": True, "rows": 573, "matched": 560, "duplicates": 1,
+             "unmatched_sample": ["Corse", "Guyane"]}  # fmt: skip
+    viz, seen = viz_with({("POST", f"/datasets/{DATASET_ID}/relations/check"): check})
+    tool = tools(viz)["data_via_check_relation"]
+    params = {"dataset_id": DATASET_ID, "from_column": "region",
+              "related_dataset_id": "a1b2c3d4e5f6", "to_column": "nom"}  # fmt: skip
+    out = await tool.invoke(params, ToolContext())
+    assert not out.is_error and not tool.requires_approval  # lecture : rien n'est enregistré
+    assert json.loads(seen[-1].content) == {
+        "name": "relation",
+        "dataset_id": "a1b2c3d4e5f6",
+        "from_column": "region",
+        "to_column": "nom",
+    }
+    assert "560 ligne(s) sur 573 trouvent leur clé (97.7 %)" in out.content
+    assert (
+        "13 ligne(s) sans correspondance (clé vide ou absente du jeu de dimension), ex. "
+        "« Corse », « Guyane »" in out.content
+    )
+    assert "1 clé(s) en double" in out.content and "À corriger en amont" in out.content
+    assert out.data == {"ok": False, "rows": 573, "matched": 560, "unmatched": 13,
+                        "duplicates": 1, "sample": ["Corse", "Guyane"]}  # fmt: skip
+
+    # Schéma déjà lu : une colonne inconnue est refusée sur place, avec suggestion
+    ctx = ToolContext()
+    await tools(viz)["data_via_describe_dataset"].invoke({"dataset_id": DATASET_ID}, ctx)
+    calls = len(seen)
+    bad = await tool.invoke({**params, "from_column": "regoin"}, ctx)
+    assert bad.is_error and "Vouliez-vous dire : region" in bad.content and len(seen) == calls
+    await viz.aclose()
+
+
+async def test_check_relation_relays_a_refusal_from_viz() -> None:
+    viz, seen = viz_with(
+        {("POST", f"/datasets/{DATASET_ID}/relations/check"): {"ok": False, "error": "Le jeu lié n'existe pas."}}
+    )  # fmt: skip
+    params = {"dataset_id": DATASET_ID, "from_column": "region",
+              "related_dataset_id": "0123456789ab", "to_column": "nom"}  # fmt: skip
+    out = await tools(viz)["data_via_check_relation"].invoke(params, ToolContext())
+    assert out.is_error and "Le jeu lié n'existe pas" in out.content
+    # Identifiant mal formé (Viz : 12 caractères hexadécimaux) : refusé en clair, sans appel
+    calls = len(seen)
+    bad = await tools(viz)["data_via_check_relation"].invoke(
+        {**params, "related_dataset_id": "regions"}, ToolContext()
+    )
+    assert bad.is_error and "12 caractères hexadécimaux" in bad.content and len(seen) == calls
+    await viz.aclose()
 
 
 # ─── Endpoints /api/data-via ──────────────────────────────────────

@@ -7,10 +7,15 @@ est verrouillé sur le modèle local (Ollama), sans repli vers Claude.
 On n'appelle jamais `POST /chapters/{id}/generate` (génération par le moteur IA de Savoir,
 qui peut être Claude selon ses réglages) : l'agent rédige lui-même les cartes avec le modèle
 local, puis les enregistre avec `savoir_add_flashcards`.
+
+Modèle local : les sorties sont bornées (extraits de chapitre de 4 000 caractères, questions
+seules pour la liste des cartes) et les écritures restent à la portée d'un tour de modèle (15
+cartes par appel ; un long document s'importe depuis le fichier joint, sans être recopié).
 """
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Any, Literal
 
@@ -39,10 +44,15 @@ from app.schemas.savoir import (
     StudySession,
 )
 from app.tools.base import BaseTool, ToolContext, ToolInput, ToolOutput
+from app.tools.files import ConversationFiles, FilesError
 from app.tools.formatting import markdown_table
 from app.tools.http import AppClient, AppError, AppRequestError, safe_id
 
 MAX_CARD_TEXT = 400
+#: Cartes par appel de savoir_add_flashcards : ce qu'un modèle local écrit sans couper son JSON
+MAX_CARDS_PER_CALL = 15
+#: Fichiers que Savoir sait importer comme chapitre (config.py : ALLOWED_EXTENSIONS)
+CHAPTER_EXTENSIONS = (".md", ".markdown", ".txt", ".pdf")
 
 
 class SavoirClient(AppClient):
@@ -110,6 +120,18 @@ class SavoirClient(AppClient):
             "POST", f"courses/{safe_id(course_id)}/chapters", json_body=body.model_dump()
         )
         return self.parse(Chapter, data)
+
+    async def import_chapter(
+        self, course_id: int, title: str, filename: str, data: bytes, media_type: str
+    ) -> Chapter:
+        """Chapitre importé d'un fichier (multipart « file ») : Savoir en extrait le texte."""
+        response = await self.request(
+            "POST",
+            f"courses/{safe_id(course_id)}/chapters",
+            files={"file": (filename, data, media_type or "application/octet-stream")},
+            form={"title": title},
+        )
+        return self.parse(Chapter, response)
 
     async def add_cards(self, body: CardsCreate) -> CreatedCards:
         data = await self.request(
@@ -199,7 +221,7 @@ class OverviewTool(_SavoirTool[NoInput]):
 
 
 class CourseInput(ToolInput):
-    course_id: int = Field(gt=0)
+    course_id: int = Field(gt=0, description="Identifiant du cours (savoir_overview).")
 
 
 class CourseTool(_SavoirTool[CourseInput]):
@@ -236,9 +258,14 @@ class CourseTool(_SavoirTool[CourseInput]):
 
 
 class ChapterInput(ToolInput):
-    chapter_id: int = Field(gt=0)
+    chapter_id: int = Field(gt=0, description="Identifiant du chapitre (savoir_course).")
     offset: int = Field(default=0, ge=0, description="Début de l'extrait, en caractères.")
-    max_chars: int = Field(default=8000, ge=500, le=20000)
+    max_chars: int = Field(
+        default=4000,
+        ge=500,
+        le=12_000,
+        description="Taille de l'extrait (500 à 12 000) ; la suite se lit avec offset.",
+    )
 
 
 class ChapterTool(_SavoirTool[ChapterInput]):
@@ -267,18 +294,31 @@ class ChapterTool(_SavoirTool[ChapterInput]):
 
 
 class FlashcardsInput(ToolInput):
-    course_id: int | None = Field(default=None, gt=0)
-    chapter_id: int | None = Field(default=None, gt=0)
-    status: CardStatus | None = None
-    card_type: CardType | None = None
-    limit: int = Field(default=60, ge=1, le=200)
+    course_id: int | None = Field(default=None, gt=0, description="Cartes d'un cours.")
+    chapter_id: int | None = Field(default=None, gt=0, description="Cartes d'un chapitre.")
+    status: CardStatus | None = Field(
+        default=None, description="nouvelle, a_revoir, en_cours ou maitrisee."
+    )
+    card_type: CardType | None = Field(
+        default=None, description="notion, definition, formule ou theoreme."
+    )
+    with_answers: bool = Field(
+        default=False,
+        description="true = avec les réponses. Les questions suffisent pour éviter les doublons.",
+    )
+    limit: int = Field(
+        default=30,
+        ge=1,
+        le=100,
+        description="Cartes affichées au plus (le décompte porte sur toutes).",
+    )
 
 
 class FlashcardsTool(_SavoirTool[FlashcardsInput]):
     name = "savoir_flashcards"
     description = (
-        "Cartes de révision (question, réponse, type, statut, échéance), filtrées par cours, "
-        "chapitre, statut ou type. Utile pour éviter les doublons avant d'en ajouter."
+        "Cartes de révision (question, type, statut, échéance ; réponses sur demande), filtrées "
+        "par cours, chapitre, statut ou type. Utile pour éviter les doublons avant d'en ajouter."
     )
     input_model = FlashcardsInput
 
@@ -294,17 +334,22 @@ class FlashcardsTool(_SavoirTool[FlashcardsInput]):
         )
         shown = cards[: params.limit]
         lines = [head + ("." if len(shown) == len(cards) else f" ; {len(shown)} premières.")]
-        lines += [card_line(c) for c in shown]
+        if cards and not params.with_answers:
+            lines.append("(Questions seulement : with_answers=true pour les réponses.)")
+        lines += [card_line(c, with_answer=params.with_answers) for c in shown]
         return ToolOutput(content="\n".join(lines))
 
 
 class DueInput(ToolInput):
-    course_id: int | None = Field(default=None, gt=0)
+    course_id: int | None = Field(
+        default=None, gt=0, description="Un seul cours ; par défaut tous."
+    )
     mode: Literal["dues", "toutes"] = Field(
         default="dues",
         description="dues : cartes à réviser maintenant ; toutes : tirage au hasard.",
     )
-    limit: int = Field(default=10, ge=1, le=50)
+    # 30 au plus : question et réponse de chaque carte restent dans la fenêtre d'un modèle local
+    limit: int = Field(default=10, ge=1, le=30, description="Cartes de la séance (1 à 30).")
 
 
 class DueCardsTool(_SavoirTool[DueInput]):
@@ -329,12 +374,19 @@ class DueCardsTool(_SavoirTool[DueInput]):
 
 
 # ─── Écritures (validation) ───────────────────────────────────────
+#
+# La carte de validation n'affiche que le résumé : il dit tout ce qui sera écrit (chaque
+# carte, chaque note, le début du texte), pour qu'on n'autorise jamais à l'aveugle.
+
+
+def _quoted(text: str, limit: int) -> str:
+    return f"« {clip(text, limit)} »"
 
 
 class CreateCourseInput(ToolInput):
-    title: str = Field(min_length=1, max_length=200)
-    subject: str = Field(default="", max_length=100)
-    description: str = Field(default="", max_length=2000)
+    title: str = Field(min_length=1, max_length=200, description="Titre du cours.")
+    subject: str = Field(default="", max_length=100, description="Matière (facultatif).")
+    description: str = Field(default="", max_length=2000, description="Présentation courte.")
 
 
 class CreateCourseTool(_SavoirTool[CreateCourseInput]):
@@ -344,9 +396,12 @@ class CreateCourseTool(_SavoirTool[CreateCourseInput]):
     requires_approval = True
 
     def approval_summary(self, params: CreateCourseInput) -> str:
-        return f"Créer le cours « {params.title} »" + (
+        text = f"Créer le cours « {params.title} »" + (
             f" ({params.subject})" if params.subject else ""
         )
+        if params.description:
+            text += f" — description : {_quoted(params.description, 160)}"
+        return text
 
     async def run(self, params: CreateCourseInput, ctx: ToolContext) -> ToolOutput:
         course = await self.client.create_course(CourseCreate(**params.model_dump()))
@@ -354,31 +409,87 @@ class CreateCourseTool(_SavoirTool[CreateCourseInput]):
 
 
 class AddChapterInput(ToolInput):
-    course_id: int = Field(gt=0)
-    title: str = Field(min_length=1, max_length=200)
-    content: str = Field(
-        min_length=1, max_length=200_000, description="Texte du chapitre (Markdown, LaTeX)."
+    course_id: int = Field(gt=0, description="Cours visé (identifiant de savoir_overview).")
+    title: str = Field(min_length=1, max_length=200, description="Titre du chapitre.")
+    content: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200_000,
+        description="Texte rédigé ou collé (Markdown, LaTeX). Pour un document joint au chat, "
+        "utiliser file plutôt que de le recopier.",
     )
+    file: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Nom d'un fichier joint à la conversation (.md, .txt ou .pdf) : Savoir en "
+        "extrait le texte lui-même.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_source(cls, data: object) -> object:
+        # Un petit modèle envoie souvent l'autre source vide (« "content": "" ») : non renseignée
+        if isinstance(data, dict):
+            return {
+                k: v
+                for k, v in data.items()
+                if not (k in ("content", "file") and isinstance(v, str) and not v.strip())
+            }
+        return data
+
+    @model_validator(mode="after")
+    def _source(self) -> AddChapterInput:
+        if (self.content is None) == (self.file is None):
+            raise ValueError("Indique content (texte) OU file (fichier joint), un seul des deux.")
+        # Extension visible et non prise en charge : refus avant la validation de l'utilisateur
+        # (un nom sans extension ou un identifiant est vérifié une fois le fichier retrouvé)
+        ext = re.search(r"\.([a-z][a-z0-9]{0,4})$", (self.file or "").strip().lower())
+        if ext and f".{ext.group(1)}" not in CHAPTER_EXTENSIONS:
+            raise ValueError(
+                f"Savoir importe les fichiers .md, .txt ou .pdf : « {self.file} » ne convient pas."
+            )
+        return self
 
 
 class AddChapterTool(_SavoirTool[AddChapterInput]):
     name = "savoir_add_chapter"
     description = (
-        "Ajoute un chapitre (texte collé ou rédigé : fiche de synthèse, notes de cours) à un "
-        "cours. Action soumise à validation."
+        "Ajoute un chapitre à un cours : texte rédigé ou collé (fiche de synthèse, notes), ou "
+        "fichier joint à la conversation (.md, .txt, .pdf) importé tel quel. Action soumise à "
+        "validation."
     )
     input_model = AddChapterInput
     requires_approval = True
 
+    def __init__(self, client: SavoirClient, files: ConversationFiles | None = None) -> None:
+        super().__init__(client)
+        self.files = files or ConversationFiles(None, [])
+
     def approval_summary(self, params: AddChapterInput) -> str:
-        return (
-            f"Ajouter le chapitre « {params.title} » ({len(params.content)} caractères) "
-            f"au cours #{params.course_id}"
-        )
+        target = f"le chapitre « {params.title} » au cours #{params.course_id}"
+        if params.file:
+            return f"Ajouter {target}, importé du fichier joint « {params.file} » (texte extrait par Savoir)"
+        content = params.content or ""
+        return f"Ajouter {target} ({len(content)} caractères) : {_quoted(content, 200)}"
 
     async def run(self, params: AddChapterInput, ctx: ToolContext) -> ToolOutput:
+        if params.file:
+            info, data = await self.files.load(params.file)
+            if not info.name.lower().endswith(CHAPTER_EXTENSIONS):
+                raise FilesError(
+                    f"Savoir importe les fichiers .md, .txt ou .pdf : « {info.name} » ne convient "
+                    "pas. Demandez à l'utilisateur un export en PDF ou en texte."
+                )
+            ch = await self.client.import_chapter(
+                params.course_id, params.title, info.name, data, info.media_type
+            )
+            return ToolOutput(
+                content=f"Chapitre #{ch.id} « {ch.title} » importé de « {info.name} » "
+                f"({ch.char_count} caractères extraits)."
+            )
         ch = await self.client.add_chapter(
-            params.course_id, ChapterCreate(title=params.title, content=params.content)
+            params.course_id, ChapterCreate(title=params.title, content=params.content or "")
         )
         return ToolOutput(
             content=f"Chapitre #{ch.id} « {ch.title} » ajouté ({ch.char_count} caractères)."
@@ -390,7 +501,11 @@ class AddCardsInput(ToolInput):
     course_id: int | None = Field(
         default=None, gt=0, description="Cours, si la carte n'a pas de chapitre."
     )
-    cards: list[NewCard] = Field(min_length=1, max_length=60)
+    cards: list[NewCard] = Field(
+        min_length=1,
+        max_length=MAX_CARDS_PER_CALL,
+        description=f"{MAX_CARDS_PER_CALL} cartes au plus par appel ; au-delà, plusieurs appels.",
+    )
 
     @model_validator(mode="after")
     def _target(self) -> AddCardsInput:
@@ -403,8 +518,8 @@ class AddCardsTool(_SavoirTool[AddCardsInput]):
     name = "savoir_add_flashcards"
     description = (
         "Enregistre des cartes de révision (question, réponse, type : notion, definition, "
-        "formule, theoreme) dans un chapitre ou un cours, marquées « générées par IA ». "
-        "Action soumise à validation."
+        "formule, theoreme) dans un chapitre ou un cours, marquées « générées par IA », "
+        f"{MAX_CARDS_PER_CALL} au plus par appel. Action soumise à validation."
     )
     input_model = AddCardsInput
     requires_approval = True
@@ -417,10 +532,11 @@ class AddCardsTool(_SavoirTool[AddCardsInput]):
         )
         kinds = Counter(CARD_TYPE_LABELS[c.type].lower() for c in params.cards)
         detail = ", ".join(f"{n} {k}" for k, n in kinds.most_common())
-        first = clip(params.cards[0].question, 80)
-        return (
-            f"Enregistrer {len(params.cards)} carte(s) dans {target} ({detail}), dont « {first} »"
+        cards = " ; ".join(
+            f"{i}. {_quoted(c.question, 60)} → {_quoted(c.answer, 50)}"
+            for i, c in enumerate(params.cards, start=1)
         )
+        return f"Enregistrer {len(params.cards)} carte(s) dans {target} ({detail}) : {cards}"
 
     async def run(self, params: AddCardsInput, ctx: ToolContext) -> ToolOutput:
         created = await self.client.add_cards(
@@ -445,12 +561,19 @@ class AddCardsTool(_SavoirTool[AddCardsInput]):
 class ReviewItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    card_id: int = Field(gt=0)
-    rating: Rating
+    card_id: int = Field(gt=0, description="Identifiant de la carte (#… de savoir_due_cards).")
+    rating: Rating = Field(
+        description="a_revoir (faux ou très incomplet), correct (juste avec hésitation), "
+        "maitrise (juste et immédiat)."
+    )
 
 
 class RecordReviewsInput(ToolInput):
-    reviews: list[ReviewItem] = Field(min_length=1, max_length=50)
+    reviews: list[ReviewItem] = Field(
+        min_length=1,
+        max_length=50,
+        description="Une entrée par carte interrogée (card_id et sa note), 50 au plus.",
+    )
 
 
 class RecordReviewsTool(_SavoirTool[RecordReviewsInput]):
@@ -465,8 +588,8 @@ class RecordReviewsTool(_SavoirTool[RecordReviewsInput]):
     def approval_summary(self, params: RecordReviewsInput) -> str:
         counts = Counter(RATING_LABELS[r.rating] for r in params.reviews)
         detail = ", ".join(f"{n} {label}" for label, n in counts.most_common())
-        ids = ", ".join(f"#{r.card_id}" for r in params.reviews[:10])
-        return f"Enregistrer {len(params.reviews)} révision(s) ({detail}) sur les cartes {ids}"
+        pairs = ", ".join(f"#{r.card_id} → {RATING_LABELS[r.rating]}" for r in params.reviews)
+        return f"Enregistrer {len(params.reviews)} révision(s) ({detail}) : {pairs}"
 
     async def run(self, params: RecordReviewsInput, ctx: ToolContext) -> ToolOutput:
         done: list[str] = []
@@ -496,10 +619,13 @@ def savoir_read_tools(client: SavoirClient) -> list[BaseTool[Any]]:
     ]
 
 
-def savoir_write_tools(client: SavoirClient) -> list[BaseTool[Any]]:
+def savoir_write_tools(
+    client: SavoirClient, files: ConversationFiles | None = None
+) -> list[BaseTool[Any]]:
+    """`files` : fichiers joints à la conversation (import d'un chapitre depuis un fichier)."""
     return [
         CreateCourseTool(client),
-        AddChapterTool(client),
+        AddChapterTool(client, files),
         AddCardsTool(client),
         RecordReviewsTool(client),
     ]

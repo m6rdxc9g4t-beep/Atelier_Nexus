@@ -23,13 +23,22 @@ le service n'est pas Atelier Ciné.
 
 | Boîte | Outil | Rôle |
 |---|---|---|
-| `cine` | `cine_library` | Catalogue filtré (type, mot du titre, qualité 4K / HDR / 1080p / 720p, années), trié (récents, titre, année) |
+| `cine` | `cine_library` | Catalogue filtré (type, mot du titre, genre, qualité 4K / HDR / 1080p / 720p, années), trié (récents, titre, année), avec la colonne genres |
 | `cine` | `cine_title` | Fiche d'un film (qualité, durée, sous-titres, technique) ou d'une série (épisodes par saison, épisodes manquants) |
 | `cine` | `cine_library_report` | Erreurs d'analyse, épisodes manquants, doublons probables, films sans année ou sans sous-titres, répartition des qualités |
 | `cine` | `cine_ai_summary` | Synopsis, genres et tags proposés par l'Ollama de Ciné (rien n'est enregistré ; jusqu'à 90 s) |
 | `cine_write` | `cine_scan` | Relance l'analyse des dossiers et réécrit l'index : **validation**, jusqu'à 10 min |
 
 On n'expose pas la gestion des profils ni le réglage des dossiers (`PUT /api/settings`).
+
+Genres : Ciné n'en renseigne souvent aucun (médiathèque d'exemple : aucun). `cine_library` affiche ceux qu'il connaît
+(3 au plus par titre, « ∅ » sinon) ; le filtre `genre` (accents et majuscules ignorés) est **ignoré, et la réponse le
+dit**, quand aucun titre n'a de genre, plutôt que de renvoyer une liste vide trompeuse. Quand seuls certains titres en
+ont, la réponse compte ceux qui, sans genre renseigné, sont écartés par le filtre (« 5 titre(s) sans genre renseigné
+écarté(s) ») : le modèle ne conclut pas qu'aucun autre titre ne convient. Le Ciné-club déduit alors un genre du titre
+en le signalant ; `cine_ai_summary` (lent) en propose pour un titre précis.
+
+L'artefact « Médiathèque Atelier Ciné » n'est publié que si la liste dépasse les 50 lignes montrées au modèle.
 
 ## Confidentialité
 

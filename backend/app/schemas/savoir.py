@@ -149,9 +149,13 @@ class ChapterCreate(_Body):
 class NewCard(_Body):
     """Carte proposée : la clé est `type` (et non `card_type` comme une carte enregistrée)."""
 
-    question: str = Field(min_length=1, max_length=2000)
-    answer: str = Field(min_length=1, max_length=4000)
-    type: CardType = "notion"
+    question: str = Field(
+        min_length=1, max_length=2000, description="Question précise, sur une seule idée."
+    )
+    answer: str = Field(
+        min_length=1, max_length=4000, description="Réponse courte et autonome (LaTeX : $…$)."
+    )
+    type: CardType = Field(default="notion", description="notion, definition, formule ou theoreme.")
 
 
 class CardsCreate(_Body):

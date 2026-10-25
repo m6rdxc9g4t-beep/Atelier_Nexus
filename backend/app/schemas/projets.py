@@ -139,6 +139,17 @@ class WorkItemDetail(WorkItem):
     successors: list[Neighbour] = Field(default_factory=list)
 
 
+class Story(_R):
+    """Story d'un epic (`StorySchema`) : le conteneur des éléments FEATURE / TASK / BUG."""
+
+    id: int
+    epicId: int
+    title: str
+    description: str = ""
+    startDate: date | None = None
+    dueDate: date | None = None
+
+
 class Milestone(_R):
     id: int
     projectId: int
@@ -267,9 +278,21 @@ class WorkItemCreate(_W):
 
 
 class WorkItemUpdate(_W):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=100_000)
     status: Status | None = None
     progress: int | None = Field(default=None, ge=0, le=100)
     priority: Priority | None = None
+    estimatedHours: float | None = Field(default=None, gt=0, le=10_000)
+    dueDate: date | None = None
+
+
+class StoryCreate(_W):
+    """`ContainerCreateSchema` d'Atelier Projets (`POST /epics/{id}/stories`)."""
+
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=100_000)
+    startDate: date | None = None
     dueDate: date | None = None
 
 

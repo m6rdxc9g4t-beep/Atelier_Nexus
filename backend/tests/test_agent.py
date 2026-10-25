@@ -10,7 +10,7 @@ from app.agents import (
     ToolCallEvent,
     ToolResultEvent,
 )
-from app.core.llm import Message, ProviderUnavailableError, ToolResultBlock
+from app.core.llm import Message, ProviderUnavailableError, ToolResultBlock, ToolUseBlock
 from app.tools import BaseTool, PublishArtifactTool, ToolContext, ToolInput, ToolOutput
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
 
@@ -120,13 +120,37 @@ async def test_unknown_tool_is_reported_to_model() -> None:
     assert result.is_error and "Outil inconnu" in result.content
 
 
-async def test_stops_after_max_iterations() -> None:
+async def test_stops_after_max_iterations_with_a_closing_summary() -> None:
     script = [tool_response("add", {"a": 1, "b": 1}, call_id=f"c{i}") for i in range(3)]
-    provider = ScriptedProvider("anthropic", list(script))
+    provider = ScriptedProvider("anthropic", [*script, text_response("Trois additions : 2.")])
     agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
     result = await agent.run([Message.user("boucle")])
     assert result.stop_reason == "max_iterations"
     assert result.iterations == 3
+    # Au plafond : un dernier appel pour la synthèse, plutôt qu'un texte vide
+    assert result.text == "Trois additions : 2."
+    assert "Nombre d'étapes maximal atteint" in (provider.requests[-1].system or "")
+    assert "Nombre d'étapes maximal" not in (provider.requests[0].system or "")
+    assert [m.role for m in result.new_messages][-2:] == ["user", "assistant"]
+
+
+async def test_closing_call_never_leaves_a_tool_call_without_result() -> None:
+    script = [tool_response("add", {"a": 1, "b": 1}, call_id=f"c{i}") for i in range(4)]
+    provider = ScriptedProvider("anthropic", script)
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
+    events = [e async for e in agent.run_stream([Message.user("boucle")])]
+    done = events[-1]
+    assert isinstance(done, DoneEvent)
+    result = done.result
+    last = result.new_messages[-1]
+    assert last.role == "assistant"
+    assert not any(isinstance(b, ToolUseBlock) for b in last.content)  # jamais exécuté
+    assert result.stop_reason == "max_iterations"
+    assert result.text.startswith("Nombre d'étapes maximal atteint")
+    # Le texte par défaut est diffusé comme une réponse : le chat l'affiche aussi
+    shown = "".join(e.text for e in events if isinstance(e, TextDeltaEvent))
+    assert shown == result.text
+    assert [e.id for e in events if isinstance(e, ToolCallEvent)] == ["c0", "c1", "c2"]
 
 
 async def test_sticks_to_fallback_provider_for_whole_run() -> None:

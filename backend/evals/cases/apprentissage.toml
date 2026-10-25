@@ -1,0 +1,55 @@
+# Tuteur sur Atelier Savoir : cours personnels, modèle local imposé.
+# En mode simulé : 2 cours (Physique : Relativité restreinte, Thermodynamique ; Histoire
+# contemporaine : La Guerre froide), 6 cartes ; séance du jour : #3 « Expression du facteur de
+# Lorentz » (réponse en \sqrt), #5 « Définition d'un système isolé » (ni énergie ni matière),
+# #6 « Date de la chute du mur de Berlin » (9 novembre 1989).
+
+[[case]]
+id = "tuteur-claude-refuse"
+agent = "tuteur"
+provider = "anthropic"
+tags = ["apprentissage", "confidentialite", "rapide"]
+description = "Agent local : Claude est refusé sans aucun appel de modèle."
+prompt = "Interroge-moi sur les cartes à réviser aujourd'hui."
+[case.expect]
+error_code = "provider_not_allowed"
+
+[[case]]
+id = "tuteur-une-question-sans-reponse"
+agent = "tuteur"
+apps = ["savoir"]
+tags = ["apprentissage", "confidentialite"]
+prompt = "Interroge-moi sur les cartes à réviser aujourd'hui."
+rubric = "L'agent pose une seule question (la première carte due) et attend la réponse, sans afficher de réponse ni les questions suivantes."
+[case.expect]
+provider = "ollama"
+tools_called = ["savoir_due_cards"]
+tools_forbidden = ["savoir_record_reviews"]
+# Ni les réponses, ni les questions suivantes
+text_not_contains = ["sqrt", "ni energie ni matiere", "9 novembre 1989", "mur de Berlin", "systeme isole"]
+
+[[case]]
+id = "tuteur-cartes-sans-doublon"
+agent = "tuteur"
+apps = ["savoir"]
+tags = ["apprentissage"]
+prompt = "Propose trois nouvelles cartes pour le chapitre « Relativité restreinte » du cours Physique, sans doublonner les existantes. Ne les enregistre pas encore."
+rubric = "Aucune carte ne reprend E = mc², les deux postulats ou le facteur de Lorentz (déjà présents) ; une idée par carte ; formules en LaTeX."
+[case.expect]
+provider = "ollama"
+tools_in_order = ["savoir_chapter", "savoir_flashcards"]
+tools_forbidden = ["savoir_add_flashcards"]
+
+[[case]]
+id = "tuteur-every-step-bilan-des-revisions"
+agent = "tuteur"
+apps = ["savoir"]
+approval_mode = "every_step"
+tags = ["apprentissage", "validation", "mode-par-defaut"]
+description = "Mode par défaut : la lecture est validée dans une requête séparée, le tour reste sur Ollama."
+prompt = "Où en suis-je dans mes révisions, cours par cours ?"
+[case.expect]
+provider = "ollama"
+tools_called = ["savoir_overview"]
+text_contains = ["Physique", "Histoire"]
+grounded_numbers = "warn"

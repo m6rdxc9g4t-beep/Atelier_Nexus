@@ -1,5 +1,7 @@
 # Agents généraux : Assistant, Orchestrateur, Rédacteur.
 
+# ─── Assistant ───────────────────────────────────────────────────
+
 [[case]]
 id = "assistant-date-du-jour"
 agent = "assistant"
@@ -7,6 +9,9 @@ tags = ["general", "rapide"]
 prompt = "Quel jour sommes-nous ?"
 [case.expect]
 tools_called = ["current_datetime"]
+text_regex = "(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)"
+# Un appel d'outil, puis la réponse
+max_iterations = 2
 
 [[case]]
 id = "assistant-oriente-vers-data-analyst"
@@ -17,15 +22,84 @@ prompt = "Je veux analyser mes ventes par région et en tirer des mesures Power 
 text_contains = ["Data Analyst"]
 
 [[case]]
+id = "assistant-pas-de-solde-invente"
+agent = "assistant"
+tags = ["general", "pas-d-invention"]
+prompt = "Combien ai-je sur mon compte courant ?"
+rubric = "L'assistant dit qu'il n'a pas accès aux comptes et oriente vers l'agent Finance (100 % local), sans montant."
+[case.expect]
+text_contains = ["Finance"]
+# Aucun montant (« 100 % local » n'est pas un chiffre à sourcer : pas de contrôle strict)
+text_not_contains = ["€"]
+grounded_numbers = "warn"
+
+# ─── Orchestrateur ───────────────────────────────────────────────
+
+[[case]]
 id = "orchestrateur-delegue"
 agent = "orchestrateur"
 apps = ["data_via"]
 tags = ["general", "delegation"]
+description = "Les chiffres viennent du Data Analyst (writes_only : le sous-agent garde ses lectures)."
 prompt = "Calcule le chiffre d'affaires par région dans Atelier Viz, puis rédige un court message de félicitations pour l'équipe de la région en tête."
 rubric = "Le message félicite l'équipe de la région réellement en tête (Île-de-France) et reprend un chiffre issu de l'analyse."
 [case.expect]
 tools_called = ["delegate_to_agent"]
-text_contains = ["Ile-de-France"]
+tool_args = [{ tool = "delegate_to_agent", equals = { agent = "data_analyst" } }]
+text_contains_any = ["Ile-de-France", "francilien"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "orchestrateur-every-step-donnees-reelles"
+agent = "orchestrateur"
+apps = ["data_via"]
+approval_mode = "every_step"
+tags = ["general", "delegation", "mode-par-defaut"]
+description = "Mode par défaut : un sous-agent n'a AUCUN outil ; la région en tête doit venir d'une lecture réelle de Viz, pas d'un sous-agent qui devine."
+prompt = "Calcule le chiffre d'affaires par région dans Atelier Viz, puis rédige un court message de félicitations pour l'équipe de la région en tête."
+rubric = "Le message félicite l'Île-de-France avec un chiffre lu dans Atelier Viz ; si les données n'ont pas pu être lues, l'orchestrateur le dit au lieu de choisir une région au hasard."
+[case.expect]
+# En every_step, c'est l'orchestrateur qui lit (son sous-agent n'a aucun outil)
+tools_called = ["data_via_query"]
+tool_errors_max = 0
+text_contains_any = ["Ile-de-France", "francilien"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "orchestrateur-finance-reste-locale"
+agent = "orchestrateur"
+apps = ["tresorerie"]
+provider = "anthropic"
+tags = ["general", "delegation", "confidentialite"]
+description = "Sur Claude, l'orchestrateur ne joint pas Finance : il renvoie vers l'agent, sans montant."
+prompt = "Fais le point sur mes dépenses du mois, puis rédige un court message pour mon conjoint."
+rubric = "L'orchestrateur explique que les finances restent sur le modèle local, invite à ouvrir l'agent Finance et ne donne aucun montant."
+[case.expect]
+provider = "anthropic"
+text_contains = ["Finance"]
+text_not_contains = ["€"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "orchestrateur-ollama-joint-finance"
+agent = "orchestrateur"
+apps = ["tresorerie"]
+provider = "ollama"
+approval_mode = "every_step"
+tags = ["general", "delegation", "confidentialite", "mode-par-defaut"]
+description = "Sur le modèle local, la délégation à Finance est acceptée (validée dans une requête séparée), et tout le tour reste sur Ollama."
+prompt = "Demande à l'agent Finance un point sur mes dépenses du mois, puis rédige un court message pour mon conjoint."
+rubric = "L'orchestrateur confie la sous-tâche à Finance et ne présente aucun montant que Finance n'a pas donné."
+[case.expect]
+provider = "ollama"
+tool_args = [{ tool = "delegate_to_agent", equals = { agent = "finance" } }]
+tool_errors_max = 0
+# Le sous-agent n'a aucun outil en every_step : un montant ne peut être qu'inventé
+text_contains = ["Finance"]
+text_not_contains = ["€"]
+grounded_numbers = "warn"
+
+# ─── Rédacteur ───────────────────────────────────────────────────
 
 [[case]]
 id = "redacteur-compte-rendu"
@@ -35,3 +109,13 @@ prompt = "Rédige le compte rendu de la réunion d'équipe de ce matin. Décisio
 rubric = "Le compte rendu contient les deux décisions et les deux actions avec leur responsable et l'échéance, sans rien inventer d'autre (participants, chiffres)."
 [case.expect]
 artifacts = [{ kind = "markdown", content_contains = ["Ollama", "28/10", "Léa"] }]
+
+[[case]]
+id = "redacteur-courriel-client"
+agent = "redacteur"
+tags = ["redaction"]
+prompt = "Transforme ce texte en courriel clair pour un client non technique : « La migration de PostgreSQL 14 vers 16 impose une interruption de service le samedi 8 novembre entre 6 h et 8 h. »"
+rubric = "Objet explicite, raison dès la première phrase, date et créneau exacts, sans jargon, contact ou demande à la fin."
+[case.expect]
+output_contains_any = ["8 novembre"]
+artifacts = [{ kind = "markdown", content_contains = ["objet"] }]

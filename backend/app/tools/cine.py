@@ -147,20 +147,39 @@ class _CineTool[InputT: ToolInput](BaseTool[InputT]):
 
 
 class LibraryInput(ToolInput):
-    kind: Literal["all", "movie", "show"] = "all"
-    search: str | None = Field(default=None, max_length=100, description="Mot du titre.")
-    quality: Literal["4K", "1080p", "720p", "HDR"] | None = None
-    year_from: int | None = Field(default=None, ge=1880, le=2100)
-    year_to: int | None = Field(default=None, ge=1880, le=2100)
-    sort: Literal["recent", "title", "year"] = "recent"
+    kind: Literal["all", "movie", "show"] = Field(
+        default="all", description="all = tout, movie = films, show = séries."
+    )
+    search: str | None = Field(
+        default=None, max_length=100, description="Mot du titre (accents et majuscules ignorés)."
+    )
+    genre: str | None = Field(
+        default=None,
+        max_length=50,
+        description="Genre renseigné dans Ciné (ex. « Science-fiction ») ; souvent aucun : voir "
+        "la colonne genres.",
+    )
+    quality: Literal["4K", "1080p", "720p", "HDR"] | None = Field(
+        default=None, description="4K, 1080p, 720p ou HDR."
+    )
+    year_from: int | None = Field(
+        default=None, ge=1880, le=2100, description="Année de sortie minimale."
+    )
+    year_to: int | None = Field(
+        default=None, ge=1880, le=2100, description="Année de sortie maximale."
+    )
+    sort: Literal["recent", "title", "year"] = Field(
+        default="recent",
+        description="recent = derniers ajoutés, title = titre, year = année (récents d'abord).",
+    )
 
 
 class LibraryTool(_CineTool[LibraryInput]):
     name = "cine_library"
     description = (
-        "Catalogue de la médiathèque Atelier Ciné : films et séries, avec année, qualité "
-        "(4K, HDR, 1080p…), durée, saisons / épisodes, sous-titres, date d'ajout. Filtres "
-        "par type, titre, qualité et années."
+        "Catalogue de la médiathèque Atelier Ciné : films et séries, avec année, genres (quand "
+        "Ciné les connaît), qualité (4K, HDR, 1080p…), durée, saisons / épisodes, sous-titres, "
+        "date d'ajout. Filtres par type, titre, genre, qualité et années."
     )
     input_model = LibraryInput
 
@@ -174,6 +193,16 @@ class LibraryTool(_CineTool[LibraryInput]):
             sources += lib.movies
         if params.kind in ("all", "show"):
             sources += lib.shows
+        genre = normalize_title(params.genre) if params.genre else None
+        notes: list[str] = []
+        if genre and not any(it.genres for it in sources):
+            # Rien à filtrer : on le dit plutôt que de renvoyer une liste vide trompeuse
+            notes.append(
+                f"Filtre genre « {params.genre} » ignoré : aucun titre n'a de genre renseigné dans "
+                "Ciné. Déduire un genre du titre seulement en le signalant."
+            )
+            genre = None
+        unknown_genre = 0  # titres retenus par les autres filtres, mais sans genre renseigné
         for it in sources:
             if wanted and wanted not in normalize_title(it.title):
                 continue
@@ -183,7 +212,16 @@ class LibraryTool(_CineTool[LibraryInput]):
                 continue
             if params.year_to and (it.year is None or it.year > params.year_to):
                 continue
+            if genre and not any(genre in normalize_title(g) for g in it.genres):
+                if not it.genres:
+                    unknown_genre += 1
+                continue
             items.append(it)
+        if unknown_genre:
+            notes.append(
+                f"{unknown_genre} titre(s) sans genre renseigné écarté(s) par le filtre genre : "
+                "relancer sans genre pour les voir (genre déduit du titre, en le signalant)."
+            )
         if params.sort == "recent":
             items.sort(key=lambda t: t.addedAt, reverse=True)
         elif params.sort == "title":
@@ -196,6 +234,7 @@ class LibraryTool(_CineTool[LibraryInput]):
             "type",
             "titre",
             "année",
+            "genres",
             "qualité",
             "durée / épisodes",
             "sous-titres",
@@ -211,7 +250,8 @@ class LibraryTool(_CineTool[LibraryInput]):
                 subs = "voir cine_title"
             rows.append([
                 it.id, "film" if isinstance(it, Movie) else "série", it.title, it.year,
-                ", ".join(it.quality) or "∅", length, subs, it.addedAt.date().isoformat(),
+                ", ".join(it.genres[:3]) or "∅", ", ".join(it.quality) or "∅", length, subs,
+                it.addedAt.date().isoformat(),
             ])  # fmt: skip
         table, truncated = table_for_model(headers, rows, noun="titre")
         head = (
@@ -221,11 +261,14 @@ class LibraryTool(_CineTool[LibraryInput]):
             f"{f' ; {len(lib.errors)} erreur(s) d’analyse (voir cine_library_report)' if lib.errors else ''}."
         )
         artifacts = [data_artifact("Médiathèque Atelier Ciné", headers, rows)] if truncated else []
-        return ToolOutput(content=f"{head}\n{table}", artifacts=artifacts)
+        return ToolOutput(content="\n".join([head, *notes, table]), artifacts=artifacts)
 
 
 class TitleInput(ToolInput):
-    media_id: str = Field(pattern=MEDIA_ID, description="Identifiant m-… (film) ou s-… (série).")
+    media_id: str = Field(
+        pattern=MEDIA_ID,
+        description="Identifiant m-… (film) ou s-… (série) donné par cine_library.",
+    )
 
 
 class TitleTool(_CineTool[TitleInput]):

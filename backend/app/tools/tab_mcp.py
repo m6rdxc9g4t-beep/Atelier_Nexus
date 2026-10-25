@@ -23,6 +23,7 @@ import contextlib
 import json
 import os
 import sys
+import unicodedata
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -292,7 +293,8 @@ class SetCellsTool(_TabWriteTool[SetCellsInput]):
     name = "tab_set_cells"
     description = (
         "Modifie des cellules d'une table d'Atelier Tab (valeurs saisies comme dans la grille, "
-        "formules comprises). Action soumise à validation."
+        'formules comprises). Ex. cells = [{"row": 2, "column": "C", "value": "30 000"}]. '
+        "Action soumise à validation."
     )
     input_model = SetCellsInput
 
@@ -321,7 +323,8 @@ class AddRowsInput(ToolInput):
     rows: list[dict[str, CellValue]] = Field(
         min_length=1,
         max_length=100,
-        description="Une ligne = {colonne: valeur} (lettre, libellé ou id).",
+        description='Une ligne = {colonne: valeur} (lettre, libellé ou id), ex. [{"Lot / Tâche": '
+        '"Plomberie", "Coût HT": "12 000", "Statut": "À faire"}].',
     )
     before_row: int | None = Field(
         default=None,
@@ -364,28 +367,171 @@ class DeleteRowsInput(ToolInput):
     rows: list[int | str] = Field(
         min_length=1, max_length=100, description="Numéros affichés ou ids rec_…."
     )
+    titles: list[str] = Field(
+        min_length=1,
+        max_length=100,
+        description="Pour chaque ligne, dans le même ordre, son titre (ou une valeur qui "
+        'l\'identifie) tel que lu par tab_read_table ; "" pour une ligne entièrement vide. Ex. '
+        'rows = [5, 7], titles = ["Plomberie", "Peinture"]. Rien n\'est supprimé si une ligne '
+        "ne le contient plus.",
+    )
+
+    @model_validator(mode="after")
+    def _one_title_per_row(self) -> DeleteRowsInput:
+        if len(self.titles) != len(self.rows):
+            raise ValueError("Donner un titre par ligne à supprimer, dans le même ordre (titles).")
+        if len({str(r).strip() for r in self.rows}) != len(self.rows):
+            raise ValueError("Une ligne est citée deux fois.")
+        return self
+
+
+#: Lignes lues par appel de `read_table` (maximum du serveur MCP de Tab)
+READ_PAGE = 500
+#: Titres attendus d'une ligne sans aucune valeur (`_value(None)` affiche « (vide) »)
+EMPTY_TITLES = frozenset({"", "(vide)"})
+#: Caractères au moins avant « … » pour qu'un début de titre désigne une ligne : « P… » vaudrait
+#: pour toute ligne qui commence par P
+MIN_PREFIX = 4
+
+
+def _row_number(ref: int | str) -> int | None:
+    """Numéro affiché d'une référence de ligne (`5` ou `"5"`), None pour un id `rec_…`."""
+    if isinstance(ref, int):
+        return ref
+    return int(ref) if ref.strip().isdigit() else None
+
+
+def _norm(text: str) -> str:
+    """Casse, accents et espaces ignorés ; les autres caractères (œ, emoji, idéogrammes) sont
+    gardés, pour qu'un titre qui n'en contient pas d'autres ne devienne jamais vide."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    plain = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(plain.casefold().split())
+
+
+def _is_blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _same_text(expected: str, value: Any) -> bool:
+    """Valeur de cellule = titre attendu (casse, accents et espaces ignorés) ; un titre recopié
+    tronqué (« Charpente bois et couv… ») vaut pour son début, s'il a au moins `MIN_PREFIX`
+    caractères (sinon il est comparé tel quel, points compris)."""
+    if value is None or isinstance(value, bool):
+        return False
+    shown = _value(value) if isinstance(value, float) else str(value)
+    text = expected.strip()
+    prefix = _norm(text.rstrip("…. ")) if text.endswith(("…", "...")) else ""
+    got = _norm(shown)
+    if len(prefix) >= MIN_PREFIX:
+        return got.startswith(prefix)
+    want = _norm(text)
+    return bool(want) and want == got
+
+
+def _shown_title(title: CellValue) -> str:
+    """Titre d'une ligne dans une carte ou un résultat : « Plomberie », ou « ligne vide »."""
+    if title is None or (isinstance(title, str) and title.strip() in EMPTY_TITLES):
+        return "ligne vide"
+    return f"« {_value(title)} »"
+
+
+def _title_match(expected: str, cells: dict[str, Any]) -> tuple[bool, CellValue]:
+    """(la ligne correspond ?, valeur reconnue) ; un titre vide ne désigne qu'une ligne vide."""
+    if expected.strip() in EMPTY_TITLES:
+        return all(_is_blank(v) for v in cells.values()), None
+    match = next((v for v in cells.values() if _same_text(expected, v)), None)
+    return match is not None, match
 
 
 class DeleteRowsTool(_TabWriteTool[DeleteRowsInput]):
     name = "tab_delete_rows"
     description = (
         "Supprime des lignes d'une table d'Atelier Tab ; les formules qui les lisaient sont "
-        "ajustées comme dans Excel. Action soumise à validation."
+        "ajustées comme dans Excel. Le titre de chaque ligne est vérifié juste avant : une "
+        "ligne décalée ou modifiée entre-temps n'est jamais supprimée. Action soumise à validation."
     )
     input_model = DeleteRowsInput
 
     def approval_summary(self, params: DeleteRowsInput) -> str:
-        rows = ", ".join(str(r) for r in params.rows[:10])
-        return f"Supprimer {len(params.rows)} ligne(s) de la table {params.table_id} : {rows}"
+        shown = [
+            f"{_shown_title(t)} ({'ligne ' + str(r) if _row_number(r) else r})"
+            for r, t in zip(params.rows[:10], params.titles[:10], strict=True)
+        ]
+        more = f" (+{len(params.rows) - 10})" if len(params.rows) > 10 else ""
+        return (
+            f"Supprimer définitivement {len(params.rows)} ligne(s) de la table "
+            f"{params.table_id} : {', '.join(shown)}{more}"
+        )
+
+    async def _read_rows(self, table_id: str) -> list[dict[str, Any]]:
+        """Toutes les lignes de la table telles que Tab les voit à l'instant (serveur MCP :
+        même store que l'app, aucun retard d'instantané)."""
+        rows: list[dict[str, Any]] = []
+        while True:
+            page = await self.client.call(
+                "read_table", {"table": table_id, "offset": len(rows), "limit": READ_PAGE}
+            )
+            if not isinstance(page, dict):
+                raise AppRequestError("Lecture de la table illisible.", app="tab")
+            batch = [r for r in page.get("rows", []) if isinstance(r, dict)]
+            rows += batch
+            if not batch or len(rows) >= int(page.get("total_rows") or 0):
+                return rows
 
     async def run(self, params: DeleteRowsInput, ctx: ToolContext) -> ToolOutput:
+        current = await self._read_rows(params.table_id)
+        by_number = {r.get("row"): r for r in current}
+        by_id = {r.get("id"): r for r in current}
+        problems: list[str] = []
+        targets: list[tuple[dict[str, Any], CellValue]] = []
+        for ref, title in zip(params.rows, params.titles, strict=True):
+            number = _row_number(ref)
+            row = by_number.get(number) if number else by_id.get(str(ref).strip())
+            where = f"ligne {number}" if number else str(ref)
+            if row is None:
+                problems.append(f"{where} introuvable (la table a {len(current)} ligne(s))")
+                continue
+            if not isinstance(row.get("id"), str):  # sans id stable, rien ne part
+                raise AppRequestError("Lecture de la table illisible (ligne sans id).", app="tab")
+            if any(row is other for other, _ in targets):  # même ligne par numéro et par id
+                problems.append(f"{where} citée deux fois (numéro et id {row['id']})")
+                continue
+            raw = row.get("cells")
+            cells: dict[str, Any] = raw if isinstance(raw, dict) else {}
+            matched, value = _title_match(title, cells)
+            if not matched:
+                found = next((v for v in cells.values() if not _is_blank(v)), None)
+                expected = (
+                    "n'est pas vide"
+                    if title.strip() in EMPTY_TITLES
+                    else f"ne contient pas « {_value(title)} »"
+                )
+                problems.append(
+                    f"{where} {expected}"
+                    + (f" (on y lit « {_value(found)} »)" if found is not None else " (ligne vide)")
+                )
+                continue
+            targets.append((row, value))
+        if problems:
+            return ToolOutput(
+                content="Suppression refusée, rien n'a été supprimé : "
+                + " ; ".join(problems)
+                + ". Relis la table (tab_read_table) puis propose de nouveau la suppression.",
+                is_error=True,
+            )
+        # Suppression par identifiant stable (rec_…) : les numéros vérifiés ne peuvent plus glisser
         result = await self.client.call(
-            "delete_rows", {"table": params.table_id, "rows": params.rows}
+            "delete_rows", {"table": params.table_id, "rows": [r.get("id") for r, _ in targets]}
+        )
+        gone = ", ".join(f"{_shown_title(t)} (ligne {r.get('row')})" for r, t in targets[:10]) + (
+            f" (+{len(targets) - 10})" if len(targets) > 10 else ""
         )
         if not isinstance(result, dict):
-            return ToolOutput(content=str(result))
+            return ToolOutput(content=f"Supprimé : {gone}. {result}")
         return ToolOutput(
-            content=f"{result.get('deleted')} ligne(s) supprimée(s) ; {result.get('remaining_rows')} restante(s)."
+            content=f"{result.get('deleted')} ligne(s) supprimée(s) : {gone} ; "
+            f"{result.get('remaining_rows')} restante(s)."
         )
 
 

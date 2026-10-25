@@ -40,7 +40,7 @@ Docker : le `docker-compose.yml` monte `${HOME}/Atelier_Tab/exports` en lecture 
 | `tab_list_tables` | Tables disponibles : espace › projet › table, lignes, colonnes, date, source |
 | `tab_read_table` | Colonnes (type, rôle DataFlow) et lignes paginées (`offset`, `limit` ≤ 200), colonnes choisies par libellé, id ou lettre ; artefact `data_preview` complet si la table dépasse la page |
 | `tab_aggregate` | Somme, moyenne, min, max, nombre ; regroupement par une colonne ; filtres d'égalité |
-| `tab_check_table` | Erreurs de formule, titres vides ou en double, échéances dépassées non terminées (`as_of`), responsables manquants, préparation à l'import dans Atelier Projets |
+| `tab_check_table` | Erreurs de formule, titres vides ou en double, échéances dépassées non terminées (`as_of`, sinon le jour courant dans le fuseau `TIMEZONE`, Europe/Paris par défaut : à 0 h 30 à Paris, c'est déjà le lendemain même si UTC est encore la veille), responsables manquants, préparation à l'import dans Atelier Projets |
 
 ## Écriture par le serveur MCP de Tab (étape 8, boîte `tab_write`)
 
@@ -64,12 +64,21 @@ faux serveur lancé en vrai sous-processus (`tests/fake_tab_mcp.py`).
 |---|---|---|
 | `tab_set_cells` | Modifier jusqu'à 100 cellules (ligne par numéro ou `rec_…`, colonne par lettre, libellé ou id) | `set_cells` |
 | `tab_add_rows` | Ajouter des lignes `{colonne: valeur}`, au-dessus de la ligne de total par défaut | `add_rows` |
-| `tab_delete_rows` | Supprimer des lignes (formules ajustées comme dans Excel) | `delete_rows` |
+| `tab_delete_rows` | Supprimer des lignes (formules ajustées comme dans Excel), **titre de chaque ligne vérifié juste avant** | `read_table` puis `delete_rows` |
 | `tab_add_column` | Ajouter une colonne typée ; formule de la ligne 1 recopiée ; préréglage « Statuts Atelier » | `add_column` |
 | `tab_create_table` | Créer une table dans un projet, avec ses colonnes et leurs rôles DataFlow | `create_table` |
 
 - **Toutes soumises à validation**, avec un résumé lisible (« Ajouter 1 ligne(s) à la table tbl_planning_lots :
   « Plomberie » »).
+- **Suppression vérifiée** : `tab_delete_rows` demande, pour chaque ligne (`rows` : numéro ou `rec_…`), son titre
+  attendu (`titles`, même ordre, tel que lu par `tab_read_table`). La carte de validation montre ces titres
+  (« Supprimer définitivement 2 ligne(s) de la table tbl_a : « Plomberie » (ligne 3), « Peinture » (rec_9) »). Juste
+  avant de supprimer, l'outil relit la table **par le serveur MCP** (même store que l'app, aucun retard d'instantané)
+  et refuse tout si une ligne n'existe plus ou ne contient plus son titre (casse, accents et espaces ignorés ; un
+  titre recopié tronqué « … » vaut pour son début s'il en garde au moins 4 caractères). Une ligne entièrement vide se désigne par un titre vide `""`
+  (carte : « ligne vide ») ; ce titre ne supprime jamais une ligne qui contient une valeur. Une même ligne citée par
+  son numéro et par son `rec_…` est refusée. La suppression part ensuite par identifiant stable (`rec_…`) : une ligne
+  ajoutée ou supprimée entre-temps ne décale plus la cible.
 - Les valeurs s'écrivent comme une saisie dans la grille (« 12 000 », « 15/01/2027 », libellé du statut, nom du
   responsable, `=C5*1.2`) : c'est Tab qui les interprète.
 - Les entrées sont validées avant tout lancement du serveur (identifiant de table, formule obligatoire pour une

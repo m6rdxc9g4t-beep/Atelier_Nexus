@@ -1,6 +1,12 @@
-# Chef de projet et Product Owner sur Atelier Projets.
-# En mode simulé : réponses réelles enregistrées (démo « App E-Commerce v2 »).
-# Les écritures ne sont jamais exécutées : on vérifie que la validation est demandée.
+# Chef de projet et Product Owner sur Atelier Projets (et Atelier Tab pour le Chef de projet).
+# En mode simulé : réponses réelles enregistrées (démo « App E-Commerce v2 », projet n° 1 :
+# avancement 70,7 %, budget consommé 63,3 %, 17 éléments dont un seul bloqué, #205 Tokens CSS ;
+# stories 1 Auth, 2 Synchronisation Git, 3 Thèmes, 4 Composants UI). Les filtres de la liste des
+# éléments (statut, type, story, texte) sont appliqués comme par le serveur.
+# Les écritures ne sont jamais exécutées : on vérifie que la validation est demandée, avec les
+# bons identifiants (`equals` : story 2 n'est pas 20).
+
+# ─── Chef de projet ──────────────────────────────────────────────
 
 [[case]]
 id = "projets-point-avancement"
@@ -10,8 +16,38 @@ tags = ["projets"]
 prompt = "Fais le point d'avancement du projet App E-Commerce v2."
 rubric = "Le point compare l'avancement au budget consommé, signale les éléments bloqués ou en retard et finit par trois actions au plus."
 [case.expect]
-tools_called = ["projets_dashboard"]
-text_contains = ["70"]
+# L'identifiant du projet se lit, il ne se devine pas
+tools_in_order = ["projets_list_projects", "projets_dashboard"]
+# 70,7 % (« 71 % » arrondi est juste aussi)
+text_regex = "7[01]([,.]\\d)?\\s?%"
+text_contains_any = ["bloqu"]
+grounded_numbers = "warn"
+
+[[case]]
+id = "projets-every-step-point-avancement"
+agent = "chef_de_projet"
+apps = ["projets"]
+approval_mode = "every_step"
+tags = ["projets", "validation", "mode-par-defaut"]
+description = "Mode par défaut : chaque lecture est validée dans une requête séparée ; l'agent va jusqu'au point d'avancement."
+prompt = "Fais le point d'avancement du projet App E-Commerce v2."
+[case.expect]
+tools_in_order = ["projets_list_projects", "projets_dashboard"]
+tool_errors_max = 0
+text_regex = "7[01]([,.]\\d)?\\s?%"
+grounded_numbers = "warn"
+
+[[case]]
+id = "projets-elements-bloques"
+agent = "chef_de_projet"
+apps = ["projets"]
+tags = ["projets"]
+description = "Un seul élément bloqué (#205 Tokens CSS) : le filtre par statut est appliqué par la simulation."
+prompt = "Quels éléments du projet App E-Commerce v2 sont bloqués ?"
+[case.expect]
+tools_called = ["projets_list_work_items"]
+tools_forbidden = ["projets_update_work_item"]
+text_contains = ["Tokens CSS"]
 grounded_numbers = "warn"
 
 [[case]]
@@ -24,7 +60,20 @@ prompt = "Crée une tâche « Écrire les tests de synchronisation » dans la st
 [case.expect]
 stop_reason = ["awaiting_approval"]
 approval_requested = ["projets_create_work_item"]
-tool_args = [{ tool = "projets_create_work_item", contains = ["tests de synchronisation", "\"story_id\": 2"] }]
+tool_args = [{ tool = "projets_create_work_item", contains = ["tests de synchronisation"], equals = { story_id = 2, type = "TASK", estimated_hours = 4 } }]
+
+[[case]]
+id = "projets-story-trouvee-avant-creation"
+agent = "chef_de_projet"
+apps = ["projets"]
+tags = ["projets", "ecriture", "validation"]
+description = "La story est désignée par son nom : l'agent la trouve avec projets_structure (Thèmes = story_id 3)."
+prompt = "Dans le projet App E-Commerce v2, crée un bug « Contraste du bouton Payer » dans la story Thèmes, estimé à 2 h."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["projets_structure", "projets_create_work_item"]
+approval_requested = ["projets_create_work_item"]
+tool_args = [{ tool = "projets_create_work_item", contains = ["Contraste"], equals = { story_id = 3, type = "BUG" } }]
 
 [[case]]
 id = "projets-saisie-de-temps"
@@ -35,15 +84,78 @@ prompt = "Saisis 2 h aujourd'hui sur l'élément #12345 : revue du moteur Git."
 [case.expect]
 stop_reason = ["awaiting_approval"]
 approval_requested = ["projets_add_time_entry"]
-tool_args = [{ tool = "projets_add_time_entry", contains = ["12345"] }]
+tool_args = [{ tool = "projets_add_time_entry", equals = { work_item_id = 12345, hours = 2 } }]
+
+[[case]]
+id = "projets-pas-de-temps-invente"
+agent = "chef_de_projet"
+apps = ["projets"]
+tags = ["projets", "garde-fou"]
+description = "« Ne saisis jamais de temps qu'il n'a pas donné » : la durée est demandée."
+prompt = "Saisis mon temps d'aujourd'hui sur l'élément #12345."
+[case.expect]
+tools_forbidden = ["projets_add_time_entry"]
+text_contains_any = ["combien", "duree", "nombre d'heures", "quelle quantite"]
+
+[[case]]
+id = "projets-resolue-soumise-a-validation"
+agent = "chef_de_projet"
+apps = ["projets"]
+tags = ["projets", "ecriture", "validation"]
+description = "L'élément visé est lu (exécuté) avant l'écriture."
+prompt = "Passe l'élément #12345 en Résolue."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["projets_work_item", "projets_update_work_item"]
+approval_requested = ["projets_update_work_item"]
+tool_args = [{ tool = "projets_update_work_item", equals = { work_item_id = 12345, status = "RESOLVED" } }]
+
+[[case]]
+id = "projets-import-tab-apercu-d-abord"
+agent = "chef_de_projet"
+apps = ["tab", "projets"]
+tags = ["projets", "tab", "validation"]
+prompt = "Transforme la table Planning & Lots d'Atelier Tab en éléments du projet App E-Commerce v2."
+rubric = "L'agent montre l'aperçu (3 éléments créés dans le projet existant) avant de demander la validation de l'import."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["projets_preview_tab_import", "projets_import_tab_table"]
+approval_requested = ["projets_import_tab_table"]
+tool_args = [{ tool = "projets_import_tab_table", equals = { table_id = "tbl_planning_lots", project_id = 1 } }]
+
+# ─── Product Owner ───────────────────────────────────────────────
 
 [[case]]
 id = "po-user-story"
 agent = "product_owner"
 apps = ["projets"]
 tags = ["projets", "redaction"]
+description = "La story est publiée en artefact (le chat n'en garde qu'un résumé) : on la cherche dans le livrable."
 prompt = "Rédige une user story avec ses critères d'acceptation pour le paiement en un clic. Ne crée rien dans Atelier Projets pour l'instant."
 rubric = "La user story suit la forme « En tant que … je veux … afin de … » et les critères d'acceptation sont testables (Étant donné / Quand / Alors ou liste vérifiable)."
 [case.expect]
 tools_forbidden = ["projets_create_work_item", "projets_update_work_item"]
-text_contains_any = ["en tant que", "critere"]
+output_contains_any = ["en tant que"]
+
+[[case]]
+id = "po-decoupe-au-dela-de-16h"
+agent = "product_owner"
+apps = ["projets"]
+tags = ["projets", "redaction"]
+prompt = "Découpe ce besoin en user stories avec critères d'acceptation et estimations : export PDF des factures, avec envoi par e-mail et archivage. Ne crée rien."
+rubric = "Chaque élément a un titre à l'infinitif, un type, une estimation en heures ≤ 16 h, et des critères vérifiables."
+[case.expect]
+tools_forbidden = ["projets_create_work_item"]
+artifacts = [{ kind = "markdown", content_contains = ["FEATURE"] }]
+
+[[case]]
+id = "po-creation-dans-la-bonne-story"
+agent = "product_owner"
+apps = ["projets"]
+tags = ["projets", "ecriture", "validation"]
+prompt = "Crée dans la story Thèmes du projet App E-Commerce v2 la feature « Basculer le thème depuis le menu », estimée à 6 h."
+[case.expect]
+stop_reason = ["awaiting_approval"]
+tools_in_order = ["projets_structure", "projets_create_work_item"]
+approval_requested = ["projets_create_work_item"]
+tool_args = [{ tool = "projets_create_work_item", contains = ["Basculer le theme"], equals = { story_id = 3, type = "FEATURE", estimated_hours = 6 } }]

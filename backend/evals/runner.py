@@ -2,7 +2,10 @@
 l'interface), puis contrôle de l'état final et, en option, jugement par un modèle.
 
 Aucune écriture n'est jamais exécutée : l'agent s'arrête sur « en attente de validation » et
-aucune validation n'est donnée. Les agents « 100 % local » restent sur Ollama, juge compris.
+aucune écriture n'est validée. En `every_step` sur applications SIMULÉES, l'évaluation autorise
+les lectures et délégations comme le ferait l'utilisateur, par des requêtes séparées (nouvel
+environnement, nouveau contexte), exactement comme l'interface ; sur données réelles, elle
+n'autorise rien. Les agents « 100 % local » restent sur Ollama, juge compris.
 """
 
 from __future__ import annotations
@@ -27,11 +30,13 @@ from app.agents import (
     ToolCallEvent,
     ToolResultEvent,
 )
+from app.agents.base import AgentResult, CallKind
 from app.api.deps import prepare_environment
 from app.api.errors import app_error_body, llm_error_body
-from app.core.config import Settings
+from app.core.config import ApprovalMode, Settings
 from app.core.llm import LLMError, LLMRouter, Message, ProviderName
 from app.core.llm.types import LLMRequest
+from app.tools.base import ToolContext
 from app.tools.environment import ToolEnvironment
 from app.tools.http import AppError
 from evals.cases import AppId, EvalCase
@@ -40,6 +45,12 @@ from evals.checks import CheckResult, ToolCallRecord, Transcript, evaluate, pass
 Mode = Literal["simulees", "reelles"]
 #: Pannes du moteur (pas de l'agent) : le cas est ignoré plutôt que compté en échec
 ENGINE_DOWN = {"provider_unavailable", "provider_not_configured"}
+#: Appels que l'évaluation autorise d'elle-même en `every_step`, sur applications simulées
+#: seulement : lectures et délégations (le sous-agent n'a alors aucun outil). Une écriture
+#: n'est JAMAIS autorisée : le tour s'arrête et le cas contrôle la validation demandée.
+SIMULATED_APPROVALS: frozenset[CallKind] = frozenset({"read", "delegation"})
+#: Requêtes au plus pour un tour en `every_step` (une par validation simulée)
+MAX_REQUESTS = 24
 
 
 @dataclass
@@ -87,6 +98,10 @@ class Attempt(BaseModel):
     pending: list[str] = Field(default_factory=list)
     text: str = ""
     error: str | None = None
+    #: Mode de validation joué, requêtes envoyées et appels autorisés par l'évaluation
+    approval_mode: str | None = None
+    requests: int = 0
+    approved: list[str] = Field(default_factory=list)
 
     @property
     def failures(self) -> list[CheckOut]:
@@ -149,52 +164,166 @@ def _error(exc: BaseException) -> tuple[str, str]:
     return "exception", f"{type(exc).__name__} : {exc}"
 
 
-async def play(
-    case: EvalCase, deps: EvalDeps, options: RunOptions
-) -> tuple[Transcript, BaseAgent | None]:
-    """Joue la demande du cas et enregistre tout ce que fait l'agent."""
-    transcript = Transcript(prompt=case.prompt)
+def approval_mode_for(case: EvalCase, settings: Settings, mode: Mode) -> ApprovalMode:
+    """Mode de validation joué. Applications simulées : celui du cas. Données réelles : jamais
+    moins strict que le réglage de l'utilisateur (CLAUDE.md, « Validation ») ; un cas
+    `every_step` peut le durcir, rien ne l'assouplit."""
+    if mode == "simulees":
+        return case.approval_mode
+    if "every_step" in (settings.approval_mode, case.approval_mode):
+        return "every_step"
+    return settings.approval_mode
+
+
+def simulated_approvals(
+    result: AgentResult, deps: EvalDeps, requests: int
+) -> dict[str, bool] | None:
+    """Validations données par l'évaluation pour reprendre le tour, ou None pour l'arrêter.
+
+    Seulement sur applications simulées, seulement pour des lectures et des délégations : dès
+    qu'une écriture attend (même à côté d'une lecture), le tour s'arrête là."""
+    if deps.mode != "simulees" or result.stop_reason != "awaiting_approval":
+        return None
+    pending = result.pending_approvals
+    if not pending or any(p.kind not in SIMULATED_APPROVALS for p in pending):
+        return None
+    if requests >= MAX_REQUESTS:
+        return None
+    return {p.id: True for p in pending}
+
+
+def merge_results(results: list[AgentResult]) -> AgentResult:
+    """Un tour réparti sur plusieurs requêtes : le dernier résultat, avec les étapes, les jetons,
+    les artefacts et les messages de toutes les requêtes. Les étapes sont les appels au modèle,
+    comptés d'après les messages de l'assistant (chaque appel en produit un), que la boucle
+    compte ses étapes par requête ou sur tout le tour."""
+    last = results[-1]
+    if len(results) == 1:
+        return last
+    usage = results[0].usage
+    for item in results[1:]:
+        usage = usage + item.usage
+    messages = [m for r in results for m in r.new_messages]
+    return last.model_copy(
+        update={
+            "iterations": sum(1 for m in messages if m.role == "assistant"),
+            "usage": usage,
+            "artifacts": [a for r in results for a in r.artifacts],
+            "new_messages": messages,
+        }
+    )
+
+
+async def _request(
+    case: EvalCase,
+    deps: EvalDeps,
+    options: RunOptions,
+    transcript: Transcript,
+    calls: dict[str, ToolCallRecord],
+    history: list[Message],
+    approvals: dict[str, bool] | None,
+) -> tuple[AgentResult, BaseAgent]:
+    """Une requête à l'agent, comme un appel de l'interface : environnement, agent et contexte
+    d'outils neufs ; seul l'historique passe d'une validation à la suivante."""
     env = deps.env_factory()
-    agent: BaseAgent | None = None
     try:
+        transcript.approval_mode = approval_mode_for(case, env.settings, deps.mode)
+        env.settings = env.settings.model_copy(update={"approval_mode": transcript.approval_mode})
         await prepare_environment(env, deps.router, deps.catalog)
         agent = await deps.catalog.build(case.agent, deps.router, env)
-        requested = case.provider or options.provider
+        # Agent 100 % local : le moteur de la ligne de commande ne s'y applique pas (il reste sur
+        # Ollama) ; seul un moteur imposé par le cas lui-même est transmis, et contrôlé
+        requested = case.provider or (None if agent.local_only else options.provider)
         resolved = agent.resolve_provider(requested) or deps.router.default
         wanted = options.provider or deps.router.default
         # Un nom de modèle n'est pas portable : seulement si le moteur est celui demandé
         model = options.model if resolved == wanted else None
-        calls: dict[str, ToolCallRecord] = {}
-        async with asyncio.timeout(options.timeout):
-            async for event in agent.run_stream(
-                [Message.user(case.prompt)], provider=requested, model=model
-            ):
-                if isinstance(event, ToolCallEvent):
+        result: AgentResult | None = None
+        transcript.pending = []  # seul compte ce qui attend à la fin de la dernière requête
+        async for event in agent.run_stream(
+            history, provider=requested, model=model, context=ToolContext(), approvals=approvals
+        ):
+            if isinstance(event, ToolCallEvent):
+                if event.id not in calls:  # un appel validé a déjà été vu en attente
                     record = ToolCallRecord(id=event.id, name=event.name, input=event.input)
                     calls[event.id] = record
                     transcript.calls.append(record)
-                elif isinstance(event, ToolResultEvent) and event.id in calls:
-                    calls[event.id].result = event.content
-                    calls[event.id].is_error = event.is_error
-                elif isinstance(event, ArtifactEvent):
-                    transcript.artifacts.append(event.artifact)
-                elif isinstance(event, ApprovalRequiredEvent):
-                    transcript.pending.extend(event.calls)
-                    # Appels demandés mais non exécutés : comptent comme « appelés »
-                    for pending in event.calls:
-                        if pending.id not in calls:
-                            record = ToolCallRecord(
-                                id=pending.id, name=pending.name, input=pending.input
-                            )
-                            calls[pending.id] = record
-                            transcript.calls.append(record)
-                elif isinstance(event, DoneEvent):
-                    transcript.result = event.result
-    except Exception as exc:  # toute panne devient un échec lisible du cas
-        transcript.error = _error(exc)
+            elif isinstance(event, ToolResultEvent) and event.id in calls:
+                calls[event.id].result = event.content
+                calls[event.id].is_error = event.is_error
+            elif isinstance(event, ArtifactEvent):
+                transcript.artifacts.append(event.artifact)
+            elif isinstance(event, ApprovalRequiredEvent):
+                transcript.pending = list(event.calls)
+                # Appels demandés mais non exécutés : comptent comme « appelés ». Sauf une lecture
+                # (ou une délégation) demandée dans la même réponse qu'une écriture : jamais
+                # exécutée avant elle, elle ne vérifie rien ; en writes_only, elle n'est même pas
+                # présentée. Même règle dans les deux modes (docs/evaluations.md §3)
+                with_write = any(p.kind == "write" for p in event.calls)
+                for pending in event.calls:
+                    if with_write and pending.kind != "write":
+                        continue
+                    if pending.id not in calls:
+                        record = ToolCallRecord(
+                            id=pending.id, name=pending.name, input=pending.input
+                        )
+                        calls[pending.id] = record
+                        transcript.calls.append(record)
+            elif isinstance(event, DoneEvent):
+                result = event.result
+        if result is None:
+            raise RuntimeError("Le flux de l'agent s'est terminé sans résultat.")
+        return result, agent
     finally:
         await env.aclose()
+
+
+async def play(
+    case: EvalCase, deps: EvalDeps, options: RunOptions
+) -> tuple[Transcript, BaseAgent | None]:
+    """Joue la demande du cas et enregistre tout ce que fait l'agent.
+
+    En `every_step` sur applications simulées, chaque arrêt sur des lectures ou des délégations
+    est suivi d'une nouvelle requête avec ces appels autorisés, comme un clic sur « Autoriser »
+    dans l'interface ; un arrêt sur une écriture termine le tour."""
+    transcript = Transcript(prompt=case.prompt)
+    agent: BaseAgent | None = None
+    calls: dict[str, ToolCallRecord] = {}
+    history: list[Message] = [Message.user(case.prompt)]
+    approvals: dict[str, bool] | None = None
+    results: list[AgentResult] = []
+    try:
+        async with asyncio.timeout(options.timeout):
+            while True:
+                result, agent = await _request(
+                    case, deps, options, transcript, calls, history, approvals
+                )
+                results.append(result)
+                transcript.requests += 1
+                history = [*history, *result.new_messages]
+                approvals = simulated_approvals(result, deps, transcript.requests)
+                if approvals is None:
+                    break
+                transcript.approved += [p.name for p in result.pending_approvals]
+    except Exception as exc:  # toute panne devient un échec lisible du cas
+        transcript.error = _error(exc)
+    if results:
+        transcript.result = merge_results(results)
     return transcript, agent
+
+
+def blocked_by_validation(case: EvalCase, transcript: Transcript) -> str | None:
+    """Données réelles en `every_step` : aucune validation n'est donnée, un tour arrêté sur une
+    lecture ou une délégation ne dit donc rien du modèle (le cas sera ignoré). None si le tour
+    s'est terminé, s'est arrêté sur une écriture, ou si le cas attend justement cet arrêt."""
+    result = transcript.result
+    if transcript.error or result is None or result.stop_reason != "awaiting_approval":
+        return None
+    if "awaiting_approval" in case.expect.stop_reason:
+        return None
+    if not transcript.pending or any(p.kind == "write" for p in transcript.pending):
+        return None
+    return ", ".join(p.name for p in transcript.pending)
 
 
 # ─── Juge ─────────────────────────────────────────────────────────
@@ -242,12 +371,19 @@ async def judge(
     options: RunOptions,
 ) -> CheckResult:
     provider = options.judge_provider
-    if agent is not None and agent.local_only:
+    # Même verrou que la conversation : agent 100 % local, ou réponse d'un agent local entrée
+    # dans l'historique (orchestrateur sur Ollama qui a joint Finance, par exemple)
+    history = [
+        Message.user(case.prompt),
+        *(transcript.result.new_messages if transcript.result else []),
+    ]
+    if agent is not None and agent.privacy_lock(history) is not None:
         if provider == "anthropic":
             return CheckResult(
                 "juge",
                 False,
-                "Agent 100 % local : le juge doit aussi être local (ollama).",
+                "Données 100 % locales dans la transcription : le juge doit aussi être local "
+                "(ollama).",
                 "advisory",
             )
         provider = "ollama"  # la transcription contient des données qui ne quittent pas la machine
@@ -289,6 +425,13 @@ async def run_case(case: EvalCase, deps: EvalDeps, options: RunOptions) -> CaseO
             outcome.skipped = f"moteur indisponible ({transcript.error[1]})"
             outcome.attempts = []
             return outcome
+        if deps.mode == "reelles" and (blocked := blocked_by_validation(case, transcript)):
+            outcome.skipped = (
+                f"validation requise (APPROVAL_MODE=every_step) avant : {blocked} — "
+                "aucune validation n'est donnée sur des données réelles"
+            )
+            outcome.attempts = []
+            return outcome
         checks = evaluate(case, transcript)
         if options.judge and case.rubric and not transcript.error:
             checks.append(await judge(case, transcript, agent, deps, options))
@@ -310,6 +453,9 @@ async def run_case(case: EvalCase, deps: EvalDeps, options: RunOptions) -> CaseO
                 error=f"{transcript.error[0]} : {transcript.error[1]}"
                 if transcript.error
                 else None,
+                approval_mode=transcript.approval_mode,
+                requests=transcript.requests,
+                approved=transcript.approved,
             )
         )
     return outcome

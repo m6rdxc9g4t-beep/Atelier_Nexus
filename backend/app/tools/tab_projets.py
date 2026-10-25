@@ -214,7 +214,11 @@ class ImportTabTableTool(_BridgeTool[TabImportInput]):
 
     def approval_summary(self, params: TabImportInput) -> str:
         rows = f"{len(params.rows)} ligne(s)" if params.rows else "toutes les lignes"
-        target = f"le projet #{params.project_id}" if params.project_id else "le projet du même nom"
+        target = (
+            f"le projet #{params.project_id}"
+            if params.project_id
+            else "le projet du même nom, créé s'il n'existe pas"
+        )
         return (
             f"Importer {rows} de la table {params.table_id} dans Atelier Projets ({target}, "
             f"éléments {params.type or 'TASK'})"

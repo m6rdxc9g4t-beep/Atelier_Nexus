@@ -17,6 +17,10 @@ ColumnType = Literal["number", "string", "date", "boolean"]
 Scalar = float | int | str | bool | None
 Agg = Literal["sum", "avg", "min", "max", "count", "count_distinct", "median", "calc"]
 DateBin = Literal["year", "quarter", "month", "week", "day"]
+#: Calculs rapides de Viz (« Afficher la valeur comme ») : cumul annuel, cumul, N-1, écart et
+#: évolution vs N-1, moyenne mobile, part du total. `yoy_pct` et `pct_total` sont en points de %.
+ShowKind = Literal["ytd", "running", "prev_year", "yoy_diff", "yoy_pct", "moving_avg", "pct_total"]
+PERCENT_SHOWS = frozenset({"yoy_pct", "pct_total"})
 FilterOp = Literal[
     "in",
     "not_in",
@@ -66,6 +70,8 @@ class ColumnProfile(_Response):
     top_values: list[ValueCount] = Field(default_factory=list)
     calculated: bool = False
     expression: str | None = None
+    #: Relation d'origine d'une colonne liée (`magasins.ville` → « magasins »)
+    related: str | None = None
 
 
 class CalculatedColumn(_Response):
@@ -79,9 +85,21 @@ class CalculatedMeasure(_Response):
     description: str | None = None
 
 
+class Relation(_Response):
+    """Relation plusieurs-à-un vers un autre jeu (modèle en étoile : fait → dimension). Les
+    colonnes du jeu lié apparaissent dans le profil sous le nom `<name>.<colonne>`."""
+
+    name: str
+    dataset_id: str
+    from_column: str
+    to_column: str
+    columns: list[str] | None = None
+
+
 class DatasetModel(_Response):
     columns: list[CalculatedColumn] = Field(default_factory=list)
     measures: list[CalculatedMeasure] = Field(default_factory=list)
+    relations: list[Relation] = Field(default_factory=list)
 
 
 class DatasetOrigin(_Response):
@@ -150,18 +168,51 @@ class Dimension(_Request):
         return f"{self.field}|{self.bin}" if self.bin else self.field
 
 
+class ShowAs(_Request):
+    """Calcul rapide appliqué à une mesure, selon un champ date (sauf `pct_total`)."""
+
+    kind: ShowKind = Field(
+        description="ytd (cumul annuel), running (cumul), prev_year (N-1), yoy_diff (écart vs N-1), "
+        "yoy_pct (évolution vs N-1, en %), moving_avg (moyenne mobile), pct_total (part du total, en %)."
+    )
+    date: str | None = Field(
+        default=None, description="Colonne date de référence (obligatoire sauf pour pct_total)."
+    )
+    window: int = Field(default=3, ge=2, le=60, description="Périodes de la moyenne mobile.")
+
+    @model_validator(mode="after")
+    def _date_required(self) -> Self:
+        if self.kind != "pct_total" and not self.date:
+            raise ValueError(f"Le calcul « {self.kind} » demande une colonne date (`date`).")
+        return self
+
+    @property
+    def suffix(self) -> str:
+        return f"@{self.kind}{self.window if self.kind == 'moving_avg' else ''}"
+
+
 class Measure(_Request):
-    """Agrégat. `field` vide avec `count` = nombre de lignes ; `calc` = mesure du modèle."""
+    """Agrégat. `field` vide avec `count` = nombre de lignes ; `calc` = mesure du modèle ;
+    `show` = calcul rapide fait par Viz (cumul, N-1, part du total…)."""
 
     field: str | None = Field(
         default=None,
         description="Colonne à agréger, ou nom de la mesure calculée si agg = calc.",
     )
     agg: Agg = "sum"
+    show: ShowAs | None = Field(
+        default=None,
+        description='Calcul rapide, ex. {"kind": "pct_total"} ou {"kind": "yoy_pct", "date": "date"}.',
+    )
+
+    @property
+    def base_key(self) -> str:
+        return f"{self.agg}({self.field or '*'})"
 
     @property
     def key(self) -> str:
-        return f"{self.agg}({self.field or '*'})"
+        """Clé de la colonne du résultat, comme Viz : `sum(ca)`, `sum(ca)@ytd`, `sum(ca)@moving_avg3`."""
+        return self.base_key + (self.show.suffix if self.show else "")
 
 
 class Filter(_Request):
@@ -181,7 +232,10 @@ class Filter(_Request):
 
 
 class Sort(_Request):
-    key: str = Field(description="Clé de colonne du résultat : `champ`, `champ|mois`, `sum(ca)`.")
+    key: str = Field(
+        description="Clé d'une colonne de la requête : `champ`, `champ|month`, "
+        "`sum(chiffre_affaires)`, `sum(chiffre_affaires)@pct_total`."
+    )
     desc: bool = False
 
 
@@ -228,6 +282,28 @@ class ExpressionResult(_Response):
     error: str | None = None
     position: int | None = None
     preview: list[Scalar] = Field(default_factory=list)
+
+
+# ─── Vérification d'une relation (modèle en étoile), sans enregistrement ──
+
+
+class RelationDraft(_Request):
+    """Corps de `POST /datasets/{id}/relations/check` (schéma `Relation` de Viz). `name` n'est
+    qu'un préfixe de colonnes : la vérification ne l'utilise pas."""
+
+    name: str = Field(default="relation", min_length=1, max_length=40, pattern=r"^[^.|\[\]\"]+$")
+    dataset_id: str = Field(description="Jeu lié, côté « un » (la dimension).")
+    from_column: str = Field(min_length=1, description="Colonne de ce jeu (clé étrangère).")
+    to_column: str = Field(min_length=1, description="Colonne du jeu lié (clé, valeurs uniques).")
+
+
+class RelationCheck(_Response):
+    ok: bool
+    error: str | None = None
+    rows: int = 0
+    matched: int = 0
+    duplicates: int = 0
+    unmatched_sample: list[str] = Field(default_factory=list)
 
 
 # ─── Statut du connecteur (exposé par Atelier Nexus) ──────────────

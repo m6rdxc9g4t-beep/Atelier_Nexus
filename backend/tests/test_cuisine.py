@@ -562,6 +562,7 @@ def test_apps_status_reads_supabase_never_vercel(tmp_path: Path) -> None:
         tresorerie_base_url=None,
         cine_base_url=None,
         savoir_base_url=None,
+        convert_base_url=None,  # sinon /api/apps/status joindrait un vrai Convert local
         tab_exports_dir=None,
         cuisine_supabase_url=URL,
         cuisine_supabase_anon_key=ANON,

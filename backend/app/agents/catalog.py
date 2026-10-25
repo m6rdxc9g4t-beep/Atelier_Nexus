@@ -37,6 +37,8 @@ class AgentCatalog:
         if self.custom is None:
             return []
         try:
+            # Définitions validées une à une par le dépôt : une ligne illisible est écartée
+            # seule, une boîte inconnue est signalée par l'agent (`unavailable_toolsets`)
             return await self.custom.list()
         except Exception as exc:  # base indisponible : les experts restent utilisables
             logger.warning("Agents personnalisés indisponibles : %s", exc)
@@ -70,10 +72,11 @@ class AgentCatalog:
         built: list[BaseAgent] = [
             cls(router, env, delegated=delegated) for cls in list_agent_classes()
         ]
-        built += [
-            ConfigurableAgent(d, router, env, delegated=delegated)
-            for d in await self._custom_definitions()
-        ]
+        for definition in await self._custom_definitions():
+            try:
+                built.append(ConfigurableAgent(definition, router, env, delegated=delegated))
+            except Exception:  # un agent défaillant n'emporte pas les autres
+                logger.exception("Agent personnalisé « %s » inutilisable, ignoré", definition.name)
         return built
 
     async def infos(self, router: LLMRouter, env: ToolEnvironment | None) -> list[AgentInfo]:

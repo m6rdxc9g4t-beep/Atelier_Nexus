@@ -1,5 +1,6 @@
-"""Étape 5 : validations humaines, verrou local, délégation, catalogue."""
+"""Étape 5 : validations humaines, verrou local, délégation, catalogue, agents personnalisés."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -16,10 +17,18 @@ from app.agents import (
 from app.agents.base import REFUSED
 from app.api.deps import prepare_environment
 from app.core.config import ApprovalMode, Settings
-from app.core.llm import Message, ProviderNotAllowedError, ProviderUnavailableError
+from app.core.llm import (
+    Message,
+    ProviderNotAllowedError,
+    ProviderUnavailableError,
+    ToolResultBlock,
+    ToolUseBlock,
+)
+from app.schemas.agents import CustomAgentDefinition
 from app.tools import BaseTool, ToolContext, ToolInput, ToolOutput
 from app.tools.base import Artifact
 from app.tools.environment import ToolEnvironment
+from app.tools.toolsets import Toolset
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
 
 
@@ -164,10 +173,24 @@ async def test_local_agent_never_falls_back_to_claude() -> None:
     assert anthropic.requests == []
 
 
-def test_finance_experts_are_local_only() -> None:
-    by_name = {cls.name: cls for cls in list_agent_classes()}
-    for name in ("finance", "comptable"):
-        assert describe(by_name[name](make_router())).local_only
+#: Agents fournis verrouillés sur le modèle local (déclaré ou boîte sensible) : un verrou ajouté
+#: ou perdu doit se voir ici
+LOCAL_EXPERTS = {"finance", "comptable", "tuteur"}
+
+
+def test_local_experts_are_exactly_the_expected_ones() -> None:
+    builtin = [cls for cls in list_agent_classes() if cls.__module__.startswith("app.")]
+    local = {cls.name for cls in builtin if describe(cls(make_router())).local_only}
+    assert local == LOCAL_EXPERTS
+
+
+async def test_local_experts_refuse_claude() -> None:
+    from app.agents import get_agent_class
+
+    for name in sorted(LOCAL_EXPERTS):
+        agent = get_agent_class(name)(make_router())
+        with pytest.raises(ProviderNotAllowedError):
+            await agent.run([Message.user("?")], provider="anthropic")
 
 
 # ─── Catalogue ────────────────────────────────────────────────────
@@ -187,11 +210,9 @@ def env_without_apps(approval_mode: ApprovalMode = "every_step") -> ToolEnvironm
 async def test_catalog_lists_the_experts_with_categories() -> None:
     infos = await AgentCatalog().infos(make_router(), env_without_apps())
     names = [i.name for i in infos]
-    for expected in (
-        "assistant", "orchestrateur", "data_analyst", "chef_de_projet", "product_owner",
-        "developpeur", "finance", "comptable", "marketing", "commercial", "juridique", "rh",
-        "redacteur",
-    ):  # fmt: skip
+    # Tous les agents fournis (registre), sans liste figée à tenir à jour
+    assert set(names) >= {cls.name for cls in list_agent_classes()}
+    for expected in ("orchestrateur", "data_analyst", "tableur", "tuteur", "cineclub", "cuisine"):
         assert expected in names
     assert names[0] == "assistant"
     assert all(i.category and i.icon and i.starters for i in infos)
@@ -292,3 +313,158 @@ async def test_delegated_agents_have_no_write_or_delegate_tools() -> None:
     assert not any(t.requires_approval for t in agent.tools.values())
     orchestrator = await catalog.build("orchestrateur", make_router(), env, delegated=True)
     assert "delegate_to_agent" not in orchestrator.tools
+
+
+async def test_delegation_list_follows_the_engine_with_a_closed_choice() -> None:
+    """G-11 / F-03 : enum des agents, agents locaux seulement sur Ollama, jamais l'Assistant."""
+    router = make_router()
+    env = env_without_apps()
+    catalog = AgentCatalog()
+    await prepare_environment(env, router, catalog)
+    delegate = (await catalog.build("orchestrateur", router, env)).tools["delegate_to_agent"]
+    online = delegate.spec_for(ToolContext(state={"provider": "anthropic"}))
+    local = delegate.spec_for(ToolContext(state={"provider": "ollama"}))
+    online_enum = online.input_schema["properties"]["agent"]["enum"]
+    local_enum = local.input_schema["properties"]["agent"]["enum"]
+    assert "redacteur" in online_enum and "assistant" not in online_enum
+    assert not {"finance", "comptable", "tuteur"} & set(online_enum)
+    assert {"finance", "comptable", "tuteur"} <= set(local_enum)
+    assert "Tu tournes sur un modèle en ligne" in online.description and "Finance" in online.description  # fmt: skip
+    assert "Tu tournes sur le modèle local" in local.description
+    assert "repli possible" not in local.description
+    # Sans contexte (catalogues) : tous les agents, les locaux signalés
+    assert "[données locales]" in delegate.spec().description
+    # Repli possible vers Claude : le routeur lui renverrait la même requête, la description
+    # reste vraie sur les deux moteurs (un agent local y serait refusé à l'exécution)
+    uncertain = delegate.spec_for(
+        ToolContext(state={"provider": "ollama", "fallback": "anthropic"})
+    )
+    assert "repli possible sur un modèle en ligne" in uncertain.description
+    assert "finance" in uncertain.input_schema["properties"]["agent"]["enum"]
+    # Boîtes indisponibles signalées dans la liste (GitHub non configuré ici)
+    line = next(x for x in online.description.splitlines() if x.startswith("- developpeur :"))
+    assert line.endswith("[indisponible ici : GitHub — lecture, GitHub — branches et PR]")
+    writer = next(x for x in online.description.splitlines() if x.startswith("- redacteur :"))
+    assert "indisponible" not in writer
+
+
+# ─── Agents personnalisés ─────────────────────────────────────────
+
+
+class Definitions:
+    """Source d'agents personnalisés en mémoire (dépôt de la base dans test_api_agents.py)."""
+
+    def __init__(self, *items: CustomAgentDefinition) -> None:
+        self.items = list(items)
+
+    async def list(self) -> list[CustomAgentDefinition]:
+        return list(self.items)
+
+    async def get(self, name: str) -> CustomAgentDefinition | None:
+        return next((d for d in self.items if d.name == name), None)
+
+
+def definition(name: str, toolsets: list[str]) -> CustomAgentDefinition:
+    now = datetime.now(UTC)
+    return CustomAgentDefinition.model_validate(
+        {
+            "id": name, "name": name, "display_name": f"Agent {name}",
+            "description": "Agent de test.", "system_prompt": "Tu aides l'équipe sur ses sujets.",
+            "toolsets": toolsets, "created_at": now, "updated_at": now,
+        }
+    )  # fmt: skip
+
+
+async def test_custom_agent_with_an_unknown_toolset_is_kept_and_reported() -> None:
+    """G-08 : extension retirée → l'agent reste listé, les autres aussi, la boîte est signalée."""
+    catalog = AgentCatalog(
+        Definitions(
+            definition("ancien", ["core", "extension_retiree"]),
+            definition("veille", ["core", "projets_read"]),
+        )  # fmt: skip
+    )
+    env = env_without_apps()
+    infos = {i.name: i for i in await catalog.infos(make_router(), env)}
+    assert {"ancien", "veille", "assistant"} <= set(infos)
+    assert infos["ancien"].unavailable_toolsets == ["extension_retiree"]
+    assert infos["ancien"].toolsets == ["core"] and not infos["ancien"].local_only
+    agent = await catalog.build("ancien", make_router(), env)
+    assert "extension retirée de NEXUS_PLUGINS" in agent.build_system_prompt(ToolContext())
+
+    # Une conversation qui contient des résultats d'un outil disparu reste sur le modèle local
+    call = ToolUseBlock(id="x1", name="outil_extension", input={})
+    result = ToolResultBlock(tool_use_id="x1", tool_name="outil_extension", content="secret")
+    history = [
+        Message.user("?"),
+        Message(role="assistant", content=[call]),
+        Message(role="user", content=[result]),
+        Message.assistant("…"),
+        Message.user("Et ensuite ?"),
+    ]
+    with pytest.raises(ProviderNotAllowedError, match="extension_retiree"):
+        agent.resolve_provider("anthropic", history)
+    assert agent.resolve_provider(None, history) == "ollama"
+    assert agent.resolve_provider("anthropic", [Message.user("Nouvelle question")]) == "anthropic"
+
+
+async def test_custom_agents_get_the_common_rules_of_the_experts() -> None:
+    """G-15 : une seule source pour les règles communes ; étapes selon les boîtes."""
+    from app.agents.custom import ConfigurableAgent
+    from app.agents.experts.common import COMMON
+
+    agent = ConfigurableAgent(definition("regles", ["core"]), make_router())
+    system = agent.build_system_prompt(ToolContext())
+    assert "Règles communes d'Atelier Nexus (ne pas ignorer) :" in system
+    rules = [line for line in COMMON.splitlines() if line.startswith("- ")]
+    assert rules and all(rule in system for rule in rules)
+    assert agent.max_iterations == 8
+    wide = ConfigurableAgent(
+        definition("large", ["core", "projets_read", "projets_write", "tab"]), make_router()
+    )
+    assert wide.max_iterations == 14
+
+
+async def test_an_agent_with_delegation_is_never_delegable() -> None:
+    """Jamais de délégation en chaîne : un agent doté de la délégation (Orchestrateur, agent
+    personnalisé) n'est ni proposé ni joignable ; délégué malgré tout, il la perdrait."""
+    router = make_router()
+    catalog = AgentCatalog(Definitions(definition("chef_orchestre", ["core", "delegation"])))
+    env = env_without_apps("writes_only")
+    await prepare_environment(env, router, catalog)
+    assert not {"chef_orchestre", "orchestrateur"} & {name for name, _, _ in env.delegation_roster}
+    assert "chef_orchestre" in env.delegation_names  # connu (annuaire de l'Assistant, verrou)
+
+    delegate = (await catalog.build("orchestrateur", router, env)).tools["delegate_to_agent"]
+    ctx = ToolContext(state={"provider": "anthropic"})
+    assert (
+        "chef_orchestre" not in delegate.spec_for(ctx).input_schema["properties"]["agent"]["enum"]
+    )
+    refused = await delegate.invoke(
+        {"agent": "chef_orchestre", "task": "Fais le point sur la campagne."}, ctx
+    )
+    assert refused.is_error and "indisponible" in refused.content
+    sub = await catalog.build("chef_orchestre", router, env, delegated=True)
+    assert sub.tools and "delegate_to_agent" not in sub.tools
+
+
+async def test_internal_toolset_is_never_opened_to_a_custom_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Boîte interne (réservée au code d'une extension) écrite à la main en base : inconnue."""
+    from app.agents.custom import ConfigurableAgent
+    from app.tools import toolsets
+
+    internal = Toolset(
+        id="interne_test",
+        label="Interne",
+        description="Boîte réservée au code.",
+        build=lambda env: [SaveNoteTool()],
+        internal=True,
+    )
+    monkeypatch.setitem(toolsets._TOOLSETS, "interne_test", internal)
+    agent = ConfigurableAgent(
+        definition("bricole", ["core", "interne_test"]), make_router(), env_without_apps()
+    )
+    assert agent.toolsets == ("core",) and agent.missing_toolsets == ("interne_test",)
+    assert "save_note" not in agent.tools
+    assert describe(agent).unavailable_toolsets == ["interne_test"]
