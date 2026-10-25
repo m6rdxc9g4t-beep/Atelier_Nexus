@@ -18,6 +18,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -27,8 +28,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/section-label";
 import { NativeSelect } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { appTheme } from "@/features/workflows-graph/catalog";
@@ -82,28 +86,25 @@ const REFRESH_MS = 30_000;
 export function ApprovalReminder({ className }: { className?: string }) {
   const { lead, tail } = triggerReminder(useApprovalMode());
   return (
-    <p className={cn("flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/8 px-2 py-1.5 text-xs", className)}>
-      <ShieldQuestion className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
-      <span>
-        {lead} <strong className="font-semibold">À valider</strong>
-        {tail}
-      </span>
-    </p>
+    <Callout tone="warning" icon={ShieldQuestion} className={className}>
+      {lead} <strong className="font-semibold">À valider</strong>
+      {tail}
+    </Callout>
   );
 }
 
 function SectionTitle({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <h3 id={id} className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+    <SectionLabel as="h3" id={id}>
       {children}
-    </h3>
+    </SectionLabel>
   );
 }
 
 function FieldError({ id, message }: { id: string; message: string | undefined }) {
   if (!message) return null;
   return (
-    <p id={id} role="alert" className="text-[11px] text-destructive">
+    <p id={id} role="alert" className="text-xs text-destructive-ink">
       {message}
     </p>
   );
@@ -202,21 +203,29 @@ export function TriggersPanel({
   if (!workflowId)
     return (
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
-        <p className="rounded-md border border-atelier-line bg-sunken px-3 py-2 text-sm text-muted-foreground">
-          Enregistrez d&apos;abord le workflow (un titre et ses étapes) : un déclencheur lance sa version enregistrée, à heure
-          fixe ou quand une application publie un événement.
-        </p>
+        <EmptyState
+          icon={Zap}
+          title="Enregistrez d'abord le workflow"
+          className="py-6"
+          actions={
+            <Button type="button" onClick={() => void onSave()}>
+              <Save />
+              Enregistrer le workflow
+            </Button>
+          }
+        >
+          Un déclencheur lance la version enregistrée (un titre et ses étapes), à heure fixe ou quand une application publie
+          un événement.
+        </EmptyState>
         {preset && (
-          <p className="text-xs">
+          <Callout tone="signature" icon={Zap}>
             Un déclencheur sur{" "}
-            <em>{catalog ? (catalogApp(catalog, preset.app)?.events.find((e) => e.type === preset.types[0])?.label ?? preset.types[0]) : preset.types[0]}</em>{" "}
+            <em className="font-medium not-italic">
+              {catalog ? (catalogApp(catalog, preset.app)?.events.find((e) => e.type === preset.types[0])?.label ?? preset.types[0]) : preset.types[0]}
+            </em>{" "}
             vous attend : il s&apos;ouvrira dès l&apos;enregistrement.
-          </p>
+          </Callout>
         )}
-        <Button type="button" onClick={() => void onSave()}>
-          <Save />
-          Enregistrer le workflow
-        </Button>
       </div>
     );
 
@@ -251,42 +260,54 @@ export function TriggersPanel({
     );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
-      <div className="flex items-center gap-2">
-        <SectionTitle id={`${ids}-list`}>Déclencheurs</SectionTitle>
-        <Button type="button" variant="ghost" size="icon-sm" className="ml-auto size-7" aria-label="Actualiser les déclencheurs" onClick={() => setRefresh((r) => r + 1)}>
-          <RefreshCw />
-        </Button>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+        <div className="flex items-center gap-2">
+          <SectionTitle id={`${ids}-list`}>Déclencheurs</SectionTitle>
+          <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label="Actualiser les déclencheurs" onClick={() => setRefresh((r) => r + 1)}>
+            <RefreshCw />
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">Lancez ce workflow tout seul : à heure fixe, ou quand une application de la suite publie un événement.</p>
       </div>
-      <p className="text-xs text-muted-foreground">Lancez ce workflow tout seul : à heure fixe, ou quand une application de la suite publie un événement.</p>
-      {dirty && (
-        <p className="rounded-md border border-atelier-line bg-sunken px-2 py-1.5 text-xs text-muted-foreground">
-          Modifications non enregistrées : les déclencheurs lancent la dernière version enregistrée.
-        </p>
-      )}
+      {dirty && <Callout tone="info">Modifications non enregistrées : les déclencheurs lancent la dernière version enregistrée.</Callout>}
       <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(emptyTriggerDraft("schedule"))}>
+        <Button type="button" variant="outline" onClick={() => setEditing(emptyTriggerDraft("schedule"))}>
           <CalendarClock />
           Horaire
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(emptyTriggerDraft("event"))}>
+        <Button type="button" variant="outline" onClick={() => setEditing(emptyTriggerDraft("event"))}>
           <Zap />
           Événement
         </Button>
       </div>
       <ApprovalReminder />
       {listError && (
-        <p role="alert" className="text-sm text-destructive">
+        <Callout
+          tone="destructive"
+          role="alert"
+          action={
+            <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => setRefresh((r) => r + 1)}>
+              <RefreshCw />
+              Réessayer
+            </Button>
+          }
+        >
           {listError}
-        </p>
+        </Callout>
       )}
       {triggers === null && !listError && (
-        <p role="status" className="text-xs text-muted-foreground">
-          Lecture des déclencheurs…
+        <div role="status" className="grid gap-2">
+          <span className="sr-only">Lecture des déclencheurs…</span>
+          <Skeleton className="h-28" />
+        </div>
+      )}
+      {triggers?.length === 0 && (
+        <p className="rounded-xl border border-dashed border-atelier-line px-3 py-4 text-center text-sm text-muted-foreground">
+          Aucun déclencheur : ce workflow ne part qu&apos;à la main.
         </p>
       )}
-      {triggers?.length === 0 && <p className="text-xs text-muted-foreground">Aucun déclencheur : ce workflow ne part qu&apos;à la main.</p>}
-      <ul aria-labelledby={`${ids}-list`} className="grid grid-cols-[minmax(0,1fr)] gap-2">
+      <ul aria-labelledby={`${ids}-list`} className="grid grid-cols-[minmax(0,1fr)] gap-3">
         {triggers?.map((trigger) => (
           <TriggerCard
             key={trigger.id}
@@ -372,11 +393,13 @@ function TriggerCard({
     <li
       {...(app ? appTheme(app.app, app.color) : {})}
       className={cn(
-        "grid grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border bg-card p-3",
-        trigger.enabled ? "border-atelier-border shadow-glow" : "border-atelier-line opacity-80",
+        // Surface calme : le trait prend la couleur de l'app quand le déclencheur est actif ;
+        // coupé, il reste neutre (et le badge « coupé » le dit en toutes lettres)
+        "grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border bg-card p-3.5 transition-colors",
+        trigger.enabled ? "border-atelier-border-soft" : "border-atelier-line",
       )}
     >
-      <header className="flex items-start gap-2">
+      <header className="flex items-start gap-2.5">
         {trigger.kind === "event" ? (
           <AppTile app={trigger.app} color={app?.color} size="xs" />
         ) : (
@@ -385,10 +408,15 @@ function TriggerCard({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p id={`${ids}-title`} className="text-sm leading-snug font-medium">
+          <p id={`${ids}-title`} className="flex flex-wrap items-center gap-1.5 text-sm leading-snug font-medium">
             {trigger.label || (trigger.kind === "event" ? "Événement" : "Horaire")}
+            {!trigger.enabled && (
+              <Badge variant="outline" aria-hidden>
+                coupé
+              </Badge>
+            )}
           </p>
-          <p className="text-xs leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
             {parts.map((p, i) => (p.em ? <em key={i} className="text-foreground">{p.text}</em> : <span key={i}>{p.text}</span>))}
           </p>
         </div>
@@ -406,19 +434,17 @@ function TriggerCard({
       </span>
 
       {state.last_error && (
-        <p role="alert" className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/8 px-2 py-1.5 text-xs text-destructive">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <span className="min-w-0">{state.last_error}</span>
-        </p>
+        <Callout tone="destructive" role="alert" className="break-words">
+          {state.last_error}
+        </Callout>
       )}
       {state.warning && (
-        <p className="flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/8 px-2 py-1.5 text-xs">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
-          <span className="min-w-0">{state.warning}</span>
-        </p>
+        <Callout tone="warning" icon={TriangleAlert} className="break-words">
+          {state.warning}
+        </Callout>
       )}
 
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-atelier-line pt-2.5 text-xs">
         {trigger.kind === "schedule" && (
           <>
             <dt className="text-muted-foreground">Prochaine</dt>
@@ -458,9 +484,9 @@ function TriggerCard({
       </dl>
 
       {error && (
-        <p role="alert" className="text-xs text-destructive">
+        <Callout tone="destructive" role="alert">
           {error}
-        </p>
+        </Callout>
       )}
 
       {testing ? (
@@ -478,7 +504,7 @@ function TriggerCard({
         <div className="flex flex-wrap items-center justify-end gap-1">
           {confirming ? (
             <>
-              <span className="mr-auto text-xs">Supprimer ce déclencheur ?</span>
+              <span className="mr-auto text-sm">Supprimer ce déclencheur ?</span>
               <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
                 Annuler
               </Button>
@@ -488,7 +514,7 @@ function TriggerCard({
             </>
           ) : (
             <>
-              <Button type="button" size="icon-sm" variant="ghost" className="mr-auto size-7" aria-label="Supprimer le déclencheur" onClick={() => setConfirming(true)}>
+              <Button type="button" size="icon-xs" variant="ghost" className="mr-auto" aria-label="Supprimer le déclencheur" onClick={() => setConfirming(true)}>
                 <Trash2 />
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={onEdit}>
@@ -548,18 +574,18 @@ function TestRunner({
   };
 
   return (
-    <section aria-label="Tester le déclencheur" className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border border-atelier-line bg-sunken p-2">
-      <p className="text-xs">
+    <section aria-label="Tester le déclencheur" className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-lg border border-atelier-line bg-sunken p-3">
+      <p className="text-sm">
         Lance le workflow une fois, tout de suite, comme le ferait ce déclencheur
         {trigger.kind === "event" ? " avec l'événement ci-dessous (modifiable)." : ", avec ses paramètres."}
       </p>
       {trigger.kind === "event" && (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
           <div className="flex items-center">
-            <label htmlFor={id} className="flex-1 text-[11px] font-medium">
+            <label htmlFor={id} className="flex-1 text-xs font-medium">
               Événement d&apos;exemple (JSON)
             </label>
-            <Button type="button" variant="ghost" size="sm" className="h-6 px-1.5 text-xs" onClick={() => setText(example)}>
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setText(example)}>
               Rétablir
             </Button>
           </div>
@@ -567,7 +593,7 @@ function TestRunner({
             id={id}
             rows={8}
             spellCheck={false}
-            className="font-mono text-[11px]"
+            className="bg-card font-mono text-xs"
             value={text}
             aria-invalid={!!problem}
             aria-describedby={problem ? `${id}-err` : undefined}
@@ -634,13 +660,13 @@ function TriggerForm({
   };
 
   return (
-    <form onSubmit={(e) => void submit(e)} noValidate className="grid grid-cols-[minmax(0,1fr)] gap-4" aria-labelledby={`${ids}-title`}>
-      <div className="flex items-center gap-2">
+    <form onSubmit={(e) => void submit(e)} noValidate className="grid grid-cols-[minmax(0,1fr)] gap-6" aria-labelledby={`${ids}-title`}>
+      <div className="flex items-center gap-2 border-b border-atelier-line pb-3">
         {draft.kind === "event" ? <Zap className="size-4 text-accent-ink" aria-hidden /> : <CalendarClock className="size-4 text-accent-ink" aria-hidden />}
-        <h3 id={`${ids}-title`} className="flex-1 text-sm font-semibold">
+        <h3 id={`${ids}-title`} className="flex-1 text-base font-semibold tracking-tight">
           {draft.id ? "Modifier le déclencheur" : draft.kind === "event" ? "Nouveau déclencheur sur événement" : "Nouveau déclencheur horaire"}
         </h3>
-        <Button type="button" variant="ghost" size="icon-sm" className="size-7" aria-label="Fermer sans enregistrer" onClick={onCancel}>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label="Fermer sans enregistrer" onClick={onCancel}>
           <X />
         </Button>
       </div>
@@ -671,9 +697,9 @@ function TriggerForm({
 
       <ParamsFields draft={draft} params={params} errors={shown} ids={ids} app={app} set={set} />
 
-      <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-limits`}>
+      <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-limits`}>
         <SectionTitle id={`${ids}-limits`}>Garde-fous</SectionTitle>
-        <div className={cn("grid gap-2", draft.kind === "event" ? "grid-cols-2" : "grid-cols-1")}>
+        <div className={cn("grid gap-3", draft.kind === "event" ? "grid-cols-2" : "grid-cols-1")}>
           <NumberField
             id={`${ids}-max`}
             label="Lancements par heure, au plus"
@@ -695,7 +721,7 @@ function TriggerForm({
             />
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Au-delà du plafond, les déclenchements sont ignorés (et comptés). Une seule exécution attend votre validation à la fois.
           {draft.kind === "event" && " Une rafale d'événements regroupée ne lance qu'une exécution, avec le dernier événement."}
         </p>
@@ -709,20 +735,20 @@ function TriggerForm({
       <ApprovalReminder />
 
       {serverError && (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/8 px-2 py-1.5 text-sm text-destructive">
+        <Callout tone="destructive" role="alert">
           {serverError}
-        </p>
+        </Callout>
       )}
       {touched && hasErrors(errors) && (
-        <p role="alert" className="text-xs text-destructive">
+        <Callout tone="destructive" role="alert">
           {Object.keys(errors).length === 1 ? "Un champ est à corriger." : `${Object.keys(errors).length} champs sont à corriger.`}
-        </p>
+        </Callout>
       )}
-      <div className="flex justify-end gap-1.5">
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+      <div className="flex justify-end gap-2 border-t border-atelier-line pt-3">
+        <Button type="button" variant="ghost" onClick={onCancel}>
           Annuler
         </Button>
-        <Button type="submit" size="sm" disabled={saving}>
+        <Button type="submit" disabled={saving}>
           <Save />
           {saving ? "Enregistrement…" : draft.id ? "Enregistrer" : "Créer le déclencheur"}
         </Button>
@@ -776,7 +802,7 @@ function NumberField({
       {error ? (
         <FieldError id={`${id}-err`} message={error} />
       ) : (
-        <p id={`${id}-hint`} className="text-[11px] text-muted-foreground">
+        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
           {min} à {max}
         </p>
       )}
@@ -788,7 +814,7 @@ function ScheduleFields({ draft, errors, ids, set }: FieldsProps) {
   const toggleDay = (day: (typeof WEEKDAYS)[number]) =>
     set({ days: draft.days.includes(day) ? draft.days.filter((d) => d !== day) : [...draft.days, day] });
   return (
-    <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-when`}>
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-3" aria-labelledby={`${ids}-when`}>
       <SectionTitle id={`${ids}-when`}>Quand</SectionTitle>
       <div className="grid grid-cols-2 gap-1" role="radiogroup" aria-label="Rythme">
         {(
@@ -803,7 +829,8 @@ function ScheduleFields({ draft, errors, ids, set }: FieldsProps) {
             size="sm"
             role="radio"
             aria-checked={draft.scheduleKind === value}
-            variant={draft.scheduleKind === value ? "default" : "outline"}
+            variant={draft.scheduleKind === value ? "soft" : "outline"}
+            className={cn(draft.scheduleKind === value && "border border-atelier-border")}
             onClick={() => set({ scheduleKind: value })}
           >
             {label}
@@ -842,7 +869,7 @@ function ScheduleFields({ draft, errors, ids, set }: FieldsProps) {
             {errors.at ? (
               <FieldError id={`${ids}-at-err`} message={errors.at} />
             ) : (
-              <p id={`${ids}-at-hint`} className="text-[11px] text-muted-foreground">
+              <p id={`${ids}-at-hint`} className="text-xs text-muted-foreground">
                 HH:MM, de 00:00 à 23:59, dans le fuseau des réglages de Nexus (Europe/Paris par défaut).
               </p>
             )}
@@ -850,10 +877,10 @@ function ScheduleFields({ draft, errors, ids, set }: FieldsProps) {
           <fieldset className="grid grid-cols-[minmax(0,1fr)] gap-1" aria-describedby={errors.days ? `${ids}-days-err` : undefined}>
             <legend className="mb-1 flex w-full items-center text-xs font-medium">
               <span className="flex-1">Jours</span>
-              <Button type="button" variant="link" size="sm" className="h-auto px-1 text-[11px]" onClick={() => set({ days: [...WORKDAYS] })}>
+              <Button type="button" variant="link" size="sm" className="h-auto px-1 text-xs" onClick={() => set({ days: [...WORKDAYS] })}>
                 ouvrés
               </Button>
-              <Button type="button" variant="link" size="sm" className="h-auto px-1 text-[11px]" onClick={() => set({ days: [...WEEKDAYS] })}>
+              <Button type="button" variant="link" size="sm" className="h-auto px-1 text-xs" onClick={() => set({ days: [...WEEKDAYS] })}>
                 tous
               </Button>
             </legend>
@@ -865,11 +892,11 @@ function ScheduleFields({ draft, errors, ids, set }: FieldsProps) {
                     key={day}
                     type="button"
                     size="icon-sm"
-                    variant={on ? "default" : "outline"}
+                    variant={on ? "soft" : "outline"}
                     aria-pressed={on}
                     aria-label={WEEKDAY_LABEL[day]}
                     title={WEEKDAY_LABEL[day]}
-                    className="size-8 flex-1"
+                    className={cn("size-8 flex-1", on && "border border-atelier-border")}
                     onClick={() => toggleDay(day)}
                   >
                     {WEEKDAY_SHORT[day]}
@@ -903,19 +930,21 @@ function EventFields({
 
   return (
     <>
-      <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-app`}>
+      <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-app`}>
         <SectionTitle id={`${ids}-app`}>Application</SectionTitle>
         {catalogError && (
-          <p role="alert" className="text-xs text-destructive">
+          <Callout tone="destructive" role="alert">
             {catalogError}
-          </p>
+          </Callout>
         )}
         {!catalog && !catalogError && (
-          <p role="status" className="text-xs text-muted-foreground">
-            Lecture des événements publiés par les applications…
-          </p>
+          <div role="status" className="grid gap-1.5">
+            <span className="sr-only">Lecture des événements publiés par les applications…</span>
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+          </div>
         )}
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-1" role="radiogroup" aria-labelledby={`${ids}-app`} aria-describedby={errors.app ? `${ids}-app-err` : undefined}>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5" role="radiogroup" aria-labelledby={`${ids}-app`} aria-describedby={errors.app ? `${ids}-app-err` : undefined}>
           {apps.map((a) => (
             <AppChoice
               key={a.app}
@@ -924,16 +953,18 @@ function EventFields({
               onChoose={() => set({ app: a.app, types: draft.app === a.app ? draft.types : [], filters: draft.app === a.app ? draft.filters : [] })}
             />
           ))}
-          {unknownApp && <p className="text-xs text-warning">Application « {unknownApp} » absente du catalogue.</p>}
+          {unknownApp && <Callout tone="warning">Application « {unknownApp} » absente du catalogue.</Callout>}
         </div>
         <FieldError id={`${ids}-app-err`} message={errors.app} />
       </section>
 
       {draft.app && (
         <fieldset className="grid grid-cols-[minmax(0,1fr)] gap-1" aria-describedby={errors.types ? `${ids}-types-err` : undefined}>
-          <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Événements</legend>
+          <legend className="mb-1.5">
+            <SectionLabel as="p">Événements</SectionLabel>
+          </legend>
           {app && app.events.length === 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {app.status === "ok" ? "Cette application ne publie aucun événement." : "Application injoignable : ses événements ne sont pas connus pour le moment."}
             </p>
           )}
@@ -941,7 +972,7 @@ function EventFields({
             (ev) => {
               const checked = draft.types.includes(ev.type);
               return (
-                <label key={ev.type} className="flex items-start gap-2 rounded-md px-1 py-1 hover:bg-accent">
+                <label key={ev.type} className="flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent">
                   <Checkbox
                     className="mt-0.5"
                     checked={checked}
@@ -949,7 +980,7 @@ function EventFields({
                   />
                   <span className="min-w-0">
                     <span className="block text-sm leading-tight">{ev.label}</span>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">{ev.type}</span>
+                    <span className="block truncate font-mono text-xs text-muted-foreground">{ev.type}</span>
                   </span>
                 </label>
               );
@@ -960,7 +991,7 @@ function EventFields({
       )}
 
       {draft.app && (
-        <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-filters`}>
+        <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-filters`}>
           <div className="flex items-center">
             <SectionTitle id={`${ids}-filters`}>Seulement si…</SectionTitle>
             <Button
@@ -975,7 +1006,7 @@ function EventFields({
               Filtre
             </Button>
           </div>
-          {draft.filters.length === 0 && <p className="text-[11px] text-muted-foreground">Aucun filtre : chaque événement coché lance le workflow.</p>}
+          {draft.filters.length === 0 && <p className="text-xs text-muted-foreground">Aucun filtre : chaque événement coché lance le workflow.</p>}
           <datalist id={`${ids}-fields`}>
             {fields.map((f) => (
               <option key={f} value={f} />
@@ -985,12 +1016,12 @@ function EventFields({
             {draft.filters.map((filter, i) => {
               const key = `filters.${i}`;
               return (
-                <li key={i} className="grid grid-cols-[minmax(0,1fr)] gap-1 rounded-md border border-atelier-line bg-sunken p-2">
+                <li key={i} className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-lg border border-atelier-line bg-sunken p-2.5">
                   <div className="flex items-center gap-1">
                     <Input
                       aria-label={`Champ du filtre ${i + 1}`}
                       list={`${ids}-fields`}
-                      className="h-7 flex-1 font-mono text-xs"
+                      className="h-8 flex-1 bg-card font-mono text-xs"
                       placeholder="data.to"
                       value={filter.path}
                       aria-invalid={!!errors[key]}
@@ -1000,8 +1031,7 @@ function EventFields({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon-sm"
-                      className="size-7"
+                      size="icon-xs"
                       aria-label={`Retirer le filtre ${i + 1}`}
                       onClick={() => set({ filters: draft.filters.filter((_, j) => j !== i) })}
                     >
@@ -1054,8 +1084,8 @@ function AppChoice({ app, checked, onChoose }: { app: EventsCatalogApp; checked:
       {...appTheme(app.app, app.color)}
       onClick={onChoose}
       className={cn(
-        "flex items-center gap-2 rounded-md border px-2 py-1.5 text-left outline-none transition-colors hover:bg-signature-faint focus-visible:shadow-focus",
-        checked ? "border-signature bg-signature-soft shadow-glow" : "border-atelier-line bg-card",
+        "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors hover:bg-signature-faint focus-visible:shadow-focus",
+        checked ? "border-atelier-border bg-signature-soft shadow-glow" : "border-atelier-line bg-card",
       )}
     >
       <AppTile app={app.app} color={app.color} size="xs" />
@@ -1063,7 +1093,7 @@ function AppChoice({ app, checked, onChoose }: { app: EventsCatalogApp; checked:
         <span className="block truncate text-sm font-medium">{app.name}</span>
         <span className="flex items-center gap-2">
           <AppStatusDot status={app.status} />
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {count === 0 ? "aucun événement" : `${count} événement${count >= 2 ? "s" : ""}`}
           </span>
         </span>
@@ -1078,12 +1108,12 @@ function ParamsFields({ draft, params, errors, ids, app, set }: FieldsProps & { 
   const orphans = Object.keys(draft.params).filter((name) => draft.params[name] && !params.some((p) => p.name === name));
   const setParam = (name: string, value: string) => set({ params: { ...draft.params, [name]: value } });
   return (
-    <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-labelledby={`${ids}-params`}>
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-2.5" aria-labelledby={`${ids}-params`}>
       <SectionTitle id={`${ids}-params`}>Paramètres du workflow</SectionTitle>
       {params.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">Ce workflow n&apos;a pas de paramètre.</p>
+        <p className="text-xs text-muted-foreground">Ce workflow n&apos;a pas de paramètre.</p>
       ) : (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Laissez vide pour garder la valeur par défaut.
           {draft.kind === "event" && " « Utiliser… » insère une valeur de l'événement, lue à chaque lancement."}
         </p>
@@ -1095,7 +1125,7 @@ function ParamsFields({ draft, params, errors, ids, app, set }: FieldsProps & { 
           <div key={param.name} className="grid grid-cols-[minmax(0,1fr)] gap-1">
             <div className="flex items-center gap-1">
               <label htmlFor={id} className="min-w-0 flex-1 truncate text-xs font-medium">
-                {param.label || param.name} <code className="font-mono text-[10px] font-normal text-muted-foreground">{param.name}</code>
+                {param.label || param.name} <code className="font-mono text-xs font-normal text-muted-foreground">{param.name}</code>
               </label>
               {draft.kind === "event" && (
                 <EventTemplateMenu
@@ -1120,20 +1150,23 @@ function ParamsFields({ draft, params, errors, ids, app, set }: FieldsProps & { 
         );
       })}
       {orphans.map((name) => (
-        <div key={name} className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/8 px-2 py-1 text-xs">
-          <span className="min-w-0 flex-1">
-            <code className="font-mono">{name}</code> n&apos;existe plus dans le workflow.
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-6"
-            onClick={() => set({ params: Object.fromEntries(Object.entries(draft.params).filter(([k]) => k !== name)) })}
-          >
-            Retirer
-          </Button>
-        </div>
+        <Callout
+          key={name}
+          tone="warning"
+          action={
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() => set({ params: Object.fromEntries(Object.entries(draft.params).filter(([k]) => k !== name)) })}
+            >
+              Retirer
+            </Button>
+          }
+        >
+          <code className="font-mono">{name}</code> n&apos;existe plus dans le workflow.
+        </Callout>
       ))}
     </section>
   );
@@ -1151,8 +1184,8 @@ function EventTemplateMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-xs" aria-label={`Utiliser une valeur de l'événement pour ${label}`}>
-          <Braces className="size-3" />
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" aria-label={`Utiliser une valeur de l'événement pour ${label}`}>
+          <Braces className="size-3.5" />
           Utiliser…
         </Button>
       </DropdownMenuTrigger>
@@ -1164,7 +1197,7 @@ function EventTemplateMenu({
             {group.options.map((option) => (
               <DropdownMenuItem key={option.value} onSelect={() => onPick(option.value)} className="flex-col items-start gap-0">
                 <span className="text-sm">{option.label}</span>
-                <span className="flex w-full items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
                   <code className="truncate font-mono">{option.value}</code>
                   {option.hint && <span className="ml-auto shrink-0">{option.hint}</span>}
                 </span>

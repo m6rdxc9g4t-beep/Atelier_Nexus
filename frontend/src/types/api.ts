@@ -526,7 +526,7 @@ export interface OutputHint {
 export interface CatalogEntry {
   uses: StepUses;
   source: "tool" | "node";
-  /** "viz" | "tab" | "projets" | "cine" | … | null (outil système) */
+  /** "viz" | "tab" | "projets" | "convert" | "cine" | … | null (outil système) */
   app: string | null;
   label: string;
   description: string;
@@ -744,7 +744,7 @@ export interface EventFilter {
 }
 
 /** Applications qui publient des événements (atelier-node/1 §7.3). */
-export type TriggerApp = "viz" | "projets" | "tab";
+export type TriggerApp = "viz" | "projets" | "tab" | "convert";
 
 export interface TriggerCounters {
   fired: number;

@@ -22,7 +22,9 @@ const TOOLSET_APP: Record<string, string | null> = {
   cuisine_budget: "cuisine",
   github_read: "github",
   github_write: "github",
+  // Boîtes de l'extension Agent_DatAnalyst (le cœur n'ajoute que le nœud de workflow)
   convert: "convert",
+  convert_write: "convert",
 };
 
 /** Préfixe d'un nom d'outil → application (boîtes des extensions, outils isolés). */

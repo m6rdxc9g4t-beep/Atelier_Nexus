@@ -11,10 +11,10 @@ import {
   type ThemePreference,
 } from "./theme-constants";
 
-const OPTIONS: { value: ThemePreference; label: string; Icon: LucideIcon }[] = [
-  { value: "light", label: "Thème clair", Icon: Sun },
-  { value: "dark", label: "Thème sombre", Icon: Moon },
-  { value: "system", label: "Thème du système", Icon: Monitor },
+const OPTIONS: { value: ThemePreference; label: string; short: string; Icon: LucideIcon }[] = [
+  { value: "light", label: "Thème clair", short: "Clair", Icon: Sun },
+  { value: "dark", label: "Thème sombre", short: "Sombre", Icon: Moon },
+  { value: "system", label: "Thème du système", short: "Système", Icon: Monitor },
 ];
 
 /* ─── Préférence mémorisée (localStorage, avec repli en mémoire) ─── */
@@ -68,8 +68,11 @@ function applyTheme(preference: ThemePreference) {
   root.dataset.theme = dark ? "dark" : "light";
 }
 
-/** Sélecteur Clair / Sombre / Système (préférence mémorisée sur cet appareil). */
-export function ThemeToggle({ className }: { className?: string }) {
+/**
+ * Sélecteur Clair / Sombre / Système (préférence mémorisée sur cet appareil). `labels` : nom de
+ * chaque thème à côté de son icône (Réglages › Apparence) ; sinon icônes seules (barre latérale).
+ */
+export function ThemeToggle({ className, labels = false }: { className?: string; labels?: boolean }) {
   // null au rendu serveur et à l'hydratation : aucun bouton coché tant que la préférence n'est pas lue.
   const preference = useSyncExternalStore(subscribe, readPreference, () => null);
 
@@ -94,7 +97,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         className,
       )}
     >
-      {OPTIONS.map(({ value, label, Icon }) => {
+      {OPTIONS.map(({ value, label, short, Icon }) => {
         const active = preference === value;
         return (
           <button
@@ -102,10 +105,11 @@ export function ThemeToggle({ className }: { className?: string }) {
             type="button"
             aria-label={label}
             aria-pressed={active}
-            title={label}
+            title={labels ? undefined : label}
             onClick={() => writePreference(value)}
             className={cn(
-              "inline-flex size-8 items-center justify-center rounded-full transition-colors",
+              "inline-flex h-8 items-center justify-center rounded-full transition-colors",
+              labels ? "gap-1.5 px-3 text-xs font-medium" : "w-8",
               "focus-visible:shadow-focus focus-visible:outline-none",
               active
                 ? "bg-signature-soft text-atelier-ink"
@@ -113,6 +117,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             )}
           >
             <Icon className="size-4" aria-hidden="true" />
+            {labels && short}
           </button>
         );
       })}

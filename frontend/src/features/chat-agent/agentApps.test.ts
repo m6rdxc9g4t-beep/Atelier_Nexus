@@ -6,6 +6,7 @@ describe("applications d'un agent", () => {
   it("déduit les applications des boîtes, sans doublon ni outils système", () => {
     expect(agentApps({ toolsets: ["core", "data_via", "tab", "tab_write"] })).toEqual(["viz", "tab"]);
     expect(agentApps({ toolsets: ["core", "delegation"] })).toEqual([]);
+    expect(agentApps({ toolsets: ["convert", "convert_write"] })).toEqual(["convert"]);
   });
 
   it("rattache les outils d'une boîte inconnue par leur préfixe", () => {
@@ -17,6 +18,7 @@ describe("applications d'un agent", () => {
   it("reconnaît l'application d'un outil", () => {
     expect(toolApp("data_via_query")).toBe("viz");
     expect(toolApp("github_commit_files")).toBe("github");
+    expect(toolApp("convert_send_to_tab")).toBe("convert");
     expect(toolApp("current_datetime")).toBeNull();
   });
 });

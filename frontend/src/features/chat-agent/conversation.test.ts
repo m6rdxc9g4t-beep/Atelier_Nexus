@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { AgentResult } from "@/types/api";
 
-import { addUserTurn, applyEvent, canSaveAsWorkflow, emptyConversation, failLastTurn } from "./conversation";
+import {
+  addUserTurn,
+  applyEvent,
+  canSaveAsWorkflow,
+  emptyConversation,
+  failLastTurn,
+  replayableCount,
+} from "./conversation";
 
 const result = (over: Partial<AgentResult> = {}): AgentResult => ({
   agent: "assistant",
@@ -178,5 +185,10 @@ describe("canSaveAsWorkflow", () => {
         parts: [tool("current_datetime"), tool("delegate_to_agent"), tool("data_via_query", "error")],
       }),
     ).toBe(false);
+  });
+
+  it("compte les actions rejouables (« Rejouer ces n actions »)", () => {
+    const parts = [tool("data_via_query"), tool("current_datetime"), tool("projets_dashboard"), tool("tab_read_table", "error")];
+    expect(replayableCount({ id: "t", role: "assistant", meta, parts })).toBe(2);
   });
 });

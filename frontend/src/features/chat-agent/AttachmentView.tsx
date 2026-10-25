@@ -89,7 +89,7 @@ function ImageThumb({ item, onOpen }: { item: AttachmentBlock; onOpen: () => voi
     <button
       type="button"
       onClick={onOpen}
-      className="block overflow-hidden rounded-md border border-atelier-border-soft outline-none focus-visible:shadow-focus"
+      className="block overflow-hidden rounded-lg border border-atelier-border-soft outline-none transition-colors hover:border-atelier-border focus-visible:shadow-focus"
       aria-label={`Agrandir « ${item.name} »`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- image servie par l'API locale */}
@@ -119,7 +119,7 @@ function DocumentChip({ item }: { item: AttachmentBlock }) {
           );
       }}
       title={`Télécharger « ${item.name} »`}
-      className="flex max-w-72 items-center gap-2.5 rounded-md border border-atelier-border-soft bg-card px-3 py-2 text-left text-sm outline-none hover:border-primary focus-visible:shadow-focus"
+      className="flex max-w-72 items-center gap-2.5 rounded-lg border border-atelier-border-soft bg-card px-3 py-2 text-left text-sm outline-none transition-colors hover:border-atelier-border hover:bg-atelier-surface-2 focus-visible:shadow-focus"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-accent-soft text-accent-ink">
         {state === "busy" ? (
@@ -130,7 +130,7 @@ function DocumentChip({ item }: { item: AttachmentBlock }) {
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="truncate font-medium">{item.name}</span>
-        <span className={cn("text-xs text-muted-foreground", problem && "text-destructive")}>
+        <span className={cn("text-xs text-muted-foreground", problem && "text-destructive-ink")}>
           {problem ?? formatSize(item.size)}
         </span>
       </span>

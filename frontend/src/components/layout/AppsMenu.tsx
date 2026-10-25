@@ -25,7 +25,7 @@ export function AppsMenu({ apps, className }: { apps: AppStatus[]; className?: s
         aria-label={`Applications : ${up} sur ${apps.length} joignables`}
         title="Applications connectées"
         className={cn(
-          "group inline-flex h-8 items-center gap-2 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring data-[state=open]:bg-accent",
+          "group inline-flex h-8 shrink-0 items-center gap-2 rounded-lg px-2 text-[13px] whitespace-nowrap text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring data-[state=open]:bg-accent",
           className,
         )}
       >

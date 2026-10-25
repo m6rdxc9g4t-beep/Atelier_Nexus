@@ -14,6 +14,8 @@ import { agentApps } from "@/features/chat-agent/agentApps";
 import { formatWhen } from "@/features/chat-agent/formatWhen";
 import { badgeText } from "@/features/workflow-triggers/origin";
 import { useInboxCount } from "@/features/workflow-triggers/useInboxCount";
+import { homeTemplates } from "@/features/workflows/studio";
+import { TemplateCard, TemplateSkeletons, useWorkflowLibrary } from "@/features/workflows/TemplateGallery";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
@@ -28,7 +30,7 @@ const ASK_AGENT = "assistant";
 
 /**
  * Accueil : question rapide à l'Assistant, reprise des dernières conversations, agents mis en
- * avant, état de la suite, « À valider » et workflows de suite.
+ * avant, état de la suite, « À valider » et workflows de suite (modèles prêts à l'emploi).
  */
 export function HomeView({
   agents,
@@ -47,7 +49,6 @@ export function HomeView({
   const openConversation = useChatStore((s) => s.open);
   const historyVersion = useChatStore((s) => s.historyVersion);
   const setView = useNavStore((s) => s.setView);
-  const openList = useWorkflowStudioStore((s) => s.openList);
   const setMapOpen = useWorkflowStudioStore((s) => s.setMapOpen);
   const setInboxOpen = useWorkflowStudioStore((s) => s.setInboxOpen);
   const inbox = useInboxCount();
@@ -128,7 +129,10 @@ export function HomeView({
           <section aria-labelledby="home-agents" className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <SectionLabel id="home-agents">Agents</SectionLabel>
-              <span className="text-xs text-muted-foreground">Tous dans la barre latérale</span>
+              <span className="text-xs text-muted-foreground">
+                Tous dans <span className="lg:hidden">le menu</span>
+                <span className="hidden lg:inline">la barre latérale</span>
+              </span>
             </div>
             {loading && !agents.length ? (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -159,7 +163,7 @@ export function HomeView({
                       <span className="min-w-0 flex-1 truncate text-[13px]" title={app.error ?? app.detail ?? undefined}>
                         {app.label}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {app.available ? "en marche" : app.configured ? "arrêtée" : "non configurée"}
                       </span>
                     </li>
@@ -197,8 +201,62 @@ export function HomeView({
           </aside>
         </div>
 
-        <section aria-labelledby="home-workflows" className="flex flex-col gap-3">
-          <SectionLabel id="home-workflows">Workflows de suite</SectionLabel>
+        <SuiteWorkflows />
+      </div>
+    </main>
+  );
+}
+
+/**
+ * Workflows de suite : trois modèles prêts à l'emploi (les disponibles d'abord) à copier dans un
+ * brouillon, tous les modèles, ses workflows. Sans modèles (serveur plus ancien, erreur) : la
+ * présentation des workflows de suite et l'accès au Studio.
+ */
+function SuiteWorkflows() {
+  const { state } = useWorkflowLibrary();
+  const openList = useWorkflowStudioStore((s) => s.openList);
+  const setListSection = useWorkflowStudioStore((s) => s.setListSection);
+  const openTemplates = useWorkflowStudioStore((s) => s.openTemplates);
+  const picks = state.status === "ready" ? homeTemplates(state.templates) : [];
+  const openMine = () => {
+    openList(null);
+    setListSection("mine");
+  };
+
+  return (
+    <section aria-labelledby="home-workflows" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <SectionLabel id="home-workflows">Workflows de suite</SectionLabel>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={openMine}>
+            <Waypoints />
+            Mes workflows
+          </Button>
+          {picks.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={openTemplates}>
+              Voir tous les modèles
+              <ArrowRight />
+            </Button>
+          )}
+        </div>
+      </div>
+      {state.status === "loading" && <TemplateSkeletons count={3} className="grid gap-3 md:grid-cols-3" />}
+      {picks.length > 0 ? (
+        <>
+          <p className="-mt-1 text-[13px] text-muted-foreground">
+            Des enchaînements prêts à l&apos;emploi : le modèle devient un brouillon que vous relisez, et chaque étape attend
+            votre accord.
+          </p>
+          <ul className="grid gap-3 md:grid-cols-3">
+            {picks.map((template) => (
+              <li key={template.slug} className="min-w-0">
+                <TemplateCard template={template} compact />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        state.status !== "loading" && (
           <Card variant="highlight" className="overflow-hidden">
             <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
               <div className="flex flex-wrap items-center gap-1.5" aria-hidden>
@@ -210,21 +268,21 @@ export function HomeView({
                 ))}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-semibold">Enchaînez vos applications, sans modèle</p>
+                <p className="text-lg font-semibold">Enchaînez vos applications, sans passer par un agent</p>
                 <p className="text-[13px] text-muted-foreground">
                   Un relevé converti devient une table Tab, un jeu Viz, des tâches Projets : chaque étape est vérifiée
                   avant de s&apos;exécuter.
                 </p>
               </div>
-              <Button onClick={() => openList(null)}>
+              <Button onClick={openMine}>
                 <Waypoints />
                 Ouvrir les workflows
               </Button>
             </div>
           </Card>
-        </section>
-      </div>
-    </main>
+        )
+      )}
+    </section>
   );
 }
 

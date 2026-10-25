@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowUp, CircleAlert, LoaderCircle, Paperclip, Square, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,8 @@ interface ComposerProps {
   disabled?: boolean;
   onSend: (text: string, attachments: AttachmentBlock[]) => void;
   onStop: () => void;
+  /** Choix du moteur, dans la barre d'outils (reste utilisable quand l'envoi est bloqué) */
+  engine?: ReactNode;
 }
 
 interface PendingFile {
@@ -32,9 +35,13 @@ interface PendingFile {
 
 let fileSeq = 0;
 
-/** Zone de saisie : Entrée envoie, Maj+Entrée va à la ligne. Fichiers : trombone, glisser-déposer
- * ou coller (captures d'écran). Chaque fichier est envoyé au serveur dès qu'il est ajouté. */
-export function Composer({ agentName, streaming, disabled, onSend, onStop }: ComposerProps) {
+/**
+ * Zone de saisie : Entrée envoie, Maj+Entrée va à la ligne. Fichiers : trombone, glisser-déposer
+ * ou coller (captures d'écran). Chaque fichier est envoyé au serveur dès qu'il est ajouté.
+ * Surface calme : le halo n'apparaît qu'au focus. Barre d'outils interne : Joindre, moteur,
+ * aide clavier, Envoyer / Arrêter.
+ */
+export function Composer({ agentName, streaming, disabled, onSend, onStop, engine }: ComposerProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -112,7 +119,7 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
 
   return (
     <form
-      className="mx-auto w-full max-w-3xl px-4 pb-4"
+      className="mx-auto w-full max-w-3xl px-4 pt-1 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -135,12 +142,12 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
     >
       <div
         className={cn(
-          "relative rounded-lg border border-atelier-border bg-atelier-field shadow-glow focus-within:border-primary focus-within:shadow-focus",
+          "relative rounded-[20px] border border-atelier-border-soft bg-atelier-field transition-[border-color,box-shadow] focus-within:border-primary focus-within:shadow-focus",
           dragging && "border-dashed border-primary bg-accent-soft",
         )}
       >
         {dragging && (
-          <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg text-sm font-medium text-accent-ink">
+          <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[20px] text-sm font-medium text-accent-ink">
             Déposez les fichiers pour les joindre
           </p>
         )}
@@ -177,8 +184,9 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
           }}
           placeholder={`Écrire à ${agentName}…`}
           rows={1}
+          aria-describedby="composer-keys"
           className={cn(
-            "max-h-60 min-h-12 resize-none border-0 bg-transparent py-3 pr-14 pl-11 shadow-none focus-visible:shadow-none",
+            "max-h-60 min-h-11 resize-none rounded-none border-0 bg-transparent px-4 pt-3 pb-1 shadow-none focus-visible:shadow-none",
             dragging && "opacity-30",
           )}
         />
@@ -195,11 +203,12 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
             e.target.value = ""; // le même fichier pourra être rejoint
           }}
         />
-        <div className="absolute bottom-2 left-2">
+        <div className={cn("flex items-center gap-1 px-2 pb-2", dragging && "opacity-30")}>
           <Button
             type="button"
             size="icon-sm"
             variant="ghost"
+            className="rounded-full"
             disabled={disabled}
             onClick={() => input.current?.click()}
             aria-label="Joindre des fichiers"
@@ -207,13 +216,19 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
           >
             <Paperclip />
           </Button>
-        </div>
-        <div className="absolute right-2 bottom-2">
+          {engine}
+          <span className="flex-1" />
+          <span id="composer-keys" className="mr-1 hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+            {/* Espaces explicites : la description lue (aria-describedby) garde ses mots séparés */}
+            <Kbd className="h-5 text-xs">Entrée</Kbd> envoyer · <Kbd className="h-5 text-xs">Maj+Entrée</Kbd> à la
+            ligne
+          </span>
           {streaming ? (
             <Button
               type="button"
               size="icon-sm"
               variant="secondary"
+              className="rounded-full"
               onClick={onStop}
               aria-label="Arrêter la réponse"
             >
@@ -223,6 +238,7 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
             <Button
               type="submit"
               size="icon-sm"
+              className="rounded-full"
               disabled={!canSend}
               aria-label={uploading ? "Envoi des fichiers en cours" : "Envoyer"}
             >
@@ -231,9 +247,6 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop }: Com
           )}
         </div>
       </div>
-      <p className="mt-1.5 text-center text-xs text-muted-foreground">
-        Les agents peuvent se tromper : vérifiez les chiffres et le code avant de les utiliser.
-      </p>
     </form>
   );
 }
@@ -272,7 +285,7 @@ function PendingChip({ file, onRemove }: { file: PendingFile; onRemove: () => vo
           role="status"
           className={cn(
             "truncate text-xs text-muted-foreground",
-            error && "whitespace-normal text-destructive",
+            error && "whitespace-normal text-destructive-ink",
           )}
         >
           {file.status === "uploading" && "Préparation…"}

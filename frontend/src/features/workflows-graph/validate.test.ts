@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { catalogIndex } from "./catalog";
 import { catalogFixture, diamondSteps, step } from "./fixtures";
-import { errorsByField, globalErrors, validateLocal } from "./validate";
+import { displayedErrors, errorsByField, firstErrorStep, globalErrors, problemsText, validateLocal } from "./validate";
 
 const catalog = catalogIndex(catalogFixture);
 const params = [{ name: "jeu", label: "", default: "" }];
@@ -75,5 +75,38 @@ describe("validation locale", () => {
     const byField = errorsByField(errors, "a");
     expect([...byField.keys()]).toEqual(["filters", null]);
     expect(globalErrors(errors)).toHaveLength(1);
+  });
+});
+
+describe("badge « n problèmes »", () => {
+  it("tait « aucune étape », déjà dit par le canevas vide", () => {
+    const errors = validateLocal({ steps: [], params: [{ name: "Mauvais", label: "", default: "" }] });
+    expect(codes(errors)).toEqual(["NO_STEPS", "BAD_PARAM"]);
+    expect(codes(displayedErrors(errors))).toEqual(["BAD_PARAM"]);
+  });
+
+  it("accorde le nombre", () => {
+    expect(problemsText(1)).toBe("1 problème");
+    expect(problemsText(4)).toBe("4 problèmes");
+  });
+
+  it("vise la première étape en erreur dans l'ordre du graphe", () => {
+    const errors = [
+      { step_id: null, field: "params", code: "TOO_MANY_PARAMS", message: "" },
+      { step_id: "ajouter", field: null, code: "UNKNOWN_USES", message: "" },
+      { step_id: "creer", field: "title", code: "REF_NOT_ANCESTOR", message: "" },
+    ];
+    expect(firstErrorStep(diamondSteps, errors)).toBe("creer");
+    expect(firstErrorStep(diamondSteps, [errors[0]!])).toBeNull();
+    expect(firstErrorStep(diamondSteps, [{ step_id: "retiree", field: null, code: "CYCLE", message: "" }])).toBeNull();
+  });
+
+  it("suit l'ordre d'exécution plutôt que l'ordre d'ajout, celui de la liste en cas de cycle", () => {
+    // « ecrire » ajoutée avant « lire » mais exécutée après elle (première colonne : « lire »)
+    const steps = [step("ecrire", "node:tab/rows.add", ["lire"]), step("lire", "tool:data_via_query")];
+    const both = ["ecrire", "lire"].map((id) => ({ step_id: id, field: null, code: "UNKNOWN_USES", message: "" }));
+    expect(firstErrorStep(steps, both)).toBe("lire");
+    const loop = [step("a", "tool:x", ["b"]), step("b", "tool:y", ["a"])];
+    expect(firstErrorStep(loop, [{ step_id: "b", field: null, code: "CYCLE", message: "" }, { step_id: "a", field: null, code: "CYCLE", message: "" }])).toBe("a");
   });
 });

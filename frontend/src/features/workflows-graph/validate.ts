@@ -6,7 +6,7 @@
 
 import type { CatalogEntry, ValidationError, WorkflowParam, WorkflowStepV2 } from "@/types/api";
 
-import { MAX_PARAMS, MAX_STEPS, STEP_ID, ancestors, cyclicSteps } from "./graph";
+import { MAX_PARAMS, MAX_STEPS, STEP_ID, ancestors, cyclicSteps, topoOrder } from "./graph";
 import { parseRef, templateRefs } from "./refs";
 
 /** Outils qui appellent un modèle ou n'ont pas de sens sans lui (docs/workflows-v2-api.md §6). */
@@ -136,3 +136,23 @@ export function errorsByField(errors: ValidationError[], stepId: string): Map<st
 
 /** Erreurs qui ne visent aucune étape (paramètres, nombre d'étapes…). */
 export const globalErrors = (errors: ValidationError[]): ValidationError[] => errors.filter((e) => !e.step_id);
+
+/**
+ * Erreurs montrées dans l'en-tête et l'inspecteur : « aucune étape » est déjà dit par le
+ * canevas vide (point de départ), inutile de l'afficher en rouge sur un workflow neuf.
+ */
+export const displayedErrors = (errors: ValidationError[]): ValidationError[] => errors.filter((e) => e.code !== "NO_STEPS");
+
+/** Badge de l'en-tête : « 1 problème », « 3 problèmes ». */
+export const problemsText = (count: number): string => (count === 1 ? "1 problème" : `${count} problèmes`);
+
+/**
+ * Première étape en erreur, dans l'ordre d'exécution (celui des colonnes de la mise en page ;
+ * ordre de la liste si le graphe a un cycle) ; null si les erreurs ne visent que le workflow
+ * (paramètres, aucune étape…) ou une étape retirée.
+ */
+export function firstErrorStep(steps: WorkflowStepV2[], errors: ValidationError[]): string | null {
+  const faulty = new Set(errors.map((e) => e.step_id).filter(Boolean));
+  const order = topoOrder(steps) ?? steps.map((s) => s.id);
+  return order.find((id) => faulty.has(id)) ?? null;
+}

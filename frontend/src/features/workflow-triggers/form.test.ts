@@ -175,6 +175,7 @@ describe("gabarits et événement d'exemple", () => {
 
   it("reconnaît les applications qui publient des événements", () => {
     expect(isTriggerApp("projets")).toBe(true);
+    expect(isTriggerApp("convert")).toBe(true);
     expect(isTriggerApp("cine")).toBe(false);
   });
 

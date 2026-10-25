@@ -284,6 +284,11 @@ export function fromStored(detail: ConversationDetail, artifactIds: Record<strin
 /** Outils qui n'ont pas de sens sans modèle : ils ne suffisent pas à proposer un workflow. */
 const NOT_REPLAYABLE = new Set(["current_datetime", "delegate_to_agent"]);
 
+/** Actions réussies et rejouables sans modèle d'un tour (« Rejouer ces n actions »). */
+export function replayableCount(turn: ChatTurn): number {
+  return turn.parts.filter((p) => p.kind === "tool" && p.status === "done" && !NOT_REPLAYABLE.has(p.name)).length;
+}
+
 /** Le tour peut devenir un workflow : terminé, sans erreur, avec une action réussie et rejouable. */
 export function canSaveAsWorkflow(turn: ChatTurn): boolean {
   return (
@@ -291,6 +296,6 @@ export function canSaveAsWorkflow(turn: ChatTurn): boolean {
     !!turn.meta &&
     turn.meta.stop_reason !== "awaiting_approval" &&
     !turn.error &&
-    turn.parts.some((p) => p.kind === "tool" && p.status === "done" && !NOT_REPLAYABLE.has(p.name))
+    replayableCount(turn) > 0
   );
 }

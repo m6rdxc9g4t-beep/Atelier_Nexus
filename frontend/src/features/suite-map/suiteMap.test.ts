@@ -107,6 +107,13 @@ describe("déclencheur depuis un événement de la carte", () => {
     expect(choices[1]).toEqual({ label: "Ajouter à « Doc »", target: { kind: "open", id: "wf_1", panel: "triggers", trigger } });
   });
 
+  it("propose un workflow déclenché par un événement d'Atelier Convert", () => {
+    const trigger = { app: "convert", types: ["convert.conversion.created"] };
+    expect(triggerChoices("convert", "convert.conversion.created", null)).toEqual([
+      { label: "Nouveau workflow déclenché par cet événement", target: { kind: "new", agent: null, trigger } },
+    ]);
+  });
+
   it("ne propose rien pour une app qui ne déclenche pas de workflow", () => {
     expect(triggerChoices("cine", "cine.film.added", null)).toEqual([]);
   });

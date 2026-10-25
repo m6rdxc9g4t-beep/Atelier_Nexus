@@ -222,10 +222,20 @@
   .prose-chat > * + * {
     @apply mt-3;
   }
+  /* Un titre en tête de réponse ne décale pas le texte sous la signature de l'agent */
+  .prose-chat > :first-child {
+    @apply mt-0;
+  }
   .prose-chat h1,
   .prose-chat h2,
   .prose-chat h3 {
-    @apply mt-5 font-semibold;
+    @apply mt-5 font-semibold tracking-tight;
+  }
+  .prose-chat strong {
+    @apply font-semibold;
+  }
+  .prose-chat hr {
+    @apply my-5 border-atelier-line;
   }
   .prose-chat h1 {
     @apply text-lg;
@@ -248,14 +258,15 @@
   .prose-chat code {
     @apply rounded-sm bg-signature-faint px-1 py-0.5 font-mono text-[0.85em];
   }
+  /* Code et tableaux : surfaces creusées ou calmes (trait fin, sans halo) */
   .prose-chat pre {
-    @apply overflow-x-auto rounded-md border border-atelier-border-soft bg-sunken p-3 text-[0.8125rem] leading-snug;
+    @apply overflow-x-auto rounded-lg border border-atelier-line bg-sunken p-3 text-[0.8125rem] leading-snug;
   }
   .prose-chat pre code {
     @apply bg-transparent p-0;
   }
   .prose-chat table {
-    @apply block w-max max-w-full overflow-x-auto rounded-md border border-atelier-border-soft text-sm;
+    @apply block w-max max-w-full overflow-x-auto rounded-lg border border-atelier-line text-sm;
   }
   .prose-chat th,
   .prose-chat td {
@@ -265,16 +276,17 @@
     @apply bg-signature-faint font-medium;
   }
   .prose-chat blockquote {
-    @apply border-l-2 border-primary pl-3 text-muted-foreground;
+    @apply border-l-2 border-atelier-border-soft pl-3 text-muted-foreground;
   }
 }
 
 /* ─── Éditeur de workflows en graphe (React Flow) ─────────────────
    Variables de @xyflow/react branchées sur la charte : traits, poignées, mini-carte et
-   contrôles dans la signature, en clair comme en sombre. */
+   contrôles dans la signature, en clair comme en sombre. Canevas calme (points discrets,
+   outils sans halo) : le néon reste aux étapes sélectionnées ou en cours. */
 .react-flow.atelier-flow {
   --xy-background-color: transparent;
-  --xy-background-pattern-color: var(--atelier-border-soft);
+  --xy-background-pattern-color: var(--atelier-line);
   --xy-edge-stroke: var(--atelier-border);
   --xy-edge-stroke-width: 1.5;
   --xy-edge-stroke-selected: var(--atelier-signature);
@@ -293,7 +305,7 @@
   --xy-controls-button-color: var(--atelier-text);
   --xy-controls-button-color-hover: var(--atelier-ink);
   --xy-controls-button-border-color: var(--atelier-line);
-  --xy-controls-box-shadow: var(--atelier-glow);
+  --xy-controls-box-shadow: none;
   --xy-attribution-background-color: transparent;
   --xy-edge-label-background-color: var(--atelier-surface);
   --xy-edge-label-color: var(--atelier-muted);
@@ -301,7 +313,7 @@
 }
 .react-flow.atelier-flow .react-flow__minimap,
 .react-flow.atelier-flow .react-flow__controls {
-  @apply overflow-hidden rounded-md border border-atelier-border-soft;
+  @apply overflow-hidden rounded-lg border border-atelier-line bg-card;
 }
 .react-flow.atelier-flow .react-flow__attribution a {
   @apply text-muted-foreground;
@@ -310,7 +322,11 @@
   @apply size-3 border-2;
 }
 .react-flow.atelier-flow .react-flow__node:focus-visible {
-  @apply rounded-md outline-2 outline-offset-4 outline-primary;
+  @apply rounded-lg outline-2 outline-offset-4 outline-primary;
+}
+/* Liaison vers une étape en cours : trait de la signature, en pointillés animés par React Flow */
+.react-flow.atelier-flow .react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--atelier-signature);
 }
 .react-flow.atelier-flow .react-flow__edge.selected .react-flow__edge-path,
 .react-flow.atelier-flow .react-flow__edge:focus-visible .react-flow__edge-path {

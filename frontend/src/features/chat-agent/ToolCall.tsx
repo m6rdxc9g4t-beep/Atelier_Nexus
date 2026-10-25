@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronRight, CircleAlert, CircleCheck, LoaderCircle, Wrench } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-import type { ToolCallPart } from "./conversation";
+import { ActionStatusIcon } from "./ActionStatusIcon";
+import { type ActivityEntry, formatParams } from "./thread";
 
 /** Libellés lisibles des outils connus ; les autres gardent leur nom technique.
  * Mêmes noms que `backend/app/tools/labels.py` (résumés des cartes de validation). */
@@ -89,42 +89,31 @@ export function registerToolLabels(agents: { tools: { name: string; label?: stri
 
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? backendLabels.get(name) ?? name;
 
-/** Appel d'outil replié : on voit qu'il a eu lieu, on déplie pour l'entrée et le résultat. */
-export function ToolCall({ part }: { part: ToolCallPart }) {
-  const [open, setOpen] = useState(false);
-  const Icon =
-    part.status === "running" ? LoaderCircle : part.status === "error" ? CircleAlert : CircleCheck;
-  const state =
-    part.status === "running" ? "en cours" : part.status === "error" ? "en erreur" : "terminé";
-
+/**
+ * Une action de la chronologie d'activité (ToolActivity) : ligne sans boîte — état, libellé,
+ * résumé de sa validation et décision — qui se déplie sur ses paramètres et son résultat.
+ */
+export function ToolCall({ entry, label }: { entry: ActivityEntry; label: string }) {
   return (
-    <div className="rounded-md border border-atelier-border-soft bg-sunken text-sm">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-muted-foreground hover:text-foreground"
-      >
-        <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
-        <Wrench className="size-3.5" aria-hidden />
-        <span className="min-w-0 flex-1 truncate">{toolLabel(part.name)}</span>
-        <Icon
-          aria-label={state}
-          className={cn(
-            "size-3.5",
-            part.status === "running" && "animate-spin",
-            part.status === "error" && "text-destructive",
-            part.status === "done" && "text-success",
+    <li>
+      <details className="group/tool">
+        <summary className="-mx-1.5 flex cursor-pointer list-none items-start gap-2 rounded-md px-1.5 py-1 text-muted-foreground select-none hover:bg-accent hover:text-foreground [&::-webkit-details-marker]:hidden">
+          <ActionStatusIcon status={entry.status} className="mt-0.5" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-foreground">{label}</span>
+            {entry.summary && <span className="block truncate text-xs">{entry.summary}</span>}
+          </span>
+          {entry.decision !== undefined && (
+            <Badge variant={entry.decision ? "success" : "outline"}>{entry.decision ? "Autorisée" : "Refusée"}</Badge>
           )}
-        />
-      </button>
-      {open && (
-        <div className="space-y-2 border-t px-2.5 py-2">
-          <Detail label="Paramètres">{JSON.stringify(part.input, null, 2)}</Detail>
-          {part.result !== undefined && <Detail label="Résultat">{part.result}</Detail>}
+          <ChevronRight className="mt-0.5 size-4 shrink-0 transition-transform group-open/tool:rotate-90" aria-hidden />
+        </summary>
+        <div className="mt-1 mb-2 flex flex-col gap-2 pl-6">
+          <Detail label="Paramètres">{formatParams(entry.input)}</Detail>
+          {entry.result !== undefined && <Detail label="Résultat">{entry.result}</Detail>}
         </div>
-      )}
-    </div>
+      </details>
+    </li>
   );
 }
 
@@ -132,7 +121,7 @@ function Detail({ label, children }: { label: string; children: string }) {
   return (
     <div>
       <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <pre className="max-h-64 overflow-auto rounded-sm border border-atelier-line bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
+      <pre className="max-h-64 overflow-auto rounded-md border border-atelier-line bg-sunken p-2.5 font-mono text-xs leading-snug break-words whitespace-pre-wrap">
         {children}
       </pre>
     </div>

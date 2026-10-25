@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ToolsetInfo } from "@/types/api";
 
-import { emptyForm, forcesLocal, slugify, toPayload, validate } from "./form";
+import { MAX_TOOLSETS, emptyForm, forcesLocal, missingToolsets, slugify, toPayload, validate } from "./form";
 
 const toolset = (id: string, sensitive = false): ToolsetInfo => ({
   id,
@@ -41,5 +41,20 @@ describe("éditeur d'agents", () => {
     expect(payload.privacy).toBe("local_only");
     expect(payload.default_provider).toBeNull();
     expect(payload.starters).toEqual(["Mon budget ?", "Mes dépenses ?"]);
+  });
+
+  it("isole les boîtes absentes du catalogue (extension retirée) et les garde à l'envoi", () => {
+    const form = { ...emptyForm(), toolsets: ["core", "data_via", "extension_x", "extension_x", "tresorerie"] };
+    expect(missingToolsets(form.toolsets, TOOLSETS)).toEqual(["extension_x"]);
+    expect(missingToolsets(["core", "data_via"], TOOLSETS)).toEqual([]);
+    // Ni retirée ni rendue sensible à l'insu de l'utilisateur : elle part telle quelle
+    expect(toPayload(form, TOOLSETS).toolsets).toContain("extension_x");
+  });
+
+  it("limite le nombre de boîtes à outils, Essentiels compris", () => {
+    const base = { ...emptyForm(), display_name: "Veille", description: "Résume la veille.", system_prompt: "Tu résumes la veille chaque lundi." };
+    const ids = (n: number) => ["core", ...Array.from({ length: n - 1 }, (_, i) => `boite_${i}`)];
+    expect(validate({ ...base, toolsets: ids(MAX_TOOLSETS) }, [], true).toolsets).toBeUndefined();
+    expect(validate({ ...base, toolsets: ids(MAX_TOOLSETS + 1) }, [], true).toolsets).toMatch(/au plus/);
   });
 });

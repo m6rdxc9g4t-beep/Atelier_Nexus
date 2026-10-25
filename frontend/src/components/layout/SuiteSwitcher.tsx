@@ -4,6 +4,7 @@ import { Check, Globe, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { appTheme } from "@/features/workflows-graph/catalog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,12 +63,9 @@ export function SuiteSwitcher() {
                 if (!current) openExternal(app.url);
               }}
             >
-              {/* Chaque tuile dans la couleur signature de SON application */}
-              <span
-                className="atelier-brand__tile atelier-brand__tile--sm"
-                data-atelier-app={app.id}
-                aria-hidden
-              >
+              {/* Chaque tuile dans la couleur signature de SON application ; `appTheme` pose la
+                  signature locale d'une app que la marque copiée ne connaît pas (Convert) */}
+              <span className="atelier-brand__tile atelier-brand__tile--sm" {...appTheme(app.id)} aria-hidden>
                 <AppIcon app={app.id} />
               </span>
               <span className="min-w-0 flex-1">

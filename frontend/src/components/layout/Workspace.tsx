@@ -11,19 +11,23 @@ import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
 import { ChatPanel } from "@/features/chat-agent/ChatPanel";
 import { HomeView } from "@/features/home/HomeView";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
-import { SuiteMapDialog } from "@/features/suite-map/SuiteMapDialog";
-import { InboxDialog } from "@/features/workflow-triggers/InboxDialog";
-import { WorkflowListDialog } from "@/features/workflows/WorkflowsDialog";
+import { studioTab } from "@/features/workflows/studio";
+import { WorkflowsStudio } from "@/features/workflows/WorkflowsStudio";
 import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
 import { API_URL } from "@/lib/api";
+import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
 import { useChatStore } from "@/stores/useChatStore";
 import { useNavStore } from "@/stores/useNavStore";
+import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
-/** Écran principal : barre latérale (navigation + agents) · accueil ou conversation · artefacts. */
+/**
+ * Écran principal : barre latérale (navigation + agents) · accueil, conversation ou Studio des
+ * workflows · artefacts.
+ */
 export function Workspace() {
   const { agents, providers, apps, loading, error, reload } = useBackend();
   const [editor, setEditor] = useState<{ open: boolean; editing: string | null }>({
@@ -37,6 +41,10 @@ export function Workspace() {
   const setView = useNavStore((s) => s.setView);
   const drawerOpen = useNavStore((s) => s.drawerOpen);
   const setDrawerOpen = useNavStore((s) => s.setDrawerOpen);
+  // Studio des workflows (liste, carte, « À valider ») : vue plein cadre à la place de l'accueil
+  // ou de la conversation, gardée derrière l'éditeur en graphe ouvert depuis lui
+  const studio = useWorkflowStudioStore((s) => studioTab(s));
+  const closeStudio = useWorkflowStudioStore((s) => s.closeStudio);
 
   // Agent inexistant (supprimé, catalogue changé) : on revient au premier disponible
   useEffect(() => {
@@ -44,17 +52,13 @@ export function Workspace() {
   }, [agents, agent, setAgent]);
 
   const current = agents.find((a) => a.name === agent);
-  const wanted = current?.local_only
-    ? "ollama"
-    : (provider ?? current?.default_provider ?? providers.find((x) => x.is_default)?.name);
-  const chosen = providers.find((p) => p.name === wanted);
-  const blocked = error
-    ? error
-    : chosen && !chosen.configured
-      ? `${chosen.name === "anthropic" ? "Claude" : "Ollama"} n'est pas configuré : choisissez un autre moteur ou ouvrez les Réglages (roue dentée en bas de la barre latérale).`
-      : null;
+  // Conversation bloquée : serveur en erreur, ou moteur qui répondrait non configuré. ChatPanel
+  // en fait un seul message ; pour le moteur, avec le bouton « Ouvrir les réglages ».
+  const engine = providers.find((p) => p.name === effectiveProvider(current, provider, providers));
+  const blocked = error ?? (engine && !engine.configured ? `${PROVIDER_SHORT[engine.name]} n'est pas configuré.` : null);
 
   const openAgent = (name: string) => {
+    closeStudio();
     setAgent(name);
     setView("agents");
   };
@@ -80,7 +84,7 @@ export function Workspace() {
       </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader />
+        <AppHeader agents={agents} />
         <div className="flex min-h-0 flex-1">
           {error && !agents.length && !loading ? (
             <EmptyState
@@ -97,6 +101,8 @@ export function Workspace() {
               L&apos;interface attend l&apos;API sur <code className="font-mono">{API_URL}</code>. Lancez-la avec{" "}
               <code className="font-mono">uvicorn main:app --port 8100</code> dans le dossier backend.
             </EmptyState>
+          ) : studio ? (
+            <WorkflowsStudio agents={agents} />
           ) : view === "home" ? (
             <HomeView agents={agents} apps={apps} loading={loading} onOpenAgent={openAgent} />
           ) : (
@@ -107,10 +113,7 @@ export function Workspace() {
         </div>
       </div>
 
-      {/* Workflows (liste, éditeur en graphe), carte de la suite, « À valider » : une fenêtre à la fois */}
-      <WorkflowListDialog agents={agents} />
-      <SuiteMapDialog />
-      <InboxDialog />
+      {/* Éditeur en graphe : fenêtre plein écran, par-dessus le Studio ou la conversation */}
       <WorkflowGraphDialog agents={agents} />
       <SettingsDialog onSaved={reload} />
 

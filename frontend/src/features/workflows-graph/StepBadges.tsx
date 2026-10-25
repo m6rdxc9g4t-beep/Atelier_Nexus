@@ -25,15 +25,25 @@ import { STEP_STATUS_LABEL } from "./run";
 const KIND_ICON = { read: Eye, write: PenLine, destructive: ShieldAlert } as const;
 const KIND_VARIANT = { read: "outline", write: "warning", destructive: "destructive" } as const;
 
-/** Badge Lecture / Écriture / Destructif (icône + texte : la couleur n'est jamais seule). */
-export function KindBadge({ kind, className }: { kind: ActionKind; className?: string }) {
+const KIND_HINT = { read: "Aucun effet sur les données", write: "Validation demandée à chaque exécution" } as const;
+
+/**
+ * Badge Lecture / Écriture / Destructif (icône + texte : la couleur n'est jamais seule).
+ * `compact` : la lecture, sans effet, se réduit à son icône (nom lu par les lecteurs d'écran) ;
+ * l'écriture et le destructif gardent toujours leur badge complet.
+ */
+export function KindBadge({ kind, compact = false, className }: { kind: ActionKind; compact?: boolean; className?: string }) {
   const Icon = KIND_ICON[kind];
+  const hint = kind === "read" ? KIND_HINT.read : KIND_HINT.write;
+  if (compact && kind === "read")
+    return (
+      <span className={cn("inline-flex shrink-0 items-center text-muted-foreground", className)} title={`${KIND_LABEL.read} : ${hint.toLowerCase()}`}>
+        <Icon className="size-3.5" aria-hidden />
+        <span className="sr-only">{KIND_LABEL.read}</span>
+      </span>
+    );
   return (
-    <Badge
-      variant={KIND_VARIANT[kind]}
-      className={className}
-      title={kind === "read" ? "Aucun effet sur les données" : "Validation demandée à chaque exécution"}
-    >
+    <Badge variant={KIND_VARIANT[kind]} className={className} title={hint}>
       <Icon aria-hidden />
       {KIND_LABEL[kind]}
     </Badge>
@@ -78,7 +88,7 @@ const APP_STATUS_DOT: Record<NodeAppStatus, string> = {
 /** Pastille + libellé de l'état d'une application. */
 export function AppStatusDot({ status, className }: { status: CatalogApp["status"]; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[11px] text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", className)}>
       <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", APP_STATUS_DOT[status])} />
       {APP_STATUS_LABEL[status]}
     </span>

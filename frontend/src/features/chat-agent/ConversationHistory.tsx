@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, History, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Check, History, MessagesSquare, Pencil, Plus, Search, SearchX, Trash2, X } from "lucide-react";
+import { Fragment, type ReactNode, useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +14,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/section-label";
+import { Segmented } from "@/components/ui/segmented";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
 import type { AgentInfo, ConversationSummary, SearchHit } from "@/types/api";
 
-import { formatWhen } from "./formatWhen";
+import { type DayGroup as Day, formatWhen, formatWhenIn, groupByDay } from "./formatWhen";
 import { highlight, searchTerms } from "./highlight";
 
 /** Bouton « Historique » : conversations enregistrées de l'agent et recherche dans tout l'historique. */
@@ -43,7 +48,7 @@ export function ConversationHistory({
           <span className="hidden sm:inline">Historique</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl grid-cols-[minmax(0,1fr)]">
+      <DialogContent size="md" className="grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
           <DialogTitle>Conversations avec {label}</DialogTitle>
           <DialogDescription>
@@ -186,28 +191,33 @@ function HistoryList({
         />
       ) : (
         <>
-          {state.status === "loading" && <p className="text-sm text-muted-foreground">Chargement…</p>}
+          {state.status === "loading" && <ListSkeleton />}
           {state.status === "error" && (
-            <p role="alert" className="text-sm text-destructive">
+            <Callout tone="destructive" role="alert">
               Historique indisponible : {state.message}
-            </p>
+            </Callout>
           )}
           {state.status === "ready" && state.items.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Aucune conversation enregistrée avec cet agent. Elle apparaîtra ici dès votre premier message.
-            </p>
+            <EmptyState icon={MessagesSquare} title="Aucune conversation enregistrée" className="py-6">
+              Elle apparaîtra ici dès votre premier message à cet agent.
+            </EmptyState>
           )}
           {state.status === "ready" && state.items.length > 0 && (
-            <ul className="-mx-2 flex flex-col">
-              {state.items.map((item) => (
-                <HistoryRow
-                  key={item.id}
-                  item={item}
-                  current={item.id === currentId}
-                  onOpen={() => choose(item.id)}
-                />
+            <div className="flex flex-col gap-4">
+              {groupByDay(state.items).map((group) => (
+                <DayGroup key={group.label} label={group.label}>
+                  {group.items.map((item) => (
+                    <HistoryRow
+                      key={item.id}
+                      item={item}
+                      group={group.label}
+                      current={item.id === currentId}
+                      onOpen={() => choose(item.id)}
+                    />
+                  ))}
+                </DayGroup>
               ))}
-            </ul>
+            </div>
           )}
         </>
       )}
@@ -241,43 +251,42 @@ function SearchResults({
 }) {
   return (
     <div className="flex min-h-0 flex-col gap-2">
-      <div role="group" aria-label="Où chercher" className="flex items-center gap-1 text-sm">
-        <Button
-          size="sm"
-          variant={everywhere ? "ghost" : "secondary"}
-          aria-pressed={!everywhere}
-          onClick={() => onScope(false)}
-        >
-          Avec {label}
-        </Button>
-        <Button
-          size="sm"
-          variant={everywhere ? "secondary" : "ghost"}
-          aria-pressed={everywhere}
-          onClick={() => onScope(true)}
-        >
-          Tous les agents
-        </Button>
-      </div>
+      <Segmented
+        label="Où chercher"
+        value={everywhere ? "all" : "agent"}
+        onChange={(value) => onScope(value === "all")}
+        options={[
+          { value: "agent", label: `Avec ${label}` },
+          { value: "all", label: "Tous les agents" },
+        ]}
+      />
 
-      {state.status === "loading" && <p className="text-sm text-muted-foreground">Recherche…</p>}
-      {state.status === "error" && (
-        <p role="alert" className="text-sm text-destructive">
-          Recherche impossible : {state.message}
+      {state.status === "loading" && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Recherche…
         </p>
       )}
+      {state.status === "error" && (
+        <Callout tone="destructive" role="alert">
+          Recherche impossible : {state.message}
+        </Callout>
+      )}
       {state.status === "ready" && state.hits.length === 0 && (
-        <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
-          <p>
-            Aucune conversation {everywhere ? "" : `avec ${label} `}ne contient tous ces mots. Les accents et
-            les majuscules ne comptent pas.
-          </p>
-          {!everywhere && (
-            <Button size="sm" variant="outline" onClick={() => onScope(true)}>
-              Chercher chez tous les agents
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={SearchX}
+          title="Aucun résultat"
+          className="py-6"
+          actions={
+            !everywhere && (
+              <Button size="sm" variant="outline" onClick={() => onScope(true)}>
+                Chercher chez tous les agents
+              </Button>
+            )
+          }
+        >
+          Aucune conversation {everywhere ? "" : `avec ${label} `}ne contient tous ces mots. Les accents et les
+          majuscules ne comptent pas.
+        </EmptyState>
       )}
       {state.status === "ready" && state.hits.length > 0 && (
         <>
@@ -295,7 +304,7 @@ function SearchResults({
                   type="button"
                   onClick={() => onOpen(hit.id)}
                   className={cn(
-                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
+                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-lg px-2 py-2 text-left outline-none hover:bg-accent focus-visible:shadow-focus",
                     hit.id === currentId && "atelier-nav-active",
                   )}
                 >
@@ -345,10 +354,13 @@ function Highlighted({ text, query }: { text: string; query: string }) {
 
 function HistoryRow({
   item,
+  group,
   current,
   onOpen,
 }: {
   item: ConversationSummary;
+  /** Groupe de la ligne : le jour y est déjà dit, la ligne ne garde que l'heure */
+  group: Day;
   current: boolean;
   onOpen: () => void;
 }) {
@@ -400,9 +412,13 @@ function HistoryRow({
 
   if (mode === "confirm") {
     return (
-      <li className="flex flex-wrap items-center gap-2 rounded-md bg-destructive/5 px-2 py-2">
-        <p className="min-w-0 flex-1 text-sm">
-          Supprimer « {item.title} » et ses {item.artifact_count} artefact(s) ?
+      <li className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-2.5 py-2">
+        <p role="alert" className="min-w-0 flex-1 text-sm">
+          Supprimer « {item.title} »
+          {item.artifact_count > 0
+            ? ` et ${item.artifact_count > 1 ? `ses ${item.artifact_count} artefacts` : "son artefact"}`
+            : ""}{" "}
+          ?
         </p>
         <Button size="sm" variant="destructive" onClick={() => void remove(item.id)}>
           Supprimer
@@ -415,15 +431,22 @@ function HistoryRow({
   }
 
   return (
-    <li className={cn("group flex items-center gap-1 rounded-md px-2", current ? "atelier-nav-active" : "hover:bg-accent")}>
+    <li
+      className={cn(
+        "group flex items-center gap-1 rounded-lg px-2",
+        current ? "atelier-nav-active" : "hover:bg-accent focus-within:bg-accent",
+      )}
+    >
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-sm py-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+        className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-md py-2 text-left outline-none focus-visible:shadow-focus"
       >
         <span className="w-full truncate text-sm font-medium">{item.title}</span>
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
-          <time dateTime={item.updated_at}>{formatWhen(item.updated_at)}</time>
+          <time dateTime={item.updated_at} title={formatWhen(item.updated_at)}>
+            {formatWhenIn(item.updated_at, group)}
+          </time>
           {item.artifact_count > 0 && (
             <span>
               {item.artifact_count} artefact{item.artifact_count > 1 ? "s" : ""}
@@ -432,23 +455,56 @@ function HistoryRow({
           {current && <Badge variant="secondary">Ouverte</Badge>}
         </span>
       </button>
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        onClick={() => setMode("rename")}
-        aria-label={`Renommer « ${item.title} »`}
-      >
-        <Pencil />
-      </Button>
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        className="text-muted-foreground hover:text-destructive"
-        onClick={() => setMode("confirm")}
-        aria-label={`Supprimer « ${item.title} »`}
-      >
-        <Trash2 />
-      </Button>
+      {/* Pointeur fin : visibles au survol ou au focus de la ligne ; écran tactile : toujours visibles */}
+      <span className="flex shrink-0 items-center gap-0.5 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          onClick={() => setMode("rename")}
+          aria-label={`Renommer « ${item.title} »`}
+          title="Renommer"
+        >
+          <Pencil />
+        </Button>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          className="hover:text-destructive-ink"
+          onClick={() => setMode("confirm")}
+          aria-label={`Supprimer « ${item.title} »`}
+          title="Supprimer"
+        >
+          <Trash2 />
+        </Button>
+      </span>
     </li>
+  );
+}
+
+/** Groupe de l'historique (Aujourd'hui, Hier, Plus ancien) : titre de section et liste. */
+function DayGroup({ label, children }: { label: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-1">
+      <SectionLabel as="h3" id={id} className="px-2">
+        {label}
+      </SectionLabel>
+      <ul className="-mx-2 flex flex-col">{children}</ul>
+    </section>
+  );
+}
+
+/** Chargement de la liste : la place de quelques lignes est gardée. */
+function ListSkeleton() {
+  return (
+    <div role="status" className="flex flex-col gap-3">
+      <span className="sr-only">Chargement…</span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex flex-col gap-1.5">
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="h-3 w-1/4" />
+        </div>
+      ))}
+    </div>
   );
 }
