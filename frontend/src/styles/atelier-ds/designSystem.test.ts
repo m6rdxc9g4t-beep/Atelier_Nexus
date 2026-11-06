@@ -1,7 +1,7 @@
 /**
  * Contrat de la suite (SUITE.md §1.1) : copies verbatim du design system d'Atelier Projets.
  * Vérifie la présence des variables de fondation et des 15 couleurs officielles, et le
- * branchement de l'app sur la charte « néon monochrome » (styles/brand/atelier-brand.css).
+ * branchement de l'app sur la charte v2 « Linear » (styles/brand/atelier-brand.css).
  */
 
 import { readFileSync } from "node:fs";
@@ -57,20 +57,31 @@ describe("design system de la suite Atelier", () => {
       "--sidebar: var(--atelier-sidebar);",
     ])
       expect(css).toContain(decl);
-    // Fond de page : raccourci background (jamais background-image), fixé au défilement
-    expect(css).toContain("background: var(--atelier-backdrop), var(--atelier-bg);");
-    expect(css).toContain("background-attachment: fixed;");
-    expect(css).not.toMatch(/background-image:\s*var\(--atelier-backdrop\)/);
+    // Charte v2 : fond de page uni, police Inter de la marque, aucun halo ni texte lumineux
+    expect(css).toContain("background: var(--atelier-bg);");
+    expect(css).not.toContain("--atelier-backdrop");
+    expect(css).toContain("--font-ui: var(--atelier-font);");
+    expect(css).toContain("--shadow-glow: none;");
+    expect(css).toContain("--text-shadow-glow: none;");
     // Aucune couleur de structure en dur : seules les palettes porteuses de sens (oklch des graphiques)
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/fonts\.googleapis/);
   });
 
-  it("la marque est dans l'orange de Nexus, avec sa police embarquée", () => {
+  it("la marque v2 donne l'orange de Nexus, avec la police Inter embarquée", () => {
     const brand = read("../brand/atelier-brand.css");
-    expect(brand).toContain("--atelier-sig-nexus: #e8590c;");
-    expect(brand).toContain('url("./nunito-latin-wght-normal.woff2")');
-    expect(read("../brand/OFL-Nunito.txt")).toContain("SIL OPEN FONT LICENSE");
+    expect(brand).toContain("Atelier — marque commune et palette de la suite (v2");
+    expect(brand).toContain("--atelier-sig-nexus: #c84f00;");
+    expect(brand).toContain('url("./inter-latin-wght-normal.woff2")');
+    expect(brand).toContain('url("./inter-latin-ext-wght-normal.woff2")');
+    expect(read("../brand/LICENSE-Inter.txt")).toContain("SIL Open Font License");
     expect(read("../../app/layout.tsx")).toContain('data-atelier-app="nexus"');
+  });
+
+  it("la préférence de thème commune est posée avant l'affichage", () => {
+    expect(read("../brand/atelier-theme.js")).toContain("window.atelierTheme = {");
+    const script = read("../../components/theme/theme-script.tsx");
+    expect(script).toContain("src/styles/brand/atelier-theme.js");
+    expect(read("../../app/layout.tsx")).toContain("<ThemeScript />");
   });
 });

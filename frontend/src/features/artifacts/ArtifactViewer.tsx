@@ -90,7 +90,7 @@ export function ArtifactViewer({ artifact, onRemove }: { artifact: StoredArtifac
             size="sm"
             aria-pressed={wrap}
             onClick={() => setWrap((w) => !w)}
-            className={cn("h-7 px-2 text-xs", wrap && "bg-signature-faint text-accent-ink")}
+            className={cn("h-7 px-2 text-xs", wrap && "bg-atelier-selected text-foreground")}
           >
             <WrapText className="size-3.5" />
             <span className="sr-only sm:not-sr-only">Retour à la ligne</span>
@@ -214,7 +214,7 @@ function NotesCallout({ title, notes }: { title: string; notes: string }) {
   const id = useId();
   return (
     <Callout
-      tone="signature"
+      tone="info"
       icon={Plug}
       title={
         <button
@@ -222,7 +222,7 @@ function NotesCallout({ title, notes }: { title: string; notes: string }) {
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center gap-1.5 rounded-sm text-left font-semibold focus-visible:shadow-focus focus-visible:outline-none"
+          className="flex w-full items-center gap-1.5 rounded-sm text-left font-medium text-foreground"
         >
           {title}
           <ChevronDown className={cn("ml-auto size-4 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
@@ -274,10 +274,10 @@ function DataTable({ table, caption }: { table: TableData; caption?: string }) {
         tabIndex={0}
         aria-labelledby={caption ? captionId : undefined}
         aria-label={caption ? undefined : "Aperçu des données"}
-        className="max-h-[60vh] overflow-auto rounded-lg border border-atelier-line bg-card focus-visible:shadow-focus focus-visible:outline-none"
+        className="max-h-[60vh] overflow-auto rounded-md border border-atelier-border bg-card tabular-nums"
       >
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-atelier-surface-2">
+          <thead className="sticky top-0 z-10 bg-sidebar">
             <tr>
               {table.headers.map((h, i) => (
                 <th
@@ -303,7 +303,7 @@ function DataTable({ table, caption }: { table: TableData; caption?: string }) {
               </tr>
             )}
             {table.rows.map((row, r) => (
-              <tr key={r} className="even:bg-signature-faint">
+              <tr key={r} className="border-b border-atelier-line last:border-b-0 hover:bg-atelier-hover/60">
                 {row.map((cell, c) => (
                   <td
                     key={c}

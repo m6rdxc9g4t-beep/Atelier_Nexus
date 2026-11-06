@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Agents IA de la suite Atelier",
 };
 
-// Barre du navigateur aux couleurs de fond du kit (orange), une par schéma.
+// Barre du navigateur sur le fond neutre de la charte v2, une par schéma.
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
@@ -20,11 +20,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // Thème Clair / Sombre / Système (contrat de la suite Atelier) : clair par défaut au
-    // rendu serveur ; ThemeScript applique la préférence (localStorage « atelier-nexus-theme »,
-    // défaut Système) avant le premier affichage — sombre = .dark + data-theme="dark".
+    // Thème Système / Clair / Sombre commun à la suite : clair par défaut au rendu serveur ;
+    // ThemeScript (atelier-theme.js, copie verbatim) applique la préférence avant le premier
+    // affichage — sombre = .dark + data-theme="dark".
     // suppressHydrationWarning : le script modifie <html> avant l'hydratation.
-    // data-atelier-app : toute l'app dans la couleur signature de Nexus (orange #E8590C).
+    // data-atelier-app : accent dans la signature de Nexus (orange #c84f00), structure neutre.
     <html lang="fr" data-atelier-app="nexus" data-theme="light" suppressHydrationWarning>
       <head>
         <ThemeScript />

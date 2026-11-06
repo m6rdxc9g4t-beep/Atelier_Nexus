@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Copie verbatim du design system de la suite (atelier-theme.js) : jamais modifiée ici
+    "src/styles/brand/**",
   ]),
 ]);
 

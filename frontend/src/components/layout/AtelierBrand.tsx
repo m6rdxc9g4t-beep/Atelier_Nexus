@@ -1,20 +1,16 @@
 "use client";
 
-import { Network, X } from "lucide-react";
-import { useId, useRef, useState } from "react";
-
-/** Logo complet de l'app (bicolore) : réservé à la fenêtre « À propos », jamais dans l'interface de travail. */
-const LOGO_SRC = "/brand/logo-atelier-nexus.png";
+import { Workflow, X } from "lucide-react";
+import { useId, useRef } from "react";
 
 /**
- * Marque commune de la suite (SUITE.md §1.6) : tuile cyan + icône, « atelier_ » atténué,
- * nom en gras. Un clic ouvre la fenêtre « À propos » (toujours sombre), avec le logo complet.
+ * Marque commune de la suite (SUITE.md §1.6) : icône carrée arrondie en dégradé de la signature
+ * (orange de Nexus), glyphe Lucide `workflow` blanc, « Atelier » atténué puis le nom en gras.
+ * Un clic ouvre la fenêtre « À propos », qui suit le thème de l'app, avec la grande icône.
  */
-export function AtelierBrand() {
+export function AtelierBrand({ compact = false }: { compact?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  // Logo chargé à la première ouverture seulement (image lourde, inutile tant que la fenêtre est fermée)
-  const [opened, setOpened] = useState(false);
 
   return (
     <>
@@ -22,18 +18,16 @@ export function AtelierBrand() {
         type="button"
         className="atelier-brand"
         aria-haspopup="dialog"
-        onClick={() => {
-          setOpened(true);
-          dialog.current?.showModal();
-        }}
+        onClick={() => dialog.current?.showModal()}
       >
-        <span className="atelier-brand__tile" aria-hidden>
-          <Network />
+        <span className="atelier-brand__tile atelier-brand__tile--sm" aria-hidden>
+          <Workflow />
         </span>
-        <span className="atelier-brand__name hidden sm:inline">
-          <span className="atelier-brand__prefix">atelier_</span>Nexus
+        {/* `compact` (barre des petits écrans) : l'icône seule sous sm, le nom reste lu */}
+        <span className={compact ? "atelier-brand__name hidden sm:inline" : "atelier-brand__name"}>
+          <span className="atelier-brand__prefix">Atelier </span>Nexus
         </span>
-        <span className="sr-only sm:hidden">Atelier Nexus</span>
+        {compact && <span className="sr-only sm:hidden">Atelier Nexus</span>}
       </button>
 
       <dialog
@@ -53,12 +47,11 @@ export function AtelierBrand() {
           >
             <X className="size-4" aria-hidden />
           </button>
-          {opened && (
-            // eslint-disable-next-line @next/next/no-img-element -- fichier statique de la marque (export statique de l'app de bureau, sans optimiseur d'images)
-            <img className="atelier-about__logo" src={LOGO_SRC} alt="Logo Atelier Nexus" width={1254} height={1254} decoding="async" />
-          )}
+          <span className="atelier-about__icon atelier-brand__tile" aria-hidden>
+            <Workflow />
+          </span>
           <h2 id={titleId} className="atelier-about__name">
-            <span className="atelier-brand__prefix">atelier_</span>Nexus
+            <span className="atelier-brand__prefix">Atelier </span>Nexus
           </h2>
           <p className="atelier-about__tagline">
             Des agents IA et des workflows qui relient vos applications Atelier : Convert, Tab, Viz,

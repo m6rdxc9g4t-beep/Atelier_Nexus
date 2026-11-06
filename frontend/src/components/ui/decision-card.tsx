@@ -26,19 +26,19 @@ function DecisionCard({
     <section
       data-slot="decision-card"
       className={cn(
-        "overflow-hidden rounded-xl border bg-card",
-        submitted ? "border-atelier-line" : "decision-card border-atelier-border",
+        "overflow-hidden rounded-lg border bg-card",
+        submitted ? "border-atelier-border" : "decision-card",
         className,
       )}
       {...props}
     >
       <header
         className={cn(
-          "flex items-center gap-2 px-3.5 pt-3 pb-1 text-xs font-semibold",
+          "flex items-center gap-2 px-3.5 pt-3 pb-1 text-xs font-medium",
           submitted ? "text-muted-foreground" : "text-warning-ink",
         )}
       >
-        <ShieldQuestion className={cn("size-4 shrink-0", !submitted && "text-warning")} aria-hidden />
+        <ShieldQuestion className="size-4 shrink-0" aria-hidden />
         {heading}
       </header>
       <ul className="flex flex-col divide-y divide-atelier-line">{children}</ul>
@@ -81,7 +81,7 @@ function DecisionRow({
 /** Détails repliés (paramètres, entrée résolue) : JSON creusé, défilement interne. */
 function DecisionDetails({ label, children }: { label: string; children: string }) {
   return (
-    <details className="group rounded-lg border border-atelier-line bg-sunken">
+    <details className="group rounded-md border border-atelier-line bg-sunken">
       <summary className="cursor-pointer px-2.5 py-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
         {label}
       </summary>

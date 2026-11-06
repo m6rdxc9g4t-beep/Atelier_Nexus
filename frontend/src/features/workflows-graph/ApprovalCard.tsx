@@ -88,7 +88,7 @@ export function ApprovalCard({
 function PreviousResult({ step, label }: { step: StepRun; label: string }) {
   const excerpt = resultExcerpt(step);
   return (
-    <section aria-label="Résultat de l'étape précédente" className="rounded-xl border border-atelier-line bg-sunken px-3 py-2 text-xs">
+    <section aria-label="Résultat de l'étape précédente" className="rounded-md border border-atelier-line bg-sunken px-3 py-2 text-xs">
       <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
         <StepStatusIcon status={step.status} />
         <span className="min-w-0 truncate">

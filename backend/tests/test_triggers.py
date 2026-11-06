@@ -537,7 +537,7 @@ def test_events_catalog(api: TestClient, suite: Suite) -> None:
     apps = {a["app"]: a for a in api.get("/api/triggers/events-catalog").json()["apps"]}
     assert set(apps) == {"viz", "tab", "projets", "convert"}
     projets = apps["projets"]
-    assert projets["status"] == "ok" and projets["color"] == "#94D82D"
+    assert projets["status"] == "ok" and projets["color"] == "#568100"
     status = next(e for e in projets["events"] if e["type"] == STATUS)
     assert status == {"type": STATUS, "label": "Statut changé",
                       "fields": ["data.project_id", "data.from", "data.to", "subject.id",
@@ -548,7 +548,7 @@ def test_events_catalog(api: TestClient, suite: Suite) -> None:
     assert apps["tab"]["events"][0]["type"] == "tab.table.changed"
     # Convert : champs de `data` lus dans son manifeste réel
     convert = apps["convert"]
-    assert convert["name"] == "Atelier Convert" and convert["color"] == "#C9951D"
+    assert convert["name"] == "Atelier Convert" and convert["color"] == "#9d6d1c"
     created = next(e for e in convert["events"] if e["type"] == "convert.conversion.created")
     assert created["fields"] == ["data.name", "data.format", "data.rows", "data.columns",
                                  "data.statement", "data.ocr", "data.origin", "subject.id",

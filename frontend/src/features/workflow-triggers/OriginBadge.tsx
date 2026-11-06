@@ -27,7 +27,7 @@ export function OriginBadge({
   const automatic = !!trigger && trigger !== "manual";
   return (
     <Badge
-      variant={automatic ? "signature" : "outline"}
+      variant={automatic ? "default" : "outline"}
       className={cn(compact && "px-1", className)}
       title={`Origine : ${label}`}
     >

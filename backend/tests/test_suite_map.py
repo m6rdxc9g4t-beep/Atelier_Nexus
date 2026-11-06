@@ -18,7 +18,7 @@ def test_suite_map(client: TestClient, suite: Suite) -> None:
     apps = {a["app"]: a for a in data["apps"]}
     assert [a["app"] for a in data["apps"]][:4] == ["viz", "tab", "projets", "convert"]
     viz = apps["viz"]
-    assert viz["status"] == "ok" and viz["transport"] == "http" and viz["color"] == "#F2C811"
+    assert viz["status"] == "ok" and viz["transport"] == "http" and viz["color"] == "#996c00"
     assert {"id": "datasets.upsert_rows", "label": "Publier une table", "kind": "write",
             "output_format": "json"} in viz["actions"]  # fmt: skip
     assert {"type": "viz.dataset.refreshed", "label": "Jeu actualisé"} in viz["events"]
@@ -31,7 +31,7 @@ def test_suite_map(client: TestClient, suite: Suite) -> None:
     assert apps["tab"]["transport"] == "mcp"
     assert apps["tresorerie"]["status"] == "not_configured"
     convert = apps["convert"]
-    assert convert["name"] == "Atelier Convert" and convert["color"] == "#C9951D"
+    assert convert["name"] == "Atelier Convert" and convert["color"] == "#9d6d1c"
     assert convert["status"] == "ok" and convert["transport"] == "http"
     assert {"id": "conversions.table", "label": "Lire la table d'une conversion",
             "kind": "read", "output_format": "atelier-table/1"} in convert["actions"]  # fmt: skip

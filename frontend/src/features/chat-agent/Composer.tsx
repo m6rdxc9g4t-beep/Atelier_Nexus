@@ -142,12 +142,12 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
     >
       <div
         className={cn(
-          "relative rounded-[20px] border border-atelier-border-soft bg-atelier-field transition-[border-color,box-shadow] focus-within:border-primary focus-within:shadow-focus",
+          "relative rounded-lg border border-atelier-border-soft bg-atelier-field transition-[border-color,box-shadow] focus-within:border-primary focus-within:shadow-focus",
           dragging && "border-dashed border-primary bg-accent-soft",
         )}
       >
         {dragging && (
-          <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[20px] text-sm font-medium text-accent-ink">
+          <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg text-sm font-medium text-accent-ink">
             Déposez les fichiers pour les joindre
           </p>
         )}
@@ -186,7 +186,7 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
           rows={1}
           aria-describedby="composer-keys"
           className={cn(
-            "max-h-60 min-h-11 resize-none rounded-none border-0 bg-transparent px-4 pt-3 pb-1 shadow-none focus-visible:shadow-none",
+            "max-h-60 min-h-11 resize-none rounded-none border-0 bg-transparent px-3.5 pt-3 pb-1 text-base shadow-none focus-visible:shadow-none",
             dragging && "opacity-30",
           )}
         />
@@ -208,7 +208,6 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
             type="button"
             size="icon-sm"
             variant="ghost"
-            className="rounded-full"
             disabled={disabled}
             onClick={() => input.current?.click()}
             aria-label="Joindre des fichiers"
@@ -218,17 +217,15 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
           </Button>
           {engine}
           <span className="flex-1" />
-          <span id="composer-keys" className="mr-1 hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+          <span id="composer-keys" className="mr-1.5 hidden items-center gap-1 text-xs text-atelier-faint sm:flex">
             {/* Espaces explicites : la description lue (aria-describedby) garde ses mots séparés */}
-            <Kbd className="h-5 text-xs">Entrée</Kbd> envoyer · <Kbd className="h-5 text-xs">Maj+Entrée</Kbd> à la
-            ligne
+            <Kbd>Entrée</Kbd> envoyer · <Kbd>Maj+Entrée</Kbd> à la ligne
           </span>
           {streaming ? (
             <Button
               type="button"
               size="icon-sm"
               variant="secondary"
-              className="rounded-full"
               onClick={onStop}
               aria-label="Arrêter la réponse"
             >
@@ -238,7 +235,6 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
             <Button
               type="submit"
               size="icon-sm"
-              className="rounded-full"
               disabled={!canSend}
               aria-label={uploading ? "Envoi des fichiers en cours" : "Envoyer"}
             >

@@ -25,7 +25,7 @@ function Switch({
       data-state={state}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-input bg-atelier-field outline-none transition-colors focus-visible:border-primary focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary",
+        "inline-flex h-[18px] w-8 shrink-0 items-center rounded-full border border-input bg-atelier-hover transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary",
         className,
       )}
       {...props}
@@ -33,7 +33,7 @@ function Switch({
       <span
         aria-hidden
         data-state={state}
-        className="pointer-events-none block size-3.5 translate-x-0.5 rounded-full bg-muted-foreground shadow-sm transition-transform data-[state=checked]:translate-x-[1.05rem] data-[state=checked]:bg-primary-foreground"
+        className="pointer-events-none block size-3 translate-x-[2px] rounded-full bg-atelier-surface shadow-[0_1px_2px_rgb(0_0_0/0.2)] transition-transform data-[state=checked]:translate-x-[15px]"
       />
     </button>
   );

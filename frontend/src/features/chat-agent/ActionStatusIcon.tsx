@@ -23,13 +23,14 @@ const ICON: Record<ActionStatus, LucideIcon> = {
   interrupted: CircleSlash,
 };
 
+// Charte v2 : un état nominal reste neutre (l'icône porte le sens) ; seuls les anormaux sont en couleur.
 const TONE: Record<ActionStatus, string> = {
-  queued: "text-muted-foreground",
-  running: "animate-spin text-accent-ink motion-reduce:animate-none",
-  done: "text-success",
-  error: "text-destructive",
-  refused: "text-muted-foreground",
-  interrupted: "text-warning",
+  queued: "text-atelier-faint",
+  running: "animate-spin text-muted-foreground motion-reduce:animate-none",
+  done: "text-muted-foreground",
+  error: "text-destructive-ink",
+  refused: "text-atelier-faint",
+  interrupted: "text-warning-ink",
 };
 
 /** Icône d'état d'une action ou d'une ligne d'activité (role="img", nommée). */

@@ -50,7 +50,7 @@ export function KindBadge({ kind, compact = false, className }: { kind: ActionKi
   );
 }
 
-/** Tuile d'application dans SA couleur signature (marque de la suite). */
+/** Icône d'application dans SA couleur signature (marque de la suite) : seul élément coloré par app. */
 export function AppTile({
   app,
   color,
@@ -78,31 +78,41 @@ export function AppTile({
   );
 }
 
+// Témoin muet : une app joignable n'a ni pastille ni couleur ; rouge ou ambre seulement si ça ne va pas.
 const APP_STATUS_DOT: Record<NodeAppStatus, string> = {
-  ok: "bg-success",
+  ok: "hidden",
   unreachable: "bg-destructive",
   no_contract: "bg-warning",
-  not_configured: "bg-muted-foreground/50",
+  not_configured: "bg-atelier-faint/50",
+};
+
+const APP_STATUS_TEXT: Record<NodeAppStatus, string> = {
+  ok: "text-atelier-faint",
+  unreachable: "font-medium text-destructive-ink",
+  no_contract: "text-warning-ink",
+  not_configured: "text-atelier-faint",
 };
 
 /** Pastille + libellé de l'état d'une application. */
 export function AppStatusDot({ status, className }: { status: CatalogApp["status"]; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1.5 text-xs", APP_STATUS_TEXT[status], className)}>
       <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", APP_STATUS_DOT[status])} />
       {APP_STATUS_LABEL[status]}
     </span>
   );
 }
 
+// États de run : neutres quand tout va bien (l'icône suffit), colorés seulement s'ils sont anormaux
+// (échec, refus, validation attendue).
 const RUN_ICON = {
-  pending: { Icon: CircleDashed, className: "text-muted-foreground" },
-  running: { Icon: LoaderCircle, className: "animate-spin text-accent-ink" },
-  ok: { Icon: CircleCheck, className: "text-success" },
-  error: { Icon: CircleAlert, className: "text-destructive" },
-  refused: { Icon: CircleSlash, className: "text-warning" },
-  skipped: { Icon: CircleSlash, className: "text-muted-foreground" },
-  awaiting_approval: { Icon: ShieldQuestion, className: "text-warning" },
+  pending: { Icon: CircleDashed, className: "text-atelier-faint" },
+  running: { Icon: LoaderCircle, className: "animate-spin text-muted-foreground motion-reduce:animate-none" },
+  ok: { Icon: CircleCheck, className: "text-muted-foreground" },
+  error: { Icon: CircleAlert, className: "text-destructive-ink" },
+  refused: { Icon: CircleSlash, className: "text-warning-ink" },
+  skipped: { Icon: CircleSlash, className: "text-atelier-faint" },
+  awaiting_approval: { Icon: ShieldQuestion, className: "text-warning-ink" },
 } as const;
 
 /** Icône d'état d'exécution d'une étape, avec son libellé accessible. */
@@ -112,5 +122,5 @@ export function StepStatusIcon({ status, className }: { status: StepDisplayStatu
 }
 
 export function ErrorIcon({ className, label }: { className?: string; label: string }) {
-  return <TriangleAlert role="img" aria-label={label} className={cn("size-3.5 shrink-0 text-destructive", className)} />;
+  return <TriangleAlert role="img" aria-label={label} className={cn("size-3.5 shrink-0 text-destructive-ink", className)} />;
 }

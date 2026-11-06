@@ -3,10 +3,8 @@
    CSS natif pur (Custom Properties), sans aucune dépendance métier :
    ce fichier se copie tel quel dans n'importe quelle autre application.
 
-   Base neutre quasi noire. Dans les applications de la suite Atelier, ces valeurs
-   sont teintées de la couleur signature de l'app par brand/atelier-brand.css
-   (jetons --atelier-bg, --atelier-surface…, branchés par chaque application) :
-   elles ne servent telles quelles qu'en dehors de la suite.
+   Base neutre gris froid (charte v2, identique à brand/atelier-brand.css) :
+   les apps de la suite utilisent les jetons --atelier-*, mêmes valeurs.
 
    Activation : data-theme="dark" sur <html> (toute la page) ou sur un conteneur.
    Le sélecteur :root[data-theme="dark"] l'emporte sur le :root du thème clair,
@@ -17,10 +15,10 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --bg-main: #0A0A0D;       /* Fond principal de l'application      */
-  --bg-surface: #111116;    /* Cartes, tableaux, panneaux latéraux  */
-  --bg-elevated: #191A21;   /* Modales, menus déroulants, survols   */
-  --text-primary: #F4F5F7;  /* Texte principal                      */
-  --text-muted: #A1A6B2;    /* Texte secondaire, métadonnées        */
-  --border-color: #262833;  /* Bordures fines et séparateurs        */
+  --bg-main: #0F1012;       /* Fond principal de l'application      */
+  --bg-surface: #17181B;    /* Cartes, tableaux, panneaux latéraux  */
+  --bg-elevated: #1C1D21;   /* Modales, menus déroulants, survols   */
+  --text-primary: #E8E9EC;  /* Texte principal                      */
+  --text-muted: #969AA3;    /* Texte secondaire, métadonnées        */
+  --border-color: #24262B;  /* Bordures fines et séparateurs        */
 }

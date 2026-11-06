@@ -107,7 +107,7 @@ export function Palette({
                   type="button"
                   aria-expanded={open}
                   onClick={toggle}
-                  className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none"
+                  className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-accent"
                 >
                   <AppTile app={group.app} color={group.color} size="xs" />
                   <span className="min-w-0 flex-1">

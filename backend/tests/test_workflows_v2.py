@@ -582,7 +582,7 @@ def test_catalog_of_the_suite_and_of_an_agent(client: TestClient, suite: Suite) 
     suite.viz.mode = "down"
     catalog = client.get("/api/workflows/catalog").json()
     apps = {a["app"]: a for a in catalog["apps"]}
-    assert apps["viz"]["status"] == "unreachable" and apps["viz"]["color"] == "#F2C811"
+    assert apps["viz"]["status"] == "unreachable" and apps["viz"]["color"] == "#996c00"
     assert apps["projets"]["status"] == "no_contract" and apps["tab"]["status"] == "ok"
     assert apps["tresorerie"]["status"] == "not_configured"
     entries = {e["uses"]: e for e in catalog["entries"]}
@@ -605,7 +605,7 @@ def test_catalog_lists_the_convert_node(client: TestClient, suite: Suite) -> Non
     catalog = client.get("/api/workflows/catalog").json()
     apps = {a["app"]: a for a in catalog["apps"]}
     assert apps["convert"] == {"app": "convert", "name": "Atelier Convert", "status": "ok",
-                               "color": "#C9951D"}  # fmt: skip
+                               "color": "#9d6d1c"}  # fmt: skip
     entries = {e["uses"]: e for e in catalog["entries"]}
     table = entries["node:convert/conversions.table"]
     assert table["output_format"] == "atelier-table/1" and table["available"] is True

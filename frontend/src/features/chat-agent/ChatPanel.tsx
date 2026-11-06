@@ -84,22 +84,18 @@ export function ChatPanel({
     <section aria-label={`Conversation avec ${label}`} className="flex min-h-0 min-w-0 flex-1 flex-col">
       {/* Sous lg, la barre mobile (AppHeader) montre déjà l'agent : ici, seulement ses badges et
           les actions de la conversation (le titre reste pour les lecteurs d'écran) */}
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-atelier-line px-4 lg:h-14">
-        <AgentTile icon={agent?.icon} className="hidden lg:grid" />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="sr-only min-w-0 text-[15px] font-semibold tracking-tight lg:not-sr-only">
-              <span className="block truncate">{label}</span>
-            </h1>
-            {localOnly && (
-              <Badge variant="signature" title="Données traitées uniquement par le modèle local (Ollama)">
-                <Lock aria-hidden />
-                100 % local
-              </Badge>
-            )}
-          </div>
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-atelier-line pr-2 pl-4 lg:pl-5">
+        <AgentTile icon={agent?.icon} variant="bare" className="hidden lg:grid" />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h1 className="sr-only shrink-0 text-sm font-semibold lg:not-sr-only">{label}</h1>
+          {localOnly && (
+            <Badge variant="outline" title="Données traitées uniquement par le modèle local (Ollama)">
+              <Lock aria-hidden />
+              100 % local
+            </Badge>
+          )}
           {agent?.description && (
-            <p className="hidden truncate text-xs text-muted-foreground lg:block">{agent.description}</p>
+            <p className="hidden min-w-0 truncate text-sm text-atelier-faint lg:block">{agent.description}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">

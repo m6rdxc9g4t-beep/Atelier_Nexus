@@ -112,7 +112,7 @@ export function SuiteMapView() {
           <span className="hidden sm:inline">Actualiser</span>
         </Button>
       </div>
-      <p className="max-w-3xl text-[13px] text-muted-foreground">
+      <p className="max-w-3xl text-sm text-muted-foreground">
         Ce que chaque application reçoit et produit, les agents qui s&apos;en servent et les échanges entre elles. Partez
         d&apos;une action (+) pour créer un workflow, ou d&apos;un événement pour le lancer tout seul.
       </p>
@@ -120,7 +120,7 @@ export function SuiteMapView() {
       {map.status === "loading" && tab !== "events" && (
         <div role="status" aria-label="Lecture des manifestes des applications" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-64 rounded-xl" />
+            <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
         </div>
       )}
@@ -169,7 +169,7 @@ function AppsGrid({ map, focus, onClearFocus }: { map: SuiteMap; focus: string |
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       {focus && shown.length > 0 && (
-        <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>
             Application : <span className="font-medium text-foreground">{appName(map, focus)}</span>
           </span>
@@ -215,7 +215,7 @@ function Fold({ icon: Icon, title, count, children }: { icon: typeof Bell; title
     return <p className="flex items-center gap-1.5 py-1 pr-1 pl-5 text-xs text-muted-foreground">{head}</p>;
   return (
     <details className="group min-w-0">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-1 text-xs font-medium text-muted-foreground select-none hover:text-foreground focus-visible:shadow-focus focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-1 text-xs font-medium text-muted-foreground select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
         {head}
       </summary>
@@ -224,14 +224,13 @@ function Fold({ icon: Icon, title, count, children }: { icon: typeof Bell; title
   );
 }
 
-const plusClass = "shrink-0 text-muted-foreground hover:text-accent-ink";
+const plusClass = "shrink-0 text-atelier-faint hover:text-foreground";
 
 function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
   const openEditor = useWorkflowStudioStore((s) => s.openEditor);
   const { inputs, outputs } = splitActions(app);
   const { incoming, outgoing } = flowsOf(map.flows, app.app);
   const workflows = workflowsOf(map, app.app);
-  const theme = appTheme(app.app, app.color);
 
   const actionLine = (action: SuiteMapAction) => (
     <li
@@ -239,7 +238,7 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
       className="flex items-center gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent"
       title={action.kind === "read" ? `${action.id} · ${action.output_format}` : action.id}
     >
-      <span className="min-w-0 flex-1 truncate text-[13px]">{action.label}</span>
+      <span className="min-w-0 flex-1 truncate text-sm">{action.label}</span>
       {action.kind !== "read" && <KindBadge kind={action.kind} />}
       <Button
         variant="ghost"
@@ -255,8 +254,8 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
   );
 
   return (
-    <li {...theme} className="min-w-0">
-      <Card className="gap-3 p-4">
+    <li className="min-w-0">
+      <Card className="gap-3 p-3.5">
         <header className="flex items-start gap-2.5" title={`Transport : ${transportLabel(app.transport)}`}>
           <AppTile app={app.app} color={app.color} />
           <div className="min-w-0 flex-1">
@@ -283,7 +282,7 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
             <ul className="grid gap-0.5">
               {app.events.map((ev) => (
                 <li key={ev.type} title={ev.type} className="flex items-center gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent">
-                  <span className="min-w-0 flex-1 truncate text-[13px]">{ev.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{ev.label}</span>
                   <EventTriggerMenu app={app.app} type={ev.type} label={ev.label} />
                 </li>
               ))}
@@ -303,8 +302,8 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
           <Fold icon={Bot} title="Agents" count={app.agents.length}>
             <ul className="grid gap-1">
               {app.agents.map((agent) => (
-                <li key={agent.name} className="flex items-center gap-1.5 text-[13px]">
-                  <AgentIcon icon={agent.icon} className="size-3.5 shrink-0 text-accent-ink" aria-hidden />
+                <li key={agent.name} className="flex items-center gap-1.5 text-sm">
+                  <AgentIcon icon={agent.icon} className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{agent.display_name}</span>
                   <span className="text-xs text-muted-foreground">{agent.writes ? "lit et écrit" : "lecture seule"}</span>
                 </li>
@@ -313,7 +312,7 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
           </Fold>
 
           <Fold icon={Waypoints} title="Échanges" count={incoming.length + outgoing.length}>
-            <ul className="grid gap-0.5 text-[13px] text-muted-foreground">
+            <ul className="grid gap-0.5 text-sm text-muted-foreground">
               {incoming.map((f, i) => (
                 <li key={`in-${i}`} title={`Par ${f.via}`}>
                   ← <span className="text-foreground">{appName(map, f.from)}</span> · {f.label}
@@ -333,7 +332,7 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
                 <li key={wf.id}>
                   <button
                     type="button"
-                    className="w-full truncate rounded-md px-1.5 py-0.5 text-left text-[13px] text-accent-ink hover:bg-accent hover:underline focus-visible:shadow-focus focus-visible:outline-none"
+                    className="w-full truncate rounded-md px-1.5 py-0.5 text-left text-sm text-accent-ink hover:bg-accent hover:underline"
                     onClick={() => openEditor({ kind: "open", id: wf.id })}
                   >
                     {wf.title}
@@ -395,7 +394,7 @@ function FlowsView({ map, onPick }: { map: SuiteMap; onPick: (app: string) => vo
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
       {/* Défilement interne sous 480 px : le texte du schéma ne descend jamais sous 12 px */}
-      <figure className="overflow-x-auto rounded-xl border border-atelier-line bg-card p-2">
+      <figure className="overflow-x-auto rounded-lg border border-atelier-border bg-card p-2">
         <svg
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           role="img"
@@ -405,12 +404,12 @@ function FlowsView({ map, onPick }: { map: SuiteMap; onPick: (app: string) => vo
           <title id="suite-flows-title">Schéma des échanges entre les applications de la suite</title>
           <defs>
             <marker id="suite-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" className="fill-atelier-chart-2" />
+              <path d="M 0 0 L 10 5 L 0 10 z" className="fill-atelier-faint" />
             </marker>
           </defs>
           {layout.edges.map((edge) => (
             <g key={edge.key}>
-              <path d={edge.path} fill="none" strokeWidth={1.5} markerEnd="url(#suite-flow-arrow)" className="stroke-atelier-border" />
+              <path d={edge.path} fill="none" strokeWidth={1.25} markerEnd="url(#suite-flow-arrow)" className="stroke-atelier-border-soft" />
               <text
                 x={edge.labelX}
                 y={edge.labelY}
@@ -436,7 +435,7 @@ function FlowsView({ map, onPick }: { map: SuiteMap; onPick: (app: string) => vo
                       role: "button",
                       tabIndex: 0,
                       "aria-label": `Voir l'application ${appName(map, node.id)}`,
-                      className: "cursor-pointer outline-none [&:focus-visible_circle]:stroke-[4] [&:hover_circle]:stroke-[3]",
+                      className: "cursor-pointer outline-none [&:focus-visible_.tile-ring]:stroke-primary [&:hover_.tile-ring]:stroke-atelier-faint",
                       onClick: () => onPick(node.id),
                       onKeyDown: (e: React.KeyboardEvent) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -447,15 +446,40 @@ function FlowsView({ map, onPick }: { map: SuiteMap; onPick: (app: string) => vo
                     }
                   : {})}
               >
-                <circle cx={node.x} cy={node.y} r={22} strokeWidth={2} className="fill-atelier-surface stroke-signature" />
-                <AppIcon app={node.id} x={node.x - 9} y={node.y - 9} width={18} height={18} className="text-atelier-ink" aria-hidden />
+                {/* Icône de l'app (charte v2) : carré arrondi en dégradé de SA signature, glyphe blanc */}
+                <defs>
+                  <linearGradient id={`suite-tile-${node.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--atelier-signature) 78%, white)" }} />
+                    <stop offset="1" style={{ stopColor: "var(--atelier-signature)" }} />
+                  </linearGradient>
+                </defs>
+                <rect
+                  x={node.x - 24}
+                  y={node.y - 24}
+                  width={48}
+                  height={48}
+                  rx={13}
+                  strokeWidth={2}
+                  className="tile-ring fill-none stroke-transparent"
+                />
+                <rect x={node.x - 20} y={node.y - 20} width={40} height={40} rx={10} fill={`url(#suite-tile-${node.id})`} />
+                <AppIcon
+                  app={node.id}
+                  x={node.x - 11}
+                  y={node.y - 11}
+                  width={22}
+                  height={22}
+                  strokeWidth={2}
+                  className="text-white"
+                  aria-hidden
+                />
                 <text
                   x={node.x}
-                  y={node.y + 38}
+                  y={node.y + 40}
                   textAnchor="middle"
                   strokeWidth={4}
                   style={{ paintOrder: "stroke" }}
-                  className="fill-atelier-ink stroke-card text-[12px] font-semibold"
+                  className="fill-foreground stroke-card text-[12px] font-medium"
                 >
                   {name}
                 </text>
@@ -538,19 +562,18 @@ function EventsFeed({ map, refresh }: { map: SuiteMap | null; refresh: number })
       {feed.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucun événement récent.</p>
       ) : (
-        <ol className="grid gap-1.5" aria-live="polite">
+        <ol className="overflow-hidden rounded-lg border border-atelier-border bg-card" aria-live="polite">
           {feed.map((ev) => (
             <li
               key={`${ev.app}-${ev.seq}`}
-              {...appTheme(ev.app, map?.apps.find((a) => a.app === ev.app)?.color)}
               title={ev.type}
-              className="flex items-center gap-2.5 rounded-lg border border-atelier-line bg-card px-2.5 py-2"
+              className="flex min-h-10 items-center gap-2.5 border-b border-atelier-line px-3 py-1.5 last:border-b-0"
             >
-              <AppTile app={ev.app} size="xs" />
+              <AppTile app={ev.app} color={map?.apps.find((a) => a.app === ev.app)?.color} size="xs" />
               <p className="min-w-0 flex-1 truncate text-sm">
                 {eventLabel(map, ev.app, ev.type)} · <span className="font-medium">{ev.subject.label || ev.subject.id}</span>
               </p>
-              <time dateTime={ev.at} className="shrink-0 text-xs text-muted-foreground">
+              <time dateTime={ev.at} className="shrink-0 text-xs text-atelier-faint tabular-nums">
                 {formatWhen(ev.at)}
               </time>
             </li>

@@ -4,26 +4,28 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 
 ## 1. Écran
 
-Refonte visuelle (étape 24) : « cockpit d'agents », calme par défaut, néon sur l'intention.
+Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : structure neutre gris froid, dense et
+plate ; l'orange de Nexus ne marque que l'accent (bouton principal, sélection, focus, liens) et l'icône de l'app.
 
 ```
 ┌ Barre latérale (lg+) ─────┬ Accueil · Conversation · Studio des workflows ─────┬ Livrables (xl+) ┐
-│ ⊞ [▣] atelier_Nexus        │ ▣ Agent · badges            [Workflows][Historique] │ liste · type    │
+│ [▣] Atelier Nexus       ⊞  │ ▣ Agent · description       [Workflows][Historique] │ liste · type    │
 │ ⌂ Accueil                  │                                                      │ copier          │
 │ ⟿ Workflows                │  réponses (tuile de l'agent) · actions regroupées   │ télécharger     │
 │ ◫ Carte de la suite        │  en une ligne d'activité · carte « Votre accord     │ notes Power BI  │
 │ ✓ À valider (n)            │  est nécessaire » · dock de décision                │                 │
-│ AGENTS  [Rechercher /]     │                                                      │                 │
+│ Agents  [Rechercher /]     │                                                      │                 │
 │ ▾ Général …                │  [ Écrire à … ] [📎] [moteur ▾]   Entrée · Maj+Entrée │                 │
 │ ● Apps 3/9  ☼☾▣  ⚙         │                                                      │                 │
 └────────────────────────────┴──────────────────────────────────────────────────────┴─────────────────┘
 ```
 
-- **Barre latérale unique** (`components/layout/AppSidebar.tsx`, fixe ≥ lg, en tiroir `Sheet` sous lg) : sélecteur
-  Suite Atelier et marque, navigation (Accueil, Workflows, Carte de la suite, À valider avec son badge), agents
+- **Barre latérale unique** (`components/layout/AppSidebar.tsx`, 232 px, fixe ≥ lg, en tiroir `Sheet` sous lg) : marque
+  puis sélecteur Suite Atelier, navigation (Accueil, Workflows, Carte de la suite, À valider avec son compteur), agents
   (`AgentSidebar` : recherche sans accents, « / » ou ⌘K / Ctrl+K pour y aller, catégories repliables mémorisées,
   tuile de chaque agent, crayon des agents personnalisés), puis état des applications, thème et Réglages.
-- **Barre mobile** (`AppHeader`, sous lg) : marque, bouton du contexte courant (accueil, onglet du Studio ou agent,
+- **Barre haute** de 44 px : chaque vue a la sienne sur grand écran (titre de la vue, actions) ; **barre mobile**
+  (`AppHeader`, sous lg) : marque, bouton du contexte courant (accueil, onglet du Studio ou agent,
   `headerContext.ts`) qui ouvre le tiroir, « À valider » et la Suite. Sous lg, l'en-tête de la conversation ne garde
   que les badges et les actions.
 - **Vues** (`stores/useNavStore.ts`) : `home` (accueil) ou `agents` (conversation). Le **Studio des workflows**
@@ -39,28 +41,36 @@ Refonte visuelle (étape 24) : « cockpit d'agents », calme par défaut, néon 
 
 ## 2. Design system de la suite
 
-- `src/styles/atelier-ds/{light,dark,colors}.css` et `src/styles/brand/` (marque, police Nunito et sa licence) : **copies verbatim** d'`Atelier_Projets/design-system` (SUITE.md §1.1). Ne jamais les modifier ici ; `designSystem.test.ts` vérifie les 6 variables de fondation, les 15 couleurs officielles et le branchement sur la charte.
-- Charte « néon monochrome » : toute l'app est dans l'orange de Nexus (`#E8590C`, `data-atelier-app="nexus"` sur `<html>`). `globals.css` branche les jetons Shadcn sur les jetons `--atelier-*` de `brand/atelier-brand.css` (fond, surfaces, texte, bordures, accent, focus), qui changent seuls entre clair et sombre ; fond de page `background: var(--atelier-backdrop), var(--atelier-bg)` fixé. Aucun code hex dans `globals.css`.
-- **Règle d'élévation** : surface calme par défaut (`bg-card border border-atelier-line`, sans halo) ; interactif au
-  survol (`hover:border-atelier-border hover:shadow-glow`) ; mis en avant, actif ou vivant (élément sélectionné,
-  bouton principal, réponse en cours, validation attendue) : `border-atelier-border shadow-glow` ; superposé
-  (fenêtres, menus, tiroirs) : `shadow-glow-strong` ; creusé (JSON, journaux, code) : `bg-sunken`. Entrée active :
-  `.atelier-nav-active`. Séparateurs de structure : `border-atelier-line`.
-- **Encres de statut** : `text-warning-ink`, `text-success-ink`, `text-destructive-ink` (couleur du statut mêlée au
-  texte, ≥ 4,5:1 en clair comme en sombre) pour tout texte ; les icônes et pastilles gardent `text-warning`… Les
-  statuts (`--destructive`, `--success`, `--warning`) et les séries de graphiques gardent leurs couleurs.
-- **Identité** : `AgentTile` (tuile d'un agent, verre néon ou discrète), `AppChip` (puce d'une application dans SA
-  couleur par `appTheme` : `data-atelier-app`, ou signature locale pour Convert `#C9951D` que la marque copiée ne
-  connaît pas), `agentApps()` (applications d'un agent d'après ses boîtes).
-- **Primitives** (`src/components/ui/`) : `card`, `callout` (info, signature, warning, destructive, success, avec
+- `src/styles/atelier-ds/{light,dark,colors}.css` et `src/styles/brand/` (marque v2, `atelier-theme.js`, police Inter et sa licence) : **copies verbatim** d'`Atelier_Projets/design-system` (SUITE.md §1.1). Ne jamais les modifier ici ; `designSystem.test.ts` vérifie les 6 variables de fondation, les 15 couleurs officielles et le branchement sur la charte.
+- Charte v2 « Linear » : structure neutre commune à la suite ; la signature de Nexus (`#c84f00`, `data-atelier-app="nexus"` sur `<html>`) ne sert qu'à l'accent. `globals.css` branche les jetons Shadcn et le thème Tailwind (couleurs, police Inter, rayons 5 / 7 / 10 px, base de texte 13 px sur ordinateur et 14 px sur téléphone) sur les jetons `--atelier-*` de `brand/atelier-brand.css`, qui changent seuls entre clair et sombre ; fond de page uni `background: var(--atelier-bg)`. Aucun code hex dans `globals.css`.
+- **Règle d'élévation (plat au repos)** : surface `bg-card border border-atelier-border`, sans ombre ; interactif au
+  survol : fond `hover:bg-accent` (neutre) ou trait appuyé ; sélection : `bg-accent-soft` (signature en voile) et trait
+  `border-primary` ; superposé (fenêtres, menus, tiroirs, dock) : `shadow-glow-strong` (seule ombre) ; creusé (JSON,
+  journaux, code) : `bg-sunken`. Entrée courante : `.atelier-nav-active` (fond neutre, jamais de barre de couleur).
+  Listes denses (accueil, workflows, événements) : un conteneur à trait fin, une ligne par élément, filets `border-atelier-line`.
+  `shadow-glow`, `shadow-signature-glow` et `text-shadow-glow` valent « rien ».
+- **États** : seuls les états anormaux sont en couleur — échec et erreur `text-destructive-ink` (= `--atelier-down`),
+  validation attendue et modification non enregistrée `text-warning-ink` (= `--atelier-warn`, `.decision-card` : trait
+  ambre de 1 px). Une étape réussie ou en cours, une app joignable restent neutres (l'icône porte l'état). Les statuts
+  (`--destructive`, `--success`, `--warning`) en pastille et les séries de graphiques gardent leurs couleurs.
+- **Identité** : `AgentTile` (icône d'un agent, neutre : `plain` encadrée, `bare` comme la navigation), `AppChip` (puce
+  neutre avec la petite icône carrée de l'application dans SA couleur par `appTheme` / `data-atelier-app`), `AppTile`,
+  `agentApps()` (applications d'un agent d'après ses boîtes). Seule l'icône d'une app porte sa couleur.
+- **Primitives** (`src/components/ui/`) : `card`, `callout` (info, warning, destructive ; `signature` et `success` neutres, avec
   action), `decision-card` (anatomie unique des validations : conversation, éditeur, « À valider »), `skeleton`,
   `segmented`, `kbd`, `status-dot`, `section-label`, `empty-state`, `sheet` (côté `left` ou `right`), `dialog` (props
-  `size` sm | md | lg | xl et `scroll="body"` avec `DialogBody`), `badge` (variante `signature`), `button`
-  (variante `soft`, taille `icon-xs`).
-- Polices : pile système ; la police Nunito embarquée ne sert qu'à la marque (SUITE.md §1.6), y compris pour les
-  titres. Aucune ressource externe (pas de Google Fonts).
-- Thème : Clair / Sombre / Système (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ; classe `dark` **et** `data-theme` sur `<html>`, clé `atelier-nexus-theme` (l'ancienne `atelier-nexus:theme` est reprise) ; script de démarrage anti-flash dans `layout.tsx`.
-- Marque `atelier_Nexus` (icône Lucide `network`) + fenêtre « À propos » (logo complet `public/brand/logo-atelier-nexus.png`, classe `.atelier-about__logo`), sélecteur « Suite Atelier » avec état des API (Nexus, Viz, Tab, Projets, Convert, Trésorerie, Ciné, Savoir) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
+  `size` sm | md | lg | xl et `scroll="body"` avec `DialogBody`), `badge`, `button` (30 px ; variantes `outline`,
+  `ghost`, `soft` neutre ; un seul bouton principal par écran), `segmented` (`segmentedRail` / `segmentedItem`, aussi
+  utilisés par le sélecteur de thème).
+- Police : **Inter** embarquée (`--atelier-font`, variantes `cv11` et `ss03`), chiffres tabulaires dans les données
+  (`tabular-nums`). Aucune ressource externe (pas de Google Fonts).
+- Thème : Système / Clair / Sombre (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ;
+  préférence **commune à la suite** par `styles/brand/atelier-theme.js` (cookie `atelier_theme` sur le VPS, sinon
+  `localStorage["atelier:theme"]`), posé en script bloquant dans `<head>` par `theme-script.tsx` ; le sélecteur appelle
+  `window.atelierTheme.set()` et suit l'événement `atelier-theme`. Classe `dark` **et** `data-theme` sur `<html>`. Les
+  anciennes clés `atelier-nexus-theme` et `atelier-nexus:theme` sont reprises une fois, puis effacées.
+- Marque « Atelier Nexus » (icône carrée en dégradé de la signature, glyphe Lucide `workflow` blanc) + fenêtre « À propos » (grande icône `.atelier-about__icon`, suit le thème), sélecteur « Suite Atelier » (mêmes icônes et noms que le portail, SUITE.md §1.6) avec l'état des API, muet quand une app répond (Nexus, Viz, Tab, Projets, Convert, Trésorerie, Ciné, Savoir) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
+- Icônes : `src/app/favicon.ico`, `scripts/macos/icon.png` et `AtelierNexus.icns`, `scripts/windows/AtelierNexus.ico` = l'icône carrée de l'app.
 - Réglages ouvrables de partout (`stores/useUiStore.ts`, `openSettings()`) : bouton de la barre latérale, messages
   « non configuré » de la conversation.
 

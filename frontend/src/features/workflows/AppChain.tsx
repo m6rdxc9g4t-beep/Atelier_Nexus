@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { chainLabel, chainView } from "./chain";
 
 /**
- * Chaîne d'applications d'un workflow ou d'un modèle : puces dans la couleur de chaque app,
+ * Chaîne d'applications d'un workflow ou d'un modèle : puces neutres (icône de chaque app),
  * reliées par des chevrons (« Convert › Tab › Viz »), le reste en « +n ». Les lecteurs d'écran
  * reçoivent la phrase « Applications : Convert, puis Tab… ».
  */
@@ -31,12 +31,12 @@ export function AppChain({
       <span aria-hidden className="flex flex-wrap items-center gap-1">
         {shown.map((app, i) => (
           <span key={app} className="flex items-center gap-1">
-            {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+            {i > 0 && <ChevronRight className="size-3 shrink-0 text-atelier-faint" />}
             <AppChip app={app} color={colors?.[app]} />
           </span>
         ))}
         {hidden > 0 && (
-          <span className="text-xs text-muted-foreground tabular-nums" title={rest.map(appShort).join(", ")}>
+          <span className="text-xs text-atelier-faint tabular-nums" title={rest.map(appShort).join(", ")}>
             +{hidden}
           </span>
         )}

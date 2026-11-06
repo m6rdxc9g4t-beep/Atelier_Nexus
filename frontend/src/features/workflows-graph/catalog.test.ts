@@ -61,7 +61,7 @@ describe("groupCatalog", () => {
       entries: [{ ...catalogFixture.entries[0]!, app: "savoir", uses: "node:savoir/x" }],
     };
     const [group] = groupCatalog(catalog);
-    expect(group).toMatchObject({ key: "savoir", name: "savoir", color: "#9B5DE5" });
+    expect(group).toMatchObject({ key: "savoir", name: "savoir", color: "#a853c1" });
   });
 });
 
@@ -73,13 +73,12 @@ describe("thème d'application", () => {
       "data-atelier-app": "ailleurs",
       style: { "--atelier-signature": "#123456" },
     });
-    expect(appTheme("ailleurs", "red; x")).toMatchObject({ style: { "--atelier-signature": "#E8590C" } });
+    expect(appTheme("ailleurs", "red; x")).toMatchObject({ style: { "--atelier-signature": "#c84f00" } });
   });
 
-  it("donne à Convert sa signature locale (absente de la marque copiée)", () => {
-    const convert = { "data-atelier-app": "convert", style: { "--atelier-signature": "#C9951D" } };
-    expect(appTheme("convert")).toEqual(convert);
-    expect(appTheme("convert", "#C9951D")).toEqual(convert);
+  it("Convert est connu de la marque v2 : sa signature vient de data-atelier-app", () => {
+    expect(appTheme("convert")).toEqual({ "data-atelier-app": "convert" });
+    expect(appTheme("convert", "#9d6d1c")).toEqual({ "data-atelier-app": "convert" });
   });
 
   it("indexe le catalogue et replie les accents", () => {

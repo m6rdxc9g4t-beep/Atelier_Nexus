@@ -211,7 +211,7 @@ export function RunPanel({
           {params.length === 0 ? (
             <p className="text-xs text-muted-foreground">Aucun paramètre : le workflow part tel qu&apos;il est.</p>
           ) : (
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-xl border border-atelier-line bg-card p-3">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-md border border-atelier-border bg-card p-3">
               {params.map((param) => (
                 <div key={param.name} className="grid grid-cols-[minmax(0,1fr)] gap-1">
                   <label htmlFor={`${ids}-${param.name}`} className="text-xs font-medium">
@@ -293,14 +293,14 @@ export function RunPanel({
             );
           })}
 
-          <ol aria-label="Étapes de l'exécution" className="grid grid-cols-[minmax(0,1fr)] divide-y divide-atelier-line overflow-hidden rounded-xl border border-atelier-line bg-card">
+          <ol aria-label="Étapes de l'exécution" className="grid grid-cols-[minmax(0,1fr)] divide-y divide-atelier-line overflow-hidden rounded-md border border-atelier-border bg-card">
             {run.steps.map((step) => (
               <StepRunLine key={step.id} step={step} label={label(step.id)} />
             ))}
           </ol>
 
           {run.artifacts.length > 0 && (
-            <Button type="button" variant="soft" size="sm" onClick={onShowArtifacts}>
+            <Button type="button" variant="outline" size="sm" onClick={onShowArtifacts}>
               <Layers />
               Voir les livrables ({run.artifacts.length})
             </Button>
@@ -336,7 +336,7 @@ export function RunPanel({
                   aria-current={item.id === run?.id}
                   title={originText(item)}
                   className={cn(
-                    "grid w-full grid-cols-[minmax(0,1fr)] gap-1 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none",
+                    "grid w-full grid-cols-[minmax(0,1fr)] gap-1 rounded-md px-2.5 py-2 text-left text-xs hover:bg-accent",
                     item.id === run?.id && "atelier-nav-active",
                   )}
                 >
@@ -376,7 +376,7 @@ function StepRunLine({ step, label }: { step: StepRun; label: string }) {
         aria-expanded={open}
         disabled={!detail}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left enabled:hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none"
+        className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left enabled:hover:bg-accent focus-visible:-outline-offset-2"
       >
         <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90", !detail && "invisible")} aria-hidden />
         <StepStatusIcon status={step.status} />

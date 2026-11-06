@@ -11,9 +11,19 @@ export interface SegmentedOption<T extends string> {
   ariaLabel?: string;
 }
 
+/** Rail du contrôle segmenté (DESIGN.md « Contrôles compacts ») : fond de survol, 2 px de marge. */
+export const segmentedRail = "inline-flex w-fit items-center gap-0.5 rounded-md bg-atelier-hover p-0.5";
+
+/** Option : 24 px, Label-sm atténué ; pressée (`aria-pressed`) = surface + micro-ombre, encre. */
+export const segmentedItem = cn(
+  "inline-flex h-6 items-center justify-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap text-atelier-muted transition-colors [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "hover:text-foreground",
+  "aria-pressed:bg-atelier-surface aria-pressed:text-foreground aria-pressed:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_var(--atelier-line)]",
+);
+
 /**
- * Choix exclusif compact (filtres, portée, vue) : groupe de boutons `aria-pressed`, dans le style
- * du sélecteur de thème.
+ * Choix exclusif compact (filtres, portée, vue) : groupe de boutons `aria-pressed`, même style que
+ * le sélecteur de thème.
  */
 function Segmented<T extends string>({
   value,
@@ -32,33 +42,19 @@ function Segmented<T extends string>({
   size?: "sm" | "xs";
 }) {
   return (
-    <div
-      role="group"
-      aria-label={label}
-      className={cn(
-        "inline-flex w-fit items-center gap-0.5 rounded-full border border-atelier-border-soft bg-atelier-surface/70 p-0.5",
-        className,
-      )}
-    >
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={active}
-            aria-label={o.ariaLabel}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap transition-colors focus-visible:shadow-focus focus-visible:outline-none [&_svg]:size-3.5",
-              size === "sm" ? "h-7 px-3 text-xs" : "h-6 px-2.5 text-[11px]",
-              active ? "bg-signature-soft text-atelier-ink" : "text-atelier-muted hover:bg-signature-faint hover:text-foreground",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
+    <div role="group" aria-label={label} className={cn(segmentedRail, className)}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={o.value === value}
+          aria-label={o.ariaLabel}
+          onClick={() => onChange(o.value)}
+          className={cn(segmentedItem, size === "sm" ? "px-2.5" : "h-[22px] px-2 text-[11.5px]")}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -3,10 +3,12 @@
 
 /* ─── Design system de la suite Atelier (docs/SUITE.md §1) ──────────
    Copies verbatim de Atelier_Projets/design-system : ne pas modifier ici.
-   - atelier-ds : variables de fondation neutres (hors suite) et couleurs officielles
-     des types et statuts (elles portent un sens : inchangées).
-   - brand : marque commune et palette « néon monochrome » (jetons --atelier-*),
-     avec la police Nunito. Couche « components » : les utilitaires Tailwind gardent la main. */
+   - atelier-ds : variables de fondation neutres et couleurs officielles des types et statuts
+     (elles portent un sens : inchangées).
+   - brand : marque commune et palette v2 « Linear » (jetons --atelier-*, structure neutre gris
+     froid, signature de l'app pour l'accent), police Inter embarquée ; atelier-theme.js
+     (préférence de thème commune) est posé dans <head> par components/theme/theme-script.tsx.
+     Couche « components » : les utilitaires Tailwind gardent la main. */
 @import "../styles/atelier-ds/light.css";
 @import "../styles/atelier-ds/dark.css";
 @import "../styles/atelier-ds/colors.css";
@@ -15,30 +17,33 @@
 /* Sombre = classe `dark` ET data-theme="dark" sur <html> (SUITE.md §1.5) */
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Jetons Shadcn branchés sur la charte « néon monochrome » ───────
-   Toute l'app est dans sa couleur signature, l'orange de Nexus (--atelier-sig-nexus)
-   (data-atelier-app="nexus" sur <html>). Les jetons --atelier-* de
-   atelier-brand.css changent d'eux-mêmes de valeur entre clair et sombre
-   (.dark / data-theme="dark" sur <html>) : un seul bloc suffit.
-   Aucune couleur de structure en dur ; seules les couleurs qui portent un
-   sens (statuts, erreurs, séries de graphiques) viennent d'ailleurs. */
+/* ─── Jetons Shadcn branchés sur la charte v2 « Linear » (Atelier_Deploy/DESIGN.md) ──
+   Structure neutre commune à la suite (fonds, surfaces, textes, traits) ; la signature de Nexus
+   (orange, data-atelier-app="nexus" sur <html>) ne sert qu'à l'accent : bouton principal plein,
+   sélection, focus, liens. Les jetons --atelier-* changent d'eux-mêmes entre clair et sombre
+   (.dark / data-theme="dark" sur <html>) : un seul bloc suffit. Aucune couleur de structure en
+   dur ; seules les couleurs qui portent un sens (statuts, séries de graphiques) viennent d'ailleurs. */
 :root {
   color-scheme: light;
-  --radius: 10px; /* --ds-radius-md */
+  --radius: 7px;
+
+  /* Échelle de texte : base 13 px sur ordinateur, 14 px sur téléphone (corps des réponses 14 / 15). */
+  --fs-sm: 0.875rem;
+  --fs-base: 0.9375rem;
 
   --background: var(--atelier-bg);
   --foreground: var(--atelier-text);
   --card: var(--atelier-surface);
   --card-foreground: var(--atelier-text);
-  /* Menus, popovers : surface de survol. */
-  --popover: var(--atelier-surface-2);
+  /* Menus, popovers : surface, trait fin et ombre de surgissement (ce qui flotte). */
+  --popover: var(--atelier-surface);
   --popover-foreground: var(--atelier-text);
 
-  /* Accent = signature. Bouton principal : plein en clair, contour néon en sombre
-     (variante « default » de components/ui/button.tsx). */
+  /* Accent = signature : bouton principal plein dans les deux thèmes. */
   --primary: var(--atelier-signature);
   --primary-foreground: var(--atelier-signature-contrast);
-  /* Élément actif, tag : signature en transparence ; texte / icône en couleur lisible. */
+  --primary-hover: var(--atelier-signature-hover);
+  /* Sélection (ligne, tuile choisie) : signature en transparence ; liens : signature lisible. */
   --accent-soft: var(--atelier-signature-soft);
   --accent-ink: var(--atelier-ink);
 
@@ -46,31 +51,28 @@
   --secondary-foreground: var(--atelier-text);
   --muted: var(--atelier-surface-2);
   --muted-foreground: var(--atelier-muted);
-  /* Survol des menus et boutons fantômes : signature en transparence. */
-  --accent: var(--atelier-signature-faint);
+  /* Survol des menus, lignes et boutons fantômes : neutre (jamais teinté). */
+  --accent: var(--atelier-surface-2);
   --accent-foreground: var(--atelier-text);
 
-  /* Couleurs qui portent un sens : statuts officiels de la suite, inchangés. */
+  /* Couleurs qui portent un sens : statuts officiels de la suite, inchangés (pastilles, icônes). */
   --destructive: var(--status-rejected);
   --success: var(--status-closed);
   --warning: var(--status-hold);
-  /* Encres : les mêmes couleurs utilisées comme TEXTE, mêlées au texte courant pour rester
-     lisibles (≥ 4,5:1) en clair comme en sombre (--atelier-text change seul). Les icônes et
-     pastilles gardent la couleur pure. */
-  --destructive-ink: color-mix(in oklab, var(--destructive) 78%, var(--atelier-text));
-  --success-ink: color-mix(in oklab, var(--success) 62%, var(--atelier-text));
-  --warning-ink: color-mix(in oklab, var(--warning) 52%, var(--atelier-text));
+  /* Encres : états anormaux en TEXTE, lisibles en clair comme en sombre (jetons de la charte). */
+  --destructive-ink: var(--atelier-down);
+  --success-ink: var(--atelier-up);
+  --warning-ink: var(--atelier-warn);
 
-  /* Traits : séparateurs et lignes (par défaut sur tout élément) ; champs et boutons
-     secondaires en trait doux ; contour des cartes = --atelier-border (utilitaire
-     border-atelier-border sur les composants). */
+  /* Traits : séparateurs et lignes (par défaut sur tout élément) ; champs et boutons en trait
+     appuyé ; contour des cartes = --atelier-border. */
   --border: var(--atelier-line);
   --border-strong: var(--atelier-border-soft);
   --input: var(--atelier-border-soft);
-  /* Anneau de focus = --atelier-focus (3px de signature en transparence). */
-  --ring: color-mix(in oklab, var(--atelier-signature) 35%, transparent);
-  /* Blocs de code, journaux d'outils : creusés dans le fond. */
-  --sunken: var(--atelier-bg);
+  /* Anneau de focus : signature (contour de 2 px décalé de 2 px, base ci-dessous). */
+  --ring: var(--atelier-signature);
+  /* Blocs de code, journaux d'outils : creusés dans le fond de la barre latérale. */
+  --sunken: var(--atelier-sidebar);
 
   /* Palette multi-séries (sens par couleur) : inchangée. */
   --chart-1: oklch(0.646 0.222 41.116);
@@ -81,11 +83,18 @@
 
   --sidebar: var(--atelier-sidebar);
   --sidebar-foreground: var(--atelier-text);
+  /* Encre seconde (DESIGN.md ink-2) : libellés de navigation et de champ, entre texte et atténué. */
+  --ink-2: color-mix(in oklab, var(--atelier-text) 78%, var(--atelier-muted));
 
-  --font-system: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-code: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    monospace;
+  --font-ui: var(--atelier-font);
+  --font-code: var(--atelier-font-mono);
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --fs-sm: 0.8125rem;
+    --fs-base: 0.875rem;
+  }
 }
 
 .dark {
@@ -98,11 +107,25 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-system);
+  --font-sans: var(--font-ui);
   --font-mono: var(--font-code);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: 1.45;
+  --text-base: var(--fs-base);
+  --text-base--line-height: 1.55;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: 1.35;
+  --text-2xl: 1.25rem;
+  --text-2xl--line-height: 1.3;
+  /* Rayons : 5 / 7 / 10 px (touches et petites icônes · boutons, champs · panneaux, tuiles) */
+  --radius-xs: 4px;
+  --radius-sm: var(--atelier-radius-sm);
+  --radius-md: var(--atelier-radius-md);
+  --radius-lg: var(--atelier-radius-lg);
+  --radius-xl: var(--atelier-radius-lg);
+  --radius-2xl: var(--atelier-radius-lg);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -111,6 +134,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
   --color-secondary: var(--secondary);
@@ -137,60 +161,70 @@
   --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  /* Charte néon monochrome : utilitaires Tailwind sur les jetons Atelier.
-     Couleurs : bg-atelier-surface(-2|-3), bg-atelier-field, text-atelier-ink,
-     text-atelier-muted, border-atelier-border(-soft), border-atelier-line,
-     bg-signature, bg-signature-soft, bg-signature-faint, fill-atelier-chart-1..3
-     (graphiques à une seule mesure).
-     Halos : shadow-glow (cartes, panneaux, tableaux, en-tête), shadow-glow-strong
-     (modales, menus, popovers), shadow-signature-glow (bouton principal),
-     shadow-focus (focus), text-shadow-glow (titres de page). */
+  /* Charte v2 : utilitaires Tailwind sur les jetons Atelier.
+     Structure : bg-atelier-surface(-2|-3), bg-atelier-hover (= surface-2, survol),
+     bg-atelier-selected (= surface-3, élément courant), bg-atelier-field, text-atelier-muted,
+     text-atelier-faint, border-atelier-border(-soft), border-atelier-line.
+     Accent : bg-signature, bg-signature-soft (sélection), bg-signature-faint, text-atelier-ink
+     (signature lisible : liens), fill-atelier-chart-1..3 (graphiques à une seule mesure).
+     Ombres : shadow-glow-strong = surgissement (menus, dialogues) ; shadow-focus = halo des champs.
+     shadow-glow, shadow-signature-glow et text-shadow-glow valent « rien » (plat au repos). */
   --color-signature: var(--atelier-signature);
   --color-signature-soft: var(--atelier-signature-soft);
   --color-signature-faint: var(--atelier-signature-faint);
   --color-atelier-surface: var(--atelier-surface);
   --color-atelier-surface-2: var(--atelier-surface-2);
   --color-atelier-surface-3: var(--atelier-surface-3);
+  --color-atelier-hover: var(--atelier-surface-2);
+  --color-atelier-selected: var(--atelier-surface-3);
   --color-atelier-field: var(--atelier-field);
   --color-atelier-ink: var(--atelier-ink);
   --color-atelier-muted: var(--atelier-muted);
+  --color-atelier-ink-2: var(--ink-2);
+  --color-atelier-faint: var(--atelier-faint);
   --color-atelier-border: var(--atelier-border);
   --color-atelier-border-soft: var(--atelier-border-soft);
   --color-atelier-line: var(--atelier-line);
+  --color-atelier-warn: var(--atelier-warn);
+  --color-atelier-down: var(--atelier-down);
   --color-atelier-chart-1: var(--atelier-chart-1);
   --color-atelier-chart-2: var(--atelier-chart-2);
   --color-atelier-chart-3: var(--atelier-chart-3);
-  --shadow-glow: var(--atelier-glow);
+  --shadow-glow: none;
   --shadow-glow-strong: var(--atelier-glow-strong);
-  --shadow-signature-glow: var(--atelier-signature-glow);
+  --shadow-signature-glow: none;
   --shadow-focus: var(--atelier-focus);
-  --text-shadow-glow: var(--atelier-text-glow);
+  --text-shadow-glow: none;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html,
   body {
     height: 100%;
   }
-  /* Fond de page : teinte de la signature + fine grille + lueur en haut (clair et sombre).
-     --atelier-backdrop contient positions et tailles des calques (« 0 0 / 32px 32px ») :
-     il ne passe que par la propriété raccourcie background, pas par background-image. */
+  /* Fond de page uni (plus de grille ni de lueur) ; Inter, chiffres de la charte (cv11, ss03). */
   body {
-    @apply font-sans text-foreground antialiased;
-    background: var(--atelier-backdrop), var(--atelier-bg);
-    background-attachment: fixed;
+    @apply font-sans text-sm text-foreground antialiased;
+    background: var(--atelier-bg);
+    font-feature-settings: "cv11", "ss03";
+    text-rendering: optimizeLegibility;
   }
   :focus-visible {
     outline: 2px solid var(--atelier-signature);
     outline-offset: 2px;
   }
   ::selection {
-    background-color: var(--atelier-surface-3);
+    background-color: color-mix(in oklab, var(--atelier-signature) 30%, transparent);
+    color: var(--atelier-text);
   }
-  /* Barres de défilement fines, dans la signature */
+  a {
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  /* Barres de défilement fines, neutres */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--atelier-border-soft) transparent;
@@ -206,18 +240,18 @@
 }
 
 /* ─── Carte de décision (validation humaine) ──────────────────────
-   Barre ambre à gauche + halo de la signature : « à vous de décider » se distingue de l'orange
-   de Nexus par la barre, l'icône et le libellé (jamais par la seule couleur). */
+   État anormal « à vous de décider » : trait de 1 px ambre (--atelier-warn) autour de la carte,
+   icône et libellé ambre ; jamais de barre de couleur sur le côté ni de halo. */
 @layer components {
   .decision-card {
-    box-shadow: inset 3px 0 0 var(--warning), var(--atelier-glow);
+    border-color: color-mix(in oklab, var(--atelier-warn) 45%, var(--atelier-border));
   }
 }
 
 /* ─── Contenu Markdown des réponses d'agents ────────────────────── */
 @layer components {
   .prose-chat {
-    @apply text-[0.9375rem] leading-relaxed;
+    @apply text-base leading-relaxed;
   }
   .prose-chat > * + * {
     @apply mt-3;
@@ -256,24 +290,24 @@
     @apply text-accent-ink underline underline-offset-2;
   }
   .prose-chat code {
-    @apply rounded-sm bg-signature-faint px-1 py-0.5 font-mono text-[0.85em];
+    @apply rounded-xs border border-atelier-line bg-sunken px-1 py-px font-mono text-[0.85em];
   }
-  /* Code et tableaux : surfaces creusées ou calmes (trait fin, sans halo) */
+  /* Code et tableaux : surfaces creusées, trait fin, chiffres alignés */
   .prose-chat pre {
-    @apply overflow-x-auto rounded-lg border border-atelier-line bg-sunken p-3 text-[0.8125rem] leading-snug;
+    @apply overflow-x-auto rounded-md border border-atelier-line bg-sunken p-3 text-[12.5px] leading-snug;
   }
   .prose-chat pre code {
-    @apply bg-transparent p-0;
+    @apply border-0 bg-transparent p-0;
   }
   .prose-chat table {
-    @apply block w-max max-w-full overflow-x-auto rounded-lg border border-atelier-line text-sm;
+    @apply block w-max max-w-full overflow-x-auto rounded-md border border-atelier-line text-sm tabular-nums;
   }
   .prose-chat th,
   .prose-chat td {
-    @apply border border-atelier-line px-2.5 py-1.5 text-left;
+    @apply border border-atelier-line px-2.5 py-1 text-left;
   }
   .prose-chat th {
-    @apply bg-signature-faint font-medium;
+    @apply bg-sunken font-medium;
   }
   .prose-chat blockquote {
     @apply border-l-2 border-atelier-border-soft pl-3 text-muted-foreground;
@@ -281,29 +315,30 @@
 }
 
 /* ─── Éditeur de workflows en graphe (React Flow) ─────────────────
-   Variables de @xyflow/react branchées sur la charte : traits, poignées, mini-carte et
-   contrôles dans la signature, en clair comme en sombre. Canevas calme (points discrets,
-   outils sans halo) : le néon reste aux étapes sélectionnées ou en cours. */
+   Variables de @xyflow/react branchées sur la charte v2 : canevas neutre (points discrets,
+   traits gris, contrôles plats). La signature ne marque que la sélection et la liaison qu'on
+   trace ; une étape en cours reste neutre (pointillés animés), seuls les états anormaux sont
+   en couleur (sur les étapes elles-mêmes). */
 .react-flow.atelier-flow {
   --xy-background-color: transparent;
-  --xy-background-pattern-color: var(--atelier-line);
-  --xy-edge-stroke: var(--atelier-border);
+  --xy-background-pattern-color: var(--atelier-border-soft);
+  --xy-edge-stroke: var(--atelier-border-soft);
   --xy-edge-stroke-width: 1.5;
   --xy-edge-stroke-selected: var(--atelier-signature);
   --xy-connectionline-stroke: var(--atelier-signature);
-  --xy-connectionline-stroke-width: 2;
+  --xy-connectionline-stroke-width: 1.5;
   --xy-handle-background-color: var(--atelier-surface);
-  --xy-handle-border-color: var(--atelier-signature);
+  --xy-handle-border-color: var(--atelier-faint);
   --xy-selection-background-color: var(--atelier-signature-faint);
-  --xy-selection-border: 1px dashed var(--atelier-border);
+  --xy-selection-border: 1px dashed var(--atelier-border-soft);
   --xy-minimap-background-color: var(--atelier-surface);
   --xy-minimap-mask-background-color: color-mix(in oklab, var(--atelier-bg) 70%, transparent);
-  --xy-minimap-node-background-color: var(--atelier-signature-soft);
-  --xy-minimap-node-stroke-color: var(--atelier-border);
+  --xy-minimap-node-background-color: var(--atelier-surface-3);
+  --xy-minimap-node-stroke-color: var(--atelier-border-soft);
   --xy-controls-button-background-color: var(--atelier-surface);
   --xy-controls-button-background-color-hover: var(--atelier-surface-2);
-  --xy-controls-button-color: var(--atelier-text);
-  --xy-controls-button-color-hover: var(--atelier-ink);
+  --xy-controls-button-color: var(--atelier-muted);
+  --xy-controls-button-color-hover: var(--atelier-text);
   --xy-controls-button-border-color: var(--atelier-line);
   --xy-controls-box-shadow: none;
   --xy-attribution-background-color: transparent;
@@ -313,22 +348,27 @@
 }
 .react-flow.atelier-flow .react-flow__minimap,
 .react-flow.atelier-flow .react-flow__controls {
-  @apply overflow-hidden rounded-lg border border-atelier-line bg-card;
+  @apply overflow-hidden rounded-md border border-atelier-line bg-card;
 }
 .react-flow.atelier-flow .react-flow__attribution a {
   @apply text-muted-foreground;
 }
 .react-flow.atelier-flow .react-flow__handle {
-  @apply size-3 border-2;
+  @apply size-2.5 border-[1.5px];
+}
+.react-flow.atelier-flow .react-flow__handle:hover,
+.react-flow.atelier-flow .react-flow__handle.connectingfrom,
+.react-flow.atelier-flow .react-flow__handle.valid {
+  border-color: var(--atelier-signature);
 }
 .react-flow.atelier-flow .react-flow__node:focus-visible {
-  @apply rounded-lg outline-2 outline-offset-4 outline-primary;
+  @apply rounded-md outline-2 outline-offset-4 outline-primary;
 }
-/* Liaison vers une étape en cours : trait de la signature, en pointillés animés par React Flow */
+/* Liaison vers une étape en cours : pointillés animés par React Flow, trait neutre appuyé */
 .react-flow.atelier-flow .react-flow__edge.animated .react-flow__edge-path {
-  stroke: var(--atelier-signature);
+  stroke: var(--atelier-muted);
 }
 .react-flow.atelier-flow .react-flow__edge.selected .react-flow__edge-path,
 .react-flow.atelier-flow .react-flow__edge:focus-visible .react-flow__edge-path {
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
