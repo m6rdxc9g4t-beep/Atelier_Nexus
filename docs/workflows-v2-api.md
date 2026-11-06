@@ -86,7 +86,7 @@ interface Catalog {
 ```
 
 Couleurs (signature, charte v2, docs/SUITE.md §1.7) : viz `#996c00`, tab `#1c8742`, projets `#568100`, nexus `#c84f00`,
-cine `#cd3d83`, savoir `#a853c1`, tresorerie `#3c72da`, cuisine `#3a6c97`, dates `#db373a`, convert `#9d6d1c`, système
+cine `#cd3d83`, savoir `#a853c1`, tresorerie `#3c72da`, cuisine `#9b84dc`, dates `#db373a`, convert `#9d6d1c`, système
 (null) → couleur nexus.
 Les actions des nœuds viennent des manifestes de Viz, Tab, Projets et Convert (`node:convert/conversions.table`…), dans cet
 ordre ; Convert arrêté → `status: "unreachable"` et aucune entrée `node:convert/…`.
