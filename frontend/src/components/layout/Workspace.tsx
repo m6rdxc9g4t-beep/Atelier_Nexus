@@ -74,7 +74,7 @@ export function Workspace() {
   return (
     <div className="flex h-dvh">
       {/* Grand écran : barre latérale fixe. Toujours montée (le choix du thème s'y applique). */}
-      <aside className="hidden w-[17rem] shrink-0 border-r border-atelier-line bg-sidebar lg:block">{sidebar}</aside>
+      <aside className="hidden w-[232px] shrink-0 border-r border-atelier-line bg-sidebar lg:block">{sidebar}</aside>
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent aria-describedby={undefined} className="lg:hidden">
           <SheetTitle className="sr-only">Navigation</SheetTitle>

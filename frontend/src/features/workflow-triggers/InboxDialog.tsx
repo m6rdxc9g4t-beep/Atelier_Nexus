@@ -43,10 +43,7 @@ export function InboxButton() {
       <Inbox />
       <span className="hidden xl:inline">À valider</span>
       {pending > 0 && (
-        <span
-          aria-hidden
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] leading-none font-semibold text-primary-foreground tabular-nums shadow-signature-glow"
-        >
+        <span aria-hidden className="text-[11.5px] leading-none font-semibold text-warning-ink tabular-nums">
           {badgeText(pending)}
         </span>
       )}
@@ -66,7 +63,7 @@ export function InboxView() {
   const texts = inboxTexts(useApprovalMode());
   return (
     <div className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-4">
-      <p className="text-[13px] text-muted-foreground">{texts.description}</p>
+      <p className="text-sm text-muted-foreground">{texts.description}</p>
       <InboxBody empty={texts.empty} />
     </div>
   );
@@ -137,7 +134,7 @@ function InboxBody({ empty }: { empty: string }) {
     return (
       <div role="status" aria-label="Lecture des exécutions en attente" className="grid gap-3">
         {[0, 1].map((i) => (
-          <Skeleton key={i} className="h-40 rounded-xl" />
+          <Skeleton key={i} className="h-40 rounded-lg" />
         ))}
       </div>
     );
@@ -180,11 +177,11 @@ function InboxBody({ empty }: { empty: string }) {
             };
             return (
               <li key={run.id}>
-                {/* Surface calme : seule la carte de validation (DecisionCard) porte le néon de l'attente */}
-                <Card className="gap-2.5 p-4">
+                {/* Surface calme : seule la carte de validation (DecisionCard) porte l'ambre de l'attente */}
+                <Card className="gap-2.5 p-3.5">
                   <header className="flex flex-wrap items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold break-words">{title}</p>
+                      <p className="text-sm font-medium break-words">{title}</p>
                       <p className="mt-0.5 flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
                         <OriginBadge trigger={run.trigger} />
                         <span className="min-w-0 break-words">{originText(run)}</span>
@@ -193,7 +190,7 @@ function InboxBody({ empty }: { empty: string }) {
                     <time
                       dateTime={run.updated_at}
                       title={new Date(run.updated_at).toLocaleString("fr-FR")}
-                      className="shrink-0 text-xs text-muted-foreground"
+                      className="shrink-0 text-xs text-atelier-faint tabular-nums"
                     >
                       {timeAgo(run.updated_at)}
                     </time>

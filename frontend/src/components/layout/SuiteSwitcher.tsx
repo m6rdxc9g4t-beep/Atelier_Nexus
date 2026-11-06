@@ -47,7 +47,7 @@ export function SuiteSwitcher() {
           <LayoutGrid />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-76">
+      <DropdownMenuContent align="end" className="w-76">
         <DropdownMenuLabel>Suite Atelier</DropdownMenuLabel>
         {apps.map((app) => {
           const current = app.id === CURRENT_APP;
@@ -58,30 +58,30 @@ export function SuiteSwitcher() {
               key={app.id}
               aria-label={`${app.name}${state ? ` (${state})` : ""}`}
               title={app.url}
-              className={cn("gap-2.5 py-2", current && "bg-signature-soft")}
+              aria-current={current ? "true" : undefined}
+              className={cn("gap-2.5 py-1.5", current && "bg-atelier-selected")}
               onSelect={() => {
                 if (!current) openExternal(app.url);
               }}
             >
-              {/* Chaque tuile dans la couleur signature de SON application ; `appTheme` pose la
-                  signature locale d'une app que la marque copiée ne connaît pas (Convert) */}
+              {/* Chaque icône dans la couleur signature de SON application (seul endroit coloré) */}
               <span className="atelier-brand__tile atelier-brand__tile--sm" {...appTheme(app.id)} aria-hidden>
                 <AppIcon app={app.id} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
                   <span className="atelier-brand__name atelier-brand__name--sm">
-                    <span className="atelier-brand__prefix">atelier_</span>
+                    <span className="atelier-brand__prefix">Atelier </span>
                     {app.short}
                   </span>
-                  {st && <StatusDot status={st} />}
+                  {st && st !== "up" && <StatusDot status={st} />}
                   {app.online && <OnlineBadge />}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {app.description}
                 </span>
               </span>
-              {current && <Check className="text-accent-ink" aria-hidden />}
+              {current && <Check className="text-muted-foreground" aria-hidden />}
             </DropdownMenuItem>
           );
         })}
@@ -93,23 +93,31 @@ export function SuiteSwitcher() {
 /** App hébergée en ligne : pas d'état vérifié, seulement l'indication « en ligne ». */
 function OnlineBadge() {
   return (
-    <span className="flex items-center gap-1 text-[11px] text-muted-foreground" aria-hidden>
+    <span className="flex items-center gap-1 text-[11.5px] text-atelier-faint" aria-hidden>
       <Globe className="size-3!" />
       {ONLINE_LABEL}
     </span>
   );
 }
 
-/** Pastille + libellé : la couleur n'est jamais seule porteuse de sens. */
+/**
+ * Pastille + libellé, seulement quand l'app ne répond pas (ou pendant la vérification) : une app en
+ * marche reste muette (DESIGN.md « témoin muet »). La couleur n'est jamais seule porteuse de sens.
+ */
 function StatusDot({ status }: { status: SuiteStatus }) {
   return (
-    <span className="flex items-center gap-1 text-[11px] text-muted-foreground" aria-hidden>
+    <span
+      className={cn(
+        "flex items-center gap-1.5 text-[11.5px]",
+        status === "down" ? "font-medium text-destructive-ink" : "text-atelier-faint",
+      )}
+      aria-hidden
+    >
       <span
         className={cn(
           "size-1.5 rounded-full",
-          status === "up" && "bg-success",
           status === "down" && "bg-destructive",
-          status === "unknown" && "animate-pulse bg-muted-foreground/60",
+          status === "unknown" && "shadow-[inset_0_0_0_1.25px_var(--atelier-faint)]",
         )}
       />
       {statusLabel(status)}

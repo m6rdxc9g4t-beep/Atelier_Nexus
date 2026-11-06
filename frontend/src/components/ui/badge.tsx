@@ -4,18 +4,20 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 py-0.5 text-xs font-medium [&>svg]:size-3",
+  "inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 text-xs font-medium tabular-nums [&>svg]:size-3",
   {
     variants: {
       variant: {
-        default: "border-atelier-border-soft bg-accent-soft text-accent-ink",
-        signature: "border-atelier-border-soft bg-signature-faint text-accent-ink",
+        // Charte v2 : étiquettes neutres ; seuls les états anormaux sont en couleur
+        default: "border-atelier-line bg-atelier-hover text-muted-foreground",
+        signature: "border-atelier-line bg-atelier-hover text-muted-foreground",
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         outline: "border-atelier-border-soft text-muted-foreground",
-        // Texte en encre (lisible), fond en transparence de la couleur pure
-        success: "border-transparent bg-success/12 text-success-ink",
-        destructive: "border-transparent bg-destructive/12 text-destructive-ink",
-        warning: "border-transparent bg-warning/15 text-warning-ink",
+        // Succès : neutre (un état nominal ne se colore pas), l'icône ou le texte portent le sens
+        success: "border-atelier-line text-muted-foreground",
+        // Texte en encre lisible, fond et trait en transparence
+        destructive: "border-destructive-ink/30 bg-destructive-ink/8 text-destructive-ink",
+        warning: "border-warning-ink/30 bg-warning-ink/8 text-warning-ink",
       },
     },
     defaultVariants: { variant: "default" },

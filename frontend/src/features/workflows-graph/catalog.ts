@@ -5,23 +5,23 @@
 
 import type { ActionKind, Catalog, CatalogEntry, NodeAppStatus, StepUses } from "@/types/api";
 
-/** Couleurs signature de la suite (docs/SUITE.md §1.7, docs/workflows-v2-api.md §3). */
+/** Couleurs signature de la suite, charte v2 (docs/SUITE.md §1.7, docs/workflows-v2-api.md §3). */
 export const APP_COLORS: Record<string, string> = {
-  viz: "#F2C811",
-  tab: "#21A366",
-  projets: "#94D82D",
-  nexus: "#E8590C",
-  cine: "#E64980",
-  savoir: "#9B5DE5",
-  tresorerie: "#3B5BDB",
-  cuisine: "#E056E2",
-  dates: "#E03131",
-  convert: "#C9951D",
+  viz: "#996c00",
+  tab: "#1c8742",
+  projets: "#568100",
+  nexus: "#c84f00",
+  cine: "#cd3d83",
+  savoir: "#a853c1",
+  tresorerie: "#3c72da",
+  cuisine: "#8568a7",
+  dates: "#db373a",
+  convert: "#9d6d1c",
 };
 
 /** Applications dont la marque (atelier-brand.css) connaît la signature : `data-atelier-app` suffit.
- * Les autres (Convert, apps des extensions) reçoivent leur couleur en signature locale. */
-const BRAND_APPS = new Set(["viz", "tab", "projets", "nexus", "cine", "savoir", "tresorerie", "cuisine", "dates"]);
+ * Les autres (apps des extensions) reçoivent leur couleur en signature locale. */
+const BRAND_APPS = new Set(["viz", "tab", "projets", "nexus", "cine", "savoir", "tresorerie", "cuisine", "dates", "convert"]);
 
 /** Outil système (app null) : couleur de Nexus. */
 export const SYSTEM_APP = "nexus";
@@ -43,8 +43,9 @@ export const APP_STATUS_LABEL: Record<NodeAppStatus, string> = {
 
 /**
  * Attributs qui mettent un élément dans la couleur de SON application : `data-atelier-app`
- * recalcule tous les jetons --atelier-* (bordures, halos, fonds) ; pour une application que la
- * marque ne connaît pas, la couleur reçue du backend est posée comme signature.
+ * recalcule la signature (--atelier-signature et ses dérivés) ; pour une application que la
+ * marque ne connaît pas, la couleur reçue du backend est posée comme signature. Charte v2 : à
+ * poser sur l'icône de l'app (`.atelier-brand__tile`), seul élément coloré par app.
  */
 export function appTheme(
   app: string | null | undefined,

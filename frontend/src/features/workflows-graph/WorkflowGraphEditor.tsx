@@ -144,7 +144,7 @@ export function WorkflowGraphDialog({ agents }: { agents: AgentInfo[] }) {
             </ReactFlowProvider>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <Monitor className="size-8 text-accent-ink" aria-hidden />
+              <Monitor className="size-8 text-atelier-faint" aria-hidden />
               <DialogTitle>Écran trop étroit</DialogTitle>
               <DialogDescription className="max-w-sm">
                 L&apos;éditeur de workflows en graphe demande un écran d&apos;au moins 1024 pixels de large.
@@ -331,13 +331,14 @@ type SidePanel = "inspect" | "run" | "triggers";
 
 type Notice = { tone: "ok" | "info" | "error"; text: string };
 
-const NOTICE_TONE = { ok: "success", info: "signature", error: "destructive" } as const;
+const NOTICE_TONE = { ok: "success", info: "info", error: "destructive" } as const;
 
 /** Pastille de la puce d'enregistrement (le libellé dit la même chose : jamais la couleur seule). */
+// Enregistré = nominal (sans pastille) ; modifications non enregistrées = ambre.
 const SAVE_DOT: Record<SaveState, string> = {
-  draft: "bg-muted-foreground/50",
+  draft: "bg-atelier-faint/50",
   modified: "bg-warning",
-  saved: "bg-success",
+  saved: "hidden",
 };
 
 function EditorBody({
@@ -661,8 +662,8 @@ function EditorBody({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-atelier-line bg-sidebar/85 pr-12 pl-3">
-        <WorkflowIcon className="ml-1 size-4 shrink-0 text-accent-ink" aria-hidden />
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-atelier-line bg-sidebar pr-12 pl-3">
+        <WorkflowIcon className="ml-1 size-4 shrink-0 text-atelier-faint" aria-hidden />
         <DialogTitle className="sr-only">{draft.title.trim() || "Nouveau workflow"}</DialogTitle>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Input
@@ -681,13 +682,13 @@ function EditorBody({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
             }}
-            className="h-8 w-auto max-w-[28rem] min-w-0 border-transparent bg-transparent px-2 text-base font-semibold tracking-tight hover:border-atelier-line focus-visible:border-input aria-[invalid=true]:border-destructive"
+            className="h-7 w-auto max-w-[28rem] min-w-0 border-transparent bg-transparent px-1.5 text-sm font-semibold hover:border-atelier-line focus-visible:border-input aria-[invalid=true]:border-destructive"
           />
-          <span role="status" className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-atelier-line px-2 py-0.5 text-xs text-muted-foreground">
+          <span role="status" className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded-sm border border-atelier-line px-1.5 text-xs text-muted-foreground">
             <span aria-hidden className={cn("size-1.5 rounded-full", SAVE_DOT[state])} />
             {SAVE_STATE_LABEL[state]}
           </span>
-          <DialogDescription className="min-w-0 truncate text-xs">
+          <DialogDescription className="min-w-0 truncate text-xs text-atelier-faint">
             {agentName ? `Workflow de ${agentName}` : "Workflow de suite"} · {draft.steps.length} étape(s)
           </DialogDescription>
         </div>
@@ -698,7 +699,7 @@ function EditorBody({
             title="Afficher le premier problème"
             className={cn(
               badgeVariants({ variant: "destructive" }),
-              "h-7 cursor-pointer px-2 transition-colors hover:bg-destructive/20 focus-visible:shadow-focus focus-visible:outline-none",
+              "h-7 cursor-pointer px-2 transition-colors hover:bg-destructive-ink/15",
             )}
           >
             <TriangleAlert aria-hidden />
@@ -788,7 +789,7 @@ function EditorBody({
 
           {notice && (
             <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4">
-              <div className="pointer-events-auto w-full max-w-xl rounded-xl bg-card shadow-glow-strong">
+              <div className="pointer-events-auto w-full max-w-xl rounded-md bg-card shadow-glow-strong">
                 <Callout
                   tone={NOTICE_TONE[notice.tone]}
                   role={notice.tone === "error" ? "alert" : "status"}
@@ -806,13 +807,13 @@ function EditorBody({
 
           {draft.steps.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-8">
-              <div className="pointer-events-auto w-full max-w-md rounded-xl border border-dashed border-atelier-border-soft bg-card/90 backdrop-blur-sm">
+              <div className="pointer-events-auto w-full max-w-md rounded-lg border border-atelier-border bg-card">
                 <EmptyState
                   icon={WorkflowIcon}
                   title="Point de départ"
                   className="py-7"
                   actions={
-                    <Button type="button" variant="soft" size="sm" onClick={onShowTemplates}>
+                    <Button type="button" variant="outline" size="sm" onClick={onShowTemplates}>
                       <LayoutTemplate />
                       Partir d&apos;un modèle de la suite
                     </Button>
@@ -825,7 +826,7 @@ function EditorBody({
                       "Validez, enregistrez, puis lancez.",
                     ].map((text, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span aria-hidden className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-signature-faint text-xs font-semibold text-accent-ink tabular-nums">
+                        <span aria-hidden className="mt-px grid size-5 shrink-0 place-items-center rounded-sm border border-atelier-line text-[11.5px] font-medium text-muted-foreground tabular-nums">
                           {i + 1}
                         </span>
                         <span>{text}</span>
@@ -857,7 +858,10 @@ function EditorBody({
                   Exécution
                   {(running || awaiting) && (
                     <>
-                      <span aria-hidden className={cn("size-1.5 rounded-full", awaiting ? "bg-warning" : "animate-pulse bg-primary")} />
+                      <span
+                        aria-hidden
+                        className={cn("size-1.5 rounded-full", awaiting ? "bg-warning" : "animate-pulse bg-atelier-faint")}
+                      />
                       <span className="sr-only">{awaiting ? "(validation demandée)" : "(en cours)"}</span>
                     </>
                   )}

@@ -8,14 +8,17 @@ import { cn } from "@/lib/utils";
  * Message encadré (information, avertissement, erreur, succès) : icône + texte + action
  * facultative. Remplace les paragraphes colorés faits à la main ; texte en encre lisible.
  */
-const calloutVariants = cva("flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[13px] leading-snug", {
+const calloutVariants = cva("flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm leading-snug", {
   variants: {
     tone: {
-      info: "border-atelier-line bg-card text-muted-foreground [&_[data-icon]]:text-muted-foreground",
-      signature: "border-atelier-border-soft bg-signature-faint text-foreground [&_[data-icon]]:text-accent-ink",
-      warning: "border-warning/30 bg-warning/8 text-warning-ink [&_[data-icon]]:text-warning",
-      destructive: "border-destructive/30 bg-destructive/8 text-destructive-ink [&_[data-icon]]:text-destructive",
-      success: "border-success/30 bg-success/8 text-success-ink [&_[data-icon]]:text-success",
+      info: "border-atelier-line bg-card text-muted-foreground [&_[data-icon]]:text-atelier-faint",
+      // Charte v2 : plus de fond teinté de la signature ; information mise en avant = neutre, texte plein
+      signature: "border-atelier-line bg-card text-foreground [&_[data-icon]]:text-muted-foreground",
+      // États anormaux : encre lisible, fond à 9 %, trait à 30 % (DESIGN.md « Error »)
+      warning: "border-warning-ink/30 bg-warning-ink/9 text-warning-ink [&_[data-icon]]:text-warning-ink",
+      destructive: "border-destructive-ink/30 bg-destructive-ink/9 text-destructive-ink [&_[data-icon]]:text-destructive-ink",
+      // Succès : nominal, donc neutre ; l'icône de validation porte le sens
+      success: "border-atelier-line bg-card text-foreground [&_[data-icon]]:text-muted-foreground",
     },
   },
   defaultVariants: { tone: "info" },

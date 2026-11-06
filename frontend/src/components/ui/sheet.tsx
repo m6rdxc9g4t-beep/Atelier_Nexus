@@ -13,12 +13,12 @@ const SheetDescription = DialogPrimitive.Description;
 
 /** Côté d'arrivée du tiroir : gauche (navigation, par défaut) ou droite (panneau Livrables). */
 const sheetSide = cva(
-  "fixed inset-y-0 z-50 flex flex-col shadow-glow-strong outline-none data-[state=open]:animate-in",
+  "fixed inset-y-0 z-50 flex flex-col shadow-glow-strong outline-none data-[state=open]:animate-in data-[state=open]:duration-200",
   {
     variants: {
       side: {
-        left: "left-0 w-[min(20rem,calc(100vw-3rem))] border-r border-atelier-border bg-sidebar data-[state=open]:slide-in-from-left",
-        right: "right-0 w-full border-l border-atelier-border bg-card sm:w-[32rem] data-[state=open]:slide-in-from-right",
+        left: "left-0 w-[min(18rem,calc(100vw-3rem))] border-r border-atelier-line bg-sidebar data-[state=open]:slide-in-from-left",
+        right: "right-0 w-full border-l border-atelier-line bg-card sm:w-[32rem] data-[state=open]:slide-in-from-right",
       },
     },
     defaultVariants: { side: "left" },
@@ -38,7 +38,7 @@ function SheetContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & VariantProps<typeof sheetSide> & { closeButton?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-[3px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgb(10_11_13/0.45)] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
         data-slot="sheet-content"
         data-side={side ?? "left"}
@@ -47,7 +47,7 @@ function SheetContent({
       >
         {children}
         {closeButton && (
-          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring">
+          <DialogPrimitive.Close className="absolute top-2 right-2 grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
             <XIcon className="size-4" />
             <span className="sr-only">Fermer</span>
           </DialogPrimitive.Close>

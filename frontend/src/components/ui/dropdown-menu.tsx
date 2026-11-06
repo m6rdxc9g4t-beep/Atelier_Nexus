@@ -21,7 +21,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-44 overflow-hidden rounded-md border border-atelier-border bg-popover p-1 text-popover-foreground shadow-glow-strong data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "z-50 min-w-44 overflow-hidden rounded-lg border border-atelier-border bg-popover p-1 text-popover-foreground shadow-glow-strong data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]",
           className,
         )}
         {...props}
@@ -38,7 +38,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+        "relative flex min-h-[30px] cursor-default items-center gap-2 rounded-md px-2 py-1 text-sm outline-none select-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -55,7 +55,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none select-none focus:bg-accent [&_svg]:size-4 [&_svg]:shrink-0",
+        "relative flex min-h-[30px] cursor-default items-center gap-2 rounded-md py-1 pr-2 pl-8 text-sm outline-none select-none focus:bg-accent [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -77,7 +77,7 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
-      className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+      className={cn("px-2 pt-1.5 pb-1 text-[11.5px] font-medium text-atelier-faint", className)}
       {...props}
     />
   );

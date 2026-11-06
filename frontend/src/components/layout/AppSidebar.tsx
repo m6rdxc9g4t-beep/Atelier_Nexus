@@ -26,8 +26,9 @@ interface AppSidebarProps {
 }
 
 /**
- * Barre latérale unique : marque et suite, navigation (accueil, workflows de suite, carte,
- * « À valider »), agents, puis état des applications, thème et réglages.
+ * Barre latérale unique (forme du portail, charte v2) : marque et sélecteur de la suite,
+ * navigation (accueil, workflows de suite, carte, « À valider »), agents, puis état des
+ * applications, thème et réglages.
  * Fixe sur grand écran, en tiroir en dessous (même contenu). Workflows, Carte et À valider
  * ouvrent le Studio sur l'onglet voulu ; Accueil ou un agent le referment.
  */
@@ -49,12 +50,15 @@ export function AppSidebar({ agents, apps, onCreateAgent, onEditAgent }: AppSide
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-14 shrink-0 items-center gap-1.5 px-3">
-        <SuiteSwitcher />
+      <div className="flex h-11 shrink-0 items-center gap-1 pr-2 pl-3">
         <AtelierBrand />
+        {/* Sous lg (tiroir), le sélecteur est dans la barre haute et la croix du tiroir prend sa place */}
+        <span className="ml-auto hidden lg:block">
+          <SuiteSwitcher />
+        </span>
       </div>
 
-      <nav aria-label="Navigation principale" className="flex flex-col gap-px px-3 pb-3">
+      <nav aria-label="Navigation principale" className="flex flex-col gap-px px-2 pt-1 pb-2">
         <NavItem
           icon={House}
           label="Accueil"
@@ -100,9 +104,7 @@ export function AppSidebar({ agents, apps, onCreateAgent, onEditAgent }: AppSide
         />
       </nav>
 
-      <div className="mx-3 border-t border-atelier-line" />
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-3 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
         <AgentSidebar
           agents={agents}
           active={!studio && view === "agents" ? agent : null}
@@ -119,7 +121,7 @@ export function AppSidebar({ agents, apps, onCreateAgent, onEditAgent }: AppSide
 
       <div className="flex shrink-0 items-center gap-1 border-t border-atelier-line px-2 py-2">
         {apps.length > 0 && <AppsMenu apps={apps} />}
-        <ThemeToggle className="ml-auto origin-right scale-90" />
+        <ThemeToggle className="ml-auto [&>button]:w-6" />
         <SettingsButton />
       </div>
     </div>
@@ -151,17 +153,15 @@ function NavItem({
       title={title}
       onClick={onClick}
       className={cn(
-        "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] font-medium transition-colors",
-        active ? "atelier-nav-active" : "text-foreground/85 hover:bg-accent hover:text-foreground",
+        "flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-sm font-medium transition-colors",
+        active ? "atelier-nav-active" : "text-atelier-ink-2 hover:bg-accent hover:text-foreground",
       )}
     >
-      <Icon className={cn("size-4 shrink-0", active ? "text-accent-ink" : "text-muted-foreground")} aria-hidden />
+      <Icon className={cn("size-4 shrink-0", active ? "text-foreground" : "text-atelier-faint")} aria-hidden />
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {/* Compteur d'alerte : des étapes attendent une décision (état anormal → ambre) */}
       {badge && (
-        <span
-          aria-hidden
-          className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] leading-none font-semibold text-primary-foreground tabular-nums shadow-signature-glow"
-        >
+        <span aria-hidden className="text-[11.5px] leading-none font-semibold text-warning-ink tabular-nums">
           {badge}
         </span>
       )}

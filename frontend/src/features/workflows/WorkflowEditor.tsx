@@ -287,13 +287,13 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
                             aria-expanded={expanded}
                             aria-controls={expanded ? panel : undefined}
                             onClick={() => toggleStep(step.key)}
-                            className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-sm focus-visible:shadow-focus focus-visible:outline-none"
+                            className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-sm"
                           >
                             <ChevronRight
                               className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
                               aria-hidden
                             />
-                            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-signature-faint text-xs font-semibold text-accent-ink tabular-nums">
+                            <span className="grid size-5 shrink-0 place-items-center rounded-sm border border-atelier-line text-[11.5px] font-medium text-muted-foreground tabular-nums">
                               {index + 1}
                             </span>
                             {app && <AppChip app={app} iconOnly className="size-5" />}
@@ -367,7 +367,7 @@ export function WorkflowEditor({ agent, source, onOpenChange, onSaved }: Workflo
                   <legend className="mb-1.5 text-sm font-medium">Paramètres demandés au lancement</legend>
                   {params.map((param) => (
                     <div key={param.name} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
-                      <code className="truncate font-mono text-xs text-accent-ink">{`{{${param.name}}}`}</code>
+                      <code className="truncate font-mono text-xs text-foreground">{`{{${param.name}}}`}</code>
                       <Input
                         aria-label={`Libellé de ${param.name}`}
                         placeholder="Libellé (ex. Jeu de données)"

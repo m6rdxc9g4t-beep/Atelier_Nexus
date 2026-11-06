@@ -304,7 +304,7 @@ function SearchResults({
                   type="button"
                   onClick={() => onOpen(hit.id)}
                   className={cn(
-                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-lg px-2 py-2 text-left outline-none hover:bg-accent focus-visible:shadow-focus",
+                    "flex w-full min-w-0 flex-col items-start gap-1 rounded-md px-2 py-1.5 text-left hover:bg-accent",
                     hit.id === currentId && "atelier-nav-active",
                   )}
                 >
@@ -341,7 +341,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     <>
       {highlight(text, query).map((seg, i) =>
         seg.match ? (
-          <mark key={i} className="rounded-sm bg-signature-soft px-0.5 text-accent-ink">
+          <mark key={i} className="rounded-xs bg-signature-soft px-0.5 text-foreground">
             {seg.text}
           </mark>
         ) : (
@@ -440,7 +440,7 @@ function HistoryRow({
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-md py-2 text-left outline-none focus-visible:shadow-focus"
+        className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-md py-2 text-left"
       >
         <span className="w-full truncate text-sm font-medium">{item.title}</span>
         <span className="flex items-center gap-2 text-xs text-muted-foreground">

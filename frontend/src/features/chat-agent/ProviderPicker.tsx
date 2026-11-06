@@ -28,8 +28,8 @@ export function ProviderPicker({ agent, providers }: { agent: AgentInfo | undefi
   if (agent?.local_only) {
     return (
       <Badge
-        variant="signature"
-        className="h-7 rounded-full px-2.5"
+        variant="outline"
+        className="h-7 px-2"
         title="Agent verrouillé sur le modèle local : ses données ne quittent pas la machine"
       >
         <Lock aria-hidden />
@@ -50,7 +50,7 @@ export function ProviderPicker({ agent, providers }: { agent: AgentInfo | undefi
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 max-w-48 gap-1 rounded-full px-2.5 text-xs"
+          className="h-7 max-w-48 gap-1 px-2 text-xs"
           aria-label={`Moteur d'IA : ${current}`}
         >
           <Cpu className="size-3.5" aria-hidden />

@@ -296,10 +296,10 @@ export function AgentEditor({ open, editing, onOpenChange, onSaved }: AgentEdito
                       <label
                         key={t.id}
                         className={cn(
-                          "flex cursor-pointer gap-2.5 rounded-lg border p-2.5 text-sm transition-[border-color,background-color] has-focus-visible:shadow-focus",
+                          "flex cursor-pointer gap-2.5 rounded-md border p-2.5 text-sm transition-[border-color,background-color] has-focus-visible:shadow-focus",
                           checked
-                            ? "border-atelier-border bg-signature-faint"
-                            : "border-atelier-line bg-card hover:border-atelier-border",
+                            ? "border-primary bg-accent-soft"
+                            : "border-atelier-border bg-card hover:border-atelier-border-soft",
                         )}
                       >
                         <Checkbox
@@ -492,7 +492,7 @@ function MissingToolsets({ ids, kept, onToggle }: { ids: string[]; kept: string[
           >
             <Unplug className={cn("mt-0.5 size-4 shrink-0", present ? "text-warning" : "text-muted-foreground")} aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className={cn("block font-mono text-[13px] font-medium break-all", !present && "text-muted-foreground line-through")}>
+              <span className={cn("block font-mono text-sm font-medium break-all", !present && "text-muted-foreground line-through")}>
                 {id}
               </span>
               <span className={cn("mt-0.5 block text-xs", present ? "text-warning-ink" : "text-muted-foreground")}>
@@ -553,9 +553,9 @@ function IconPicker({ icons, value, onChange }: { icons: string[]; value: string
               onClick={() => onChange(icon)}
               onKeyDown={(e) => move(e, index)}
               className={cn(
-                "grid size-9 place-items-center rounded-lg border transition-colors focus-visible:shadow-focus focus-visible:outline-none",
+                "grid size-8 place-items-center rounded-md border transition-colors",
                 checked
-                  ? "border-atelier-border bg-signature-soft text-accent-ink"
+                  ? "border-primary bg-accent-soft text-foreground"
                   : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
@@ -580,8 +580,8 @@ function AgentPreview({ form, apps, local }: { form: AgentForm; apps: string[]; 
       <SectionLabel as="p">Aperçu</SectionLabel>
       <div className="grid gap-1.5">
         <p className="text-xs text-muted-foreground">Dans la liste des agents</p>
-        <div className="atelier-nav-active flex items-center gap-2.5 rounded-lg px-1.5 py-1 text-[13px] font-semibold">
-          <AgentTile icon={form.icon} size="sm" variant="glass" />
+        <div className="atelier-nav-active flex h-[30px] items-center gap-2.5 rounded-md px-2 text-sm font-medium">
+          <AgentTile icon={form.icon} variant="bare" className="text-foreground" />
           <span className="min-w-0 flex-1 truncate">{name}</span>
           {local && (
             <>
@@ -595,10 +595,10 @@ function AgentPreview({ form, apps, local }: { form: AgentForm; apps: string[]; 
       <div className="grid gap-1.5">
         <p className="text-xs text-muted-foreground">Accueil de la conversation</p>
         <Card className="gap-3 p-4">
-          <AgentTile icon={form.icon} variant="glass" />
+          <AgentTile icon={form.icon} />
           <div className="min-w-0">
-            <p className="truncate text-base font-semibold tracking-tight">{name}</p>
-            <p className="mt-1 line-clamp-3 text-[13px] text-muted-foreground">
+            <p className="truncate text-[15px] font-semibold">{name}</p>
+            <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
               {form.description.trim() || "Son rôle en une phrase."}
             </p>
           </div>
@@ -612,7 +612,7 @@ function AgentPreview({ form, apps, local }: { form: AgentForm; apps: string[]; 
           )}
           {local && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Lock className="size-3.5 shrink-0 text-accent-ink" aria-hidden />
+              <Lock className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
               Modèle local uniquement
             </p>
           )}

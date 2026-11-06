@@ -89,7 +89,7 @@ function ImageThumb({ item, onOpen }: { item: AttachmentBlock; onOpen: () => voi
     <button
       type="button"
       onClick={onOpen}
-      className="block overflow-hidden rounded-lg border border-atelier-border-soft outline-none transition-colors hover:border-atelier-border focus-visible:shadow-focus"
+      className="block overflow-hidden rounded-md border border-atelier-border transition-colors hover:border-atelier-border-soft"
       aria-label={`Agrandir « ${item.name} »`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- image servie par l'API locale */}
@@ -119,9 +119,9 @@ function DocumentChip({ item }: { item: AttachmentBlock }) {
           );
       }}
       title={`Télécharger « ${item.name} »`}
-      className="flex max-w-72 items-center gap-2.5 rounded-lg border border-atelier-border-soft bg-card px-3 py-2 text-left text-sm outline-none transition-colors hover:border-atelier-border hover:bg-atelier-surface-2 focus-visible:shadow-focus"
+      className="flex max-w-72 items-center gap-2.5 rounded-md border border-atelier-border bg-card px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-accent"
     >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-accent-soft text-accent-ink">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-atelier-line bg-atelier-hover text-muted-foreground">
         {state === "busy" ? (
           <LoaderCircle className="size-4 animate-spin" aria-hidden />
         ) : (

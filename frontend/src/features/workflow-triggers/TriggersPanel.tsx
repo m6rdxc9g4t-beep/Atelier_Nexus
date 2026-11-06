@@ -218,7 +218,7 @@ export function TriggersPanel({
           un événement.
         </EmptyState>
         {preset && (
-          <Callout tone="signature" icon={Zap}>
+          <Callout tone="info" icon={Zap}>
             Un déclencheur sur{" "}
             <em className="font-medium not-italic">
               {catalog ? (catalogApp(catalog, preset.app)?.events.find((e) => e.type === preset.types[0])?.label ?? preset.types[0]) : preset.types[0]}
@@ -303,7 +303,7 @@ export function TriggersPanel({
         </div>
       )}
       {triggers?.length === 0 && (
-        <p className="rounded-xl border border-dashed border-atelier-line px-3 py-4 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-dashed border-atelier-border-soft px-3 py-4 text-center text-sm text-muted-foreground">
           Aucun déclencheur : ce workflow ne part qu&apos;à la main.
         </p>
       )}
@@ -395,7 +395,7 @@ function TriggerCard({
       className={cn(
         // Surface calme : le trait prend la couleur de l'app quand le déclencheur est actif ;
         // coupé, il reste neutre (et le badge « coupé » le dit en toutes lettres)
-        "grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border bg-card p-3.5 transition-colors",
+        "grid grid-cols-[minmax(0,1fr)] gap-3 rounded-md border bg-card p-3 transition-colors",
         trigger.enabled ? "border-atelier-border-soft" : "border-atelier-line",
       )}
     >
@@ -403,7 +403,7 @@ function TriggerCard({
         {trigger.kind === "event" ? (
           <AppTile app={trigger.app} color={app?.color} size="xs" />
         ) : (
-          <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-accent-soft text-accent-ink">
+          <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-atelier-line text-muted-foreground">
             <CalendarClock className="size-3.5" />
           </span>
         )}
@@ -662,8 +662,8 @@ function TriggerForm({
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="grid grid-cols-[minmax(0,1fr)] gap-6" aria-labelledby={`${ids}-title`}>
       <div className="flex items-center gap-2 border-b border-atelier-line pb-3">
-        {draft.kind === "event" ? <Zap className="size-4 text-accent-ink" aria-hidden /> : <CalendarClock className="size-4 text-accent-ink" aria-hidden />}
-        <h3 id={`${ids}-title`} className="flex-1 text-base font-semibold tracking-tight">
+        {draft.kind === "event" ? <Zap className="size-4 text-atelier-faint" aria-hidden /> : <CalendarClock className="size-4 text-atelier-faint" aria-hidden />}
+        <h3 id={`${ids}-title`} className="flex-1 text-sm font-semibold">
           {draft.id ? "Modifier le déclencheur" : draft.kind === "event" ? "Nouveau déclencheur sur événement" : "Nouveau déclencheur horaire"}
         </h3>
         <Button type="button" variant="ghost" size="icon-xs" aria-label="Fermer sans enregistrer" onClick={onCancel}>
@@ -1084,8 +1084,8 @@ function AppChoice({ app, checked, onChoose }: { app: EventsCatalogApp; checked:
       {...appTheme(app.app, app.color)}
       onClick={onChoose}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors hover:bg-signature-faint focus-visible:shadow-focus",
-        checked ? "border-atelier-border bg-signature-soft shadow-glow" : "border-atelier-line bg-card",
+        "flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors hover:bg-accent",
+        checked ? "border-primary bg-accent-soft hover:bg-accent-soft" : "border-atelier-border bg-card",
       )}
     >
       <AppTile app={app.app} color={app.color} size="xs" />

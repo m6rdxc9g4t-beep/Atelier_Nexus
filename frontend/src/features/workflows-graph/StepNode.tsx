@@ -6,34 +6,31 @@ import { memo } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { appTheme } from "./catalog";
 import { type NodeTone, type StepNode as StepNodeType, nodeTone } from "./graph";
 import { STEP_STATUS_LABEL } from "./run";
 import { AppTile, ErrorIcon, KindBadge, StepStatusIcon } from "./StepBadges";
 
 /**
- * Teinte de bordure par état (graph.ts › nodeTone). Au repos, le trait est celui de l'application
- * (jetons recalculés par `data-atelier-app`) ; l'étape à valider porte en plus la barre ambre des
- * cartes de décision.
+ * Trait par état (graph.ts › nodeTone), charte v2 : neutre au repos, en cours et réussi (l'icône
+ * porte l'état) ; seuls les états anormaux sont en couleur — échec et problème en rouge, validation
+ * attendue en ambre. Jamais de barre latérale ni de halo.
  */
 const TONE: Record<NodeTone, string> = {
-  idle: "border-atelier-border-soft hover:border-atelier-border",
-  invalid: "border-destructive",
-  awaiting:
-    "border-warning before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:rounded-l-[inherit] before:bg-warning",
-  running: "border-atelier-border shadow-glow",
-  failed: "border-destructive",
-  done: "border-success/60",
+  idle: "border-atelier-border-soft hover:border-atelier-faint/60",
+  invalid: "border-destructive-ink/70",
+  awaiting: "border-warning-ink/70 bg-[color-mix(in_oklab,var(--atelier-warn)_6%,var(--card))]",
+  running: "border-atelier-faint/70",
+  failed: "border-destructive-ink/70 bg-[color-mix(in_oklab,var(--atelier-down)_5%,var(--card))]",
+  done: "border-atelier-border-soft",
   faded: "border-atelier-line opacity-60",
 };
 
 /**
- * Nœud du graphe : une étape, dans la couleur de son application (trait, tuile), avec son
- * libellé, son identifiant, la nature de l'action et son état d'exécution (bordure + icône).
- * Sélectionné : halo renforcé, sans anneau supplémentaire.
+ * Nœud du graphe : une étape, avec l'icône de son application (seul élément dans la couleur de
+ * l'app), son libellé, son identifiant, la nature de l'action et son état d'exécution (trait +
+ * icône). Sélectionné : trait et anneau de 1 px dans l'accent de Nexus.
  */
 function StepNodeView({ data, selected }: NodeProps<StepNodeType>) {
-  const theme = appTheme(data.app, data.color);
   const run = data.run;
   const tone = nodeTone(data);
   const hasErrors = data.errors.length > 0;
@@ -46,14 +43,13 @@ function StepNodeView({ data, selected }: NodeProps<StepNodeType>) {
         : null;
   return (
     <div
-      {...theme}
       title={data.errors.map((e) => e.message).join("\n") || data.unavailable || undefined}
       className={cn(
-        "relative w-60 rounded-lg border bg-card px-3 py-2.5 text-card-foreground transition-[border-color,box-shadow,opacity]",
+        "relative w-60 rounded-md border bg-card px-3 py-2.5 text-card-foreground transition-[border-color,box-shadow,opacity]",
         TONE[tone],
-        // Sélection : halo renforcé ; le trait reste celui de l'état (seul le repos s'avive)
-        selected && "shadow-glow-strong",
-        selected && tone === "idle" && "border-atelier-border",
+        // Sélection : accent de Nexus (anneau de 1 px, plat) ; un état anormal garde sa couleur de trait
+        selected && "shadow-[0_0_0_1px_var(--primary)]",
+        selected && (tone === "idle" || tone === "done" || tone === "running") && "border-primary",
         (data.unknown || data.unavailable) && "border-dashed",
       )}
     >
@@ -62,7 +58,7 @@ function StepNodeView({ data, selected }: NodeProps<StepNodeType>) {
         <AppTile app={data.app} color={data.color} size="xs" className="mt-0.5" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm leading-tight font-medium">{data.label}</p>
-          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{data.stepId}</p>
+          <p className="mt-0.5 truncate font-mono text-[11.5px] text-atelier-faint">{data.stepId}</p>
         </div>
         {/* État d'exécution, puis problèmes : toujours en tête, même sans ligne de nature */}
         {(run || hasErrors) && (

@@ -221,7 +221,10 @@ export function MyWorkflows({ agents, onShowTemplates }: { agents: AgentInfo[]; 
       {state.status === "loading" && (
         <div role="status" aria-label="Lecture des workflows" className={GRID}>
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+            <div key={i} className="flex h-14 items-center gap-3 border-b border-atelier-line px-4 last:border-b-0">
+              <Skeleton className="h-3 w-56" />
+              <Skeleton className="ml-auto h-3 w-24" />
+            </div>
           ))}
         </div>
       )}
@@ -247,7 +250,7 @@ export function MyWorkflows({ agents, onShowTemplates }: { agents: AgentInfo[]; 
             actions={
               !query.trim() && (
                 <>
-                  <Button variant="soft" onClick={onShowTemplates}>
+                  <Button onClick={onShowTemplates}>
                     <LibraryBig />
                     Partir d&apos;un modèle
                   </Button>
@@ -270,7 +273,7 @@ export function MyWorkflows({ agents, onShowTemplates }: { agents: AgentInfo[]; 
             {items.map((wf) => {
               const owner = wf.agent ? byName.get(wf.agent) : undefined;
               return (
-                <li key={wf.id} className="min-w-0">
+                <li key={wf.id} className="min-w-0 border-b border-atelier-line last:border-b-0">
                   <WorkflowCard
                     wf={wf}
                     owner={owner}
@@ -310,7 +313,8 @@ export function MyWorkflows({ agents, onShowTemplates }: { agents: AgentInfo[]; 
   );
 }
 
-const GRID = "grid gap-3 md:grid-cols-2 2xl:grid-cols-3";
+/** Liste dense (charte v2) : un conteneur à trait fin, une ligne par workflow. */
+const GRID = "overflow-hidden rounded-lg border border-atelier-border bg-card";
 
 /**
  * Carte d'un workflow : titre, agent ou « Suite », chaîne d'applications, étapes, dernier
@@ -361,33 +365,42 @@ function WorkflowCard({
   }, [confirming]);
 
   return (
-    <Card variant="interactive" className={cn("h-full gap-3 p-4", confirming && "border-destructive/40")}>
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold" title={wf.title}>
+    <div
+      className={cn(
+        "grid gap-x-4 gap-y-2 px-4 py-2.5 transition-colors hover:bg-atelier-hover/50 md:grid-cols-[minmax(0,1fr)_auto_13rem_auto] md:items-center",
+        confirming && "bg-destructive-ink/5 hover:bg-destructive-ink/5",
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="truncate text-sm font-medium" title={wf.title}>
             {wf.title}
           </h3>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            {wf.agent ? (
-              <AgentIcon icon={owner?.icon} className="size-3.5 shrink-0" aria-hidden />
-            ) : (
-              <Network className="size-3.5 shrink-0" aria-hidden />
-            )}
-            <span className="truncate">{ownerLabel}</span>
-            {orphan && <span className="shrink-0 text-warning-ink">· agent introuvable</span>}
-          </p>
+          {!v2 && (
+            <Badge variant="outline" title="Workflow simple : les étapes d'un agent, l'une après l'autre">
+              Simple
+            </Badge>
+          )}
         </div>
-        {!v2 && (
-          <Badge variant="outline" title="Workflow simple : les étapes d'un agent, l'une après l'autre">
-            Simple
-          </Badge>
-        )}
+        <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          {wf.agent ? (
+            <AgentIcon icon={owner?.icon} className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
+          ) : (
+            <Network className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
+          )}
+          <span className="shrink-0">{ownerLabel}</span>
+          {orphan && <span className="shrink-0 text-warning-ink">· agent introuvable</span>}
+          {wf.description && (
+            <span className="min-w-0 truncate text-atelier-faint" title={wf.description}>
+              · {wf.description}
+            </span>
+          )}
+        </p>
       </div>
 
-      {wf.description && <p className="line-clamp-2 text-[13px] text-muted-foreground">{wf.description}</p>}
       <AppChain apps={chain} />
 
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-atelier-faint tabular-nums">
         <span>{stepsText(wf.steps.length, wf.params.length)}</span>
         <span aria-hidden>·</span>
         <span>{lastRunText(wf.last_run_at)}</span>
@@ -395,20 +408,22 @@ function WorkflowCard({
       </p>
 
       {confirming ? (
-        <DeleteConfirm title={wf.title} onCancel={onCancelDelete} onDelete={onDelete} />
+        <div className="md:col-span-4">
+          <DeleteConfirm title={wf.title} onCancel={onCancelDelete} onDelete={onDelete} />
+        </div>
       ) : (
-        <div className="mt-auto flex items-center gap-1.5 pt-1">
-          <Button size="sm" variant="soft" disabled={orphan} title={orphan ? "Agent introuvable" : undefined} onClick={onRun}>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="outline" disabled={orphan} title={orphan ? "Agent introuvable" : undefined} onClick={onRun}>
             <Play />
             Lancer
           </Button>
-          <Button size="sm" variant="outline" disabled={orphan} title={orphan ? "Agent introuvable" : undefined} onClick={onOpen}>
+          <Button size="sm" variant="ghost" disabled={orphan} title={orphan ? "Agent introuvable" : undefined} onClick={onOpen}>
             {v2 ? <Waypoints /> : <Pencil />}
             {v2 ? "Ouvrir" : "Modifier"}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button ref={menuRef} size="icon-xs" variant="ghost" className="ml-auto" aria-label={`Plus d'actions pour « ${wf.title} »`}>
+              <Button ref={menuRef} size="icon-sm" variant="ghost" className="ml-auto" aria-label={`Plus d'actions pour « ${wf.title} »`}>
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
@@ -433,7 +448,7 @@ function WorkflowCard({
           </DropdownMenu>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -448,14 +463,14 @@ function DeleteConfirm({ title, onCancel, onDelete }: { title: string; onCancel:
     <div
       role="group"
       aria-label={`Confirmer la suppression de ${title}`}
-      className="mt-auto grid gap-2 border-t border-atelier-line pt-3"
+      className="grid gap-2 border-t border-atelier-line pt-2.5 sm:flex sm:items-center sm:justify-between"
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
         e.stopPropagation();
         onCancel();
       }}
     >
-      <p className="text-[13px] text-destructive-ink">Supprimer « {title} » ? Ses déclencheurs et son historique partent avec lui.</p>
+      <p className="text-sm text-destructive-ink">Supprimer « {title} » ? Ses déclencheurs et son historique partent avec lui.</p>
       <div className="flex justify-end gap-1.5">
         <Button ref={cancelRef} size="sm" variant="ghost" onClick={onCancel}>
           Annuler

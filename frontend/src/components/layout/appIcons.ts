@@ -1,33 +1,36 @@
 import {
-  ArrowRightLeft,
-  BarChart3,
-  CalendarCheck,
-  CalendarDays,
+  ArrowLeftRight,
+  ChartColumn,
   Clapperboard,
-  CookingPot,
   GitBranch,
   GraduationCap,
-  Landmark,
+  Heart,
+  Kanban,
   type LucideIcon,
   type LucideProps,
-  Network,
   Plug,
-  Table2,
+  Table,
+  Utensils,
+  Wallet,
+  Workflow,
 } from "lucide-react";
 import { createElement } from "react";
 
-/** Icône de chaque application de la suite (sélecteur, palette des workflows, carte de la suite). */
+/**
+ * Icône de chaque application de la suite (sélecteur, palette des workflows, carte de la suite) :
+ * mêmes glyphes Lucide que le portail (SUITE.md §1.6). GitHub n'est pas une app de la suite.
+ */
 export const APP_ICONS: Record<string, LucideIcon> = {
-  nexus: Network,
-  viz: BarChart3,
-  tab: Table2,
-  projets: CalendarCheck,
-  tresorerie: Landmark,
+  nexus: Workflow,
+  viz: ChartColumn,
+  tab: Table,
+  projets: Kanban,
+  tresorerie: Wallet,
   cine: Clapperboard,
   savoir: GraduationCap,
-  cuisine: CookingPot,
-  dates: CalendarDays,
-  convert: ArrowRightLeft,
+  cuisine: Utensils,
+  dates: Heart,
+  convert: ArrowLeftRight,
   github: GitBranch,
 };
 

@@ -51,9 +51,9 @@ export function DecisionDock({
     <div
       role="region"
       aria-label="Validation en attente"
-      className="pointer-events-auto flex w-full items-center gap-3 rounded-xl border border-atelier-border bg-card/95 py-2 pr-2 pl-3.5 shadow-glow backdrop-blur"
+      className="decision-card pointer-events-auto flex w-full items-center gap-3 rounded-lg border bg-card py-1.5 pr-1.5 pl-3 shadow-glow-strong"
     >
-      <ShieldQuestion className="size-4 shrink-0 text-warning" aria-hidden />
+      <ShieldQuestion className="size-4 shrink-0 text-warning-ink" aria-hidden />
       <p className="min-w-0 flex-1 truncate text-sm">
         <span className="font-medium text-warning-ink">L&apos;agent attend votre accord</span>
         <span className="text-muted-foreground">

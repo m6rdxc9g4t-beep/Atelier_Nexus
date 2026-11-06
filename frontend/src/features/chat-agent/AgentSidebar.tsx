@@ -79,8 +79,8 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
   const groups = useMemo(() => groupAgents(filterAgents(agents, query)), [agents, query]);
 
   return (
-    <nav aria-label="Agents" className="flex flex-col gap-2">
-      <div className="flex items-center justify-between px-2">
+    <nav aria-label="Agents" className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between pr-1 pl-2">
         <SectionLabel>Agents</SectionLabel>
         <button
           type="button"
@@ -88,14 +88,14 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
           disabled={disabled}
           aria-label="Nouvel agent"
           title="Créer un agent"
-          className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring disabled:opacity-50"
+          className="grid size-6 place-items-center rounded-sm text-atelier-faint transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
         >
-          <Plus className="size-4" aria-hidden />
+          <Plus className="size-3.5" aria-hidden />
         </button>
       </div>
 
-      <div className="relative px-1">
-        <Search className="pointer-events-none absolute top-1/2 left-3.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-atelier-faint" aria-hidden />
         <label htmlFor={`${uid}-search`} className="sr-only">
           Rechercher un agent
         </label>
@@ -114,31 +114,31 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
             if (e.key === "Enter" && groups[0]?.[1][0]) onSelect(groups[0][1][0].name);
           }}
           placeholder="Rechercher un agent"
-          className="h-8 rounded-lg border-atelier-line pr-8 pl-8 text-[13px] focus-visible:border-atelier-border [&::-webkit-search-cancel-button]:hidden"
+          className="h-[30px] rounded-md border-atelier-line bg-atelier-surface pr-8 pl-8 [&::-webkit-search-cancel-button]:hidden"
         />
         {searching ? (
           <button
             type="button"
             onClick={() => setQuery("")}
             aria-label="Effacer la recherche"
-            className="absolute top-1/2 right-2.5 grid size-5 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground hover:text-foreground"
+            className="absolute top-1/2 right-1.5 grid size-5 -translate-y-1/2 place-items-center rounded-xs text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" aria-hidden />
           </button>
         ) : (
-          <Kbd className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2" aria-hidden>
+          <Kbd className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2" aria-hidden>
             /
           </Kbd>
         )}
       </div>
 
       {searching && groups.length === 0 && (
-        <p role="status" className="px-2 py-3 text-[13px] text-muted-foreground">
+        <p role="status" className="px-2 py-3 text-sm text-muted-foreground">
           Aucun agent ne correspond à « {query.trim()} ».
         </p>
       )}
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {groups.map(([category, list]) => {
           const open = searching || !collapsed.includes(category);
           const listId = `${uid}-${category.replace(/\W+/g, "-")}`;
@@ -151,20 +151,22 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
                   aria-controls={listId}
                   onClick={() => toggle(category)}
                   disabled={searching}
-                  className="group/cat flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-[11px] font-semibold tracking-[0.08em] text-atelier-muted uppercase transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-atelier-muted"
+                  className="group/cat flex h-7 w-full items-center gap-1 rounded-md px-2 pt-1.5 text-left text-[11.5px] font-medium text-atelier-faint transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-atelier-faint"
                 >
+                  <span className="min-w-0 flex-1 truncate">{category}</span>
+                  <span className="tabular-nums">{list.length}</span>
                   <ChevronRight
-                    className={cn("size-3 shrink-0 transition-transform", open && "rotate-90", searching && "opacity-0")}
+                    className={cn(
+                      "size-3 shrink-0 opacity-0 transition-[transform,opacity] group-hover/cat:opacity-100 group-focus-visible/cat:opacity-100",
+                      open && "rotate-90",
+                      searching && "hidden",
+                    )}
                     aria-hidden
                   />
-                  <span className="min-w-0 flex-1 truncate">{category}</span>
-                  <span className="font-medium tabular-nums opacity-0 transition-opacity group-hover/cat:opacity-100">
-                    {list.length}
-                  </span>
                 </button>
               </h2>
               {open && (
-                <ul id={listId} className="flex flex-col gap-px pb-1">
+                <ul id={listId} className="flex flex-col gap-px">
                   {list.map((agent) => {
                     const current = agent.name === active;
                     return (
@@ -176,15 +178,15 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
                           onClick={() => onSelect(agent.name)}
                           title={agent.description}
                           className={cn(
-                            "flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[13px] transition-colors disabled:opacity-50",
+                            "flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
                             agent.source === "custom" && "pr-8",
-                            current ? "atelier-nav-active font-semibold" : "text-foreground/90 hover:bg-accent hover:text-foreground",
+                            current ? "atelier-nav-active [&_[aria-hidden]]:text-foreground" : "text-atelier-ink-2 hover:bg-accent hover:text-foreground",
                           )}
                         >
-                          <AgentTile icon={agent.icon} size="sm" variant={current ? "glass" : "plain"} />
+                          <AgentTile icon={agent.icon} variant="bare" />
                           <span className="min-w-0 flex-1 truncate">{agent.display_name}</span>
                           {agent.local_only && (
-                            <Lock className="size-3 shrink-0 text-muted-foreground" aria-label="100 % local" />
+                            <Lock className="size-3 shrink-0 text-atelier-faint" aria-label="100 % local" />
                           )}
                         </button>
                         {agent.source === "custom" && (
@@ -192,7 +194,7 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
                             type="button"
                             onClick={() => onEdit(agent.name)}
                             aria-label={`Modifier ${agent.display_name}`}
-                            className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signature-soft hover:text-foreground focus-visible:opacity-100"
+                            className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-atelier-selected hover:text-foreground focus-visible:opacity-100"
                           >
                             <Pencil className="size-3.5" aria-hidden />
                           </button>
@@ -211,11 +213,9 @@ export function AgentSidebar({ agents, active, disabled, onSelect, onCreate, onE
         type="button"
         onClick={onCreate}
         disabled={disabled}
-        className="mx-1 mt-1 flex items-center gap-2.5 rounded-lg border border-dashed border-atelier-border-soft px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:border-atelier-border hover:bg-accent hover:text-foreground disabled:opacity-50"
+        className="mt-1 flex h-[30px] items-center gap-2.5 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
       >
-        <span className="grid size-7 place-items-center rounded-lg bg-signature-faint text-accent-ink" aria-hidden>
-          <Plus className="size-3.5" />
-        </span>
+        <Plus className="size-4 text-atelier-faint" aria-hidden />
         Créer un agent
       </button>
     </nav>

@@ -5,19 +5,20 @@ import { cn } from "@/lib/utils";
 import { AgentIcon } from "./agentMeta";
 
 /**
- * Tuile d'un agent : son icône dans un carré arrondi. `glass` reprend le verre néon de la tuile
- * de marque (en-tête, accueil, élément actif) ; `plain` reste discret (listes, avatars du fil).
+ * Icône d'un agent. Charte v2 : neutre, jamais dans la couleur de l'app (seule l'icône de la marque
+ * porte la signature). `plain` : carré arrondi à trait fin (en-têtes, accueil, avatars du fil) ;
+ * `bare` : l'icône seule, comme les entrées de navigation (barre latérale).
  */
 const tileVariants = cva("grid shrink-0 place-items-center", {
   variants: {
     size: {
-      sm: "size-7 rounded-lg [&_svg]:size-3.5",
-      md: "size-9 rounded-[10px] [&_svg]:size-[18px]",
-      lg: "size-14 rounded-2xl [&_svg]:size-7",
+      sm: "size-6 rounded-sm [&_svg]:size-3.5",
+      md: "size-8 rounded-md [&_svg]:size-4",
+      lg: "size-12 rounded-lg [&_svg]:size-6",
     },
     variant: {
-      glass: "atelier-brand__tile",
-      plain: "border border-atelier-line bg-signature-faint text-accent-ink",
+      plain: "border border-atelier-border bg-card text-muted-foreground",
+      bare: "size-4 text-atelier-faint [&_svg]:size-4",
     },
   },
   defaultVariants: { size: "md", variant: "plain" },

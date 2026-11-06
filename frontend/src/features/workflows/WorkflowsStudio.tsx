@@ -49,14 +49,12 @@ export function WorkflowsStudio({ agents }: { agents: AgentInfo[] }) {
   return (
     <section aria-label="Workflows de suite" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Tabs value={tab} onValueChange={(v) => select(v as StudioTab)} className="min-h-0 flex-1 gap-0">
-        <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-atelier-line px-4 py-2 md:h-14 md:flex-nowrap md:py-0">
-          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-atelier-line bg-signature-faint text-accent-ink">
-            <Waypoints className="size-[18px]" aria-hidden />
-          </span>
-          <h1 className="text-[15px] font-semibold tracking-tight">Workflows</h1>
+        <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b border-atelier-line py-2 pr-2 pl-4 md:h-11 md:flex-nowrap md:py-0 lg:pl-5">
+          <Waypoints className="size-4 shrink-0 text-atelier-faint" aria-hidden />
+          <h1 className="text-sm font-semibold">Workflows</h1>
           <TabsList
             aria-label="Sections du Studio des workflows"
-            className="order-last w-full max-w-full justify-start overflow-x-auto md:order-none md:ml-3 md:w-fit"
+            className="order-last w-full max-w-full justify-start overflow-x-auto md:order-none md:ml-2 md:w-fit"
           >
             <TabsTrigger value="workflows">
               <Waypoints />
@@ -70,10 +68,7 @@ export function WorkflowsStudio({ agents }: { agents: AgentInfo[] }) {
               <Inbox />
               À valider
               {pending > 0 && (
-                <span
-                  aria-hidden
-                  className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] leading-none font-semibold text-primary-foreground tabular-nums"
-                >
+                <span aria-hidden className="text-[11.5px] leading-none font-semibold text-warning-ink tabular-nums">
                   {badgeText(pending)}
                 </span>
               )}
@@ -86,7 +81,7 @@ export function WorkflowsStudio({ agents }: { agents: AgentInfo[] }) {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:py-6">
+          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-5 lg:py-5">
             <TabsContent value="workflows" className="grid grid-cols-[minmax(0,1fr)] gap-4">
               <Segmented<ListSection>
                 label="Afficher"

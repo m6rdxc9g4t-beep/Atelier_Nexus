@@ -570,7 +570,7 @@ export function WorkflowSettings({
           </Callout>
         )}
         {draft.params.length === 0 && (
-          <p className="rounded-xl border border-dashed border-atelier-line px-3 py-3 text-center text-xs text-muted-foreground">
+          <p className="rounded-md border border-dashed border-atelier-border-soft px-3 py-3 text-center text-xs text-muted-foreground">
             Aucun paramètre : le workflow part toujours avec les mêmes valeurs.
           </p>
         )}
@@ -578,7 +578,7 @@ export function WorkflowSettings({
           {draft.params.map((param, index) => {
             const bad = !STEP_ID.test(param.name);
             return (
-              <li key={index} className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-xl border border-atelier-line bg-card p-2.5">
+              <li key={index} className="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-atelier-border bg-card p-2.5">
                 <div className="flex items-center gap-1">
                   <Input
                     aria-label={`Nom du paramètre ${index + 1}`}

@@ -71,17 +71,12 @@ export function AgentWelcome({
   ];
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-8 px-6 py-10">
-      <div className="flex flex-col items-start gap-4">
-        <AgentTile
-          icon={agent?.icon}
-          size="lg"
-          variant="plain"
-          className="size-12 rounded-xl border-atelier-border-soft shadow-glow [&_svg]:size-6"
-        />
+    <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-7 px-6 py-10">
+      <div className="flex flex-col items-start gap-3.5">
+        <AgentTile icon={agent?.icon} size="lg" />
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-shadow-glow">{label}</h2>
-          {agent?.description && <p className="mt-1.5 text-muted-foreground">{agent.description}</p>}
+          <h2 className="text-2xl font-semibold tracking-[-0.012em]">{label}</h2>
+          {agent?.description && <p className="mt-1 text-sm text-muted-foreground">{agent.description}</p>}
         </div>
         {agent && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -91,7 +86,7 @@ export function AgentWelcome({
                 {apps.map((app) => (
                   <AppChip key={app} app={app} />
                 ))}
-                <span aria-hidden className="text-muted-foreground">
+                <span aria-hidden className="text-atelier-faint">
                   ·
                 </span>
               </>
@@ -110,7 +105,7 @@ export function AgentWelcome({
           </div>
         )}
         {agent?.local_only && (
-          <Callout tone="signature" icon={Lock} className="w-full">
+          <Callout tone="info" icon={Lock} className="w-full">
             Cet agent travaille sur des données qui ne quittent pas la machine : il utilise uniquement le modèle
             local (Ollama).
           </Callout>
@@ -132,17 +127,20 @@ export function AgentWelcome({
         )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="overflow-hidden rounded-lg border border-atelier-border bg-card">
         {starters.map((starter) => (
           <button
             key={starter}
             type="button"
             disabled={disabled}
             onClick={() => onStart(starter)}
-            className="group flex items-start gap-3 rounded-xl border border-atelier-line bg-card px-4 py-3 text-left text-sm leading-snug transition-colors hover:border-atelier-border hover:bg-atelier-surface-2 disabled:pointer-events-none disabled:opacity-50"
+            className="group flex min-h-10 w-full items-center gap-3 border-b border-atelier-line px-3.5 py-2 text-left text-sm leading-snug transition-colors last:border-b-0 hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
           >
             <span className="min-w-0 flex-1">{starter}</span>
-            <ArrowUpRight className="size-4 shrink-0 text-accent-ink" aria-hidden />
+            <ArrowUpRight
+              className="size-4 shrink-0 text-atelier-faint transition-colors group-hover:text-foreground"
+              aria-hidden
+            />
           </button>
         ))}
       </div>
@@ -150,7 +148,7 @@ export function AgentWelcome({
       {agent && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Button
-            variant="soft"
+            variant="outline"
             size="sm"
             onClick={() => {
               // Comme le bouton « Workflows » de l'en-tête : la liste de l'agent, pas les modèles
@@ -179,14 +177,14 @@ export function ThreadSkeleton() {
   return (
     <div role="status" className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8">
       <span className="sr-only">Ouverture de la conversation…</span>
-      <Skeleton className="ml-auto h-11 w-2/3 rounded-2xl" />
+      <Skeleton className="ml-auto h-11 w-2/3 rounded-lg" />
       <div className="flex flex-col gap-2.5">
         <Skeleton className="h-6 w-36" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-5/6" />
         <Skeleton className="h-4 w-2/3" />
       </div>
-      <Skeleton className="ml-auto h-11 w-1/2 rounded-2xl" />
+      <Skeleton className="ml-auto h-11 w-1/2 rounded-lg" />
     </div>
   );
 }

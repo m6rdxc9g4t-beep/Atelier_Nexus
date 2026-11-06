@@ -38,33 +38,31 @@ export function AppHeader({ agents = [] }: { agents?: AgentInfo[] }) {
   const ContextIcon = ctx.kind === "agent" ? null : CONTEXT_ICON[ctx.kind];
 
   return (
-    <header className="relative z-10 flex h-14 shrink-0 items-center gap-1 border-b border-atelier-line bg-sidebar/85 px-2 backdrop-blur-md lg:hidden">
+    <header className="relative z-10 flex h-11 shrink-0 items-center gap-1 border-b border-atelier-line bg-sidebar px-2 lg:hidden">
       <span className="flex shrink-0 pr-0.5 pl-1">
-        <AtelierBrand />
+        <AtelierBrand compact />
       </span>
       <button
         type="button"
         aria-haspopup="dialog"
         aria-expanded={drawerOpen}
         onClick={() => setDrawerOpen(true)}
-        className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 text-left transition-colors hover:bg-accent focus-visible:shadow-focus focus-visible:outline-none"
+        className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-accent"
       >
         {ContextIcon ? (
-          <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-lg border border-atelier-line bg-signature-faint text-accent-ink">
-            <ContextIcon className="size-3.5" />
-          </span>
+          <ContextIcon className="size-4 shrink-0 text-atelier-faint" aria-hidden />
         ) : (
-          <AgentTile icon={ctx.icon} size="sm" />
+          <AgentTile icon={ctx.icon} variant="bare" />
         )}
         <span className="sr-only">Ouvrir la navigation : </span>
         <span className="min-w-0 truncate text-sm font-semibold">{ctx.label}</span>
         {ctx.localOnly && (
           <>
-            <Lock className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+            <Lock className="size-3 shrink-0 text-atelier-faint" aria-hidden />
             <span className="sr-only">, 100 % local</span>
           </>
         )}
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <ChevronDown className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
       </button>
       <div className="flex shrink-0 items-center gap-0.5">
         <InboxButton />

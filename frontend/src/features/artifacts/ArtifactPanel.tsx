@@ -155,20 +155,20 @@ function PanelBody({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-atelier-line px-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-atelier-border-soft bg-signature-faint text-accent-ink">
-          <KindIcon kind={selected.kind} className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-muted-foreground">{artifactSubtitle(selected.kind, selected.createdAt)}</p>
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-atelier-line px-3">
+        <KindIcon kind={selected.kind} className="size-4 shrink-0 text-atelier-faint" />
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <h2
             ref={heading}
             tabIndex={-1}
-            className="truncate text-sm font-semibold tracking-tight outline-none"
+            className="min-w-0 truncate text-sm font-semibold outline-none"
             title={selected.title}
           >
             {selected.title}
           </h2>
+          <p className="hidden shrink-0 text-xs text-atelier-faint tabular-nums sm:block">
+            {artifactSubtitle(selected.kind, selected.createdAt)}
+          </p>
         </div>
         {position.total > 1 && (
           <nav aria-label="Parcourir les livrables" className="flex shrink-0 items-center">
@@ -227,7 +227,7 @@ function PanelBody({
               aria-expanded={listOpen}
               aria-controls={listId}
               onClick={() => setListOpen((o) => !o)}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md pr-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:shadow-focus focus-visible:outline-none"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md pr-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ChevronDown className={cn("size-3.5 transition-transform", !listOpen && "-rotate-90")} aria-hidden />
               Livrables
@@ -262,16 +262,16 @@ function PanelBody({
                     onClick={() => select(a.id)}
                     title={a.title}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:shadow-focus focus-visible:outline-none",
-                      active ? "atelier-nav-active font-medium" : "text-foreground/90 hover:bg-accent hover:text-foreground",
+                      "flex h-[30px] w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors",
+                      active ? "atelier-nav-active font-medium" : "text-atelier-ink-2 hover:bg-accent hover:text-foreground",
                     )}
                   >
                     <KindIcon
                       kind={a.kind}
-                      className={cn("size-3.5 shrink-0", active ? "text-accent-ink" : "text-muted-foreground")}
+                      className={cn("size-3.5 shrink-0", active ? "text-foreground" : "text-atelier-faint")}
                     />
                     <span className="min-w-0 flex-1 truncate">{a.title}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{artifactTime(a.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-atelier-faint tabular-nums">{artifactTime(a.createdAt)}</span>
                   </button>
                 </li>
               );

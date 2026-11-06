@@ -4,16 +4,16 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Carte de la charte : surface calme par défaut (trait fin, sans halo) ; le néon est réservé à ce
- * qui demande l'attention (`highlight`) ou répond au pointeur (`interactive`).
+ * Carte de la charte v2 : surface, trait de 1 px, plate au repos (jamais d'ombre ni de halo).
+ * `interactive` : le trait s'appuie au survol ; `highlight` : trait appuyé (ce qui demande l'attention).
  */
-const cardVariants = cva("flex flex-col rounded-xl border bg-card text-card-foreground", {
+const cardVariants = cva("flex flex-col rounded-lg border bg-card text-card-foreground", {
   variants: {
     variant: {
-      default: "border-atelier-line",
+      default: "border-atelier-border",
       interactive:
-        "border-atelier-line transition-[border-color,box-shadow,background-color] hover:border-atelier-border hover:shadow-glow focus-within:border-atelier-border",
-      highlight: "border-atelier-border shadow-glow",
+        "border-atelier-border transition-[border-color,background-color] hover:border-atelier-border-soft focus-within:border-atelier-border-soft",
+      highlight: "border-atelier-border-soft",
       sunken: "border-atelier-line bg-sunken",
     },
   },
@@ -25,7 +25,7 @@ function Card({ className, variant, ...props }: React.ComponentProps<"div"> & Va
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="card-header" className={cn("flex flex-col gap-1 px-4 pt-4", className)} {...props} />;
+  return <div data-slot="card-header" className={cn("flex flex-col gap-1 px-4 pt-3.5", className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
@@ -33,7 +33,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<"p">) {
-  return <p data-slot="card-description" className={cn("text-[13px] text-muted-foreground", className)} {...props} />;
+  return <p data-slot="card-description" className={cn("text-sm text-muted-foreground", className)} {...props} />;
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {

@@ -4,11 +4,13 @@ import { cn } from "@/lib/utils";
 
 export type DotStatus = "up" | "down" | "off" | "pending" | "warning";
 
+// Pastilles d'état (DESIGN.md « État d'un service ») : vert pour le seul résumé global, rouge et
+// ambre quand ça ne va pas, cercle vide pour « vérification », gris pour « non configurée ».
 const DOT: Record<DotStatus, string> = {
   up: "bg-success",
   down: "bg-destructive",
-  off: "bg-muted-foreground/40",
-  pending: "animate-pulse bg-muted-foreground/60",
+  off: "bg-atelier-faint/45",
+  pending: "bg-transparent shadow-[inset_0_0_0_1.5px_var(--atelier-faint)]",
   warning: "bg-warning",
 };
 
@@ -25,7 +27,6 @@ function StatusDot({
   return (
     <span data-slot="status-dot" className={cn("inline-flex items-center gap-1.5", className)} {...props}>
       <span className="relative inline-flex size-2 shrink-0" aria-hidden>
-        {status === "up" && <span className="absolute inset-0 rounded-full bg-success/40 motion-safe:animate-ping [animation-duration:2.4s]" />}
         <span className={cn("relative inline-flex size-2 rounded-full", DOT[status])} />
       </span>
       {label && <span className="text-[11px] text-muted-foreground">{label}</span>}

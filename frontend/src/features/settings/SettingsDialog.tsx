@@ -355,10 +355,10 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
       )}
 
       <DialogFooter className="flex-col items-stretch sm:flex-row sm:items-center sm:justify-between">
-        <p role="status" className="flex min-h-5 items-center gap-2 text-[13px]">
+        <p role="status" className="flex min-h-5 items-center gap-2 text-sm">
           {dirty ? (
             <>
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" />
               <span className="font-medium">{pendingLabel(pendingKeys.length)}</span>
             </>
           ) : saved ? (
@@ -419,21 +419,22 @@ function SectionTab({
       value={section}
       title={status?.label}
       className={cn(
-        "h-9 shrink-0 justify-start gap-2.5 rounded-lg px-2.5 text-[13px] text-foreground/85 hover:bg-accent [&_svg]:size-4",
-        "data-[state=active]:bg-signature-soft data-[state=active]:font-semibold data-[state=active]:text-foreground",
-        "data-[state=active]:shadow-[inset_0_-2px_0_var(--atelier-signature)] sm:data-[state=active]:shadow-[inset_3px_0_0_var(--atelier-signature)]",
+        "group/tab h-[30px] shrink-0 justify-start gap-2.5 rounded-md px-2 text-sm text-atelier-ink-2 hover:bg-accent [&_svg]:size-4",
+        // Rubrique courante : fond neutre, comme la navigation (jamais de barre de couleur)
+        "data-[state=active]:bg-atelier-selected data-[state=active]:text-foreground data-[state=active]:shadow-none",
       )}
     >
-      <Icon aria-hidden className="text-muted-foreground" />
+      <Icon aria-hidden className="text-atelier-faint group-data-[state=active]/tab:text-foreground" />
       <span className="min-w-0 flex-1 truncate text-left">{SECTION_TITLE[section]}</span>
       {errors > 0 ? (
         <span aria-hidden className="text-xs font-semibold text-destructive-ink tabular-nums">
           {errors}
         </span>
       ) : pending > 0 ? (
-        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
+        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" />
       ) : null}
-      {status && <StatusDot status={status.status} />}
+      {/* Témoin muet : une rubrique en ordre n'a pas de pastille */}
+      {status && status.status !== "up" && <StatusDot status={status.status} />}
       {extra.length > 0 && <span className="sr-only">, {extra.join(", ")}</span>}
     </TabsTrigger>
   );
@@ -451,8 +452,8 @@ function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="grid min-w-0 gap-1">
-        <h3 className="text-base font-semibold tracking-tight">{SECTION_TITLE[section]}</h3>
-        {children && <p className="text-[13px] text-muted-foreground">{children}</p>}
+        <h3 className="text-[15px] font-semibold">{SECTION_TITLE[section]}</h3>
+        {children && <p className="text-sm text-muted-foreground">{children}</p>}
       </div>
       {action}
     </div>
@@ -464,12 +465,16 @@ function CheckList({ lines, checking }: { lines: CheckLine[]; checking: boolean 
   return (
     <ul aria-label="État" className="grid gap-1.5 rounded-lg border border-atelier-line bg-sunken px-3 py-2.5">
       {lines.map((l) => (
-        <li key={l.id} className="flex items-start gap-2 text-[13px]">
-          <StatusDot status={checking ? "pending" : l.ok ? "up" : l.down ? "down" : "off"} className="mt-1.5" />
+        <li key={l.id} className="flex items-start gap-2 text-sm">
+          {!checking && l.ok ? (
+            <span aria-hidden className="mt-1.5 size-2 shrink-0" />
+          ) : (
+            <StatusDot status={checking ? "pending" : l.down ? "down" : "off"} className="mt-1.5" />
+          )}
           <span className="min-w-0 break-words">
             <span className="font-medium">{l.label}</span>
             <span className="sr-only">{l.ok ? " (joignable)" : l.down ? " (injoignable)" : ""}</span>
-            <span className="text-muted-foreground"> : {l.detail}</span>
+            <span className={l.down && !checking ? "text-destructive-ink" : "text-muted-foreground"}> : {l.detail}</span>
           </span>
         </li>
       ))}
@@ -605,7 +610,7 @@ function FieldBadges({ locked, changed }: { locked: boolean; changed: boolean })
           Variable d&apos;environnement
         </Badge>
       )}
-      {changed && <Badge variant="signature">Modifié</Badge>}
+      {changed && <Badge variant="warning">Modifié</Badge>}
     </>
   );
 }
@@ -652,8 +657,9 @@ function RadioRow({
             <label
               key={choice}
               className={cn(
-                "flex cursor-pointer items-start gap-2.5 rounded-lg border bg-card p-3 text-sm transition-[border-color,box-shadow,background-color] has-focus-visible:shadow-focus",
-                checked ? "border-atelier-border bg-signature-faint shadow-glow" : "border-atelier-line hover:border-atelier-border",
+                "flex cursor-pointer items-start gap-2.5 rounded-md border bg-card p-3 text-sm transition-[border-color,background-color] has-focus-visible:shadow-focus",
+                // Option choisie = sélection (accent de Nexus en voile, trait plein)
+                checked ? "border-primary bg-accent-soft" : "border-atelier-border hover:border-atelier-border-soft",
                 locked && "cursor-not-allowed opacity-60",
               )}
             >

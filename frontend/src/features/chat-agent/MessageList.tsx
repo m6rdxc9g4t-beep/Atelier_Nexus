@@ -105,7 +105,7 @@ function UserTurn({ turn }: { turn: ChatTurn }) {
     <div className="flex flex-col items-end gap-2">
       {files.length > 0 && <MessageAttachments items={files} />}
       {text && (
-        <div className="prose-chat max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 break-words whitespace-pre-wrap">
+        <div className="prose-chat max-w-[85%] rounded-lg border border-atelier-line bg-atelier-hover px-3.5 py-2 break-words whitespace-pre-wrap">
           {text}
         </div>
       )}
@@ -145,17 +145,17 @@ function AgentTurn({
   return (
     <article aria-label={`Réponse de ${name}`} aria-busy={live} className="group/turn flex min-w-0 flex-col gap-2.5">
       <header className="flex min-h-7 items-center gap-2">
-        {/* Pastille de l'agent : néon seulement pendant qu'il répond (élément « vivant ») */}
+        {/* Pastille de l'agent : neutre ; pendant qu'il répond, l'icône passe à l'encre pleine */}
         <span
           aria-hidden
           className={cn(
-            "grid size-6 shrink-0 place-items-center rounded-md border bg-signature-faint text-accent-ink transition-shadow",
-            live ? "border-atelier-border shadow-glow" : "border-atelier-line",
+            "grid size-6 shrink-0 place-items-center rounded-sm border border-atelier-border bg-card transition-colors",
+            live ? "text-foreground" : "text-muted-foreground",
           )}
         >
           <AgentIcon icon={agent?.icon} className="size-3.5" />
         </span>
-        <span className="text-xs font-medium">{name}</span>
+        <span className="text-sm font-medium">{name}</span>
         {turn.meta && <TurnInfo meta={turn.meta} />}
       </header>
 
@@ -166,7 +166,7 @@ function AgentTurn({
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="size-1.5 animate-pulse rounded-full bg-primary"
+                  className="size-1.5 animate-pulse rounded-full bg-atelier-faint"
                   style={{ animationDelay: `${i * 160}ms` }}
                 />
               ))}
@@ -256,9 +256,9 @@ function ArtifactLink({ part }: { part: ArtifactRefPart }) {
       type="button"
       onClick={() => select(part.artifactId)}
       aria-label={`Ouvrir « ${part.title} »`}
-      className="group/art flex w-full max-w-md items-center gap-3 rounded-xl border border-atelier-border-soft bg-card px-3 py-2.5 text-left transition-colors hover:border-atelier-border hover:bg-atelier-surface-2"
+      className="group/art flex w-full max-w-md items-center gap-3 rounded-lg border border-atelier-border bg-card px-3 py-2 text-left transition-colors hover:bg-accent"
     >
-      {kind && <Badge variant="signature">{KIND_LABELS[kind]}</Badge>}
+      {kind && <Badge variant="outline">{KIND_LABELS[kind]}</Badge>}
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{part.title}</span>
       <span className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground group-hover/art:text-foreground">
         Ouvrir
@@ -271,8 +271,8 @@ function ArtifactLink({ part }: { part: ArtifactRefPart }) {
 /** Suggestion après un tour réussi : enregistrer ses actions en workflow pour les rejouer sans modèle. */
 function SaveSuggestion({ count, onSave }: { count: number; onSave: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-atelier-border-soft bg-signature-faint px-3.5 py-2.5">
-      <Workflow className="size-4 shrink-0 text-accent-ink" aria-hidden />
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-atelier-border bg-card px-3.5 py-2.5">
+      <Workflow className="size-4 shrink-0 text-atelier-faint" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           Rejouer {count > 1 ? `ces ${count} actions` : "cette action"} sans modèle

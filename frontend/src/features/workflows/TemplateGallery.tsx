@@ -77,20 +77,20 @@ export function TemplateCard({ template, compact = false }: { template: Workflow
   const startFrom = useStartFromTemplate();
   const missing = missingLines(template.missing);
   return (
-    <Card variant="interactive" className="h-full gap-3 p-4">
+    <Card variant="interactive" className="h-full gap-2.5 p-3.5">
       <div className="flex items-start gap-2">
-        <h3 className="min-w-0 flex-1 text-sm leading-snug font-semibold">{template.title}</h3>
+        <h3 className="min-w-0 flex-1 text-sm leading-snug font-medium">{template.title}</h3>
         <AvailabilityBadge available={template.available} />
       </div>
       <AppChain apps={template.apps} max={compact ? 4 : 5} />
       {compact ? (
-        <p className="line-clamp-3 text-[13px] text-muted-foreground">{template.value || template.description}</p>
+        <p className="line-clamp-3 text-sm text-muted-foreground">{template.value || template.description}</p>
       ) : (
         <>
-          {template.description && <p className="text-[13px] text-muted-foreground">{template.description}</p>}
+          {template.description && <p className="text-sm text-muted-foreground">{template.description}</p>}
           {template.value && (
-            <p className="flex items-start gap-1.5 text-[13px]">
-              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent-ink" aria-hidden />
+            <p className="flex items-start gap-1.5 text-sm">
+              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-atelier-faint" aria-hidden />
               <span className="min-w-0">{template.value}</span>
             </p>
           )}
@@ -202,7 +202,7 @@ export function TemplateGallery() {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
-        <p className="max-w-3xl min-w-0 flex-1 text-[13px] text-muted-foreground">
+        <p className="max-w-3xl min-w-0 flex-1 text-sm text-muted-foreground">
           Des enchaînements prêts à l&apos;emploi entre vos applications. Le modèle est copié dans un brouillon que vous
           relisez et enregistrez ; à l&apos;exécution, chaque étape attend votre accord.
         </p>
