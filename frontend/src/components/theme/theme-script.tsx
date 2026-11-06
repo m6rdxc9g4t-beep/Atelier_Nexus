@@ -1,13 +1,21 @@
-import { DARK_MEDIA_QUERY, LEGACY_THEME_STORAGE_KEY, THEME_STORAGE_KEY } from "./theme-constants";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { LEGACY_THEME_STORAGE_KEYS, SUITE_THEME_STORAGE_KEY } from "./theme-constants";
 
 /**
- * Applique le thème mémorisé avant le premier affichage (pas de flash).
- * Contrat Atelier sur <html> : sombre = class « dark » + data-theme="dark" ;
- * clair = sans « dark » + data-theme="light". Voir le guide Next.js
- * « Preventing flash before hydration ». À garder aligné sur applyTheme() (theme-toggle.tsx).
- * Reprend aussi le choix enregistré sous l'ancienne clé (app de bureau : stockage persistant).
+ * Reprise, une seule fois, du choix enregistré par les anciennes versions de Nexus (app de bureau :
+ * stockage persistant) sous la clé commune de la suite, puis effacement des anciennes clés.
  */
-const script = `(function(){var p="system";try{var k=${JSON.stringify(THEME_STORAGE_KEY)},o=${JSON.stringify(LEGACY_THEME_STORAGE_KEY)},v=localStorage.getItem(k),w=localStorage.getItem(o);if(w!==null){if(v===null&&(w==="light"||w==="dark")){v=w;localStorage.setItem(k,w)}localStorage.removeItem(o)}if(v==="light"||v==="dark"||v==="system")p=v}catch(e){}try{var d=p==="dark"||(p==="system"&&window.matchMedia(${JSON.stringify(DARK_MEDIA_QUERY)}).matches);var r=document.documentElement;r.classList.toggle("dark",d);r.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
+const migrate = `(function(){try{var s=localStorage,k=${JSON.stringify(SUITE_THEME_STORAGE_KEY)},o=${JSON.stringify(LEGACY_THEME_STORAGE_KEYS)};for(var i=0;i<o.length;i++){var v=s.getItem(o[i]);if(v!==null){if(s.getItem(k)===null&&(v==="light"||v==="dark"||v==="system"))s.setItem(k,v);s.removeItem(o[i])}}}catch(e){}})();`;
+
+/**
+ * Préférence de thème commune à la suite (SUITE.md §1.5) : `styles/brand/atelier-theme.js`, copie
+ * verbatim d'Atelier_Projets/design-system, lu au rendu serveur (ou à l'export statique) et posé en
+ * script bloquant dans <head> : le thème est appliqué avant le premier affichage (pas de flash).
+ * Effet sur <html> : data-theme="light|dark", classe « dark », data-theme-pref ; `window.atelierTheme`.
+ */
+const suite = readFileSync(join(process.cwd(), "src/styles/brand/atelier-theme.js"), "utf8");
 
 export function ThemeScript() {
   return (
@@ -15,7 +23,7 @@ export function ThemeScript() {
       // Exécuté pendant l'analyse du HTML ; ignoré côté client (pas d'avertissement React sur <script>).
       type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: script }}
+      dangerouslySetInnerHTML={{ __html: `${migrate}\n${suite}` }}
     />
   );
 }
