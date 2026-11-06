@@ -81,8 +81,8 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Serveur sur `127.0.0.1` uniquement, port 8100 s'il est libre, sinon un port libre : l'interface utilise des adresses
   relatives (`NEXT_PUBLIC_API_URL` vide), elle fonctionne sur n'importe quel port.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
-- Fond de la fenêtre avant l'affichage de l'interface : celui de la charte néon (`WINDOW_BACKGROUND` dans
-  `app/desktop.py`, `#fbf3f2` clair / `#120c0d` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
+- Fond de la fenêtre avant l'affichage de l'interface : celui de la charte v2 (`WINDOW_BACKGROUND` dans
+  `app/desktop.py`, `#fbfbfc` clair / `#0f1012` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app` ; sous Windows, s'il existe,
   `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd`, SUITE.md §9.6),
   l'écriture dans Tab est activée sans réglage (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.
@@ -139,7 +139,7 @@ Particularités de la mise à jour sous Windows (`app/desktop_update.py`) :
 - **Aucune console** : tout programme lancé par l'app (git, npm, pip, Claude Code, serveur MCP de Tab) l'est avec
   `CREATE_NO_WINDOW` (`app/core/processes.py`). Sans console, `sys.stdout` est redirigé vers `atelier-nexus.log`.
 - Fins de ligne : `.gitattributes` (LF, scripts Windows en CRLF) : un clone Windows ne paraît jamais modifié.
-- Fenêtre : icône `scripts/windows/AtelierNexus.ico` (dérivée du logo), identifiant de barre des tâches `Atelier.Nexus`,
+- Fenêtre : icône `scripts/windows/AtelierNexus.ico` (icône carrée de l'app, SUITE.md §1.6), identifiant de barre des tâches `Atelier.Nexus`,
   fond clair ou sombre selon `AppsUseLightTheme`. Sans WebView2, l'app s'ouvre dans le navigateur.
 
 ## Proxy du système et apps locales

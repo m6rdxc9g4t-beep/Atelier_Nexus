@@ -13,7 +13,7 @@ mise à jour automatique après un `git pull` (§8). Windows 10 (21H2+) et Windo
   Elle vérifie les prérequis (Git, Node.js 22.12+ ou 24+, Python 3.11+ pour Viz et Nexus) et dit en français comment installer
   ce qui manque (`winget install …`), sans rien installer de système elle-même.
 - Elle crée le **lanceur** (§8.1) et ses raccourcis : menu Démarrer (dossier « Atelier ») et Bureau (facultatif : `-SansBureau`),
-  avec le nom affiché de l'app et son icône (`.ico` dérivé du logo, §1.6). Elle fait la première mise à jour, puis enregistre
+  avec le nom affiché de l'app et son icône (`.ico` = l'icône carrée de l'app, §1.6). Elle fait la première mise à jour, puis enregistre
   l'app (§9.4). Relancer la commande répare l'installation sans toucher aux données. `-Desinstaller` retire lanceur, raccourcis
   et enregistrement, jamais les données.
 - Le lanceur n'ouvre **aucune fenêtre de console** visible.
