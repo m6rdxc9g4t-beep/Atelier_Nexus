@@ -14,7 +14,7 @@ export const APP_COLORS: Record<string, string> = {
   cine: "#cd3d83",
   savoir: "#a853c1",
   tresorerie: "#3c72da",
-  cuisine: "#8568a7",
+  cuisine: "#3a6c97",
   dates: "#db373a",
   convert: "#9d6d1c",
 };
