@@ -16,8 +16,8 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 /** Préférence par défaut : suivre le réglage de l'appareil. */
 export const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
 
-/** Fond de page (--atelier-bg de la charte v2, structure neutre), pour la meta theme-color. */
-export const THEME_COLORS = { light: "#fbfbfc", dark: "#0f1012" } as const;
+/** Fond de page (--atelier-bg de la charte : crème en clair, bleu nuit en sombre), pour la meta theme-color. */
+export const THEME_COLORS = { light: "#f8f4ec", dark: "#0b1220" } as const;
 
 export function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === "string" && (THEME_PREFERENCES as readonly string[]).includes(value);

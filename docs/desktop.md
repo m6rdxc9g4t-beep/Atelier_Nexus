@@ -82,7 +82,7 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
   relatives (`NEXT_PUBLIC_API_URL` vide), elle fonctionne sur n'importe quel port.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
 - Fond de la fenêtre avant l'affichage de l'interface : celui de la charte v2 (`WINDOW_BACKGROUND` dans
-  `app/desktop.py`, `#fbfbfc` clair / `#0f1012` sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
+  `app/desktop.py`, crème `#f8f4ec` en clair / bleu nuit `#0b1220` en sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app` ; sous Windows, s'il existe,
   `%LOCALAPPDATA%\Programs\Atelier_Tab\resources\atelier-mcp.cmd`, SUITE.md §9.6),
   l'écriture dans Tab est activée sans réglage (`TAB_MCP_COMMAND`), sauf si le `.env` en choisit une autre.

@@ -192,26 +192,30 @@ export function HomeView({
 
             <section aria-labelledby="home-inbox" className="flex flex-col gap-2">
               <SectionLabel id="home-inbox">À valider</SectionLabel>
-              {/* Validation attendue = état anormal : trait et icône ambre ; sinon neutre */}
+              {/* Carte de chiffre (.atelier-kpi, coins de 12 px). Validation attendue = état anormal :
+                  trait, icône et chiffre ambre ; sinon neutre */}
               <button
                 type="button"
                 onClick={() => setInboxOpen(true)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent",
-                  inbox ? "decision-card" : "border-atelier-border",
+                  "atelier-kpi group text-left transition-colors hover:bg-accent",
+                  inbox && "decision-card",
                 )}
               >
-                <Inbox className={cn("size-4 shrink-0", inbox ? "text-warning-ink" : "text-atelier-faint")} aria-hidden />
-                <span className="min-w-0 flex-1">
-                  <span className={cn("block text-sm font-medium tabular-nums", inbox && "text-warning-ink")}>
-                    {inbox ? `${badgeText(inbox)} en attente` : "Rien en attente"}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">Étapes de workflows à autoriser</span>
+                <span className="atelier-kpi__label flex items-center gap-1.5">
+                  <Inbox className={cn("size-3.5 shrink-0", inbox ? "text-warning-ink" : "text-atelier-faint")} aria-hidden />
+                  Étapes de workflows à autoriser
                 </span>
-                <ChevronRight
-                  className="size-4 text-atelier-faint transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
-                  aria-hidden
-                />
+                <span className="flex items-end justify-between gap-3">
+                  <span className={cn("atelier-kpi__value", inbox && "text-warning-ink")}>
+                    {inbox ? badgeText(inbox) : "0"}
+                  </span>
+                  <ChevronRight
+                    className="mb-1 size-4 text-atelier-faint transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                    aria-hidden
+                  />
+                </span>
+                <span className="atelier-kpi__note">{inbox ? "en attente" : "Rien en attente"}</span>
               </button>
             </section>
           </aside>

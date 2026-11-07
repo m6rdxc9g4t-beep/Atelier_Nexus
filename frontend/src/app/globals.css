@@ -5,8 +5,8 @@
    Copies verbatim de Atelier_Projets/design-system : ne pas modifier ici.
    - atelier-ds : variables de fondation neutres et couleurs officielles des types et statuts
      (elles portent un sens : inchangées).
-   - brand : marque commune et palette v2 « Linear » (jetons --atelier-*, structure neutre gris
-     froid, signature de l'app pour l'accent), police Inter embarquée ; atelier-theme.js
+   - brand : marque commune et palette v2 « Linear » (jetons --atelier-*, structure crème en
+     clair, bleu nuit en sombre, signature de l'app pour l'accent), police Inter embarquée ; atelier-theme.js
      (préférence de thème commune) est posé dans <head> par components/theme/theme-script.tsx.
      Couche « components » : les utilitaires Tailwind gardent la main. */
 @import "../styles/atelier-ds/light.css";

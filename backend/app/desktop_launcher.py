@@ -40,8 +40,8 @@ APP_LOG_NAME = "atelier-nexus.log"
 APP_LOG_MAX_BYTES = 5_000_000
 MIN_PYTHON = (3, 12)
 INSTALL_HINT = r"powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1"
-#: Couleurs de la fenêtre d'attente : structure neutre de la charte v2 (cf. app/desktop.py)
-SPLASH_COLORS = {"bg": "#fbfbfc", "text": "#1a1b1e", "muted": "#5f636c"}
+#: Couleurs de la fenêtre d'attente : structure crème de la charte (cf. app/desktop.py)
+SPLASH_COLORS = {"bg": "#f8f4ec", "text": "#1f1b16", "muted": "#5f574b"}
 
 T = TypeVar("T")
 
