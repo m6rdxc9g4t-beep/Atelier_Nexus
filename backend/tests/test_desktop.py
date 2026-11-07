@@ -153,7 +153,7 @@ def test_versioned_url(tmp_path: Path) -> None:
 
 
 def test_window_matches_the_brand() -> None:
-    """Fond de fenêtre et page d'erreur aux couleurs de la charte néon (orange de Nexus)."""
+    """Fond de fenêtre et page d'erreur aux couleurs de la charte (crème / bleu nuit)."""
     constants = (
         Path(__file__).resolve().parents[2] / "frontend/src/components/theme/theme-constants.ts"
     ).read_text(encoding="utf-8")

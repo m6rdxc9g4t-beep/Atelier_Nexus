@@ -10,10 +10,10 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --bg-main: #FBFBFC;       /* Fond principal de l'application      */
-  --bg-surface: #FFFFFF;    /* Cartes, tableaux, panneaux latéraux  */
-  --bg-elevated: #EEEFF2;   /* Modales, menus déroulants, survols   */
-  --text-primary: #1A1B1E;  /* Texte principal                      */
-  --text-muted: #5F636C;    /* Texte secondaire, métadonnées        */
-  --border-color: #E3E4E8;  /* Bordures fines et séparateurs        */
+  --bg-main: #F8F4EC;       /* Fond principal de l'application      */
+  --bg-surface: #FFFDF8;    /* Cartes, tableaux, panneaux latéraux  */
+  --bg-elevated: #EFE8DB;   /* Modales, menus déroulants, survols   */
+  --text-primary: #1F1B16;  /* Texte principal                      */
+  --text-muted: #5F574B;    /* Texte secondaire, métadonnées        */
+  --border-color: #E4DAC8;  /* Bordures fines et séparateurs        */
 }

@@ -100,8 +100,8 @@ cd frontend && npx shadcn@latest add button card input
 
 ## Charte graphique (suite Atelier)
 
-Charte v2 « Linear » commune à la suite (`Atelier_Deploy/DESIGN.md`, SUITE.md §1.7) : une **structure neutre gris froid**,
-identique dans toutes les apps, en clair et en sombre, dense et plate (traits de 1 px, pas de halo, pas de grille ni de
+Charte v2 « Linear » commune à la suite (`Atelier_Deploy/DESIGN.md`, SUITE.md §1.7) : une **structure crème en clair et
+bleu nuit en sombre** (7 nov. 2026, comme le portfolio), identique dans toutes les apps, en clair et en sombre, dense et plate (traits de 1 px, pas de halo, pas de grille ni de
 lueur de fond). La signature de Nexus, **orange `#c84f00`**, ne sert qu'à l'accent : bouton principal plein, sélection,
 focus, liens, et l'icône de l'app.
 
@@ -113,6 +113,8 @@ focus, liens, et l'icône de l'app.
   thème Tailwind (couleurs, police, rayons 5 / 7 / 10 px, texte 13 px sur ordinateur, 14 px sur téléphone) sur ces jetons
   (détail dans [`docs/frontend.md`](docs/frontend.md) §2). Chaque application citée (sélecteur « Suite Atelier », puces,
   nœuds et modèles de workflows, carte) est reconnue à **son icône** carrée dans SA couleur, rien d'autre n'est teinté.
+- **Cartes de chiffres** (KPI) : `.atelier-kpi` de la marque commune (carte plate, trait de 1 px, coins de 12 px
+  `--atelier-radius-xl`, chiffre en tabulaire), par exemple « À valider » sur l'accueil.
 - Coquille à la Linear : barre latérale de 232 px (marque « Atelier Nexus » + icône Lucide `workflow`, navigation, agents,
   état des apps, thème, réglages ; en tiroir sur petit écran), barre haute de 44 px par vue, listes denses.
 - **États** : seuls les états anormaux sont en couleur (échec en rouge, validation attendue en ambre) ; une étape réussie
@@ -121,7 +123,7 @@ focus, liens, et l'icône de l'app.
   **Réglages › Apparence**. Préférence **commune à la suite** (`atelier-theme.js` : cookie `atelier_theme` sur le VPS,
   sinon `localStorage["atelier:theme"]`), appliquée avant le premier affichage ; sombre = `.dark` + `data-theme="dark"`,
   clair = `data-theme="light"`. Les anciennes clés de Nexus sont reprises une fois.
-- Application de bureau : la fenêtre s'ouvre sur le fond de la charte (`#fbfbfc` clair, `#0f1012` sombre, selon
+- Application de bureau : la fenêtre s'ouvre sur le fond de la charte (crème `#f8f4ec` en clair, bleu nuit `#0b1220` en sombre, selon
   l'apparence de macOS), sans éclair blanc ; icônes (`scripts/macos/`, `scripts/windows/`, favicon) = l'icône carrée.
 - Les couleurs qui portent un sens (`--chart-*` multi-séries, statuts, nature lecture / écriture) ne changent pas ;
   utilisées comme texte, elles passent par les encres lisibles `text-warning-ink`, `text-destructive-ink`.

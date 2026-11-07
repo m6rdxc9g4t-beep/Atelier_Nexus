@@ -4,8 +4,8 @@ Next.js 16 (App Router) · Tailwind v4 · composants Shadcn (`src/components/ui/
 
 ## 1. Écran
 
-Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : structure neutre gris froid, dense et
-plate ; l'orange de Nexus ne marque que l'accent (bouton principal, sélection, focus, liens) et l'icône de l'app.
+Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : structure crème en clair, bleu nuit en sombre
+(7 nov. 2026), dense et plate ; l'orange de Nexus ne marque que l'accent (bouton principal, sélection, focus, liens) et l'icône de l'app.
 
 ```
 ┌ Barre latérale (lg+) ─────┬ Accueil · Conversation · Studio des workflows ─────┬ Livrables (xl+) ┐
@@ -42,7 +42,7 @@ plate ; l'orange de Nexus ne marque que l'accent (bouton principal, sélection, 
 ## 2. Design system de la suite
 
 - `src/styles/atelier-ds/{light,dark,colors}.css` et `src/styles/brand/` (marque v2, `atelier-theme.js`, police Inter et sa licence) : **copies verbatim** d'`Atelier_Projets/design-system` (SUITE.md §1.1). Ne jamais les modifier ici ; `designSystem.test.ts` vérifie les 6 variables de fondation, les 15 couleurs officielles et le branchement sur la charte.
-- Charte v2 « Linear » : structure neutre commune à la suite ; la signature de Nexus (`#c84f00`, `data-atelier-app="nexus"` sur `<html>`) ne sert qu'à l'accent. `globals.css` branche les jetons Shadcn et le thème Tailwind (couleurs, police Inter, rayons 5 / 7 / 10 px, base de texte 13 px sur ordinateur et 14 px sur téléphone) sur les jetons `--atelier-*` de `brand/atelier-brand.css`, qui changent seuls entre clair et sombre ; fond de page uni `background: var(--atelier-bg)`. Aucun code hex dans `globals.css`.
+- Charte v2 « Linear » : structure commune à la suite (crème en clair, bleu nuit en sombre) ; cartes de chiffres (KPI) = `.atelier-kpi` de la marque (coins de 12 px, trait de 1 px, plate) ; la signature de Nexus (`#c84f00`, `data-atelier-app="nexus"` sur `<html>`) ne sert qu'à l'accent. `globals.css` branche les jetons Shadcn et le thème Tailwind (couleurs, police Inter, rayons 5 / 7 / 10 px, base de texte 13 px sur ordinateur et 14 px sur téléphone) sur les jetons `--atelier-*` de `brand/atelier-brand.css`, qui changent seuls entre clair et sombre ; fond de page uni `background: var(--atelier-bg)`. Aucun code hex dans `globals.css`.
 - **Règle d'élévation (plat au repos)** : surface `bg-card border border-atelier-border`, sans ombre ; interactif au
   survol : fond `hover:bg-accent` (neutre) ou trait appuyé ; sélection : `bg-accent-soft` (signature en voile) et trait
   `border-primary` ; superposé (fenêtres, menus, tiroirs, dock) : `shadow-glow-strong` (seule ombre) ; creusé (JSON,

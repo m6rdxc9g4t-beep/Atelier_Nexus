@@ -38,7 +38,7 @@ function SheetContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & VariantProps<typeof sheetSide> & { closeButton?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgb(10_11_13/0.45)] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgb(11_18_32/0.45)] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
         data-slot="sheet-content"
         data-side={side ?? "left"}

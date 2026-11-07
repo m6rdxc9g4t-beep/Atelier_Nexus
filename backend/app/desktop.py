@@ -81,9 +81,10 @@ APP_LOG_NAME = "atelier-nexus.log"
 WINDOWS_ICON = BACKEND.parent / "scripts" / "windows" / "AtelierNexus.ico"
 #: Identifiant de l'app pour la barre des tâches de Windows (regroupement, épinglage)
 WINDOWS_APP_ID = "Atelier.Nexus"
-# Fond de la fenêtre avant l'affichage de l'interface : --atelier-bg de la charte v2, structure
-# neutre commune à la suite (frontend/src/components/theme/theme-constants.ts, THEME_COLORS).
-WINDOW_BACKGROUND = {"light": "#fbfbfc", "dark": "#0f1012"}
+# Fond de la fenêtre avant l'affichage de l'interface : --atelier-bg de la charte, structure
+# commune à la suite, crème en clair et bleu nuit en sombre
+# (frontend/src/components/theme/theme-constants.ts, THEME_COLORS).
+WINDOW_BACKGROUND = {"light": "#f8f4ec", "dark": "#0b1220"}
 
 log = logging.getLogger("atelier_nexus.desktop")
 
@@ -415,11 +416,11 @@ def system_appearance() -> str:
     return "dark" if "dark" in result.stdout.lower() else "light"
 
 
-# Page d'erreur aux couleurs de la charte v2 (jetons --atelier-* : structure neutre, titre dans
-# la signature de Nexus en encre lisible).
+# Page d'erreur aux couleurs de la charte (jetons --atelier-* : crème en clair, bleu nuit en
+# sombre, titre dans la signature de Nexus en encre lisible).
 _ERROR_CSS = (
-    ":root{color-scheme:light dark;--bg:#fbfbfc;--text:#1a1b1e;--muted:#5f636c;--ink:#b04600}"
-    "@media (prefers-color-scheme:dark){:root{--bg:#0f1012;--text:#e8e9ec;--muted:#969aa3;"
+    ":root{color-scheme:light dark;--bg:#f8f4ec;--text:#1f1b16;--muted:#5f574b;--ink:#b04600}"
+    "@media (prefers-color-scheme:dark){:root{--bg:#0b1220;--text:#e6eaf2;--muted:#a3aec2;"
     "--ink:#dd9261}}"
     "body{font:15px -apple-system,system-ui,sans-serif;display:grid;place-items:center;"
     "height:90vh;margin:0;background:var(--bg);color:var(--text)}"
