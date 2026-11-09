@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "marketing-campagne",
+  "titre": "Campagne Brume",
+  "sous_titre": "Lancement d'une marque de cosmétiques par une agence",
+  "secteur": "Marketing",
+  "resume": "L'agence Orbe lance la gamme d'automne de Brume Cosmétiques : plan média, performances par canal, factures des régies ; le budget Meta explose au lancement et le coût d'acquisition grimpe."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_marketing-campagne",
+  "tab_tables": [
+   "tbl_ex_marketing-campagne_0",
+   "tbl_ex_marketing-campagne_1"
+  ],
+  "viz_jeu_cle": "exemple:marketing-campagne:operations",
+  "viz_alerte": "Dépenses Meta du mois — Campagne Brume",
+  "valeur": "4 320,00 €",
+  "seuil": "2 500,00 €",
+  "projets_projet": "Brume — lancement automne 2026",
+  "projets_story": "Suivi des budgets"
+ }
+}

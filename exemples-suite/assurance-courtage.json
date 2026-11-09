@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "assurance-courtage",
+  "titre": "Arpège Courtage",
+  "sous_titre": "Portefeuille, sinistres et renouvellements d'un cabinet de courtage",
+  "secteur": "Assurance",
+  "resume": "Le cabinet Arpège, à Toulouse, gère 7 clients professionnels : primes, commissions, sinistres déclarés ; la flotte automobile se dégrade et les frais juridiques dépassent leur budget en octobre."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_assurance-courtage",
+  "tab_tables": [
+   "tbl_ex_assurance-courtage_0",
+   "tbl_ex_assurance-courtage_1"
+  ],
+  "viz_jeu_cle": "exemple:assurance-courtage:operations",
+  "viz_alerte": "Frais juridiques du mois — Arpège Courtage",
+  "valeur": "2 360,00 €",
+  "seuil": "800,00 €",
+  "projets_projet": "Renouvellements T4 2026 — Arpège Courtage",
+  "projets_story": "Suivi des budgets"
+ }
+}

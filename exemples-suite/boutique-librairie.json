@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "boutique-librairie",
+  "titre": "Librairie Les Pages Vives",
+  "sous_titre": "Ventes, stock et commandes d'une librairie-papeterie",
+  "secteur": "Boutique",
+  "resume": "Une librairie-papeterie de la Croix-Rousse à Lyon : caisse par rayon, stock et commandes aux distributeurs, rentrée scolaire puis préparation des fêtes ; les achats de livres d'octobre dépassent."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_boutique-librairie",
+  "tab_tables": [
+   "tbl_ex_boutique-librairie_0",
+   "tbl_ex_boutique-librairie_1"
+  ],
+  "viz_jeu_cle": "exemple:boutique-librairie:operations",
+  "viz_alerte": "Achats de livres du mois — Librairie Les Pages Vives",
+  "valeur": "15 200,00 €",
+  "seuil": "13 000,00 €",
+  "projets_projet": "Fêtes de fin d'année 2026 — Les Pages Vives",
+  "projets_story": "Suivi des budgets"
+ }
+}

@@ -126,6 +126,10 @@ def call(name: str, args: dict) -> dict:
                 ],
             }
         )
+    if name == "load_suite_example":
+        return text({"example": args["example"], "project": {"id": f"prj_ex_{args['example']}"}})
+    if name == "remove_suite_example":
+        return text({"example": args["example"], "removed": True})
     return text(f"Outil inconnu : {name}", error=True)
 
 

@@ -14,6 +14,7 @@ import { type ListSection, useWorkflowStudioStore } from "@/stores/useWorkflowSt
 import type { AgentInfo } from "@/types/api";
 
 import { shownSection, studioTab, type StudioTab } from "./studio";
+import { SuiteExamples } from "./SuiteExamples";
 import { TemplateGallery } from "./TemplateGallery";
 import { MyWorkflows } from "./WorkflowsDialog";
 
@@ -113,7 +114,10 @@ export function WorkflowsStudio({ agents }: { agents: AgentInfo[] }) {
                 // Nouvelle portée à chaque agent suivi (bouton Workflows d'une conversation)
                 <MyWorkflows key={listAgent ?? ""} agents={agents} onShowTemplates={openTemplates} />
               ) : (
-                <TemplateGallery />
+                <>
+                  <SuiteExamples />
+                  <TemplateGallery />
+                </>
               )}
             </TabsContent>
             <TabsContent value="map">

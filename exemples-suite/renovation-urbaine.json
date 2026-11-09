@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "renovation-urbaine",
+  "titre": "Rénovation Urbaine 2026",
+  "sous_titre": "Suivi d'un chantier de réhabilitation",
+  "secteur": "Chantier",
+  "resume": "La réhabilitation d'un immeuble de logements à Villeurbanne : planning des lots, situations de travaux payées depuis le compte chantier, budget par lot ; le gros œuvre dépasse son enveloppe du mois."
+ },
+ "workflows": [
+  {
+   "modele": "tab-planning-vers-projets"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_renovation-urbaine",
+  "tab_tables": [
+   "tbl_ex_renovation-urbaine_0",
+   "tbl_ex_renovation-urbaine_1"
+  ],
+  "viz_jeu_cle": "exemple:renovation-urbaine:operations",
+  "viz_alerte": "Gros œuvre du mois — Rénovation Urbaine 2026",
+  "valeur": "16 000,00 €",
+  "seuil": "14 000,00 €",
+  "projets_projet": "Rénovation Urbaine 2026",
+  "projets_story": "Suivi des budgets"
+ }
+}

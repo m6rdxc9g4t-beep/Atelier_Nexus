@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "finance-patrimoine",
+  "titre": "Lemaire Patrimoine",
+  "sous_titre": "Portefeuille et allocation d'une holding familiale",
+  "secteur": "Finance",
+  "resume": "La holding de la famille Lemaire place sa trésorerie : achats d'ETF, dividendes, comité mensuel, allocation cible ; les frais de courtage d'octobre dépassent l'enveloppe après un rééquilibrage."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_finance-patrimoine",
+  "tab_tables": [
+   "tbl_ex_finance-patrimoine_0",
+   "tbl_ex_finance-patrimoine_1"
+  ],
+  "viz_jeu_cle": "exemple:finance-patrimoine:operations",
+  "viz_alerte": "Frais de courtage du mois — Lemaire Patrimoine",
+  "valeur": "421,62 €",
+  "seuil": "250,00 €",
+  "projets_projet": "Rééquilibrage 2026 — Lemaire Patrimoine",
+  "projets_story": "Suivi des budgets"
+ }
+}

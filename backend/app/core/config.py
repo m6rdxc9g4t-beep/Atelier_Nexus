@@ -66,6 +66,8 @@ class Settings(BaseSettings):
 
     # Application de bureau : interface compilée (frontend/out) servie par le backend
     frontend_dist: str | None = None
+    #: Exemples de la suite (`exemples-suite/`, format atelier-exemples/1) ; vide = celui du dépôt
+    exemples_dir: str | None = None
 
     # Déclencheurs de workflows (docs/workflows.md, section Déclencheurs)
     #: Fuseau des horaires quotidiens (nom IANA), heure d'été / d'hiver comprises
@@ -134,6 +136,7 @@ class Settings(BaseSettings):
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",
+        "exemples_dir",
         "tab_data_dir",
         "github_token",
         "github_repo",

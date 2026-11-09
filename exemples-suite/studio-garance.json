@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "studio-garance",
+  "titre": "Studio Garance",
+  "sous_titre": "Clôture comptable d'un studio de design",
+  "secteur": "Compta",
+  "resume": "Un studio de design graphique d'Arles clôture son mois : relevés bancaires convertis, catégorisés, comparés au budget ; le poste Matériel dépasse et devient une tâche de suivi."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_studio-garance",
+  "tab_tables": [
+   "tbl_ex_studio-garance_0",
+   "tbl_ex_studio-garance_1"
+  ],
+  "viz_jeu_cle": "exemple:studio-garance:operations",
+  "viz_alerte": "Matériel du mois — Studio Garance",
+  "valeur": "708,00 €",
+  "seuil": "600,00 €",
+  "projets_projet": "Gestion 2026 — Studio Garance",
+  "projets_story": "Suivi des budgets"
+ }
+}
