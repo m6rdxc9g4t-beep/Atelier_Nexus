@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "freelance-data",
+  "titre": "Consultant data freelance",
+  "sous_titre": "Missions, temps facturé et trésorerie d'un indépendant",
+  "secteur": "Freelance",
+  "resume": "Julien Morel, consultant data indépendant à Dijon : missions suivies dans Tab et Projets, temps passé, factures payées via une plateforme, provisions URSSAF ; ses frais de logiciels dérapent en octobre."
+ },
+ "workflows": [
+  {
+   "modele": "projets-temps-hebdo-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_freelance-data",
+  "tab_tables": [
+   "tbl_ex_freelance-data_0",
+   "tbl_ex_freelance-data_1"
+  ],
+  "viz_jeu_cle": "exemple:freelance-data:operations",
+  "viz_alerte": "Logiciels du mois — Consultant data freelance",
+  "valeur": "1 142,60 €",
+  "seuil": "300,00 €",
+  "projets_projet": "Missions 2026 — Julien Morel",
+  "projets_story": "Suivi des budgets"
+ }
+}

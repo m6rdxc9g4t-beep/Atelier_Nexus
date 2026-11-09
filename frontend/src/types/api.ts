@@ -838,3 +838,33 @@ export interface EventsCatalog {
 export interface InboxCount {
   awaiting_approval: number;
 }
+
+// ─── Exemples de la suite (GET/POST/DELETE /api/exemples-suite) ───────
+
+export interface ExampleStep {
+  app: string;
+  titre: string;
+  texte: string;
+}
+
+export interface ExampleStory {
+  id: string;
+  titre: string;
+  sous_titre: string;
+  secteur: string;
+  resume: string;
+  parcours: ExampleStep[];
+  /** Workflows d'exemple de cette histoire déjà dans Nexus */
+  workflows: { id: string; title: string }[];
+}
+
+export interface ExampleLoaded {
+  histoire: string;
+  workflows: { id: string; title: string }[];
+  trigger_id: string | null;
+  jeu: string | null;
+  story: number | null;
+  /** Projet de l'histoire chargé dans les fichiers de Tab (serveur MCP) */
+  tab: boolean;
+  notes: string[];
+}

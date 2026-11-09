@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "immobilier-locatif",
+  "titre": "SCI Les Tilleuls",
+  "sous_titre": "Gestion locative de six appartements",
+  "secteur": "Immobilier",
+  "resume": "La SCI familiale Les Tilleuls loue six appartements à Nantes : loyers encaissés, charges, état locatif, travaux ; en octobre un appartement est vacant, un loyer est impayé et les travaux de remise en état dépassent leur budget."
+ },
+ "workflows": [
+  {
+   "modele": "convert-derniere-conversion-tab-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_immobilier-locatif",
+  "tab_tables": [
+   "tbl_ex_immobilier-locatif_0",
+   "tbl_ex_immobilier-locatif_1"
+  ],
+  "viz_jeu_cle": "exemple:immobilier-locatif:operations",
+  "viz_alerte": "Travaux du mois — SCI Les Tilleuls",
+  "valeur": "3 540,00 €",
+  "seuil": "1 500,00 €",
+  "projets_projet": "Gestion 2026 — SCI Les Tilleuls",
+  "projets_story": "Suivi des budgets"
+ }
+}

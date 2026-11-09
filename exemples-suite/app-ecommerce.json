@@ -1,0 +1,31 @@
+{
+ "format": "atelier-exemples/1",
+ "histoire": {
+  "id": "app-ecommerce",
+  "titre": "App E-Commerce v2",
+  "sous_titre": "Une boutique en ligne lance la v2 de son app",
+  "secteur": "Produit",
+  "resume": "Verveine & Co, boutique de thés en ligne, sort la v2 de son app en octobre : backlog et sprints, commandes du back-office, virements Stripe ; la pub du lancement dépasse son budget."
+ },
+ "workflows": [
+  {
+   "modele": "projets-temps-hebdo-viz"
+  },
+  {
+   "modele": "viz-alerte-tache-projets"
+  }
+ ],
+ "references": {
+  "tab_projet": "prj_ex_app-ecommerce",
+  "tab_tables": [
+   "tbl_ex_app-ecommerce_0",
+   "tbl_ex_app-ecommerce_1"
+  ],
+  "viz_jeu_cle": "exemple:app-ecommerce:operations",
+  "viz_alerte": "Publicité du mois — App E-Commerce v2",
+  "valeur": "2 480,00 €",
+  "seuil": "1 500,00 €",
+  "projets_projet": "App E-Commerce v2 — Verveine & Co",
+  "projets_story": "Suivi des budgets"
+ }
+}

@@ -18,6 +18,8 @@ import type {
   EditorOptions,
   AtelierEvent,
   EventsCatalog,
+  ExampleLoaded,
+  ExampleStory,
   InboxCount,
   RunStatus,
   Trigger,
@@ -165,6 +167,10 @@ export const api = {
   /** Catalogue des étapes ; sans `agent` (null) : catalogue de suite. */
   /** Modèles de workflows de suite (Convert → Tab → Viz…), avec leur disponibilité. */
   workflowLibrary: (signal?: AbortSignal) => getJson<WorkflowTemplate[]>("/api/workflows/library", signal),
+  suiteExamples: (signal?: AbortSignal) => getJson<{ histoires: ExampleStory[] }>("/api/exemples-suite", signal),
+  loadSuiteExample: (id: string) => sendJson<ExampleLoaded>("POST", `/api/exemples-suite/${encodeURIComponent(id)}`),
+  removeSuiteExample: (id: string) =>
+    sendJson<{ histoire: string; retires: number }>("DELETE", `/api/exemples-suite/${encodeURIComponent(id)}`),
   workflowCatalog: (agent: string | null, signal?: AbortSignal) =>
     getJson<Catalog>(`/api/workflows/catalog${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`, signal),
   workflow: (id: string, signal?: AbortSignal) =>
