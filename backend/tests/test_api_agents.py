@@ -21,7 +21,7 @@ from app.tools import toolsets
 from app.tools.environment import ToolEnvironment
 from app.tools.toolsets import Toolset
 from main import app
-from tests.fake_suite import FakeConvertNode
+from tests.fake_suite import FakeConvertNode, FakeWikiNode
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
 from tests.test_connectors import FakeProjets
 
@@ -59,7 +59,10 @@ def client(
         tresorerie_base_url="http://127.0.0.1:1/api",  # port fermé : injoignable
         data_via_base_url=None,
         convert_base_url="http://127.0.0.1:8010/api",
-        # Jamais les vraies apps de la machine (Ciné 4000, Savoir 5051, dossier de Tab)
+        # Jamais les vraies apps de la machine (Wiki 3200, Formulaire 3300, Ciné 4000,
+        # Savoir 5051, dossier de Tab)
+        wiki_base_url=None,
+        formulaire_base_url=None,
         cine_base_url=None,
         savoir_base_url=None,
         tab_exports_dir=None,
@@ -326,11 +329,18 @@ def test_apps_status_reads_the_convert_manifest(client: TestClient) -> None:
         savoir_base_url=None,
         tab_exports_dir=None,
         convert_base_url="http://127.0.0.1:8010/api",
+        wiki_base_url="http://127.0.0.1:3200/api",
+        formulaire_base_url=None,
     )
-    convert = FakeConvertNode()
-    env = lambda: ToolEnvironment(settings, transports={"convert": convert.transport})  # noqa: E731
+    convert, wiki = FakeConvertNode(), FakeWikiNode()
+    transports = {"convert": convert.transport, "wiki": wiki.transport}
+    env = lambda: ToolEnvironment(settings, transports=transports)  # noqa: E731
     app.dependency_overrides[get_env_factory] = lambda: env
     status = {a["id"]: a for a in client.get("/api/apps/status").json()}
+    # Wiki et Formulaire : même sonde (manifeste du nœud), désactivés par une adresse vide
+    assert status["wiki"]["available"] is True and status["wiki"]["label"] == "Atelier Wiki"
+    assert status["wiki"]["detail"] == "7 action(s), 6 événement(s) (nœud atelier-node/1)"
+    assert status["formulaire"]["configured"] is False
     assert (
         status["convert"]["available"] is True and status["convert"]["label"] == "Atelier Convert"
     )

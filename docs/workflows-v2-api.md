@@ -86,9 +86,10 @@ interface Catalog {
 ```
 
 Couleurs (signature, charte v2, docs/SUITE.md §1.7) : viz `#996c00`, tab `#1c8742`, projets `#568100`, nexus `#c84f00`,
-cine `#cd3d83`, savoir `#a853c1`, tresorerie `#3c72da`, cuisine `#9b84dc`, dates `#db373a`, convert `#9d6d1c`, système
+cine `#cd3d83`, savoir `#a853c1`, tresorerie `#3c72da`, cuisine `#9b84dc`, dates `#db373a`, convert `#9d6d1c`, wiki `#007cbb`, formulaire `#008478`, système
 (null) → couleur nexus.
-Les actions des nœuds viennent des manifestes de Viz, Tab, Projets et Convert (`node:convert/conversions.table`…), dans cet
+Les actions des nœuds viennent des manifestes de Viz, Tab, Projets, Convert, Wiki et Formulaire (`node:convert/conversions.table`,
+`node:wiki/pages.append`, `node:formulaire/responses.list`…), dans cet
 ordre ; Convert arrêté → `status: "unreachable"` et aucune entrée `node:convert/…`.
 
 ## 4. Validation
@@ -197,7 +198,7 @@ interface SuiteMap {
 convert→tab « Nouvelle table » (fichiers : Convert écrit la table dans le dossier de données de Tab), plus nexus→chaque app atteinte par au moins un outil d'écriture (« Écritures validées ») et chaque app→nexus lue (« Lecture »).
 
 `GET /api/suite/events?app=&since=&limit=` → `{ app: string; events: AtelierEvent[]; next: number; gap?: boolean; status: string }[]`
-(une entrée par app de `NODE_APPS` : viz, tab, projets, convert ; `since` n'a de sens qu'avec `app`). `AtelierEvent` = format §7.3
+(une entrée par app de `NODE_APPS` : viz, tab, projets, convert, wiki, formulaire ; `since` n'a de sens qu'avec `app`). `AtelierEvent` = format §7.3
 du contrat.
 
 ## 8. Sortie structurée des outils

@@ -4,6 +4,8 @@
 - **Projets** : `{projets_base_url}/atelier/manifest` (HTTP), mêmes événements.
 - **Convert** : `{convert_base_url}/atelier/manifest` (HTTP), mêmes événements ; délai des
   actions `CONVERT_TIMEOUT` (une conversion avec OCR est longue).
+- **Wiki**, **Formulaire** : `{wiki_base_url}/atelier/manifest`,
+  `{formulaire_base_url}/atelier/manifest` (HTTP), mêmes événements.
 - **Tab** : fichier `{tab_exports_dir}/_atelier/manifest.json` (repli : outil MCP
   `atelier_manifest` si `TAB_MCP_COMMAND` est défini) ; actions par le serveur MCP ;
   événements dans `_atelier/events.jsonl` (repli : outil MCP `atelier_events`).

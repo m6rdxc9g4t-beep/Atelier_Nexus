@@ -1,5 +1,5 @@
-"""État des applications connectées (Viz / Data Via, Projets, Convert, Trésorerie, Tab, Ciné,
-Savoir, Cuisine, GitHub)."""
+"""État des applications connectées (Viz / Data Via, Projets, Convert, Wiki, Formulaire,
+Trésorerie, Tab, Ciné, Savoir, Cuisine, GitHub)."""
 
 from __future__ import annotations
 
@@ -73,17 +73,20 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
         await env.projets().health()
         return f"{len(await env.projets().projects())} projet(s)"
 
-    async def convert() -> str:
-        # Nœud atelier-node/1 : même garde de bouclage et même cache que les workflows
-        st = await env.suite().state("convert", fresh=True)
-        if st.status == "ok" and st.manifest is not None:
-            return (
-                f"{len(st.manifest.actions)} action(s), {len(st.manifest.events)} événement(s) "
-                "(nœud atelier-node/1)"
-            )
-        if st.status == "no_contract":
-            return "en marche, sans manifeste atelier-node/1 (version antérieure au contrat)"
-        raise AppUnavailableError(st.reason or "injoignable", app="convert")
+    def node(app: str) -> Callable[[], Awaitable[str]]:
+        async def check() -> str:
+            # Nœud atelier-node/1 : même garde de bouclage et même cache que les workflows
+            st = await env.suite().state(app, fresh=True)
+            if st.status == "ok" and st.manifest is not None:
+                return (
+                    f"{len(st.manifest.actions)} action(s), {len(st.manifest.events)} "
+                    "événement(s) (nœud atelier-node/1)"
+                )
+            if st.status == "no_contract":
+                return "en marche, sans manifeste atelier-node/1 (version antérieure au contrat)"
+            raise AppUnavailableError(st.reason or "injoignable", app=app)
+
+        return check
 
     async def tresorerie() -> str:
         await env.tresorerie().ping()
@@ -118,7 +121,11 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
             await asyncio.gather(
                 _probe("viz", "Atelier Viz (Data Via)", s.data_via_base_url, viz),
                 _probe("projets", "Atelier Projets", s.projets_base_url, projets),
-                _probe("convert", "Atelier Convert", s.convert_base_url, convert),
+                _probe("convert", "Atelier Convert", s.convert_base_url, node("convert")),
+                _probe("wiki", "Atelier Wiki", s.wiki_base_url, node("wiki")),
+                _probe(
+                    "formulaire", "Atelier Formulaire", s.formulaire_base_url, node("formulaire")
+                ),
                 _probe("tresorerie", "Atelier Trésorerie", s.tresorerie_base_url, tresorerie),
                 _probe("tab", "Atelier Tab", s.tab_exports_dir, tab),
                 _probe("cine", "Atelier Ciné", s.cine_base_url, cine),

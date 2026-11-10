@@ -17,7 +17,7 @@ Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 WEEKDAYS: tuple[Weekday, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 FilterOp = Literal["eq", "ne", "in", "contains", "gt", "gte", "lt", "lte", "exists"]
 #: Applications qui publient des événements : les nœuds `NODE_APPS` (test d'égalité)
-TriggerApp = Literal["viz", "projets", "tab", "convert"]
+TriggerApp = Literal["viz", "projets", "tab", "convert", "wiki", "formulaire"]
 RunOrigin = Literal["manual", "schedule", "event", "test"]
 
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")

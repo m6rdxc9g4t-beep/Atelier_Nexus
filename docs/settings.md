@@ -36,13 +36,16 @@ Premier groupe des Réglages, en boutons radio :
 
 - **Liste blanche** (`FIELDS`) : APPROVAL_MODE, CLAUDE_MODE, CLAUDE_CLI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
   OLLAMA_NUM_CTX, LLM_DEFAULT_PROVIDER, LLM_FALLBACK_PROVIDER, DATA_VIA_BASE_URL, PROJETS_BASE_URL, PROJETS_IMPORT_TOKEN,
-  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, CONVERT_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
+  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, CONVERT_BASE_URL, WIKI_BASE_URL, FORMULAIRE_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
   CUISINE_EMAIL, CUISINE_PASSWORD, CUISINE_REFRESH_TOKEN (groupe « Atelier Cuisine »), GITHUB_TOKEN, GITHUB_REPO,
   GITHUB_ALLOWED_REPOS. Tout le reste est refusé — en particulier **`TAB_MCP_COMMAND`** (commande exécutée) et
   `DATABASE_URL`, ainsi que `CLAUDE_CLI_PATH`, qui restent dans le fichier.
 - Validation : adresses `http(s)://`, choix fermés, Atelier Cuisine (adresse HTTPS du projet, clé publique seulement :
   `service_role` / `sb_secret_…` refusées, e-mail valide — [`apps/cuisine.md`](apps/cuisine.md)), pas de retour à la ligne (aucune injection d'une autre clé), puis
   contrôle par le modèle `Settings`. Une valeur refusée ne modifie pas le fichier.
+- Atelier Wiki (`WIKI_BASE_URL`, défaut `http://127.0.0.1:3200/api`) et Atelier Formulaire (`FORMULAIRE_BASE_URL`, défaut
+  `http://127.0.0.1:3300/api`) : nœuds des workflows de la suite, mêmes règles que Convert (bouclage seulement, vide =
+  désactivé) — [`apps/noeuds.md`](apps/noeuds.md).
 - Atelier Convert (`CONVERT_BASE_URL`, défaut `http://127.0.0.1:8010/api`, vide = désactivé) : nœud des workflows de la
   suite, adresse de bouclage seulement (`127.0.0.1`, `localhost`, `::1`) — une autre adresse est enregistrée mais le nœud la
   refuse (« injoignable »). Le délai de ses actions, `CONVERT_TIMEOUT` (120 s, une conversion avec OCR est longue), reste

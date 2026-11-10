@@ -535,7 +535,12 @@ def test_deleting_a_workflow_deletes_its_triggers(api: TestClient) -> None:
 def test_events_catalog(api: TestClient, suite: Suite) -> None:
     suite.viz.mode = "down"
     apps = {a["app"]: a for a in api.get("/api/triggers/events-catalog").json()["apps"]}
-    assert set(apps) == {"viz", "tab", "projets", "convert"}
+    assert set(apps) == {"viz", "tab", "projets", "convert", "wiki", "formulaire"}
+    # Wiki et Formulaire : événements de leurs manifestes réels, proposés aux déclencheurs
+    assert apps["wiki"]["name"] == "Atelier Wiki" and apps["wiki"]["color"] == "#007cbb"
+    assert "wiki.page.updated" in [e["type"] for e in apps["wiki"]["events"]]
+    assert apps["formulaire"]["color"] == "#008478"
+    assert "formulaire.response.submitted" in [e["type"] for e in apps["formulaire"]["events"]]
     projets = apps["projets"]
     assert projets["status"] == "ok" and projets["color"] == "#568100"
     status = next(e for e in projets["events"] if e["type"] == STATUS)

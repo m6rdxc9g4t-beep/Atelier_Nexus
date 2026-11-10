@@ -10,6 +10,11 @@ Manifestes de Viz, Projets et Tab : noms d'actions SUPPOSÉS, choisis pour exerc
   `rows.delete` (`delete_rows`, destructive).
 Les routes non « atelier » sont déléguées aux doubles existants (Data Via, Projets).
 
+Wiki et Formulaire : manifestes RÉELS (`tests/fixtures/wiki/manifest.json`,
+`tests/fixtures/formulaire/manifest.json`, obtenus en évaluant `manifest()` de
+`backend/src/services/atelier-manifest.ts` de chaque dépôt, version 0.1.0), jamais retouchés.
+Les doubles répondent aux routes de ces manifestes (`FakeWikiNode`, `FakeFormulaireNode`).
+
 Convert : manifeste RÉEL (`tests/fixtures/convert/manifest.json`, capturé une fois avec
 `build_manifest()` dans le venv d'Atelier_Convert, version 0.1.0), jamais retouché. Le double
 répond aux routes de ce manifeste (`FakeConvertNode`).
@@ -43,8 +48,10 @@ def _recorded(app: str) -> dict[str, Any]:
 
 
 CONVERT_MANIFEST = _recorded("convert")
+WIKI_MANIFEST = _recorded("wiki")
+FORMULAIRE_MANIFEST = _recorded("formulaire")
 REAL_MANIFESTS: dict[str, dict[str, Any]] = {
-    app: _recorded(app) for app in ("viz", "projets", "tab", "convert")
+    app: _recorded(app) for app in ("viz", "projets", "tab", "convert", "wiki", "formulaire")
 }
 
 TABLE_SCHEMA: dict[str, Any] = {
@@ -628,3 +635,160 @@ def write_tab_manifest(exports: Path, manifest: dict[str, Any] | None = None) ->
 
 def mcp_command() -> str:
     return f"{shlex.quote(sys.executable)} {shlex.quote(FAKE_MCP)}"
+
+
+# ─── Atelier Wiki et Atelier Formulaire (manifestes réels enregistrés) ───
+
+
+def wiki_event(seq: int, page_id: str = "12", **data: Any) -> dict[str, Any]:
+    """Événement `wiki.page.created` au format §7.3 (jamais le texte de la page)."""
+    return {
+        "seq": seq,
+        "type": "wiki.page.created",
+        "at": f"2026-10-24T11:{seq % 60:02d}:00+02:00",
+        "subject": {"kind": "page", "id": page_id, "label": "Compte rendu"},
+        "data": {"space_id": "1", "version": 1} | data,
+    }
+
+
+class FakeWikiNode(_Node):
+    """Atelier Wiki (API sur 3200, préfixe `/api`) : routes de son manifeste réel. Une page
+    (`12`) dans l'espace `1` ; créations et ajouts idempotents (`Idempotency-Key`)."""
+
+    manifest = WIKI_MANIFEST
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.events = [wiki_event(seq) for seq in (1, 2)]
+        self.pages: dict[str, dict[str, Any]] = {
+            "12": self.page("12", "Compte rendu", "# Compte rendu\n\nPremière version.")
+        }
+
+    @staticmethod
+    def page(page_id: str, title: str, content: str, version: int = 1) -> dict[str, Any]:
+        return {
+            "id": page_id, "title": title, "icon": None, "content": content, "format": "markdown",
+            "space_id": "1", "space": "Général", "parent_id": None, "version": version,
+            "created_at": "2026-10-24T11:00:00.000Z", "created_by": "Atelier Nexus",
+            "updated_at": "2026-10-24T11:00:00.000Z", "updated_by": "Atelier Nexus",
+            "path": f"/p/{page_id}", "url": None, "backlinks": [],
+        }  # fmt: skip
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        answer = self.common(request)
+        if answer is not None:
+            return answer
+        path, method = request.url.path, request.method
+        if (method, path) == ("GET", "/api/atelier/spaces"):
+            return httpx.Response(
+                200,
+                json={
+                    "format": "atelier-table/1", "name": "spaces", "label": "Espaces du wiki",
+                    "columns": [{"key": "id", "label": "Id", "type": "string"},
+                                {"key": "nom", "label": "Nom", "type": "string"},
+                                {"key": "pages", "label": "Pages", "type": "number"}],
+                    "rows": [{"id": "1", "nom": "Général", "pages": len(self.pages)}],
+                    "total": 1, "truncated": False,
+                },
+            )  # fmt: skip
+        if (method, path) == ("POST", "/api/atelier/pages"):
+            body = json.loads(request.content)
+
+            def create() -> dict[str, Any]:
+                page_id = str(12 + len(self.pages))
+                self.pages[page_id] = self.page(page_id, body["title"], body.get("content", ""))
+                return self.pages[page_id]
+
+            return self.idempotent(request, body, create)
+        parts = path.split("/")
+        if path.startswith("/api/atelier/pages/") and parts[4] not in self.pages:
+            return httpx.Response(404, json={"detail": "Page introuvable.", "code": "NOT_FOUND"})
+        if method == "GET" and len(parts) == 5:
+            return httpx.Response(200, json=self.pages[parts[4]])
+        if method == "POST" and path.endswith("/append"):
+            body = json.loads(request.content)
+
+            def append() -> dict[str, Any]:
+                page = self.pages[parts[4]]
+                heading = f"\n\n## {body['heading']}" if body.get("heading") else ""
+                page["content"] += f"{heading}\n\n{body['content']}"
+                page["version"] += 1
+                return dict(page)
+
+            return self.idempotent(request, body, append)
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+    @property
+    def transport(self) -> httpx.MockTransport:
+        return httpx.MockTransport(self)
+
+
+def formulaire_event(seq: int, form_id: str = "3") -> dict[str, Any]:
+    """Événement `formulaire.response.submitted` (jamais le contenu de la réponse)."""
+    return {
+        "seq": seq,
+        "type": "formulaire.response.submitted",
+        "at": f"2026-10-24T12:{seq % 60:02d}:00+02:00",
+        "subject": {"kind": "form", "id": form_id, "label": "Satisfaction"},
+        "data": {"response_id": str(seq), "source": "public"},
+    }
+
+
+class FakeFormulaireNode(_Node):
+    """Atelier Formulaire (API sur 3300, préfixe `/api`) : routes de son manifeste réel. Un
+    formulaire (`3`) à une question ; réponses idempotentes (`Idempotency-Key`)."""
+
+    manifest = FORMULAIRE_MANIFEST
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.events = [formulaire_event(1)]
+        self.responses: list[dict[str, Any]] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        answer = self.common(request)
+        if answer is not None:
+            return answer
+        path, method = request.url.path, request.method
+        if (method, path) == ("GET", "/api/atelier/forms"):
+            return httpx.Response(
+                200,
+                json={
+                    "format": "atelier-table/1", "name": "forms", "label": "Formulaires",
+                    "columns": [{"key": "id", "label": "Id", "type": "string"},
+                                {"key": "titre", "label": "Titre", "type": "string"},
+                                {"key": "reponses", "label": "Réponses", "type": "number"}],
+                    "rows": [{"id": "3", "titre": "Satisfaction", "reponses": len(self.responses)}],
+                    "total": 1, "truncated": False,
+                },
+            )  # fmt: skip
+        if not path.startswith("/api/atelier/forms/3"):
+            return httpx.Response(
+                404, json={"detail": "Formulaire introuvable.", "code": "NOT_FOUND"}
+            )
+        if (method, path) == ("GET", "/api/atelier/forms/3"):
+            return httpx.Response(
+                200,
+                json={
+                    "id": "3", "title": "Satisfaction", "description": "", "status": "open",
+                    "accepting": True, "response_count": len(self.responses),
+                    "questions": [{"id": "q1", "type": "rating", "label": "Note", "required": True}],
+                },
+            )  # fmt: skip
+        if (method, path) == ("POST", "/api/atelier/forms/3/responses"):
+            body = json.loads(request.content)
+
+            def submit() -> dict[str, Any]:
+                response = {
+                    "id": str(len(self.responses) + 1), "form_id": "3",
+                    "created_at": "2026-10-24T12:00:00.000Z", "answers": body["answers"],
+                }  # fmt: skip
+                self.responses.append(response)
+                return response
+
+            return self.idempotent(request, body, submit)
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+    @property
+    def transport(self) -> httpx.MockTransport:
+        return httpx.MockTransport(self)

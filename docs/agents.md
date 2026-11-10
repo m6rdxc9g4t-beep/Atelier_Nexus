@@ -214,6 +214,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `TAB_MCP_COMMAND`, `TAB_DATA_DIR` | vide | Écriture dans Atelier Tab par son serveur MCP ([`apps/tab.md`](apps/tab.md)) |
 | `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
 | `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
+| `WIKI_BASE_URL`, `FORMULAIRE_BASE_URL` | `http://127.0.0.1:3200/api`, `http://127.0.0.1:3300/api` | Atelier Wiki et Atelier Formulaire, nœuds des workflows de suite (pages, formulaires et réponses ; vide = désactivé) ([`apps/noeuds.md`](apps/noeuds.md)) |
 | `CONVERT_BASE_URL`, `CONVERT_TIMEOUT` | `http://127.0.0.1:8010/api`, `120` | Atelier Convert, nœud des workflows de suite (aucune boîte à outils dans le cœur ; l'extension Agent_DatAnalyst lit la même adresse) ([`apps/noeuds.md`](apps/noeuds.md)) |
 | `OLLAMA_NUM_CTX` | `8192` | Fenêtre de contexte demandée à Ollama (vide = celle du serveur) : consignes et outils des agents 100 % locaux ([`settings.md`](settings.md)) |
 | `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |

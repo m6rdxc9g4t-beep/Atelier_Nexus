@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     # Atelier Convert (SUITE.md §2 : API sur 8010, bouclage uniquement) : nœud atelier-node/1 des
     # workflows, vide = désactivé. Mêmes variables que l'extension Agent_DatAnalyst (un seul .env).
     convert_base_url: str | None = "http://127.0.0.1:8010/api"
+    # Atelier Wiki (3200) et Atelier Formulaire (3300) : nœuds atelier-node/1 des workflows
+    # (pages, formulaires et réponses), bouclage uniquement, vide = désactivé
+    wiki_base_url: str | None = "http://127.0.0.1:3200/api"
+    formulaire_base_url: str | None = "http://127.0.0.1:3300/api"
     #: Délai d'une action de Convert : une conversion avec OCR dépasse les 20 s d'APPS_TIMEOUT
     convert_timeout: float = Field(default=120.0, gt=0, le=1800)
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
@@ -136,6 +140,8 @@ class Settings(BaseSettings):
         "cine_base_url",
         "savoir_base_url",
         "convert_base_url",
+        "wiki_base_url",
+        "formulaire_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",

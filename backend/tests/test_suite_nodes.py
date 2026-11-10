@@ -23,13 +23,17 @@ from app.tools.environment import ToolEnvironment
 from tests.fake_suite import (
     BRUT_ID,
     CONVERT_MANIFEST,
+    FORMULAIRE_MANIFEST,
     PROJETS_MANIFEST,
     RELEVE_ID,
     TAB_MANIFEST,
     VIZ_MANIFEST,
+    WIKI_MANIFEST,
     FakeConvertNode,
+    FakeFormulaireNode,
     FakeProjetsNode,
     FakeVizNode,
+    FakeWikiNode,
     convert_event,
     mcp_command,
     write_tab_manifest,
@@ -43,6 +47,8 @@ class Suite:
         self.viz = FakeVizNode()
         self.projets = FakeProjetsNode()
         self.convert = FakeConvertNode()
+        self.wiki = FakeWikiNode()
+        self.formulaire = FakeFormulaireNode()
         self.exports = tmp_path / "exports"
         self.exports.mkdir()
         shutil.copy(FIX / "tab" / "tbl_planning_lots.json", self.exports)
@@ -66,6 +72,8 @@ class Suite:
             "data_via_base_url": "http://127.0.0.1:8000/api",
             "projets_base_url": "http://127.0.0.1:3000/api",
             "convert_base_url": "http://127.0.0.1:8010/api",
+            "wiki_base_url": "http://127.0.0.1:3200/api",
+            "formulaire_base_url": "http://127.0.0.1:3300/api",
             "tresorerie_base_url": None,
             "cine_base_url": None,
             "savoir_base_url": None,
@@ -84,6 +92,8 @@ class Suite:
                 "projets": httpx.MockTransport(self.projets),
                 # Même clé que le client Convert de l'extension Agent_DatAnalyst
                 "convert": self.convert.transport,
+                "wiki": self.wiki.transport,
+                "formulaire": self.formulaire.transport,
             },
         )
 
@@ -129,16 +139,23 @@ def test_manifest_parsing_keeps_valid_actions_and_reports_the_others() -> None:
     assert len(problems) == 4 and any("double" in p for p in problems)
 
 
-async def test_states_of_the_four_nodes(suite: Suite) -> None:
+async def test_states_of_the_six_nodes(suite: Suite) -> None:
     env = suite.env()
     try:
         states = {s.app: s for s in await env.suite().states()}
     finally:
         await env.aclose()
-    assert list(states) == ["viz", "tab", "projets", "convert"]
+    assert list(states) == ["viz", "tab", "projets", "convert", "wiki", "formulaire"]
     assert {s.status for s in states.values()} == {"ok"}
     assert states["tab"].transport == "mcp" and states["viz"].transport == "http"
     assert states["convert"].transport == "http" and states["convert"].name == "Atelier Convert"
+    assert states["wiki"].transport == "http" and states["wiki"].name == "Atelier Wiki"
+    assert states["formulaire"].name == "Atelier Formulaire" and not states["formulaire"].ignored
+    wiki = [str(r.url) for r in suite.wiki.requests]
+    assert wiki == ["http://127.0.0.1:3200/api/atelier/manifest"]
+    assert [str(r.url) for r in suite.formulaire.requests] == [
+        "http://127.0.0.1:3300/api/atelier/manifest"
+    ]
     assert states["viz"].ignored  # action mal formée signalée
     # Lu une seule fois grâce au cache (60 s)
     env = suite.env()
@@ -170,11 +187,15 @@ async def test_status_unreachable_no_contract_and_not_configured(suite: Suite) -
     assert states["tab"].status == "no_contract" and states["tab"].transport == "files"
     assert states["convert"].status == "unreachable"
     assert "Atelier Convert injoignable" in (states["convert"].reason or "")
+    # Une application arrêtée n'empêche pas de lire les autres
+    assert states["wiki"].status == states["formulaire"].status == "ok"
     env = ToolEnvironment(
         suite.settings(
             data_via_base_url=None,
             projets_base_url=None,
             convert_base_url=None,
+            wiki_base_url=None,
+            formulaire_base_url=None,
             tab_exports_dir=None,
         )
     )
@@ -402,6 +423,104 @@ def test_tab_manifest_double_matches_the_mcp_double() -> None:
         "add_rows",
         "delete_rows",
     }
+
+
+# ─── Atelier Wiki et Atelier Formulaire (manifestes réels enregistrés) ───
+
+
+def test_wiki_and_formulaire_real_manifests_parse_without_loss() -> None:
+    wiki, ignored = parse_manifest(WIKI_MANIFEST, "wiki")
+    assert ignored == [] and wiki.transport == "http"
+    kinds = {a.id: a.kind for a in wiki.actions}
+    assert kinds == {
+        "spaces.list": "read",
+        "pages.search": "read",
+        "pages.list": "read",
+        "pages.get": "read",
+        "pages.create": "write",
+        "pages.append": "write",
+        "pages.replace": "destructive",
+    }
+    append = wiki.action("pages.append")
+    assert append is not None and append.http is not None
+    assert append.http.path_params == ["page_id"] and append.idempotency == "header"
+    assert "wiki.page.created" in [e.type for e in wiki.events]
+    formulaire, ignored = parse_manifest(FORMULAIRE_MANIFEST, "formulaire")
+    assert ignored == []
+    assert [a.id for a in formulaire.actions] == [
+        "forms.list",
+        "forms.get",
+        "responses.list",
+        "responses.submit",
+    ]
+    submit = formulaire.action("responses.submit")
+    assert submit is not None and submit.kind == "write" and submit.idempotency == "header"
+    assert "formulaire.response.submitted" in [e.type for e in formulaire.events]
+
+
+async def test_wiki_actions(suite: Suite) -> None:
+    env = suite.env()
+    nodes = env.suite()
+    try:
+        spaces = await nodes.run_action("wiki", "spaces.list", {})
+        page = await nodes.run_action("wiki", "pages.get", {"page_id": "12"})
+        payload = {"title": "Bilan d'octobre", "content": "Tout est prêt."}
+        created = await nodes.run_action(
+            "wiki", "pages.create", payload, idempotency_key="nexus:run:bilan"
+        )
+        again = await nodes.run_action(
+            "wiki", "pages.create", payload, idempotency_key="nexus:run:bilan"
+        )
+        appended = await nodes.run_action(
+            "wiki",
+            "pages.append",
+            {"page_id": "12", "content": "Suite.", "heading": "Semaine 43"},
+            idempotency_key="nexus:run:suite",
+        )
+        with pytest.raises(NodeActionError) as invalid:
+            await nodes.run_action("wiki", "pages.get", {"page_id": "../secret"})
+        with pytest.raises(NodeActionError) as missing:
+            await nodes.run_action("wiki", "pages.get", {"page_id": "999"})
+        events = await nodes.events("wiki", since=1)
+    finally:
+        await env.aclose()
+    assert spaces.data["rows"] == [{"id": "1", "nom": "Général", "pages": 1}]
+    assert page.data["title"] == "Compte rendu" and "Première version" in page.data["content"]
+    assert created.data["id"] == again.data["id"] and again.replayed and not created.replayed
+    assert len(suite.wiki.pages) == 2  # créée une seule fois
+    assert appended.data["version"] == 2
+    assert appended.data["content"].endswith("## Semaine 43\n\nSuite.")
+    # Identifiant du chemin retiré du corps, clé d'idempotence transmise
+    sent = next(r for r in suite.wiki.requests if r.url.path.endswith("/append"))
+    assert sent.url.path == "/api/atelier/pages/12/append"
+    assert json.loads(sent.content) == {"content": "Suite.", "heading": "Semaine 43"}
+    assert sent.headers["idempotency-key"] == "nexus:run:suite"
+    assert invalid.value.code == "INPUT_INVALID" and missing.value.code == "NOT_FOUND"
+    assert [e.type for e in events.events] == ["wiki.page.created"] and events.next == 2
+
+
+async def test_formulaire_actions(suite: Suite) -> None:
+    env = suite.env()
+    nodes = env.suite()
+    try:
+        forms = await nodes.run_action("formulaire", "forms.list", {})
+        form = await nodes.run_action("formulaire", "forms.get", {"form_id": "3"})
+        payload = {"form_id": "3", "answers": {"q1": 5}}
+        sent = await nodes.run_action(
+            "formulaire", "responses.submit", payload, idempotency_key="nexus:run:avis"
+        )
+        again = await nodes.run_action(
+            "formulaire", "responses.submit", payload, idempotency_key="nexus:run:avis"
+        )
+        with pytest.raises(NodeActionError) as invalid:
+            await nodes.run_action("formulaire", "responses.submit", {"form_id": "3"})
+    finally:
+        await env.aclose()
+    assert forms.data["rows"][0]["titre"] == "Satisfaction"
+    assert form.data["questions"][0]["id"] == "q1"
+    assert sent.data["answers"] == {"q1": 5} and again.replayed
+    assert len(suite.formulaire.responses) == 1  # jamais deux fois la même réponse
+    assert invalid.value.code == "INPUT_INVALID"
 
 
 # ─── Atelier Convert (manifeste réel enregistré) ──────────────────
