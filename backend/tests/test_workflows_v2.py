@@ -16,6 +16,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from app.db.workflows import WorkflowRepository
 from app.schemas.workflows import WorkflowCreate, WorkflowStep
@@ -305,6 +306,31 @@ async def test_runs_interrupted_by_a_shutdown_are_closed_at_startup(
     assert other["status"] == "awaiting_approval" and other["pending"]
     assert await repo.fail_interrupted_runs() == 0  # sans effet la seconde fois
     assert not suite.projets.created
+
+
+async def test_run_lists_never_read_the_internal_state(
+    client: TestClient, repo: WorkflowRepository
+) -> None:
+    """Historique d'un workflow et boîte « À valider » : `state` (définition figée, contexte des
+    outils, entrée en attente) n'est jamais renvoyé, donc jamais lu pour une liste."""
+    wf = create(client, MULTI)
+    run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
+    statements: list[str] = []
+    engine = repo.sessions.kw["bind"].sync_engine
+
+    def record(conn: Any, cursor: Any, statement: str, *_: Any) -> None:
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        listed = await repo.list_runs(wf["id"], 20, "awaiting_approval")
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert [r.id for r in listed] == [run["id"]] and listed[0].pending[0].step_id == "lire"
+    assert len(statements) == 1 and "workflow_runs.state" not in statements[0]
+    # Le détail, lui, garde l'état interne pour la reprise
+    found = await repo.get_run(run["id"])
+    assert found is not None and found[1]
 
 
 def test_refusal_stops_and_skips_the_rest(client: TestClient, suite: Suite) -> None:

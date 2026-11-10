@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import defer
 
 from app.db.models import WorkflowRow, WorkflowRunRow, WorkflowTriggerRow
 from app.db.repository import StorageError, _storage_message
@@ -275,6 +276,9 @@ class WorkflowRepository:
         async def op(s: AsyncSession) -> builtins.list[WorkflowRun]:
             query = (
                 select(WorkflowRunRow)
+                # `state` (définition figée, contexte des outils, entrée en attente) n'est
+                # jamais renvoyé : inutile de le lire pour une liste
+                .options(defer(WorkflowRunRow.state))
                 .order_by(WorkflowRunRow.created_at.desc())
                 .limit(max(1, min(limit, MAX_RUNS)))
             )
