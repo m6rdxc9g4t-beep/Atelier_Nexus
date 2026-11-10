@@ -68,6 +68,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logger.info("%d pièce(s) jointe(s) abandonnée(s) supprimée(s)", purged)
     except StorageError as exc:
         logger.debug("Nettoyage des pièces jointes ignoré : %s", exc)
+    try:  # exécutions qu'un arrêt de Nexus a laissées « en cours » : closes avant tout lancement
+        interrupted = await get_workflow_repository().fail_interrupted_runs()
+        if interrupted:
+            logger.warning("%d exécution(s) de workflow interrompue(s) close(s)", interrupted)
+    except StorageError as exc:
+        logger.debug("Exécutions interrompues non vérifiées : %s", exc)
     service = background_triggers() if settings.triggers_enabled else None
     if service is not None:
         service.start()

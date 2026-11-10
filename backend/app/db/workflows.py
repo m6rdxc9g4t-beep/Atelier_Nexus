@@ -25,6 +25,9 @@ from app.schemas.workflows_v2 import (
 MAX_LIST = 200
 MAX_RUNS = 100
 
+#: Message d'une exécution que l'arrêt de Nexus a laissée « en cours »
+INTERRUPTED = "Exécution interrompue (Nexus s'est arrêté pendant une étape) : relancez le workflow."
+
 AnyWorkflow = Workflow | WorkflowV2
 
 
@@ -209,6 +212,50 @@ class WorkflowRepository:
             )
             await s.commit()
             return bool(getattr(result, "rowcount", 0))
+
+        return await self._run(op)
+
+    async def fail_interrupted_runs(self) -> int:
+        """Clôt les exécutions restées `running` : le processus s'est arrêté pendant une étape
+        (application quittée, erreur de base) et plus rien ne les ferait sortir de cet état.
+
+        AU DÉMARRAGE SEULEMENT, avant que quoi que ce soit ne s'exécute : appelée pendant le
+        service, elle fermerait une exécution réellement en cours. L'étape entamée passe en
+        erreur (`INTERRUPTED` : son action a pu aboutir ou non, à vérifier dans l'application),
+        les suivantes sont sautées. Les exécutions en attente de validation ne bougent pas."""
+
+        async def op(s: AsyncSession) -> int:
+            query = select(WorkflowRunRow).where(WorkflowRunRow.status == "running")
+            rows = (await s.scalars(query)).all()
+            now = datetime.now(UTC)
+            for row in rows:
+                steps = []
+                for step in row.steps or []:
+                    step = dict(step)
+                    if step.get("status") in ("pending", "awaiting_approval"):
+                        if step.get("started_at") and not step.get("ended_at"):
+                            step |= {
+                                "status": "error",
+                                "error_code": "INTERRUPTED",
+                                "content": INTERRUPTED,
+                                "ended_at": now.isoformat(),
+                            }
+                        else:
+                            step["status"] = "skipped"
+                    steps.append(step)
+                row.steps = steps
+                row.pending = []
+                row.state = {k: v for k, v in (row.state or {}).items() if k != "pending"}
+                row.status = "failed"
+                row.message = INTERRUPTED
+                row.updated_at = now
+                workflow = await s.get(WorkflowRow, row.workflow_id)
+                if workflow is not None:  # comme `record_run` : compteur et dernier résultat
+                    workflow.run_count += 1
+                    workflow.last_run_at = now
+                    workflow.last_status = "failed"
+            await s.commit()
+            return len(rows)
 
         return await self._run(op)
 

@@ -267,6 +267,46 @@ def test_multi_app_run_stops_on_each_write_with_the_resolved_input(
     assert client.get("/api/workflow-runs/inconnue").status_code == 404
 
 
+async def test_runs_interrupted_by_a_shutdown_are_closed_at_startup(
+    client: TestClient, repo: WorkflowRepository, suite: Suite
+) -> None:
+    """Nexus quitté pendant une étape : l'exécution restait « en cours » pour toujours (ni
+    reprise ni clôture possibles). Le démarrage suivant la clôt, sans toucher aux autres."""
+    wf = create(client, MULTI)
+    waiting = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
+    run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
+    run = decide(client, run)  # « lire » exécutée, « creer » en attente
+    # Reprise validée, puis arrêt du processus pendant l'étape : c'est l'état laissé en base
+    assert await repo.claim_run(run["id"])
+    stuck = client.get(f"/api/workflow-runs/{run['id']}").json()
+    assert stuck["status"] == "running"
+    token = stuck["steps"][1]["id"]
+    assert (
+        client.post(
+            f"/api/workflow-runs/{run['id']}/resume", json={"approvals": {token: True}}
+        ).status_code
+        == 409
+    )  # plus rien ne la faisait avancer
+
+    assert await repo.fail_interrupted_runs() == 1
+    closed = client.get(f"/api/workflow-runs/{run['id']}").json()
+    assert closed["status"] == "failed" and "interrompue" in closed["message"]
+    assert closed["pending"] == []
+    assert [(x["id"], x["status"], x["error_code"]) for x in closed["steps"]] == [
+        ("lire", "ok", None),
+        ("creer", "error", "INTERRUPTED"),
+        ("publier", "skipped", None),
+    ]
+    assert closed["steps"][1]["ended_at"] is not None
+    stored = client.get(f"/api/workflows/{wf['id']}").json()
+    assert stored["last_status"] == "failed" and stored["run_count"] == 1
+    # Une exécution en attente de validation n'est pas « interrompue » : elle reste décidable
+    other = client.get(f"/api/workflow-runs/{waiting['id']}").json()
+    assert other["status"] == "awaiting_approval" and other["pending"]
+    assert await repo.fail_interrupted_runs() == 0  # sans effet la seconde fois
+    assert not suite.projets.created
+
+
 def test_refusal_stops_and_skips_the_rest(client: TestClient, suite: Suite) -> None:
     wf = create(client, MULTI)
     run = client.post(f"/api/workflows/{wf['id']}/run", json={"params": {}}).json()
