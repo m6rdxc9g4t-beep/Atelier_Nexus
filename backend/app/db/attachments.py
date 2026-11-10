@@ -79,19 +79,28 @@ class AttachmentRepository:
             return {}
 
         async def op(s: AsyncSession) -> dict[str, AttachmentContent]:
-            rows = await s.scalars(select(AttachmentRow).where(AttachmentRow.id.in_(wanted)))
+            # Sans la colonne `data` (fichier d'origine, jusqu'à 20 Mo) : le modèle lit le texte
+            # extrait ; seules les images ont besoin de leurs octets, relus à part
+            row = AttachmentRow
+            columns = (row.id, row.name, row.kind, row.media_type, row.text, row.meta)
+            rows = (await s.execute(select(*columns).where(row.id.in_(wanted)))).all()
+            image_ids = [r.id for r in rows if r.kind == "image"]
+            images: dict[str, bytes] = {}
+            if image_ids:
+                found = await s.execute(select(row.id, row.data).where(row.id.in_(image_ids)))
+                images = {i: data for i, data in found.all()}
             return {
-                row.id: AttachmentContent(
-                    name=row.name,
-                    kind=row.kind,  # type: ignore[arg-type]
-                    media_type=row.media_type,
-                    text=row.text,
-                    image_base64=base64.b64encode(row.data).decode()
-                    if row.kind == "image"
+                r.id: AttachmentContent(
+                    name=r.name,
+                    kind=r.kind,
+                    media_type=r.media_type,
+                    text=r.text,
+                    image_base64=base64.b64encode(images[r.id]).decode()
+                    if r.id in images
                     else None,
-                    meta=dict(row.meta or {}),
+                    meta=dict(r.meta or {}),
                 )
-                for row in rows
+                for r in rows
             }
 
         result: dict[str, AttachmentContent] = await self._run(op)
