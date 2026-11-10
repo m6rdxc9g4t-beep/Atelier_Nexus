@@ -73,6 +73,7 @@ async def test_plain_answer_and_safe_invocation(
     call = calls(tmp_path)[0]
     args = call["args"]
     for flag in (
+        "--safe-mode",  # ni CLAUDE.md, ni mémoire, ni hooks, ni MCP du compte de l'utilisateur
         "--tools",
         "--strict-mcp-config",
         "--disable-slash-commands",
@@ -80,6 +81,7 @@ async def test_plain_answer_and_safe_invocation(
     ):
         assert flag in args
     assert args[args.index("--tools") + 1] == ""
+    assert args[args.index("--max-turns") + 1] == "2"  # SUITE.md §5.3
     assert args[args.index("--model") + 1] == "sonnet"
     assert "Tu es concis." in args[args.index("--system-prompt") + 1]
     assert call["env"] == {

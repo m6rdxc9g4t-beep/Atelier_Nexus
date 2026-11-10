@@ -72,6 +72,9 @@ CLI_ENV = (
     "CLAUDE_CONFIG_DIR",
 )
 MAX_RESULT_CHARS = 40_000
+#: `--max-turns` : valeur des autres applications de la suite avec `--json-schema`
+MAX_TURNS = 2
+
 INSTRUCTION = (
     "Poursuis la conversation fournie sur l'entrée standard : réponds à son dernier message, "
     "au format JSON demandé."
@@ -392,6 +395,9 @@ class ClaudeCodeProvider(LLMProvider):
         model = self.resolve_model(request)
         args = [
             "-p", INSTRUCTION,
+            # Contrat de la suite (SUITE.md §5.3) : ni CLAUDE.md, ni mémoire, ni hooks, ni
+            # extensions, ni MCP du compte Claude Code de l'utilisateur dans les appels des agents
+            "--safe-mode",
             "--output-format", "json",
             "--json-schema", json.dumps(response_schema(request.tools), ensure_ascii=False),
             "--system-prompt", system_prompt(request),
@@ -400,6 +406,8 @@ class ClaudeCodeProvider(LLMProvider):
             "--strict-mcp-config",
             "--disable-slash-commands",
             "--no-session-persistence",
+            # Borne les allers-retours internes : 2 = la sortie structurée, puis la fin du tour
+            "--max-turns", str(MAX_TURNS),
         ]  # fmt: skip
         if any(isinstance(b, ImageBlock) for m in request.messages for b in m.content):
             # Images : entrée stream-json (le texte simple ne peut pas les porter)

@@ -293,8 +293,11 @@ def test_providers_receive_images() -> None:
     assert json.loads(result_line(out))["type"] == "result"
 
 
-async def test_claude_code_sends_images_as_stream_json(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_claude_code_sends_images_as_stream_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "text")
+    monkeypatch.setenv("FAKE_CLAUDE_LOG", str(tmp_path / "calls.jsonl"))
     cli = ClaudeCodeProvider(binary=FAKE_CLI, default_model="sonnet", timeout=10)
     request = LLMRequest(
         messages=[
@@ -306,6 +309,10 @@ async def test_claude_code_sends_images_as_stream_json(monkeypatch: pytest.Monke
     )
     response = await cli.complete(request)
     assert response.text == "Blocs reçus : image,text"
+    # Mêmes garde-fous que l'entrée texte (SUITE.md §5.3)
+    args = json.loads((tmp_path / "calls.jsonl").read_text().splitlines()[0])["args"]
+    assert "--safe-mode" in args and args[args.index("--max-turns") + 1] == "2"
+    assert args[args.index("--tools") + 1] == ""
     # Sans image : entrée texte inchangée
     plain = await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
     assert plain.text == "Bonjour !"
