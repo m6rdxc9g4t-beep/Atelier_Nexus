@@ -36,6 +36,16 @@ def _no_claude_code(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_app_status() -> Iterator[None]:
+    """État des applications (`/api/apps/status`) : jamais celui d'un autre test."""
+    from app.api.apps import clear_status_cache
+
+    clear_status_cache()
+    yield
+    clear_status_cache()
+
+
+@pytest.fixture(autouse=True)
 def _fresh_manifests() -> Iterator[None]:
     clear_manifest_cache()
     yield

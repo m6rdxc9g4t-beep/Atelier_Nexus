@@ -126,7 +126,8 @@ Outils fournis : `current_datetime`, `publish_artifact` (types : `sql`, `dax`, `
 ## 6. Endpoints
 
 ### `GET /api/llm/providers`
-État de chaque provider.
+État de chaque provider, sondés en parallèle et gardé 60 s en mémoire (10 s si l'un est indisponible) ;
+`?refresh=true` le relit, au plus toutes les 10 s. Enregistrer les Réglages recrée le routeur : état relu aussitôt.
 ```json
 [{"name": "anthropic", "configured": true, "available": true, "is_default": true,
   "is_fallback": false, "default_model": "claude-sonnet-5-5", "models": ["…"], "error": null}]

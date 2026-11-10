@@ -346,3 +346,64 @@ def test_apps_status_reads_the_convert_manifest(client: TestClient) -> None:
     )
     assert status["convert"]["detail"] == "6 action(s), 4 événement(s) (nœud atelier-node/1)"
     assert status["convert"]["base_url"] == "http://127.0.0.1:8010/api"
+
+
+def test_apps_status_is_cached_and_github_is_spared(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L'interface relit l'état toutes les 30 s : GitHub (60 requêtes par heure sans jeton) n'est
+    interrogé que toutes les 10 minutes, une application locale toutes les 25 s au plus."""
+    from app.api import apps
+    from app.api.settings import reload_settings
+    from tests.test_connectors import FakeGitHub
+
+    clock = [1000.0]
+    monkeypatch.setattr(apps, "_now", lambda: clock[0])
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        github_repo="moi/demo",
+        data_via_base_url=None,
+        projets_base_url="http://projets.test/api",
+        tresorerie_base_url=None,
+        cine_base_url=None,
+        savoir_base_url=None,
+        tab_exports_dir=None,
+        convert_base_url=None,
+        wiki_base_url=None,
+        formulaire_base_url=None,
+    )
+    github, projets = FakeGitHub(), FakeProjets()
+    hits = {"github": 0, "projets": 0}
+
+    def counted(name: str, handler: httpx.MockTransport) -> httpx.MockTransport:
+        def handle(request: httpx.Request) -> httpx.Response:
+            hits[name] += request.url.path in ("/repos/moi/demo", "/api/health")
+            return handler.handler(request)  # type: ignore[return-value]
+
+        return httpx.MockTransport(handle)
+
+    transports = {
+        "github": counted("github", httpx.MockTransport(github)),
+        "projets": counted("projets", httpx.MockTransport(projets)),
+    }
+    app.dependency_overrides[get_env_factory] = lambda: (
+        lambda: ToolEnvironment(settings, transports=transports)
+    )
+
+    def read(query: str = "") -> dict[str, dict[str, object]]:
+        return {a["id"]: a for a in client.get(f"/api/apps/status{query}").json()}
+
+    first = read()
+    assert first["github"]["available"] is True and first["projets"]["available"] is True
+    assert read() == first and hits == {"github": 1, "projets": 1}  # deux lectures rapprochées
+    clock[0] += 30  # passage suivant de l'interface : l'application locale est relue, pas GitHub
+    read()
+    assert hits == {"github": 1, "projets": 2}
+    clock[0] += 600
+    read()
+    assert hits == {"github": 2, "projets": 3}
+    read("?refresh=true")  # « Vérifier » : tout est relu
+    assert hits == {"github": 3, "projets": 4}
+    reload_settings()  # réglages enregistrés : état relu à la requête suivante
+    read()
+    assert hits == {"github": 4, "projets": 5}

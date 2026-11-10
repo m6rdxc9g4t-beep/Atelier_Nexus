@@ -10,8 +10,10 @@ neutre et choisissent éventuellement un provider. Le routeur :
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import AsyncIterator, Mapping
+import time
+from collections.abc import AsyncIterator, Callable, Mapping
 from functools import lru_cache
 
 from pydantic import BaseModel
@@ -23,6 +25,13 @@ from app.core.llm.providers.claude_code_provider import ClaudeCodeProvider, find
 from app.core.llm.types import LLMRequest, LLMResponse, LLMStreamEvent, ProviderName
 
 logger = logging.getLogger(__name__)
+
+#: État des moteurs gardé en mémoire (contrat de la suite, SUITE.md §5.3) : l'interface le relit
+#: toutes les 30 s, et le sonder lance un `claude auth status` ou un appel à l'API d'Anthropic
+STATUS_TTL = 60.0
+#: Un moteur indisponible est resondé plus vite (Ollama qu'on vient de lancer), et une
+#: vérification demandée (`refresh`) ne relance rien avant ce délai
+STATUS_RETRY = 10.0
 
 
 class ProviderStatus(BaseModel):
@@ -49,6 +58,10 @@ class LLMRouter:
         self._providers = dict(providers)
         self.default = default
         self.fallback = fallback if fallback != default else None
+        #: Dernier état lu : (instant de lecture, expiration, états) ; un routeur recréé
+        #: (réglages enregistrés) repart sans cache
+        self._status: tuple[float, float, list[ProviderStatus]] | None = None
+        self._clock: Callable[[], float] = time.monotonic
 
     @classmethod
     def from_settings(cls, settings: Settings) -> LLMRouter:
@@ -155,31 +168,41 @@ class LLMRouter:
 
     # ─── Supervision ──────────────────────────────────────────────
 
-    async def status(self) -> list[ProviderStatus]:
-        statuses: list[ProviderStatus] = []
-        for name, provider in self._providers.items():
-            models: list[str] = []
-            error: str | None = None
-            available = False
-            if provider.is_configured:
-                try:
-                    models = await provider.list_models()
-                    available = True
-                except Exception as exc:  # supervision : on rapporte, on ne lève pas
-                    error = str(exc)
-            statuses.append(
-                ProviderStatus(
-                    name=name,
-                    configured=provider.is_configured,
-                    available=available,
-                    is_default=name == self.default,
-                    is_fallback=name == self.fallback,
-                    default_model=provider.default_model,
-                    models=models,
-                    error=error,
-                )
-            )
+    async def status(self, *, refresh: bool = False) -> list[ProviderStatus]:
+        """État de chaque moteur, gardé `STATUS_TTL` (moins si l'un est indisponible) ;
+        `refresh` le relit, au plus toutes les `STATUS_RETRY` secondes."""
+        now = self._clock()
+        if self._status is not None:
+            read_at, expires, cached = self._status
+            if now < (read_at + STATUS_RETRY if refresh else expires):
+                return cached
+        statuses = list(
+            await asyncio.gather(*(self._probe(n, p) for n, p in self._providers.items()))
+        )
+        healthy = all(s.available for s in statuses if s.configured)
+        self._status = (now, now + (STATUS_TTL if healthy else STATUS_RETRY), statuses)
         return statuses
+
+    async def _probe(self, name: ProviderName, provider: LLMProvider) -> ProviderStatus:
+        models: list[str] = []
+        error: str | None = None
+        available = False
+        if provider.is_configured:
+            try:
+                models = await provider.list_models()
+                available = True
+            except Exception as exc:  # supervision : on rapporte, on ne lève pas
+                error = str(exc)
+        return ProviderStatus(
+            name=name,
+            configured=provider.is_configured,
+            available=available,
+            is_default=name == self.default,
+            is_fallback=name == self.fallback,
+            default_model=provider.default_model,
+            models=models,
+            error=error,
+        )
 
 
 @lru_cache

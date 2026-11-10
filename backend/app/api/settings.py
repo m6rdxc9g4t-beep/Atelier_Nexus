@@ -13,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.api.apps import clear_status_cache
 from app.core.config import get_settings
 from app.core.llm.router import get_llm_router
 from app.core.settings_editor import (
@@ -50,7 +51,8 @@ Guard = Annotated[None, Depends(same_origin_only)]
 def reload_settings() -> None:
     """Configuration relue à la requête suivante (réglages, routeur LLM et ses clients)."""
     get_settings.cache_clear()
-    get_llm_router.cache_clear()
+    get_llm_router.cache_clear()  # nouveau routeur : état des moteurs relu
+    clear_status_cache()  # état des applications relu (adresse changée, jeton ajouté…)
 
 
 @router.get("", response_model=SettingsView)

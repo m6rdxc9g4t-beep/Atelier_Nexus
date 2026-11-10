@@ -4,6 +4,7 @@ Trésorerie, Tab, Ciné, Savoir, Cuisine, GitHub)."""
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -20,6 +21,24 @@ router = APIRouter(prefix="/api/apps", tags=["apps"])
 EnvFactoryDep = Annotated[Callable[[], ToolEnvironment], Depends(get_env_factory)]
 
 
+#: État d'une application locale gardé en mémoire : l'interface relit tout toutes les 30 s
+LOCAL_TTL = 25.0
+#: Services en ligne (GitHub : 60 requêtes par heure sans jeton ; Supabase d'Atelier Cuisine) :
+#: relus toutes les 10 minutes, une erreur toutes les minutes
+ONLINE_TTL = 600.0
+ONLINE_ERROR_TTL = 60.0
+ONLINE_APPS = frozenset({"github", "cuisine"})
+
+#: (application, ce qui la désigne) → (expiration, état). Jamais de client ni de secret ici.
+_CACHE: dict[tuple[str, str], tuple[float, AppStatus]] = {}
+_now = time.monotonic
+
+
+def clear_status_cache() -> None:
+    """Réglages enregistrés (`reload_settings`) : l'état est relu à la requête suivante."""
+    _CACHE.clear()
+
+
 class AppStatus(BaseModel):
     id: str
     label: str
@@ -31,13 +50,22 @@ class AppStatus(BaseModel):
 
 
 async def _probe(
-    app_id: str, label: str, base_url: str | None, check: Callable[[], Awaitable[str]]
+    app_id: str,
+    label: str,
+    base_url: str | None,
+    check: Callable[[], Awaitable[str]],
+    *,
+    refresh: bool = False,
 ) -> AppStatus:
     if not base_url:
         return AppStatus(id=app_id, label=label, configured=False, available=False, base_url=None)
+    key = (app_id, base_url)
+    cached = _CACHE.get(key)
+    if cached and cached[0] > _now() and not refresh:
+        return cached[1]
     try:
         detail = await asyncio.wait_for(check(), timeout=3)
-        return AppStatus(
+        status = AppStatus(
             id=app_id,
             label=label,
             configured=True,
@@ -47,7 +75,7 @@ async def _probe(
         )
     except (AppError, DataViaError, TimeoutError) as exc:
         message = str(exc) or "délai dépassé"
-        return AppStatus(
+        status = AppStatus(
             id=app_id,
             label=label,
             configured=True,
@@ -55,13 +83,27 @@ async def _probe(
             base_url=base_url,
             error=message,
         )
+    if app_id not in ONLINE_APPS:
+        ttl = LOCAL_TTL
+    else:
+        ttl = ONLINE_TTL if status.available else ONLINE_ERROR_TTL
+    _CACHE[key] = (_now() + ttl, status)
+    return status
 
 
 @router.get("/status", response_model=list[AppStatus])
-async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
-    """Vérifie chaque application en parallèle (3 s max chacune). Ne lève jamais."""
+async def apps_status(make_env: EnvFactoryDep, refresh: bool = False) -> list[AppStatus]:
+    """Vérifie chaque application en parallèle (3 s max chacune). Ne lève jamais.
+
+    Chaque état est gardé en mémoire (25 s pour une application locale, 10 min pour GitHub et
+    Atelier Cuisine, en ligne) ; `refresh=true` relit tout (bouton « Vérifier »)."""
     env = make_env()
     s = env.settings
+
+    def probe(
+        app_id: str, label: str, base_url: str | None, check: Callable[[], Awaitable[str]]
+    ) -> Awaitable[AppStatus]:
+        return _probe(app_id, label, base_url, check, refresh=refresh)
 
     async def viz() -> str:
         st = await env.data_via().status()
@@ -119,24 +161,24 @@ async def apps_status(make_env: EnvFactoryDep) -> list[AppStatus]:
     try:
         return list(
             await asyncio.gather(
-                _probe("viz", "Atelier Viz (Data Via)", s.data_via_base_url, viz),
-                _probe("projets", "Atelier Projets", s.projets_base_url, projets),
-                _probe("convert", "Atelier Convert", s.convert_base_url, node("convert")),
-                _probe("wiki", "Atelier Wiki", s.wiki_base_url, node("wiki")),
-                _probe(
+                probe("viz", "Atelier Viz (Data Via)", s.data_via_base_url, viz),
+                probe("projets", "Atelier Projets", s.projets_base_url, projets),
+                probe("convert", "Atelier Convert", s.convert_base_url, node("convert")),
+                probe("wiki", "Atelier Wiki", s.wiki_base_url, node("wiki")),
+                probe(
                     "formulaire", "Atelier Formulaire", s.formulaire_base_url, node("formulaire")
                 ),
-                _probe("tresorerie", "Atelier Trésorerie", s.tresorerie_base_url, tresorerie),
-                _probe("tab", "Atelier Tab", s.tab_exports_dir, tab),
-                _probe("cine", "Atelier Ciné", s.cine_base_url, cine),
-                _probe("savoir", "Atelier Savoir", s.savoir_base_url, savoir),
-                _probe(
+                probe("tresorerie", "Atelier Trésorerie", s.tresorerie_base_url, tresorerie),
+                probe("tab", "Atelier Tab", s.tab_exports_dir, tab),
+                probe("cine", "Atelier Ciné", s.cine_base_url, cine),
+                probe("savoir", "Atelier Savoir", s.savoir_base_url, savoir),
+                probe(
                     "cuisine",
                     "Atelier Cuisine",
                     s.cuisine_supabase_url if s.cuisine_configured else None,
                     cuisine,
                 ),
-                _probe("github", "GitHub", ", ".join(s.github_repo_list) or None, github),
+                probe("github", "GitHub", ", ".join(s.github_repo_list) or None, github),
             )
         )
     finally:

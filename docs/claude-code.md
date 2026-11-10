@@ -40,7 +40,8 @@ l'interface affiche toujours « Claude »). Choisi par `LLMRouter.from_settings`
   (`--no-session-persistence`), dossier de travail vide et temporaire.
 - **Erreurs** : non connecté → « tapez claude dans le Terminal… » ; limite de l'abonnement → erreur transitoire, qui
   permet le **repli vers Ollama** si `LLM_FALLBACK_PROVIDER=ollama` ; délai dépassé → transitoire aussi.
-- **État** (`/api/llm/providers`) : `claude auth status` ; modèles proposés : sonnet, opus, haiku.
+- **État** (`/api/llm/providers`) : `claude auth status`, gardé 60 s en mémoire (SUITE.md §5.3 ; `?refresh=true` le relance, au
+  plus toutes les 10 s) ; modèles proposés : sonnet, opus, haiku.
 - **Streaming** : la réponse structurée arrive d'un bloc (pas de texte partiel), tour par tour.
 
 Les agents « 100 % local » (Finance, Comptable, Tuteur) restent sur Ollama : l'abonnement est un service en ligne.

@@ -199,7 +199,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 |---|---|---|
 | GET | `/api/agents` | Catalogue complet : `icon`, `category`, `starters`, `source`, `toolsets`, `local_only`, `tools[].requires_approval`, `unavailable_toolsets` |
 | POST | `/api/agents/{name}/run` · `/stream` | Corps : `messages`, `provider`, `model`, `conversation_id`, **`approvals`** |
-| GET | `/api/apps/status` | État de Viz, Projets, Convert (nœud de workflow), Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais) |
+| GET | `/api/apps/status` | État de Viz, Projets, Convert, Wiki et Formulaire (nœuds de workflow), Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais). Gardé en mémoire : 25 s pour une application locale, 10 min pour GitHub et Cuisine (en ligne ; une erreur : 1 min) ; `?refresh=true` relit tout, et enregistrer les Réglages vide ce cache |
 
 Événements SSE : `text_delta`, `tool_call`, `tool_result`, `artifact`, **`approval_required`**, `done`, `error`.
 

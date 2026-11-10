@@ -115,9 +115,13 @@ export const api = {
   /** Retire un fichier joint pas encore envoyé. */
   removeAttachment: (id: string) => sendJson<void>("DELETE", `/api/attachments/${encodeURIComponent(id)}`),
   agents: (signal?: AbortSignal) => getJson<AgentInfo[]>("/api/agents", signal),
-  providers: (signal?: AbortSignal) => getJson<ProviderStatus[]>("/api/llm/providers", signal),
+  /** `refresh` : état relu par le serveur au lieu de son cache (60 s). */
+  providers: (signal?: AbortSignal, refresh = false) =>
+    getJson<ProviderStatus[]>(`/api/llm/providers${refresh ? "?refresh=true" : ""}`, signal),
   dataViaStatus: (signal?: AbortSignal) => getJson<DataViaStatus>("/api/data-via/status", signal),
-  appsStatus: (signal?: AbortSignal) => getJson<AppStatus[]>("/api/apps/status", signal),
+  /** `refresh` : chaque application resondée (cache du serveur : 25 s, 10 min pour GitHub et Cuisine). */
+  appsStatus: (signal?: AbortSignal, refresh = false) =>
+    getJson<AppStatus[]>(`/api/apps/status${refresh ? "?refresh=true" : ""}`, signal),
   editorOptions: (signal?: AbortSignal) => getJson<EditorOptions>("/api/toolsets", signal),
   customAgent: (name: string) =>
     getJson<CustomAgentDefinition>(`/api/custom-agents/${encodeURIComponent(name)}`),
