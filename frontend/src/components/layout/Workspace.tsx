@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, ServerOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -16,6 +16,7 @@ import { WorkflowsStudio } from "@/features/workflows/WorkflowsStudio";
 import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
 import { API_URL } from "@/lib/api";
+import { readAgentLink, withoutAgentLink } from "@/lib/deepLink";
 import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
 import { useChatStore } from "@/stores/useChatStore";
 import { useNavStore } from "@/stores/useNavStore";
@@ -62,6 +63,21 @@ export function Workspace() {
     setAgent(name);
     setView("agents");
   };
+
+  // Lien profond (Atelier Hub) : `?agent=<nom>` ouvre la conversation avec cet agent, une seule fois,
+  // quand le catalogue est chargé ; un nom inconnu laisse l'accueil. Le paramètre est retiré de l'adresse.
+  const linkHandled = useRef(false);
+  useEffect(() => {
+    if (linkHandled.current || !agents.length) return;
+    linkHandled.current = true;
+    const name = readAgentLink(window.location.search);
+    if (!name) return;
+    window.history.replaceState(window.history.state, "", withoutAgentLink(window.location.href));
+    if (!agents.some((a) => a.name === name)) return;
+    closeStudio();
+    setAgent(name);
+    setView("agents");
+  }, [agents, closeStudio, setAgent, setView]);
   const sidebar = (
     <AppSidebar
       agents={agents}

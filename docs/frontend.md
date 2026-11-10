@@ -152,6 +152,10 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 
 Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer.
 
+## 5 bis. Lien profond (Atelier Hub)
+
+`?agent=<nom>` (ex. `https://nexus.<domaine>/?agent=data_analyst`) ouvre la conversation avec cet agent : lu une fois quand le catalogue des agents est chargé (`src/lib/deepLink.ts`, appliqué dans `Workspace.tsx`), puis retiré de l'adresse. Nom inconnu : l'accueil reste affiché. C'est le lien qu'envoie Atelier Hub depuis le panneau Nexus d'une fiche projet.
+
 ## 6. Vérifier
 
 ```bash
