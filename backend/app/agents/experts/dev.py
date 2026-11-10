@@ -16,7 +16,6 @@ class DeveloperAgent(BaseAgent):
     category = "Développement"
     toolsets = ("core", "github_read", "github_write", "projets_read")
     max_iterations = 16
-    max_tokens = 8192
     starters = (
         "Présente-moi l'architecture du dépôt configuré.",
         "Écris les tests manquants pour le module le plus critique, sur une branche feat/.",

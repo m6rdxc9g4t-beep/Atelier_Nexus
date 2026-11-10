@@ -10,7 +10,16 @@ from app.agents import (
     ToolCallEvent,
     ToolResultEvent,
 )
-from app.core.llm import Message, ProviderUnavailableError, ToolResultBlock, ToolUseBlock
+from app.agents.base import CUT_FALLBACK
+from app.core.llm import (
+    LLMResponse,
+    Message,
+    ProviderUnavailableError,
+    TextBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    Usage,
+)
 from app.tools import BaseTool, PublishArtifactTool, ToolContext, ToolInput, ToolOutput
 from tests.fakes import ScriptedProvider, make_router, text_response, tool_response
 
@@ -151,6 +160,58 @@ async def test_closing_call_never_leaves_a_tool_call_without_result() -> None:
     shown = "".join(e.text for e in events if isinstance(e, TextDeltaEvent))
     assert shown == result.text
     assert [e.id for e in events if isinstance(e, ToolCallEvent)] == ["c0", "c1", "c2"]
+
+
+def cut_response(*, text: str = "", stop_reason: Literal["max_tokens", "refusal"]) -> LLMResponse:
+    """Réponse arrêtée pendant un appel d'outil : l'appel est là, ses arguments sont incomplets."""
+    content: list[TextBlock | ToolUseBlock] = [TextBlock(text=text)] if text else []
+    content.append(ToolUseBlock(id="toolu_1", name="add", input={"a": 1}))
+    return LLMResponse(
+        provider="anthropic",
+        model="anthropic-model",
+        content=list(content),
+        stop_reason=stop_reason,
+        usage=Usage(input_tokens=10, output_tokens=5),
+    )
+
+
+@pytest.mark.parametrize("stop_reason", ["max_tokens", "refusal"])
+@pytest.mark.parametrize("text", ["", "Je calcule."])
+async def test_a_cut_response_never_leaves_a_tool_call_without_result(
+    stop_reason: Literal["max_tokens", "refusal"], text: str
+) -> None:
+    """Réponse coupée en plein appel d'outil : l'appel n'est ni exécuté ni gardé (l'API refuse
+    un `tool_use` sans `tool_result`, la conversation ne pourrait plus avancer)."""
+    provider = ScriptedProvider(
+        "anthropic", [cut_response(text=text, stop_reason=stop_reason), text_response("Deux.")]
+    )
+    agent = CalcAgent(make_router(provider), approval_mode=WRITES_ONLY)
+    history = [Message.user("1 + 1 ?")]
+    events = [e async for e in agent.run_stream(history)]
+    done = events[-1]
+    assert isinstance(done, DoneEvent)
+    result = done.result
+    assert result.stop_reason == stop_reason
+    assert not any(isinstance(e, ToolCallEvent) for e in events)  # jamais exécuté
+    assert [m.role for m in result.new_messages] == ["assistant"]
+    assert not any(isinstance(b, ToolUseBlock) for b in result.new_messages[0].content)
+    assert result.text.startswith(text) and "n'a pas été exécutée" in result.text
+    # Le chat affiche la note comme elle est enregistrée, séparée du texte déjà écrit
+    shown = "".join(e.text for e in events if isinstance(e, TextDeltaEvent))
+    assert shown.endswith(("\n\n" if text else "") + CUT_FALLBACK)
+    assert result.text.endswith(("\n\n" if text else "") + CUT_FALLBACK)
+
+    # Tour suivant : aucun appel orphelin dans la requête envoyée au modèle
+    await agent.run([*history, *result.new_messages, Message.user("Recommence.")])
+    sent = provider.requests[-1].messages
+    calls = {b.id for m in sent for b in m.content if isinstance(b, ToolUseBlock)}
+    results = {b.tool_use_id for m in sent for b in m.content if isinstance(b, ToolResultBlock)}
+    assert calls == results == set()
+
+
+def test_agents_leave_room_for_a_long_tool_call() -> None:
+    """Le plafond couvre réflexion + texte + arguments d'outil : 4096 coupait un rapport."""
+    assert BaseAgent.max_tokens >= 16_000
 
 
 async def test_sticks_to_fallback_provider_for_whole_run() -> None:

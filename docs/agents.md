@@ -111,7 +111,11 @@ outil dépendant relit une fois chaque jeu déjà décrit dans la conversation (
 redemande alors la description). Le nombre d'étapes (`max_iterations`) porte sur **tout le tour**, reprises comprises
 (`AgentResult.iterations` compte les appels au modèle depuis le dernier message de l'utilisateur) ; au plafond, un
 dernier appel, dont les éventuels appels d'outils sont écartés sans être exécutés, produit une synthèse
-(`stop_reason = "max_iterations"`, sans étape de plus), jamais un texte vide.
+(`stop_reason = "max_iterations"`, sans étape de plus), jamais un texte vide. De même, une réponse arrêtée avant la
+fin (`stop_reason` `max_tokens` ou `refusal`) pendant un appel d'outil perd cet appel, incomplet : il n'est ni exécuté ni
+gardé dans l'historique (l'API refuserait ensuite un `tool_use` sans résultat), et une phrase le dit à l'utilisateur.
+Plafond d'une réponse : `BaseAgent.max_tokens` (16 000, réflexion du modèle comprise ; borné à la fenêtre
+`OLLAMA_NUM_CTX` pour Ollama).
 
 Résumé d'une lecture : `BaseTool.approval_summary()` par défaut = nom lisible (`app/tools/labels.py`, mêmes
 libellés que l'interface) + paramètres principaux (« Data Via · requête : dataset_id = « ventes », limit = 50 ») ;

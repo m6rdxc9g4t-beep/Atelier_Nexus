@@ -184,6 +184,9 @@ class OllamaProvider(LLMProvider):
     def _params(self, request: LLMRequest) -> dict[str, Any]:
         options: dict[str, Any] = {"num_predict": request.max_tokens}
         if self.num_ctx:
+            # Une réponse ne peut pas dépasser la fenêtre : le plafond des agents, pensé pour
+            # Claude, ne doit pas la faire glisser
+            options["num_predict"] = min(request.max_tokens, self.num_ctx)
             # Toujours la même valeur : un changement ferait recharger le modèle par Ollama
             options["num_ctx"] = self.num_ctx
         params: dict[str, Any] = {

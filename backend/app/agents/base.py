@@ -96,6 +96,11 @@ LIMIT_FALLBACK = (
     "Nombre d'étapes maximal atteint pour ce tour : la tâche n'est pas terminée. Relancez-moi "
     "avec une demande plus ciblée pour la poursuivre."
 )
+#: Remplace les appels d'outils d'une réponse arrêtée avant la fin (limite de longueur, refus)
+CUT_FALLBACK = (
+    "Réponse interrompue avant la fin (limite de longueur ou refus du modèle) : l'action en "
+    "cours n'a pas été exécutée. Relancez-moi, au besoin avec une demande plus courte."
+)
 
 # ─── Résultat & événements ────────────────────────────────────────
 
@@ -195,7 +200,9 @@ class BaseAgent(ABC):
     privacy: Privacy = "standard"
     default_provider: ProviderName | None = None
     max_iterations: int = 8
-    max_tokens: int = 4096
+    #: Plafond d'une réponse, réflexion du modèle comprise : trop bas, un appel d'outil au long
+    #: argument (rapport, code) est coupé en plein milieu
+    max_tokens: int = 16_000
 
     def __init__(
         self,
@@ -528,6 +535,13 @@ class BaseAgent(ABC):
                 if closed.text != response.text:  # texte par défaut : affiché comme le reste
                     yield TextDeltaEvent(text=LIMIT_FALLBACK)
                 response = closed
+            elif response.stop_reason != "tool_use" and response.tool_calls:
+                # Réponse coupée (limite de longueur, refus) pendant un appel d'outil : ses
+                # arguments sont incomplets, il n'est pas exécuté et ne reste pas dans l'historique
+                if response.text.strip():
+                    yield TextDeltaEvent(text="\n\n")
+                yield TextDeltaEvent(text=CUT_FALLBACK)
+                response = without_tool_calls(response, CUT_FALLBACK, always=True)
             assistant_msg = Message(role="assistant", content=response.content)
             history.append(assistant_msg)
             new_messages.append(assistant_msg)
@@ -697,10 +711,16 @@ def turn_iterations(history: Sequence[Message]) -> int:
     return count
 
 
-def without_tool_calls(response: LLMResponse) -> LLMResponse:
+def without_tool_calls(
+    response: LLMResponse, fallback: str = LIMIT_FALLBACK, *, always: bool = False
+) -> LLMResponse:
     """Réponse de clôture : appels d'outils retirés (jamais exécutés, ils resteraient sans
-    résultat dans l'historique) ; un texte par défaut si le modèle n'a rien écrit."""
+    résultat dans l'historique) ; `fallback` si le modèle n'a rien écrit, ou à la suite de son
+    texte avec `always`."""
     content = [b for b in response.content if not isinstance(b, ToolUseBlock)]
-    if not any(isinstance(b, TextBlock) and b.text.strip() for b in content):
-        content = [*content, TextBlock(text=LIMIT_FALLBACK)]
+    written = any(isinstance(b, TextBlock) and b.text.strip() for b in content)
+    if always and written:
+        content = [*content, TextBlock(text="\n\n" + fallback)]
+    elif not written:
+        content = [*content, TextBlock(text=fallback)]
     return response.model_copy(update={"content": content})

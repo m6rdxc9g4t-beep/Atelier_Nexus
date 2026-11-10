@@ -40,7 +40,7 @@ Différences gérées par les providers :
 | Appel d'outil | bloc `tool_use` avec `id` | `tool_calls` **sans id** → le hub génère `call_xxx` |
 | Résultat d'outil | bloc `tool_result` dans un message `user` | message `role: tool` + `tool_name` |
 | Erreur d'outil | `is_error: true` | contenu préfixé `[ERREUR]` |
-| Limite de sortie | `max_tokens` | `options.num_predict` |
+| Limite de sortie | `max_tokens` | `options.num_predict` (borné à `num_ctx`) |
 
 ## 3. LLMRouter
 

@@ -293,6 +293,11 @@ async def test_ollama_context_window_is_requested_when_configured() -> None:
         {"num_predict": 512, "num_ctx": 16384},  # toujours la même fenêtre : pas de rechargement
     ]
 
+    # Plafond des agents (pensé pour Claude) au-dessus de la fenêtre : borné à la fenêtre
+    sent.clear()
+    await provider.complete(LLMRequest(messages=CONVERSATION[:1], max_tokens=32_000))
+    assert sent[0]["options"] == {"num_predict": 16384, "num_ctx": 16384}
+
     sent.clear()
     for value in (None, 0):
         await _ollama(_ollama_echo(sent), num_ctx=value).complete(
