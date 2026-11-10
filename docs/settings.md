@@ -54,6 +54,12 @@ Premier groupe des Réglages, en boutons radio :
 - **Origine contrôlée** : refus (403) d'un appel venant d'une autre origine que l'interface de Nexus (origines CORS
   déclarées ou même origine dans l'application de bureau). Le corps JSON impose de toute façon une requête de contrôle
   CORS aux navigateurs.
+- **Requêtes locales seulement** (`app/api/local_only.py`, toute l'API) : un en-tête `Host` qui n'est ni de bouclage
+  (`127.0.0.1`, `localhost`, `[::1]`), ni l'hôte d'une origine de `CORS_ORIGINS` (le VPS : `nexus.<domaine>`), ni listé
+  dans `ALLOWED_HOSTS` (noms séparés par des virgules, sans port) est refusé (403 `forbidden_host`) : une page web dont
+  le domaine est redirigé vers 127.0.0.1 (« DNS rebinding ») ne lit pas les conversations et ne valide rien. Une écriture
+  (POST, PUT, PATCH, DELETE) dont l'`Origin` désigne un autre hôte, ou vaut `null`, est refusée (403
+  `forbidden_origin`) ; sans `Origin` (Hub, scripts), elle passe. `/health` et `/api/health` répondent à tout hôte.
 - Sans clé Claude ni Claude Code, le moteur par défaut devient Ollama (au lieu d'une erreur à chaque message).
 
 Fichier utilisé : `backend/.env` en développement, `~/Library/Application Support/Atelier Nexus/.env` dans

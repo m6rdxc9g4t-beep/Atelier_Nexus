@@ -31,7 +31,10 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 def same_origin_only(
     origin: Annotated[str | None, Header()] = None, host: Annotated[str | None, Header()] = None
 ) -> None:
-    """Interface de Nexus (origines CORS déclarées ou même origine) ; sans Origin : client local."""
+    """Interface de Nexus (origines CORS déclarées ou même origine) ; sans Origin : client local.
+
+    L'en-tête Host est déjà contrôlé par `LocalOnlyMiddleware` (bouclage ou hôte déclaré) : une
+    page d'un autre site ne peut pas s'en servir pour se dire « même origine »."""
     if origin is None:
         return
     allowed = set(get_settings().cors_origin_list)

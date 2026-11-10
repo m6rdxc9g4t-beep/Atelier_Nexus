@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Ports Nexus : 3100 (UI) / 8100 (API) — 3000 et 8000 sont pris par Projets et Viz
     cors_origins: str = "http://localhost:3100,http://127.0.0.1:3100"
+    #: Hôtes acceptés par l'API en plus du bouclage et de ceux de CORS_ORIGINS (séparés par des
+    #: virgules, sans port) : accès par un autre nom, ex. réseau local (app/api/local_only.py)
+    allowed_hosts: str = ""
 
     # Persistance
     database_url: str = "postgresql+asyncpg://atelier:change-me@localhost:5432/atelier_nexus"
@@ -193,6 +196,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
 
 
 @lru_cache

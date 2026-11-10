@@ -3,7 +3,8 @@
 `claude` peut être installé sur la machine de test : sans cette précaution, le mode
 « auto » choisirait l'abonnement et les tests dépendraient de l'environnement.
 Le cache des manifestes des nœuds de la suite est vidé entre deux tests. La tâche de fond des
-déclencheurs de workflows est coupée (`TRIGGERS_ENABLED=false`).
+déclencheurs de workflows est coupée (`TRIGGERS_ENABLED=false`). L'hôte de `TestClient` est
+ajouté à `ALLOWED_HOSTS` (garde des requêtes locales, `app/api/local_only.py`).
 """
 
 import os
@@ -13,6 +14,8 @@ import pytest
 
 # Jamais de tâche de fond des déclencheurs pendant les tests : ils appellent `tick()` eux-mêmes
 os.environ["TRIGGERS_ENABLED"] = "false"
+# `TestClient` s'annonce sous l'hôte « testserver » : accepté par la garde des requêtes locales
+os.environ["ALLOWED_HOSTS"] = "testserver"
 
 from app.suite.nodes import clear_manifest_cache
 

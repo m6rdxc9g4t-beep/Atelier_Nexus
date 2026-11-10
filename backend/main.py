@@ -33,6 +33,7 @@ from app.api.deps import (
     make_environment,
 )
 from app.api.errors import register_error_handlers
+from app.api.local_only import LocalOnlyMiddleware
 from app.core.config import get_settings
 from app.core.llm import get_llm_router
 from app.db.repository import StorageError
@@ -111,6 +112,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ajoutée en dernier, donc traversée en premier : Host et Origin contrôlés avant tout le reste
+app.add_middleware(LocalOnlyMiddleware)
 
 register_error_handlers(app)
 app.include_router(llm.router)
