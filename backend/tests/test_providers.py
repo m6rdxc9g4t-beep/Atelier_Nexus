@@ -114,10 +114,40 @@ async def test_anthropic_complete_parses_tool_use() -> None:
     )
     assert sent["model"] == "claude-test"
     assert sent["system"] == "Sys"
+    # Cache de prompt automatique : outils, consignes et historique relus au tarif réduit
+    assert sent["cache_control"] == {"type": "ephemeral"}
     assert sent["tools"][0]["input_schema"]["type"] == "object"
     assert response.stop_reason == "tool_use"
     assert response.tool_calls[0].id == "toolu_9"
     assert response.usage.output_tokens == 7
+
+
+async def test_anthropic_usage_counts_cached_tokens() -> None:
+    """Avec le cache, `input_tokens` ne compte que la partie non cachée : sans les deux autres
+    compteurs, l'usage affiché serait sous-évalué."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-test",
+                "content": [{"type": "text", "text": "ok"}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {
+                    "input_tokens": 12,
+                    "cache_creation_input_tokens": 300,
+                    "cache_read_input_tokens": 4000,
+                    "output_tokens": 7,
+                },
+            },
+        )
+
+    response = await _anthropic(handler).complete(LLMRequest(messages=CONVERSATION[:1]))
+    assert response.usage.input_tokens == 4312 and response.usage.output_tokens == 7
 
 
 async def test_anthropic_stream() -> None:

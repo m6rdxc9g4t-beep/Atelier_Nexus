@@ -41,6 +41,7 @@ Différences gérées par les providers :
 | Résultat d'outil | bloc `tool_result` dans un message `user` | message `role: tool` + `tool_name` |
 | Erreur d'outil | `is_error: true` | contenu préfixé `[ERREUR]` |
 | Limite de sortie | `max_tokens` | `options.num_predict` (borné à `num_ctx`) |
+| Cache de prompt | `cache_control: {type: "ephemeral"}` à la racine (automatique : outils, consignes et historique relus au tarif réduit d'une étape à l'autre) ; `Usage.input_tokens` additionne `input_tokens`, `cache_creation_input_tokens` et `cache_read_input_tokens` | sans objet |
 
 ## 3. LLMRouter
 

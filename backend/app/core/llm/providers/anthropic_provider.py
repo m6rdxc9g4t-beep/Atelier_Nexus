@@ -96,11 +96,16 @@ def from_anthropic_message(message: AnthropicMessage) -> LLMResponse:
         model=message.model,
         content=content,
         stop_reason=_STOP_REASONS.get(message.stop_reason or "", "other"),
-        usage=Usage(
-            input_tokens=message.usage.input_tokens,
-            output_tokens=message.usage.output_tokens,
-        ),
+        usage=usage_of(message),
     )
+
+
+def usage_of(message: AnthropicMessage) -> Usage:
+    """Jetons d'un appel. Avec le cache de prompt, `input_tokens` ne compte plus que la partie
+    non mise en cache : l'entrée réelle est la somme des trois compteurs (comme pour la CLI)."""
+    u = message.usage
+    cached = (u.cache_creation_input_tokens or 0) + (u.cache_read_input_tokens or 0)
+    return Usage(input_tokens=u.input_tokens + cached, output_tokens=u.output_tokens)
 
 
 # ─── Provider ─────────────────────────────────────────────────────
@@ -139,6 +144,10 @@ class AnthropicProvider(LLMProvider):
             "model": self.resolve_model(request),
             "max_tokens": request.max_tokens,
             "messages": to_anthropic_messages(request.messages),
+            # Cache de prompt automatique : la boucle d'agent renvoie le même préfixe (outils,
+            # consignes, historique) à chaque étape et à chaque validation ; le point de cache
+            # suit le dernier bloc, les étapes suivantes relisent le préfixe au tarif réduit
+            "cache_control": {"type": "ephemeral"},
         }
         if request.system:
             params["system"] = request.system
