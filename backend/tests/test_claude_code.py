@@ -3,7 +3,11 @@
 Un faux `claude` (tests/fake_claude_cli.py) est lancé en vrai sous-processus.
 """
 
+import asyncio
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +161,42 @@ async def test_timeout_and_missing_binary(monkeypatch: pytest.MonkeyPatch) -> No
     assert not missing.is_configured
     with pytest.raises(ProviderRequestError, match="introuvable"):
         await missing.complete(LLMRequest(messages=[Message.user("?")]))
+
+
+def alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        listing = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True, check=False
+        )
+        return str(pid) in listing.stdout
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+async def test_a_stopped_turn_stops_the_cli(
+    cli: ClaudeCodeProvider, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """« Arrêter » (flux coupé → tâche annulée) : la CLI ne tourne pas jusqu'au délai."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "slow")
+    task = asyncio.create_task(cli.complete(LLMRequest(messages=[Message.user("?")])))
+    log = tmp_path / "calls.jsonl"
+    for _ in range(100):  # le faux `claude` consigne son appel avant de s'endormir
+        if log.exists() and log.read_text().strip():
+            break
+        await asyncio.sleep(0.05)
+    pid = calls(tmp_path)[0]["pid"]
+    assert alive(pid)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    for _ in range(40):
+        if not alive(pid):
+            break
+        await asyncio.sleep(0.05)
+    assert not alive(pid)
 
 
 async def test_status_checks_login(

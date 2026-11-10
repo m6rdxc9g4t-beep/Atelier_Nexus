@@ -2,7 +2,7 @@
 """Faux programme `claude` (Claude Code) pour les tests : mêmes options, même sortie JSON.
 
 FAKE_CLAUDE_MODE : text | tool | login | limit | slow | auth_off. Chaque appel est consigné
-dans FAKE_CLAUDE_LOG (arguments, entrée standard, variables sensibles, dossier courant).
+dans FAKE_CLAUDE_LOG (PID, arguments, entrée standard, variables sensibles, dossier courant).
 """
 
 import json
@@ -35,6 +35,7 @@ if log:
         fh.write(
             json.dumps(
                 {
+                    "pid": os.getpid(),
                     "args": args,
                     "stdin": stdin,
                     "cwd_empty": not os.listdir("."),

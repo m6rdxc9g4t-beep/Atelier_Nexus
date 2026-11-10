@@ -312,6 +312,14 @@ def usage_of(payload: dict[str, Any]) -> Usage:
     return Usage(input_tokens=total_in, output_tokens=int(u.get("output_tokens") or 0))
 
 
+async def _stop(proc: asyncio.subprocess.Process) -> None:
+    """Arrête la CLI (et, sous Windows, ses enfants) puis attend sa fin."""
+    kill_tree(proc.pid)
+    with contextlib.suppress(ProcessLookupError):
+        proc.kill()
+    await proc.wait()
+
+
 # ─── Provider ─────────────────────────────────────────────────────
 
 
@@ -370,13 +378,14 @@ class ClaudeCodeProvider(LLMProvider):
                     proc.communicate(stdin.encode() if stdin is not None else None), timeout=timeout
                 )
             except TimeoutError as exc:
-                kill_tree(proc.pid)
-                with contextlib.suppress(ProcessLookupError):
-                    proc.kill()
-                await proc.wait()
                 raise ProviderUnavailableError(
                     f"Claude n'a pas répondu en {timeout:g} s.", provider=self.name
                 ) from exc
+            finally:
+                if proc.returncode is None:
+                    # Délai dépassé, ou tour arrêté par l'utilisateur (tâche annulée) : la CLI
+                    # ne continue pas seule, à consommer l'abonnement dans un dossier supprimé
+                    await asyncio.shield(_stop(proc))
         return proc.returncode or 0, out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
