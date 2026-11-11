@@ -3,12 +3,19 @@
  * dans un navigateur ; ce test garde les règles en place et hors d'atteinte des utilitaires.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(fileURLToPath(new URL("globals.css", import.meta.url)), "utf8");
+
+/** Composants de l'application (hors tests) : les règles au doigt s'appuient sur leur balisage. */
+const root = fileURLToPath(new URL("..", import.meta.url));
+const sources = readdirSync(root, { recursive: true, encoding: "utf8" })
+  .filter((file) => file.endsWith(".tsx"))
+  .map((file) => ({ file, text: readFileSync(join(root, file), "utf8") }));
 
 /** Contenu d'un bloc `{ … }` à partir de l'accolade ouvrante qui suit `from`. */
 function block(source: string, from: number): string {
@@ -53,11 +60,26 @@ describe("au doigt (pointer: coarse)", () => {
     for (const target of ["button:not(", 'a[data-slot="button"]', '[role="menuitem"]', "summary", "input:not(", "select"])
       expect(rules).toContain(target);
     expect(rules).toContain("min-width: 2.5rem;");
-    // Cases à cocher et interrupteurs (boutons Radix) gardent leur taille
-    expect(rules).toContain('button:not([role="checkbox"], [role="switch"], [role="radio"])');
+    // Cases à cocher et interrupteurs (boutons Radix) gardent leur taille : leur libellé est cliquable
+    expect(rules.match(/button:not\(\[role="checkbox"\], \[role="switch"\]\)/g)).toHaveLength(2);
     // Aucune taille minimale hors du bloc « au doigt » : la souris garde les 24 à 30 px de la charte
     expect(css.replace(rules, "")).not.toContain("min-height: 2.5rem;");
     // Couche « components » : un utilitaire explicite (min-h-*, min-w-*) garde la main
     expect(layerAt(css, media)).toBe("components");
+  });
+
+  it("un bouton radio est lui-même la cible : il fait 40 px comme les autres boutons", () => {
+    const rules = block(css, css.lastIndexOf("@media (pointer: coarse)", css.indexOf("min-height: 2.5rem;")));
+    // Les `[type="radio"]` restants sont ceux des champs natifs, dont le libellé est cliquable
+    expect(rules).not.toContain('[role="radio"]');
+    // La règle ne vaut que si chaque `role="radio"` de l'application est un vrai bouton
+    const radios = sources.flatMap(({ file, text }) =>
+      [...text.matchAll(/role="radio"/g)].map((match) => {
+        const open = text.lastIndexOf("<", match.index);
+        return { file, tag: /^<([A-Za-z.]+)/.exec(text.slice(open))?.[1] };
+      }),
+    );
+    expect(radios.length).toBeGreaterThan(0);
+    for (const radio of radios) expect(["button", "Button"], radio.file).toContain(radio.tag);
   });
 });

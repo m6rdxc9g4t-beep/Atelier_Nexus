@@ -253,10 +253,11 @@
 /* Cibles d'au moins 40 px au doigt (DESIGN.md : lignes de 40 px) : boutons, lignes de navigation,
    onglets, entrées de menu, champs. À la souris, la densité de la charte (24 à 30 px) ne change
    pas. Couche « components » : un utilitaire explicite (`min-h-*`, `min-w-*`) garde la main.
-   Cases à cocher et interrupteurs gardent leur taille (leur libellé est cliquable). */
+   Cases à cocher et interrupteurs gardent leur taille (leur libellé est cliquable) ; un bouton
+   `role="radio"` (choix d'icône, rythme, application) est lui-même la cible : il suit la règle. */
 @layer components {
   @media (pointer: coarse) {
-    button:not([role="checkbox"], [role="switch"], [role="radio"]),
+    button:not([role="checkbox"], [role="switch"]),
     a[data-slot="button"],
     [role="menuitem"],
     [role="menuitemradio"],
@@ -266,7 +267,7 @@
     select {
       min-height: 2.5rem;
     }
-    button:not([role="checkbox"], [role="switch"], [role="radio"]) {
+    button:not([role="checkbox"], [role="switch"]) {
       min-width: 2.5rem;
     }
   }
