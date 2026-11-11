@@ -181,6 +181,13 @@ cd backend && python -m scripts.demo_server
 cd frontend && npm run dev        # http://localhost:3100 → agent « Démo Data Via »
 ```
 
+Passe du 2026-11-11 vérifiée dans Chromium contre le serveur de démonstration (1440 × 900 et 390 × 844 avec
+pointeur grossier, clair et sombre) : paquet initial mesuré sur `next build`, export statique (`NEXUS_EXPORT=1`)
+servi par le backend avec ses vues chargées à la demande, retour du focus au clavier, champs à 16 px et cibles de
+40 px au doigt, « Réessayer » après une coupure du flux, sélecteur de la suite. À savoir : `next dev` ne recompile
+pas toujours `globals.css` à chaud (cache de `.next/dev`) — après une modification de ce fichier, relancer le
+serveur de développement, dossier `.next/dev` supprimé.
+
 Refonte visuelle vérifiée le 2026-10-25 dans Chromium (1440 × 900 clair et sombre, 375 × 812) : accueil, barre
 latérale et tiroir, Studio (mes workflows, modèles, carte), modèle copié dans l'éditeur, conversation avec le
 serveur de démonstration (carte de validation, ligne d'activité, suggestion « Rejouer ces actions »).
