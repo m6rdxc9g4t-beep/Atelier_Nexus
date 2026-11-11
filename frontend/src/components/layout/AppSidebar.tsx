@@ -4,7 +4,7 @@ import { House, Inbox, Map as MapIcon, Waypoints, type LucideIcon } from "lucide
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { AgentSidebar } from "@/features/chat-agent/AgentSidebar";
-import { SettingsButton } from "@/features/settings/SettingsDialog";
+import { SettingsButton } from "@/features/settings/SettingsButton";
 import { badgeText, inboxLabel } from "@/features/workflow-triggers/origin";
 import { useInboxCount } from "@/features/workflow-triggers/useInboxCount";
 import { studioTab } from "@/features/workflows/studio";

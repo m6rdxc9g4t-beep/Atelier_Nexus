@@ -1,29 +1,44 @@
 "use client";
 
 import { RefreshCw, ServerOff } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { AgentEditor } from "@/features/agent-editor/AgentEditor";
 import { ArtifactPanel } from "@/features/artifacts/ArtifactPanel";
-import { ChatPanel } from "@/features/chat-agent/ChatPanel";
 import { HomeView } from "@/features/home/HomeView";
-import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { studioTab } from "@/features/workflows/studio";
-import { WorkflowsStudio } from "@/features/workflows/WorkflowsStudio";
-import { WorkflowGraphDialog } from "@/features/workflows-graph/WorkflowGraphEditor";
 import { useBackend } from "@/hooks/useBackend";
 import { API_URL } from "@/lib/api";
 import { readAgentLink, withoutAgentLink } from "@/lib/deepLink";
 import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
 import { useChatStore } from "@/stores/useChatStore";
 import { useNavStore } from "@/stores/useNavStore";
+import { useUiStore } from "@/stores/useUiStore";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
 
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
+import { LAZY_VIEWS, whenIdle } from "./lazyViews";
+
+// Vues chargées à la demande : hors du paquet initial (l'accueil s'affiche sans elles), puis
+// préchargées quand le navigateur est au repos pour s'ouvrir sans attente (lazyViews.ts).
+/** Zone principale en attendant une vue (même encombrement : le panneau Livrables ne bouge pas). */
+const ViewLoading = () => <div aria-busy className="min-w-0 flex-1" />;
+const ChatPanel = dynamic(LAZY_VIEWS.chat, { ssr: false, loading: ViewLoading });
+const WorkflowsStudio = dynamic(LAZY_VIEWS.studio, { ssr: false, loading: ViewLoading });
+const WorkflowGraphDialog = dynamic(LAZY_VIEWS.graphEditor, { ssr: false });
+const SettingsDialog = dynamic(LAZY_VIEWS.settings, { ssr: false });
+const AgentEditor = dynamic(LAZY_VIEWS.agentEditor, { ssr: false });
+
+/** Vrai dès que `flag` l'a été une fois : une fenêtre chargée à la demande reste montée ensuite. */
+function useOnce(flag: boolean): boolean {
+  const [seen, setSeen] = useState(flag);
+  if (flag && !seen) setSeen(true);
+  return seen || flag;
+}
 
 /**
  * Écran principal : barre latérale (navigation + agents) · accueil, conversation ou Studio des
@@ -46,6 +61,12 @@ export function Workspace() {
   // ou de la conversation, gardée derrière l'éditeur en graphe ouvert depuis lui
   const studio = useWorkflowStudioStore((s) => studioTab(s));
   const closeStudio = useWorkflowStudioStore((s) => s.closeStudio);
+  // Fenêtres montées à leur première ouverture seulement (leur code n'est pas dans le paquet initial)
+  const graphEditor = useOnce(useWorkflowStudioStore((s) => s.editor !== null));
+  const settings = useOnce(useUiStore((s) => s.settingsOpen));
+
+  // Navigateur au repos : le code des autres vues est préchargé
+  useEffect(() => whenIdle(() => Object.values(LAZY_VIEWS).forEach((load) => void load().catch(() => undefined))), []);
 
   // Agent inexistant (supprimé, catalogue changé) : on revient au premier disponible
   useEffect(() => {
@@ -130,8 +151,8 @@ export function Workspace() {
       </div>
 
       {/* Éditeur en graphe : fenêtre plein écran, par-dessus le Studio ou la conversation */}
-      <WorkflowGraphDialog agents={agents} />
-      <SettingsDialog onSaved={reload} />
+      {graphEditor && <WorkflowGraphDialog agents={agents} />}
+      {settings && <SettingsDialog onSaved={reload} />}
 
       {editor.open && (
         <AgentEditor

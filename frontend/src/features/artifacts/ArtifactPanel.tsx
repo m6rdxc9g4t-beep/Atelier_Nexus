@@ -13,6 +13,7 @@ import {
   Minimize2,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { type StoredArtifact, selectSelectedArtifact, useArtifactStore } from "@/stores/useArtifactStore";
 import type { ArtifactKind } from "@/types/api";
 
-import { ArtifactViewer } from "./ArtifactViewer";
 import {
   type ArtifactScope,
   type KindFamily,
@@ -50,6 +50,10 @@ const KindIcon = ({ kind, className }: { kind: ArtifactKind; className?: string 
   const Icon = FAMILY_ICONS[kindFamily(kind)];
   return <Icon className={className} aria-hidden />;
 };
+
+// Visionneuse (et le rendu Markdown) chargée au premier livrable ouvert : le panneau, toujours
+// monté, ne l'embarque pas dans le paquet initial.
+const ArtifactViewer = dynamic(() => import("./ArtifactViewer").then((m) => m.ArtifactViewer), { ssr: false });
 
 /** Même seuil que l'ouverture automatique des livrables (useChatStore, workflows). */
 const WIDE = "(min-width: 1280px)";

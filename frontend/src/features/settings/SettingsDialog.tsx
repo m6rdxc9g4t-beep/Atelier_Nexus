@@ -9,7 +9,6 @@ import {
   type LucideIcon,
   Palette,
   RefreshCw,
-  Settings,
   ShieldCheck,
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -56,16 +55,6 @@ import {
   sectionStatus,
   sections,
 } from "./status";
-
-/** Bouton « Réglages » (barre latérale) : ouvre la fenêtre unique des Réglages. */
-export function SettingsButton({ className }: { className?: string }) {
-  const openSettings = useUiStore((s) => s.openSettings);
-  return (
-    <Button variant="ghost" size="icon-sm" aria-label="Réglages" title="Réglages" className={className} onClick={openSettings}>
-      <Settings />
-    </Button>
-  );
-}
 
 /**
  * Fenêtre de configuration (apparence, validation, moteurs, apps, Cuisine, GitHub), montée une
