@@ -220,8 +220,11 @@ class WorkflowRepository:
         """Clôt les exécutions restées `running` : le processus s'est arrêté pendant une étape
         (application quittée, erreur de base) et plus rien ne les ferait sortir de cet état.
 
-        AU DÉMARRAGE SEULEMENT, avant que quoi que ce soit ne s'exécute : appelée pendant le
-        service, elle fermerait une exécution réellement en cours. L'étape entamée passe en
+        AU DÉMARRAGE SEULEMENT, avant que quoi que ce soit ne s'exécute, et seulement si aucun
+        autre processus ne sert la même base (`InstanceGuard`, app/db/instances.py : une
+        deuxième ouverture de l'app de bureau partage `nexus.db`) : sinon elle fermerait une
+        exécution réellement en cours. Appelée par `close_interrupted_runs` (main.py), jamais
+        directement. L'étape entamée passe en
         erreur (`INTERRUPTED` : son action a pu aboutir ou non, à vérifier dans l'application),
         les suivantes sont sautées. Les exécutions en attente de validation ne bougent pas."""
 

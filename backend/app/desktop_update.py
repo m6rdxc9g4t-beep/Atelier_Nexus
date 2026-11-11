@@ -46,6 +46,7 @@ from typing import IO, Any
 
 if __package__ in (None, ""):  # script lancé par le lanceur (python -I …/desktop_update.py)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.core.filelock import try_lock, unlock  # noqa: E402
 from app.core.processes import NO_WINDOW, windows_command  # noqa: E402
 
 APP_NAME = "Atelier Nexus"
@@ -415,39 +416,6 @@ def note(log: IO[str], text: str) -> None:
     log.flush()
 
 
-def _try_lock(handle: IO[bytes]) -> bool:
-    """Verrou exclusif sans attente : `flock` (macOS, Linux), `msvcrt.locking` (Windows)."""
-    if sys.platform == "win32":
-        import msvcrt
-
-        handle.seek(0)
-        try:
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError:
-            return False
-        return True
-    import fcntl
-
-    try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        return False
-    return True
-
-
-def _unlock(handle: IO[bytes]) -> None:
-    if sys.platform == "win32":
-        import msvcrt
-
-        handle.seek(0)
-        with contextlib.suppress(OSError):
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-        return
-    import fcntl
-
-    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-
 @contextlib.contextmanager
 def update_lock(
     path: Path,
@@ -460,7 +428,7 @@ def update_lock(
     with path.open("a+b") as handle:
         deadline = time.monotonic() + timeout
         waited = False
-        while not _try_lock(handle):
+        while not try_lock(handle):
             if not waited:
                 on_wait()
                 waited = True
@@ -473,7 +441,7 @@ def update_lock(
         try:
             yield
         finally:
-            _unlock(handle)
+            unlock(handle)
 
 
 def run_command(cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[str]) -> int:

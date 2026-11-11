@@ -81,6 +81,10 @@ Remplacer ou reconstruire l'application ne touche à rien de tout cela.
 - Serveur sur `127.0.0.1` uniquement, port 8100 s'il est libre, sinon un port libre : l'interface utilise des adresses
   relatives (`NEXT_PUBLIC_API_URL` vide), elle fonctionne sur n'importe quel port.
 - Fermer la fenêtre ou ⌘Q arrête le serveur.
+- Deuxième ouverture (l'app n'a pas de garde d'instance unique) : un second serveur démarre sur un port libre, avec les
+  mêmes données. Il ne clôt pas les exécutions de workflow « en cours » de la première fenêtre : chaque processus tient
+  un témoin verrouillé dans `nexus.db.instances/`, à côté de la base (`app/db/instances.py`, voir
+  [workflows.md](workflows.md)). Ce dossier se recrée seul ; il peut être supprimé quand l'app est fermée.
 - Fond de la fenêtre avant l'affichage de l'interface : celui de la charte v2 (`WINDOW_BACKGROUND` dans
   `app/desktop.py`, crème `#f8f4ec` en clair / bleu nuit `#0b1220` en sombre selon l'apparence de macOS), comme la page d'erreur de démarrage.
 - Si Atelier Tab est installé (`/Applications/Atelier_Tab.app` ; sous Windows, s'il existe,
