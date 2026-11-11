@@ -239,6 +239,18 @@
   }
 }
 
+/* ─── Au doigt (téléphone, tablette : pointeur grossier) ──────────
+   iOS agrandit toute la page au focus d'un champ dont le texte fait moins de 16 px, et ne revient
+   pas en arrière : les champs de saisie passent à 16 px. Hors couche, pour l'emporter sur les
+   tailles posées par les utilitaires (`text-sm`, `text-base`). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+
 /* ─── Carte de décision (validation humaine) ──────────────────────
    État anormal « à vous de décider » : trait de 1 px ambre (--atelier-warn) autour de la carte,
    icône et libellé ambre ; jamais de barre de couleur sur le côté ni de halo. */
