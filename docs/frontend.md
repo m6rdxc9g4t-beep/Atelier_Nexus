@@ -62,6 +62,9 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   `size` sm | md | lg | xl et `scroll="body"` avec `DialogBody`), `badge`, `button` (30 px ; variantes `outline`,
   `ghost`, `soft` neutre ; un seul bouton principal par écran), `segmented` (`segmentedRail` / `segmentedItem`, aussi
   utilisés par le sélecteur de thème).
+  Fenêtres et tiroirs (`dialog`, `sheet`) : à la fermeture, le focus revient à l'élément qui l'avait à l'ouverture
+  (`focus-return.ts`), même sans `DialogTrigger` — Réglages, éditeur d'agent, éditeur en graphe, navigation en
+  tiroir et livrables sont ouverts par un store, et Radix ne rend le focus qu'à un déclencheur.
 - Police : **Inter** embarquée (`--atelier-font`, variantes `cv11` et `ss03`), chiffres tabulaires dans les données
   (`tabular-nums`). Aucune ressource externe (pas de Google Fonts).
 - Thème : Système / Clair / Sombre (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ;

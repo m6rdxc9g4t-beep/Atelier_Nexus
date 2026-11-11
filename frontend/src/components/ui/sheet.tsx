@@ -7,6 +7,8 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { useFocusReturn } from "./focus-return";
+
 const Sheet = DialogPrimitive.Root;
 const SheetTitle = DialogPrimitive.Title;
 const SheetDescription = DialogPrimitive.Description;
@@ -34,8 +36,12 @@ function SheetContent({
   children,
   side,
   closeButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & VariantProps<typeof sheetSide> & { closeButton?: boolean }) {
+  // Tiroir ouvert par un store (navigation, livrables) : le focus revient à l'élément d'origine
+  const focusReturn = useFocusReturn({ onOpenAutoFocus, onCloseAutoFocus });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgb(11_18_32/0.45)] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
@@ -44,6 +50,7 @@ function SheetContent({
         data-side={side ?? "left"}
         className={cn(sheetSide({ side }), className)}
         {...props}
+        {...focusReturn}
       >
         {children}
         {closeButton && (
