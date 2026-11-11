@@ -30,8 +30,11 @@ interface MessageListProps {
   onDecide: (decisions: Record<string, boolean>) => void;
   /** « Enregistrer en workflow » sous le dernier tour réussi qui a utilisé des outils. */
   onSaveWorkflow?: () => void;
-  /** « Réessayer » sur le dernier tour en échec : renvoie la même question (absent si impossible). */
-  onRetry?: () => void;
+  /**
+   * « Réessayer » sur le dernier tour en échec : renvoie la même question (absent si impossible).
+   * `keyboard` : bouton activé au clavier (le focus doit rester dans la page quand il disparaît).
+   */
+  onRetry?: (keyboard: boolean) => void;
   /** Carte de validation en attente du dernier tour (dock de décision) */
   pendingRef?: (el: HTMLElement | null) => void;
   /** Conteneur qui défile : le fil ne suit la réponse que si l'on est resté en bas */
@@ -136,7 +139,7 @@ function AgentTurn({
   agentLabel: (name: string) => string;
   onDecide: (decisions: Record<string, boolean>) => void;
   onSaveWorkflow?: () => void;
-  onRetry?: () => void;
+  onRetry?: (keyboard: boolean) => void;
   pendingRef?: (el: HTMLElement | null) => void;
 }) {
   const name = agent?.display_name ?? "Agent";
@@ -209,7 +212,8 @@ function AgentTurn({
             role="alert"
             action={
               onRetry && (
-                <Button size="sm" variant="outline" onClick={onRetry}>
+                // Clic né du clavier (Entrée, Espace) : `detail` vaut 0
+                <Button size="sm" variant="outline" onClick={(e) => onRetry(e.detail === 0)}>
                   <RotateCw />
                   Réessayer
                 </Button>

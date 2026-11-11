@@ -17,11 +17,12 @@ import type { AgentInfo, AttachmentBlock, ProviderStatus } from "@/types/api";
 
 import { AgentTile } from "./AgentTile";
 import { AgentWelcome, ThreadSkeleton } from "./AgentWelcome";
-import { Composer } from "./Composer";
+import { COMPOSER_ID, Composer } from "./Composer";
 import { ConversationHistory } from "./ConversationHistory";
 import { DecisionDock } from "./DecisionDock";
 import { MessageList } from "./MessageList";
 import { ProviderPicker } from "./ProviderPicker";
+import { focusAfterRetry } from "./retryFocus";
 import { type LiveSnapshot, liveMessage } from "./thread";
 
 /** Exemples proposés quand l'agent n'en fournit pas. */
@@ -75,6 +76,16 @@ export function ChatPanel({
   const empty = conversation.turns.length === 0;
   // Dernière question restée sans réponse (échec, arrêt) : « Réessayer » la renvoie telle quelle
   const canRetry = !blocked && !streaming && retryable(conversation) !== null;
+  const retry = (keyboard: boolean) => {
+    void retryStore({ localOnly });
+    // Le bouton disparaît avec le tour remplacé : le focus va à la zone de saisie, pas sur <body>
+    const field = document.getElementById(COMPOSER_ID);
+    focusAfterRetry({
+      composer: field instanceof HTMLTextAreaElement ? field : null,
+      keyboard,
+      coarse: window.matchMedia("(pointer: coarse)").matches,
+    });
+  };
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
   const agentLabel = (name: string) => agents.find((a) => a.name === name)?.display_name ?? name;
   const pending = pendingApproval(conversation);
@@ -139,7 +150,7 @@ export function ChatPanel({
               agentLabel={agentLabel}
               onDecide={decide}
               onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
-              onRetry={canRetry ? () => void retryStore({ localOnly }) : undefined}
+              onRetry={canRetry ? retry : undefined}
               pendingRef={setPendingCard}
               scroller={scroller}
             />
