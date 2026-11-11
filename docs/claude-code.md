@@ -35,12 +35,16 @@ l'interface affiche toujours « Claude »). Choisi par `LLMRouter.from_settings`
   `APPDATA`, `LOCALAPPDATA`, `SystemRoot`, `SystemDrive`, `windir`, `ComSpec`, `PATHEXT`, `TEMP`, `TMP`, `ProgramData`) :
   jamais `ANTHROPIC_*` (une clé serait facturée à l'usage) ni réglage de Nexus. Sous Windows, `claude.exe` (aussi
   cherché dans `%USERPROFILE%\.local\bin`), ou `claude.cmd` de npm résolu en `node.exe …\cli.js` (sinon refusé) :
-  jamais `cmd.exe`. PATH sans entrée relative ni `node_modules/.bin`. Aucun outil de Claude Code (`--tools ""`), pas de MCP
-  (`--strict-mcp-config`), pas de commandes (`--disable-slash-commands`), pas de session conservée
-  (`--no-session-persistence`), dossier de travail vide et temporaire.
+  jamais `cmd.exe`. PATH sans entrée relative ni `node_modules/.bin`. Rien du compte Claude Code de l'utilisateur
+  (`--safe-mode` : ni `CLAUDE.md`, ni mémoire, ni hooks, ni extensions, ni MCP), aucun outil de Claude Code
+  (`--tools ""`), pas de MCP (`--strict-mcp-config`), pas de commandes (`--disable-slash-commands`), pas de session
+  conservée (`--no-session-persistence`), allers-retours bornés (`--max-turns 2` : la sortie structurée, puis la fin du
+  tour), dossier de travail vide et temporaire. Un tour arrêté (bouton « Arrêter ») ou en délai dépassé arrête le
+  processus `claude`.
 - **Erreurs** : non connecté → « tapez claude dans le Terminal… » ; limite de l'abonnement → erreur transitoire, qui
   permet le **repli vers Ollama** si `LLM_FALLBACK_PROVIDER=ollama` ; délai dépassé → transitoire aussi.
-- **État** (`/api/llm/providers`) : `claude auth status` ; modèles proposés : sonnet, opus, haiku.
+- **État** (`/api/llm/providers`) : `claude auth status`, gardé 60 s en mémoire (SUITE.md §5.3 ; `?refresh=true` le relance, au
+  plus toutes les 10 s) ; modèles proposés : sonnet, opus, haiku.
 - **Streaming** : la réponse structurée arrive d'un bloc (pas de texte partiel), tour par tour.
 
 Les agents « 100 % local » (Finance, Comptable, Tuteur) restent sur Ollama : l'abonnement est un service en ligne.

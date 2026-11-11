@@ -31,6 +31,8 @@ next-env.d.ts
 # Bases locales (SQLite) et données de démonstration
 backend/data/
 *.db
+# Témoins des processus Nexus sur une base SQLite (app/db/instances.py)
+*.db.instances/
 
 # Claude Code : réglages personnels
 .claude/settings.local.json

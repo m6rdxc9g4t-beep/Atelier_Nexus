@@ -80,3 +80,55 @@ async def test_status_reports_each_provider() -> None:
     assert statuses["ollama"].available is True
     assert statuses["ollama"].is_default is True
     assert statuses["ollama"].models == ["llama3.1:8b"]
+
+
+class CountingProvider(ScriptedProvider):
+    """Compte les sondes (`list_models` : `claude auth status`, `models.list`, `ollama list`)."""
+
+    probes = 0
+    down = False
+
+    async def list_models(self) -> list[str]:
+        self.probes += 1
+        if self.down:
+            raise ProviderUnavailableError("arrêté", provider=self.name)
+        return self.models
+
+
+async def test_status_is_cached() -> None:
+    """L'interface relit l'état toutes les 30 s : les moteurs ne sont sondés qu'une fois par
+    minute, une vérification demandée (`refresh`) au plus toutes les 10 s."""
+    claude, local = CountingProvider("anthropic"), CountingProvider("ollama")
+    router = make_router(claude, local)
+    clock = [100.0]
+    router._clock = lambda: clock[0]
+    first = await router.status()
+    assert await router.status() is first and (claude.probes, local.probes) == (1, 1)
+    clock[0] += 5
+    assert await router.status(refresh=True) is first  # trop tôt : rien n'est relancé
+    clock[0] += 10
+    await router.status(refresh=True)
+    assert (claude.probes, local.probes) == (2, 2)
+    clock[0] += 59
+    await router.status()
+    assert claude.probes == 2
+    clock[0] += 2
+    await router.status()
+    assert claude.probes == 3
+
+
+async def test_an_unavailable_engine_is_probed_again_sooner() -> None:
+    """Ollama qu'on vient de lancer n'attend pas une minute pour être vu."""
+    local = CountingProvider("ollama")
+    local.down = True
+    router = make_router(CountingProvider("anthropic"), local)
+    clock = [100.0]
+    router._clock = lambda: clock[0]
+    assert {s.name: s.available for s in await router.status()} == {
+        "anthropic": True,
+        "ollama": False,
+    }
+    local.down = False
+    clock[0] += 11
+    assert all(s.available for s in await router.status())
+    assert local.probes == 2

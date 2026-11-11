@@ -35,6 +35,9 @@ interface PendingFile {
 
 let fileSeq = 0;
 
+/** Identifiant du champ de saisie (une seule conversation à l'écran) : libellé, retour du focus. */
+export const COMPOSER_ID = "composer";
+
 /**
  * Zone de saisie : Entrée envoie, Maj+Entrée va à la ligne. Fichiers : trombone, glisser-déposer
  * ou coller (captures d'écran). Chaque fichier est envoyé au serveur dès qu'il est ajouté.
@@ -161,11 +164,11 @@ export function Composer({ agentName, streaming, disabled, onSend, onStop, engin
             ))}
           </ul>
         )}
-        <label htmlFor="composer" className="sr-only">
+        <label htmlFor={COMPOSER_ID} className="sr-only">
           Message pour {agentName}
         </label>
         <Textarea
-          id="composer"
+          id={COMPOSER_ID}
           value={text}
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}

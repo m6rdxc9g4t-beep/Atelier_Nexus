@@ -8,12 +8,14 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import docx
 import openpyxl
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -293,8 +295,11 @@ def test_providers_receive_images() -> None:
     assert json.loads(result_line(out))["type"] == "result"
 
 
-async def test_claude_code_sends_images_as_stream_json(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_claude_code_sends_images_as_stream_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "text")
+    monkeypatch.setenv("FAKE_CLAUDE_LOG", str(tmp_path / "calls.jsonl"))
     cli = ClaudeCodeProvider(binary=FAKE_CLI, default_model="sonnet", timeout=10)
     request = LLMRequest(
         messages=[
@@ -306,6 +311,10 @@ async def test_claude_code_sends_images_as_stream_json(monkeypatch: pytest.Monke
     )
     response = await cli.complete(request)
     assert response.text == "Blocs reçus : image,text"
+    # Mêmes garde-fous que l'entrée texte (SUITE.md §5.3)
+    args = json.loads((tmp_path / "calls.jsonl").read_text().splitlines()[0])["args"]
+    assert "--safe-mode" in args and args[args.index("--max-turns") + 1] == "2"
+    assert args[args.index("--tools") + 1] == ""
     # Sans image : entrée texte inchangée
     plain = await cli.complete(LLMRequest(messages=[Message.user("Salut")]))
     assert plain.text == "Bonjour !"
@@ -450,6 +459,45 @@ def test_raw_images_are_refused_in_requests(client: TestClient) -> None:
     }
     r = client.post("/api/agents/assistant/run", json={"messages": [message]})
     assert r.status_code == 422
+
+
+async def test_contents_never_load_the_original_file_of_a_document(
+    sessions: async_sessionmaker,  # type: ignore[type-arg]
+) -> None:
+    """Chaque requête d'agent (et chaque « Autoriser ») relit les pièces jointes citées : pour
+    un document, seul le texte extrait sert, jamais le fichier d'origine (jusqu'à 20 Mo)."""
+    repo = AttachmentRepository(sessions)
+    doc = await repo.create(process_upload("notes.txt", "Réunion du lundi".encode()))
+    image = await repo.create(process_upload("logo.png", png()))
+    statements: list[tuple[str, Any]] = []
+    engine = sessions.kw["bind"].sync_engine
+
+    def record(conn: Any, cursor: Any, statement: str, parameters: Any, *_: Any) -> None:
+        statements.append((statement, parameters))
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        contents = await repo.contents([doc.id, image.id, "absente"])
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert set(contents) == {doc.id, image.id}
+    assert contents[doc.id].text == "Réunion du lundi" and contents[doc.id].image_base64 is None
+    assert contents[doc.id].name == "notes.txt" and contents[doc.id].kind == "document"
+    _, original = await repo.get(image.id) or (None, b"")
+    assert contents[image.id].image_base64 == base64.b64encode(original).decode()
+    assert contents[image.id].media_type == image.media_type
+    # Octets lus pour l'image seulement
+    with_data = [(sql, params) for sql, params in statements if "attachments.data" in sql]
+    assert len(statements) == 2 and len(with_data) == 1
+    assert doc.id not in str(with_data[0][1]) and image.id in str(with_data[0][1])
+    # Documents seuls : une requête, sans la colonne `data`
+    statements.clear()
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        await repo.contents([doc.id])
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert len(statements) == 1 and "attachments.data" not in statements[0][0]
 
 
 async def test_orphans_are_purged(sessions: async_sessionmaker) -> None:  # type: ignore[type-arg]

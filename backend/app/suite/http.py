@@ -1,4 +1,4 @@
-"""Client HTTP d'un nœud de la suite (Viz, Projets, Convert) : manifeste, actions, événements.
+"""Client HTTP d'un nœud de la suite (Viz, Projets, Convert, Wiki, Formulaire) : manifeste, actions, événements.
 
 Même infrastructure que les connecteurs (`AppClient` : transport injectable en test, jamais de
 redirection suivie), avec les gardes du contrat `atelier-node/1` :

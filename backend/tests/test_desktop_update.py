@@ -70,6 +70,7 @@ BACKEND_FILES = (
     "desktop.py",
     "app/__init__.py",
     "app/core/__init__.py",
+    "app/core/filelock.py",
     "app/core/processes.py",
     "app/desktop.py",
     "app/desktop_open.py",

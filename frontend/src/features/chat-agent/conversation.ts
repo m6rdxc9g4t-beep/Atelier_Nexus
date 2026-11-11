@@ -174,6 +174,27 @@ export function failLastTurn(conv: Conversation, message: string): Conversation 
   return { ...failed, history };
 }
 
+/**
+ * Question à renvoyer après un échec (« Réessayer ») : le dernier tour est une réponse en erreur
+ * juste après une question de l'utilisateur, sans action commencée ni validation (seulement du
+ * texte, ou rien) — rejouer une question dont des outils ont déjà tourné les relancerait.
+ * Rend la conversation sans ces deux tours, et la question à renvoyer telle quelle ; null sinon.
+ */
+export function retryable(
+  conv: Conversation,
+): { conv: Conversation; text: string; attachments: AttachmentBlock[] } | null {
+  const failed = conv.turns.at(-1);
+  const question = conv.turns.at(-2);
+  if (!failed || failed.role !== "assistant" || !failed.error || question?.role !== "user") return null;
+  if (failed.parts.some((p) => p.kind !== "text")) return null;
+  // La question en échec est déjà sortie de l'historique (failLastTurn) : sinon, on ne touche à rien
+  if (conv.history.at(-1)?.role === "user") return null;
+  const text = question.parts.map((p) => (p.kind === "text" ? p.text : "")).join("");
+  const attachments = question.parts.flatMap((p) => (p.kind === "attachment" ? [p.attachment] : []));
+  if (!text && !attachments.length) return null;
+  return { conv: { ...conv, turns: conv.turns.slice(0, -2) }, text, attachments };
+}
+
 /** Carte de validation en attente (dernière partie du dernier tour), s'il y en a une. */
 export function pendingApproval(conv: Conversation): ApprovalPart | null {
   const last = conv.turns.at(-1);

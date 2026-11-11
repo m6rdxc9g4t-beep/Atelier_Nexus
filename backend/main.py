@@ -33,9 +33,12 @@ from app.api.deps import (
     make_environment,
 )
 from app.api.errors import register_error_handlers
+from app.api.local_only import LocalOnlyMiddleware
 from app.core.config import get_settings
 from app.core.llm import get_llm_router
+from app.db.instances import InstanceGuard
 from app.db.repository import StorageError
+from app.db.workflows import WorkflowRepository
 from app.triggers.service import TriggerDeps, TriggerService
 
 settings = get_settings()
@@ -67,19 +70,45 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logger.info("%d pièce(s) jointe(s) abandonnée(s) supprimée(s)", purged)
     except StorageError as exc:
         logger.debug("Nettoyage des pièces jointes ignoré : %s", exc)
-    service = background_triggers() if settings.triggers_enabled else None
-    if service is not None:
-        service.start()
-        logger.info(
-            "Déclencheurs de workflows actifs (passage toutes les %.0f s, fuseau %s)",
-            settings.triggers_poll_seconds,
-            settings.timezone,
-        )
+    # Témoin de ce processus sur la base, tenu tant qu'il sert (app/db/instances.py)
+    guard = InstanceGuard.for_database(settings.database_url)
+    service: TriggerService | None = None
     try:
+        await close_interrupted_runs(get_workflow_repository(), guard)
+        service = background_triggers() if settings.triggers_enabled else None
+        if service is not None:
+            service.start()
+            logger.info(
+                "Déclencheurs de workflows actifs (passage toutes les %.0f s, fuseau %s)",
+                settings.triggers_poll_seconds,
+                settings.timezone,
+            )
         yield
     finally:
         if service is not None:
             await service.stop()  # passage en cours terminé ou annulé, tâche attendue
+        guard.release()
+
+
+async def close_interrupted_runs(repo: WorkflowRepository, guard: InstanceGuard) -> int | None:
+    """Au démarrage, avant tout lancement : clôt les exécutions qu'un arrêt de Nexus a laissées
+    « en cours ». Seulement si ce processus est le seul sur la base : une deuxième ouverture de
+    l'app de bureau partage `nexus.db` avec la première, dont les exécutions « en cours » le
+    sont peut-être vraiment (None : rien n'est touché, le nettoyage attend un démarrage seul)."""
+    if not await asyncio.to_thread(guard.acquire):
+        logger.info(
+            "Une autre instance de Nexus utilise cette base : "
+            "les exécutions « en cours » ne sont pas closes à ce démarrage"
+        )
+        return None
+    try:
+        interrupted = await repo.fail_interrupted_runs()
+    except StorageError as exc:
+        logger.debug("Exécutions interrompues non vérifiées : %s", exc)
+        return 0
+    if interrupted:
+        logger.warning("%d exécution(s) de workflow interrompue(s) close(s)", interrupted)
+    return interrupted
 
 
 def background_triggers() -> TriggerService:
@@ -111,6 +140,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ajoutée en dernier, donc traversée en premier : Host et Origin contrôlés avant tout le reste
+app.add_middleware(LocalOnlyMiddleware)
 
 register_error_handlers(app)
 app.include_router(llm.router)

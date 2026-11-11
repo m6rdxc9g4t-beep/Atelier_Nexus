@@ -111,7 +111,11 @@ outil dépendant relit une fois chaque jeu déjà décrit dans la conversation (
 redemande alors la description). Le nombre d'étapes (`max_iterations`) porte sur **tout le tour**, reprises comprises
 (`AgentResult.iterations` compte les appels au modèle depuis le dernier message de l'utilisateur) ; au plafond, un
 dernier appel, dont les éventuels appels d'outils sont écartés sans être exécutés, produit une synthèse
-(`stop_reason = "max_iterations"`, sans étape de plus), jamais un texte vide.
+(`stop_reason = "max_iterations"`, sans étape de plus), jamais un texte vide. De même, une réponse arrêtée avant la
+fin (`stop_reason` `max_tokens` ou `refusal`) pendant un appel d'outil perd cet appel, incomplet : il n'est ni exécuté ni
+gardé dans l'historique (l'API refuserait ensuite un `tool_use` sans résultat), et une phrase le dit à l'utilisateur.
+Plafond d'une réponse : `BaseAgent.max_tokens` (16 000, réflexion du modèle comprise ; borné à la fenêtre
+`OLLAMA_NUM_CTX` pour Ollama).
 
 Résumé d'une lecture : `BaseTool.approval_summary()` par défaut = nom lisible (`app/tools/labels.py`, mêmes
 libellés que l'interface) + paramètres principaux (« Data Via · requête : dataset_id = « ventes », limit = 50 ») ;
@@ -195,7 +199,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 |---|---|---|
 | GET | `/api/agents` | Catalogue complet : `icon`, `category`, `starters`, `source`, `toolsets`, `local_only`, `tools[].requires_approval`, `unavailable_toolsets` |
 | POST | `/api/agents/{name}/run` · `/stream` | Corps : `messages`, `provider`, `model`, `conversation_id`, **`approvals`** |
-| GET | `/api/apps/status` | État de Viz, Projets, Convert (nœud de workflow), Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais) |
+| GET | `/api/apps/status` | État de Viz, Projets, Convert, Wiki et Formulaire (nœuds de workflow), Trésorerie, Tab, Ciné, Savoir, Cuisine (Supabase), GitHub (3 s max chacun, ne lève jamais). Gardé en mémoire : 25 s pour une application locale, 10 min pour GitHub et Cuisine (en ligne ; une erreur : 1 min) ; `?refresh=true` relit tout, et enregistrer les Réglages vide ce cache |
 
 Événements SSE : `text_delta`, `tool_call`, `tool_result`, `artifact`, **`approval_required`**, `done`, `error`.
 
@@ -210,6 +214,7 @@ Manuellement : `cd backend && alembic upgrade head`.
 | `TAB_MCP_COMMAND`, `TAB_DATA_DIR` | vide | Écriture dans Atelier Tab par son serveur MCP ([`apps/tab.md`](apps/tab.md)) |
 | `CINE_BASE_URL` | `http://127.0.0.1:4000/api` | Atelier Ciné ([`apps/cine.md`](apps/cine.md)) |
 | `SAVOIR_BASE_URL` | `http://127.0.0.1:5051/api` | Atelier Savoir, lancé avec `ATELIER_PORT=5051` ([`apps/savoir.md`](apps/savoir.md)) |
+| `WIKI_BASE_URL`, `FORMULAIRE_BASE_URL` | `http://127.0.0.1:3200/api`, `http://127.0.0.1:3300/api` | Atelier Wiki et Atelier Formulaire, nœuds des workflows de suite (pages, formulaires et réponses ; vide = désactivé) ([`apps/noeuds.md`](apps/noeuds.md)) |
 | `CONVERT_BASE_URL`, `CONVERT_TIMEOUT` | `http://127.0.0.1:8010/api`, `120` | Atelier Convert, nœud des workflows de suite (aucune boîte à outils dans le cœur ; l'extension Agent_DatAnalyst lit la même adresse) ([`apps/noeuds.md`](apps/noeuds.md)) |
 | `OLLAMA_NUM_CTX` | `8192` | Fenêtre de contexte demandée à Ollama (vide = celle du serveur) : consignes et outils des agents 100 % locaux ([`settings.md`](settings.md)) |
 | `CUISINE_SUPABASE_URL`, `CUISINE_SUPABASE_ANON_KEY`, `CUISINE_EMAIL`, `CUISINE_PASSWORD` / `CUISINE_REFRESH_TOKEN` | vide | Atelier Cuisine, app en ligne : projet Supabase, clé publique, compte du foyer ([`apps/cuisine.md`](apps/cuisine.md)) |

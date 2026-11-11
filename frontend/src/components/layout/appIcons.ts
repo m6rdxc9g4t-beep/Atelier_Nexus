@@ -1,7 +1,9 @@
 import {
   ArrowLeftRight,
+  BookOpen,
   ChartColumn,
   Clapperboard,
+  ClipboardList,
   GitBranch,
   GraduationCap,
   Heart,
@@ -31,6 +33,8 @@ export const APP_ICONS: Record<string, LucideIcon> = {
   cuisine: Utensils,
   dates: Heart,
   convert: ArrowLeftRight,
+  wiki: BookOpen,
+  formulaire: ClipboardList,
   github: GitBranch,
 };
 
@@ -46,6 +50,8 @@ export const APP_SHORT: Record<string, string> = {
   cuisine: "Cuisine",
   dates: "Dates",
   convert: "Convert",
+  wiki: "Wiki",
+  formulaire: "Formulaire",
   github: "GitHub",
 };
 

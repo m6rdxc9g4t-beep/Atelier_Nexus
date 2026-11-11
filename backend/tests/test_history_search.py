@@ -3,12 +3,17 @@
 import json
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.db.conversations import ConversationRepository
+from app.db.models import ArtifactRow, ConversationRow
 from app.db.search import like_pattern, normalize, search_text, snippet, terms
 from tests.fakes import ScriptedProvider, text_response, tool_response
 from tests.test_conversations import anthropic, client, sessions, user  # noqa: F401
@@ -129,3 +134,56 @@ def test_migration_fills_existing_conversations(tmp_path: Path) -> None:
 @pytest.mark.parametrize("query", ["  ", "a b"])
 def test_empty_terms_give_no_result(client: TestClient, query: str) -> None:  # noqa: F811
     assert client.get("/api/conversations/search", params={"q": query}).json() == []
+
+
+async def test_lists_read_no_heavy_column_and_search_one_artifact_query(
+    sessions: async_sessionmaker,  # type: ignore[type-arg]  # noqa: F811
+) -> None:
+    """La liste et la recherche ne lisent pas le texte de recherche (jusqu'à 200 000 caractères
+    par conversation), et la recherche lit les artefacts en une requête, pas une par résultat."""
+    async with sessions() as s:
+        for name in ("alpha", "bravo", "charlie", "delta"):
+            row = ConversationRow(
+                agent="assistant",
+                title=f"Budget {name}",
+                history=[user(f"Prépare le budget {name}")],
+                search_text=f"budget {name} prepare le budget rapport detaille du trimestre",
+            )
+            s.add(row)
+            await s.flush()
+            s.add(
+                ArtifactRow(
+                    conversation_id=row.id, agent="assistant", kind="markdown",
+                    title=f"Rapport {name}", content="Budget détaillé du trimestre",
+                )
+            )  # fmt: skip
+        await s.commit()
+    repo = ConversationRepository(sessions)
+    statements: list[str] = []
+    engine = sessions.kw["bind"].sync_engine
+
+    def record(conn: Any, cursor: Any, statement: str, *_: Any) -> None:
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        hits = await repo.search("budget trimestre")
+        searched = list(statements)
+        statements.clear()
+        one = await repo.search("budget delta")
+        single = list(statements)
+        statements.clear()
+        listed = await repo.recent()
+        recent = list(statements)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert len(hits) == 4 and all(h.artifact_count == 1 and h.message_count == 1 for h in hits)
+    assert all("udget" in (h.snippet or "") for h in hits)
+    assert [h.title for h in one] == ["Budget delta"]
+    # Même nombre de requêtes pour 1 ou 4 résultats : conversations, puis leurs artefacts
+    assert len(searched) == len(single) == 2
+    assert len(listed) == 4 and len(recent) == 1
+    for sql in (searched[0], recent[0]):
+        columns = sql.split("FROM")[0]
+        assert "search_text" not in columns and "turn_meta" not in columns
+        assert "conversations.history" in columns

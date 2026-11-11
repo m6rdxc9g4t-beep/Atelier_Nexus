@@ -17,11 +17,13 @@ export const APP_COLORS: Record<string, string> = {
   cuisine: "#9b84dc",
   dates: "#db373a",
   convert: "#9d6d1c",
+  wiki: "#007cbb",
+  formulaire: "#008478",
 };
 
 /** Applications dont la marque (atelier-brand.css) connaît la signature : `data-atelier-app` suffit.
  * Les autres (apps des extensions) reçoivent leur couleur en signature locale. */
-const BRAND_APPS = new Set(["viz", "tab", "projets", "nexus", "cine", "savoir", "tresorerie", "cuisine", "dates", "convert"]);
+const BRAND_APPS = new Set(["viz", "tab", "projets", "nexus", "cine", "savoir", "tresorerie", "cuisine", "dates", "convert", "wiki", "formulaire"]);
 
 /** Outil système (app null) : couleur de Nexus. */
 export const SYSTEM_APP = "nexus";

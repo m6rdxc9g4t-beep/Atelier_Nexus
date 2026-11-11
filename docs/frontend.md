@@ -62,6 +62,16 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   `size` sm | md | lg | xl et `scroll="body"` avec `DialogBody`), `badge`, `button` (30 px ; variantes `outline`,
   `ghost`, `soft` neutre ; un seul bouton principal par écran), `segmented` (`segmentedRail` / `segmentedItem`, aussi
   utilisés par le sélecteur de thème).
+  Fenêtres et tiroirs (`dialog`, `sheet`) : à la fermeture, le focus revient à l'élément qui l'avait à l'ouverture
+  (`focus-return.ts`), même sans `DialogTrigger` — Réglages, éditeur d'agent, éditeur en graphe, navigation en
+  tiroir et livrables sont ouverts par un store, et Radix ne rend le focus qu'à un déclencheur.
+- **Au doigt** (`@media (pointer: coarse)` de `globals.css`, gardé par `src/app/touch.test.ts`) : les champs de saisie
+  font 16 px (en dessous, iOS agrandit toute la page au focus et ne revient pas en arrière) ; boutons, lignes de
+  navigation, onglets, entrées de menu et champs font au moins 40 px (24 à 30 px à la souris, inchangés). Un rail
+  d'onglets suit leur hauteur (`pointer-coarse:h-auto`). Un bouton `role="radio"` (choix d'icône, rythme) est une
+  cible comme une autre ; seuls cases à cocher et interrupteurs, dont le libellé est cliquable, gardent leur taille.
+  Un `<summary>` agrandi garde son contenu au milieu (`align-content: center`) ; s'il est une rangée flex, il
+  centre ses éléments (`items-center`) ou porte `pointer-coarse:flex-wrap`.
 - Police : **Inter** embarquée (`--atelier-font`, variantes `cv11` et `ss03`), chiffres tabulaires dans les données
   (`tabular-nums`). Aucune ressource externe (pas de Google Fonts).
 - Thème : Système / Clair / Sombre (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ;
@@ -69,7 +79,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   `localStorage["atelier:theme"]`), posé en script bloquant dans `<head>` par `theme-script.tsx` ; le sélecteur appelle
   `window.atelierTheme.set()` et suit l'événement `atelier-theme`. Classe `dark` **et** `data-theme` sur `<html>`. Les
   anciennes clés `atelier-nexus-theme` et `atelier-nexus:theme` sont reprises une fois, puis effacées.
-- Marque « Atelier Nexus » (icône carrée en dégradé de la signature, glyphe Lucide `workflow` blanc) + fenêtre « À propos » (grande icône `.atelier-about__icon`, suit le thème), sélecteur « Suite Atelier » (mêmes icônes et noms que le portail, SUITE.md §1.6) avec l'état des API, muet quand une app répond (Nexus, Viz, Tab, Projets, Convert, Trésorerie, Ciné, Savoir) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
+- Marque « Atelier Nexus » (icône carrée en dégradé de la signature, glyphe Lucide `workflow` blanc) + fenêtre « À propos » (grande icône `.atelier-about__icon`, suit le thème), sélecteur « Suite Atelier » (mêmes icônes et noms que le portail, SUITE.md §1.6) avec l'état des API, muet quand une app répond (Nexus, Viz, Tab, Projets, Convert, Wiki, Formulaire, Trésorerie, Ciné, Savoir ; Wiki et Formulaire sur le port de leur API, 3200 et 3300, surcharges `NEXT_PUBLIC_ATELIER_WIKI_URL` / `NEXT_PUBLIC_ATELIER_FORMULAIRE_URL`) ; Atelier Cuisine, app en ligne (`online: true` dans `lib/suite.ts`), n'est jamais sondée et s'affiche « en ligne ».
 - Icônes : `src/app/favicon.ico`, `scripts/macos/icon.png` et `AtelierNexus.icns`, `scripts/windows/AtelierNexus.ico` = l'icône carrée de l'app.
 - Réglages ouvrables de partout (`stores/useUiStore.ts`, `openSettings()`) : bouton de la barre latérale, messages
   « non configuré » de la conversation.
@@ -90,6 +100,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 | `src/features/home/home.ts` | Accueil : salutation, agents mis en avant, résumé de l'état de la suite ; testé |
 | `src/stores/useNavStore.ts`, `src/stores/useUiStore.ts` | Vue affichée (accueil / conversation) et tiroir mobile ; fenêtre des Réglages ouvrable de partout |
 | `src/hooks/useBackend.ts` | Agents, moteurs, état de Data Via (rafraîchis toutes les 30 s) |
+| `src/components/layout/lazyViews.ts` | **Chargement à la demande** : la conversation (et `react-markdown`), le Studio, l'éditeur en graphe (`@xyflow/react`), les Réglages et l'éditeur d'agent sont chargés par `next/dynamic` depuis `Workspace.tsx`, puis préchargés quand le navigateur est au repos (`whenIdle`) ; la visionneuse de livrables l'est depuis `ArtifactPanel.tsx`. Paquet initial de l'accueil : 1,40 Mo → 0,85 Mo de JS (433 → 273 Ko compressés). `lazyViews.test.ts` refuse un import statique de ces vues dans l'écran principal ou la barre latérale (`SettingsButton` vit pour cela dans son propre fichier) |
 | `src/features/workflows/` | Workflows (Étapes 18 et 24) : `WorkflowsStudio` (vue plein cadre : onglets Workflows — « Mes workflows » / « Modèles de la suite » —, Carte de la suite, À valider), `WorkflowsDialog.tsx` (bouton Workflows de la conversation et `MyWorkflows` : cartes avec chaîne d'applications, lancement v1, « Passer en graphe », badge « Simple » pour un v1), `TemplateGallery` (modèles de `GET /api/workflows/library`, disponibilité, prérequis repliés, « Utiliser ce modèle »), `WorkflowEditor` (enregistrer un tour, modifier un v1). Logique pure testée : `form.ts`, `chain.ts` (chaîne d'applications d'un workflow), `studio.ts` (onglet, filtres, modèles mis en avant, `missingLines`, cible « Utiliser ce modèle ») |
 | `src/features/workflows-graph/` | Éditeur de workflows v2 en graphe (`@xyflow/react`, contrat `docs/workflows-v2-api.md`) : `WorkflowGraphEditor` (fenêtre plein écran, ≥ 1024 px), `Palette` (catalogue par application), `StepNode`, `Inspector` (étape, condition, paramètres, formulaire généré depuis `input_schema`, menu « Utiliser… »), `RunPanel` (lancement, suivi, validation, historique). Logique pure testée : `graph.ts` (étapes ↔ nœuds/arêtes, ancêtres, ordre, couches, état d'exécution), `validate.ts`, `refs.ts` / `templates.ts` (gabarits), `schemaForm.ts`, `catalog.ts`, `draft.ts` (dont `draftFromTemplate` : copie non enregistrée d'un modèle, `saveState`), `run.ts`, `leave.ts` (quitter l'éditeur vers la liste ou les modèles) ; doubles du contrat dans `fixtures.ts` |
 | `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée) |
@@ -150,7 +161,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 
 ## 5. Historique des conversations
 
-Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer.
+Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer. Le message d'erreur du dernier tour propose alors **Réessayer** (`retryable` de `conversation.ts`, `retry` du store) : la même question repart avec ses fichiers, à la place du tour raté — sauf si des actions avaient déjà commencé ou si une validation était en jeu (elles seraient relancées). Le bouton disparaît avec le tour remplacé : le focus passe à la zone de saisie (`focusAfterRetry` de `retryFocus.ts`), sauf après un appui au doigt, où le clavier à l'écran recouvrirait la réponse.
 
 ## 5 bis. Lien profond (Atelier Hub)
 
@@ -172,6 +183,13 @@ cd backend && python -m scripts.demo_server
 # 3. Interface
 cd frontend && npm run dev        # http://localhost:3100 → agent « Démo Data Via »
 ```
+
+Passe du 2026-11-11 vérifiée dans Chromium contre le serveur de démonstration (1440 × 900 et 390 × 844 avec
+pointeur grossier, clair et sombre) : paquet initial mesuré sur `next build`, export statique (`NEXUS_EXPORT=1`)
+servi par le backend avec ses vues chargées à la demande, retour du focus au clavier, champs à 16 px et cibles de
+40 px au doigt, « Réessayer » après une coupure du flux, sélecteur de la suite. À savoir : `next dev` ne recompile
+pas toujours `globals.css` à chaud (cache de `.next/dev`) — après une modification de ce fichier, relancer le
+serveur de développement, dossier `.next/dev` supprimé.
 
 Refonte visuelle vérifiée le 2026-10-25 dans Chromium (1440 × 900 clair et sombre, 375 × 812) : accueil, barre
 latérale et tiroir, Studio (mes workflows, modèles, carte), modèle copié dans l'éditeur, conversation avec le

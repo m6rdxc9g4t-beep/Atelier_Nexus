@@ -69,6 +69,27 @@ describe("useChatStore et l'historique", () => {
     expect(state.saveError).toContain("Base indisponible");
   });
 
+  it("« Réessayer » renvoie la question en échec, une seule fois dans le fil et dans l'historique", async () => {
+    script = [{ type: "error", code: "provider_error", message: "Ollama ne répond pas.", provider: "ollama" }];
+    await useChatStore.getState().send("Résume ce mois");
+    let conv = useChatStore.getState().conversations.assistant;
+    expect(conv?.turns.at(-1)?.error).toBe("Ollama ne répond pas.");
+    expect(conv?.history).toHaveLength(0);
+
+    script = [{ type: "text_delta", text: "Voici" }, done];
+    await useChatStore.getState().retry();
+    conv = useChatStore.getState().conversations.assistant;
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.messages).toEqual([{ role: "user", content: [{ type: "text", text: "Résume ce mois" }] }]);
+    expect(conv?.turns.map((t) => t.role)).toEqual(["user", "assistant"]);
+    expect(conv?.turns.at(-1)?.error).toBeUndefined();
+    expect(conv?.history).toHaveLength(2);
+
+    // Rien à réessayer après une réponse réussie : aucun envoi de plus
+    await useChatStore.getState().retry();
+    expect(calls).toHaveLength(2);
+  });
+
   it("une nouvelle conversation oublie l'identifiant de la précédente", async () => {
     script = [done];
     await useChatStore.getState().send("Salut");

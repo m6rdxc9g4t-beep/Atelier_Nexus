@@ -79,6 +79,10 @@ FIELDS: tuple[EditableField, ...] = (
     EditableField("CONVERT_BASE_URL", "Atelier Convert", "Applications Atelier", "url",
                   "Relevés et fichiers convertis en tables (API sur 8010). Adresse locale uniquement "
                   "(127.0.0.1, localhost, ::1) : le contrat atelier-node/1 refuse toute autre adresse."),
+    EditableField("WIKI_BASE_URL", "Atelier Wiki", "Applications Atelier", "url",
+                  "Pages du wiki dans les workflows (API sur 3200). Adresse locale uniquement."),
+    EditableField("FORMULAIRE_BASE_URL", "Atelier Formulaire", "Applications Atelier", "url",
+                  "Formulaires et réponses dans les workflows (API sur 3300). Adresse locale uniquement."),
     EditableField("TAB_EXPORTS_DIR", "Instantanés d'Atelier Tab", "Applications Atelier", "path",
                   "Dossier exports de Tab (par défaut ~/Atelier_Tab/exports)."),
     EditableField("CUISINE_SUPABASE_URL", "Adresse du projet Supabase", "Atelier Cuisine", "url",

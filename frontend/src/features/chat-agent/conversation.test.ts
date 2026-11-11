@@ -9,6 +9,7 @@ import {
   emptyConversation,
   failLastTurn,
   replayableCount,
+  retryable,
 } from "./conversation";
 
 const result = (over: Partial<AgentResult> = {}): AgentResult => ({
@@ -109,6 +110,56 @@ describe("conversation", () => {
     conv = applyEvent(conv, { type: "done", result: result() });
     conv = failLastTurn(conv, "Réponse arrêtée.");
     expect(conv.history).toHaveLength(2);
+  });
+});
+
+describe("retryable (« Réessayer »)", () => {
+  const file = { type: "attachment" as const, id: "att_1", name: "ventes.csv", media_type: "text/csv", size: 12, kind: "document" as const };
+
+  it("rend la question en échec, ses fichiers, et la conversation sans le tour raté", () => {
+    let conv = addUserTurn(emptyConversation(), "Bonjour");
+    conv = applyEvent(conv, { type: "done", result: result() });
+    conv = addUserTurn(conv, "Analyse ce fichier", [file]);
+    conv = applyEvent(conv, { type: "text_delta", text: "Je regar" });
+    conv = failLastTurn(conv, "Le serveur Atelier Nexus ne répond pas.");
+
+    const again = retryable(conv);
+    expect(again?.text).toBe("Analyse ce fichier");
+    expect(again?.attachments).toEqual([file]);
+    expect(again?.conv.turns.map((t) => t.role)).toEqual(["user", "assistant"]);
+    // Renvoyée, la question ne figure qu'une fois dans l'historique envoyé au serveur
+    const resent = addUserTurn(again!.conv, again!.text, again!.attachments);
+    expect(resent.history.filter((m) => m.role === "user")).toHaveLength(2);
+    expect(resent.turns).toHaveLength(4);
+  });
+
+  it("rien à réessayer sans échec, ou sur une conversation vide", () => {
+    expect(retryable(emptyConversation())).toBeNull();
+    let conv = addUserTurn(emptyConversation(), "Bonjour");
+    expect(retryable(conv)).toBeNull(); // réponse en cours
+    conv = applyEvent(conv, { type: "done", result: result() });
+    expect(retryable(conv)).toBeNull();
+  });
+
+  it("pas de « Réessayer » si des actions ont déjà tourné : elles seraient relancées", () => {
+    let conv = addUserTurn(emptyConversation(), "Crée la tâche");
+    conv = applyEvent(conv, { type: "tool_call", id: "c1", name: "projets_create_work_item", input: {} });
+    conv = failLastTurn(conv, "Réponse arrêtée.");
+    expect(retryable(conv)).toBeNull();
+  });
+
+  it("pas de « Réessayer » après l'échec d'une reprise de validation", () => {
+    let conv = addUserTurn(emptyConversation(), "Crée la tâche");
+    conv = applyEvent(conv, { type: "approval_required", calls: [{ id: "c1", name: "x", input: {}, summary: "Créer" }] });
+    conv = applyEvent(conv, {
+      type: "done",
+      result: result({
+        stop_reason: "awaiting_approval",
+        new_messages: [{ role: "assistant", content: [{ type: "tool_use", id: "c1", name: "x", input: {} }] }],
+      }),
+    });
+    conv = failLastTurn(conv, "Le serveur ne répond pas.");
+    expect(retryable(conv)).toBeNull();
   });
 });
 

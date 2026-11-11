@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
-import { emptyConversation, pendingApproval } from "@/features/chat-agent/conversation";
+import { emptyConversation, pendingApproval, retryable } from "@/features/chat-agent/conversation";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
 import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
@@ -17,11 +17,12 @@ import type { AgentInfo, AttachmentBlock, ProviderStatus } from "@/types/api";
 
 import { AgentTile } from "./AgentTile";
 import { AgentWelcome, ThreadSkeleton } from "./AgentWelcome";
-import { Composer } from "./Composer";
+import { COMPOSER_ID, Composer } from "./Composer";
 import { ConversationHistory } from "./ConversationHistory";
 import { DecisionDock } from "./DecisionDock";
 import { MessageList } from "./MessageList";
 import { ProviderPicker } from "./ProviderPicker";
+import { focusAfterRetry } from "./retryFocus";
 import { type LiveSnapshot, liveMessage } from "./thread";
 
 /** Exemples proposés quand l'agent n'en fournit pas. */
@@ -48,6 +49,7 @@ export function ChatPanel({
   const sendText = useChatStore((s) => s.send);
   const decideStore = useChatStore((s) => s.decide);
   const stop = useChatStore((s) => s.stop);
+  const retryStore = useChatStore((s) => s.retry);
   const reset = useChatStore((s) => s.reset);
   const restore = useChatStore((s) => s.restore);
   const opening = useChatStore((s) => s.opening);
@@ -72,6 +74,18 @@ export function ChatPanel({
   const send = (text: string, attachments: AttachmentBlock[] = []) => sendText(text, { localOnly, attachments });
   const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
   const empty = conversation.turns.length === 0;
+  // Dernière question restée sans réponse (échec, arrêt) : « Réessayer » la renvoie telle quelle
+  const canRetry = !blocked && !streaming && retryable(conversation) !== null;
+  const retry = (keyboard: boolean) => {
+    void retryStore({ localOnly });
+    // Le bouton disparaît avec le tour remplacé : le focus va à la zone de saisie, pas sur <body>
+    const field = document.getElementById(COMPOSER_ID);
+    focusAfterRetry({
+      composer: field instanceof HTMLTextAreaElement ? field : null,
+      keyboard,
+      coarse: window.matchMedia("(pointer: coarse)").matches,
+    });
+  };
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
   const agentLabel = (name: string) => agents.find((a) => a.name === name)?.display_name ?? name;
   const pending = pendingApproval(conversation);
@@ -136,6 +150,7 @@ export function ChatPanel({
               agentLabel={agentLabel}
               onDecide={decide}
               onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
+              onRetry={canRetry ? retry : undefined}
               pendingRef={setPendingCard}
               scroller={scroller}
             />

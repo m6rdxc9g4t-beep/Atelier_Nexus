@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import defer, selectinload
 
 from app.agents.base import AgentResult
 from app.core.llm.attachments import referenced_ids
@@ -26,6 +26,13 @@ from app.schemas.conversations import (
 )
 
 MAX_LIST = 200
+
+#: Colonnes qu'une liste ou un résultat de recherche ne lit jamais
+_LIST_ONLY = (
+    defer(ConversationRow.search_text),
+    defer(ConversationRow.turn_meta),
+    defer(ConversationRow.pending),
+)
 
 
 def _summary(row: ConversationRow, artifact_count: int) -> ConversationSummary:
@@ -95,6 +102,9 @@ class ConversationRepository:
             query = (
                 select(ConversationRow, func.coalesce(counts.c.n, 0))
                 .outerjoin(counts, counts.c.conversation_id == ConversationRow.id)
+                # Une liste n'affiche ni le texte de recherche (jusqu'à 200 000 caractères
+                # par conversation), ni les métadonnées des tours, ni les validations
+                .options(*_LIST_ONLY)
                 .order_by(ConversationRow.updated_at.desc())
                 .limit(min(limit, MAX_LIST))
             )
@@ -112,6 +122,23 @@ class ConversationRepository:
             select(ArtifactRow).where(ArtifactRow.conversation_id == conversation_id)
         )
         return list(rows)
+
+    @staticmethod
+    async def _artifacts_by_conversation(
+        s: AsyncSession, ids: list[str]
+    ) -> dict[str, list[ArtifactRow]]:
+        """Artefacts de plusieurs conversations, en UNE requête (pas une par résultat)."""
+        found: dict[str, list[ArtifactRow]] = {}
+        if not ids:
+            return found
+        rows = await s.scalars(
+            select(ArtifactRow)
+            .where(ArtifactRow.conversation_id.in_(ids))
+            .order_by(ArtifactRow.created_at, ArtifactRow.id)
+        )
+        for artifact in rows:
+            found.setdefault(artifact.conversation_id, []).append(artifact)
+        return found
 
     async def search(
         self, query: str, agent: str | None = None, limit: int = 30
@@ -134,17 +161,19 @@ class ConversationRepository:
                 select(ConversationRow, func.coalesce(counts.c.n, 0))
                 .outerjoin(counts, counts.c.conversation_id == ConversationRow.id)
                 .where(condition)
+                .options(*_LIST_ONLY)
                 .order_by(ConversationRow.updated_at.desc())
                 .limit(min(limit, MAX_LIST))
             )
             if agent:
                 q = q.where(ConversationRow.agent == agent)
+            found = (await s.execute(q)).all()
+            artifacts = await self._artifacts_by_conversation(s, [row.id for row, _ in found])
             hits = []
-            for row, n in (await s.execute(q)).all():
-                arts = await self._artifacts_of(s, row.id)
+            for row, n in found:
                 texts = [
                     *message_texts(row.history or []),
-                    *(f"{a.title} : {a.content}" for a in arts),
+                    *(f"{a.title} : {a.content}" for a in artifacts.get(row.id, [])),
                 ]
                 hits.append(
                     SearchHit(**_summary(row, int(n)).model_dump(), snippet=snippet(texts, words))

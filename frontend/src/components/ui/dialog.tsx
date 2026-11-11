@@ -7,6 +7,8 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { useFocusReturn } from "./focus-return";
+
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogClose = DialogPrimitive.Close;
@@ -42,10 +44,14 @@ function DialogContent({
   children,
   size,
   scroll,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof dialogSize> &
   VariantProps<typeof dialogScroll>) {
+  // Fenêtre ouverte sans DialogTrigger (par un store) : le focus revient à l'élément d'origine
+  const focusReturn = useFocusReturn({ onOpenAutoFocus, onCloseAutoFocus });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgb(11_18_32/0.45)] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
@@ -59,6 +65,7 @@ function DialogContent({
           className,
         )}
         {...props}
+        {...focusReturn}
       >
         {children}
         <DialogPrimitive.Close className="absolute top-3 right-3 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">

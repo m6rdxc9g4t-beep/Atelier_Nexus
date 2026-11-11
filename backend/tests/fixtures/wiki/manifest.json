@@ -1,0 +1,592 @@
+{
+  "contract": "atelier-node/1",
+  "app": "wiki",
+  "name": "Atelier Wiki",
+  "version": "0.1.0",
+  "transport": "http",
+  "actions": [
+    {
+      "id": "spaces.list",
+      "label": "Lister les espaces",
+      "description": "Espaces du wiki avec leur nombre de pages.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/spaces"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "pages.search",
+      "label": "Chercher dans le wiki",
+      "description": "Recherche plein texte dans les titres et le contenu des pages ; renvoie les pages et un extrait.",
+      "kind": "read",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/search"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Mots cherchés dans les titres et le texte (accents ignorés)."
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Limiter à un espace."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "pages.list",
+      "label": "Lister les pages",
+      "description": "Pages du wiki (titre, espace, version, dernière modification), sans leur contenu.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/pages"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "space_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Limiter à un espace."
+          },
+          "updated_since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Pages modifiées depuis cet instant (ISO 8601)."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 200
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "pages.get",
+      "label": "Lire une page",
+      "description": "Contenu Markdown complet d’une page et les pages qui la citent.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/pages/{page_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          }
+        },
+        "required": [
+          "page_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "latex"
+              ]
+            },
+            "space_id": {
+              "type": "string"
+            },
+            "space": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_by": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "backlinks": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "content",
+            "space_id",
+            "version",
+            "path"
+          ]
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "pages.create",
+      "label": "Créer une page",
+      "description": "Crée une page (Markdown ou LaTeX) dans un espace, éventuellement sous une page parente.",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/pages"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 2000000,
+            "description": "Texte de la page, dans le langage de `format`."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "latex"
+            ],
+            "default": "markdown",
+            "description": "Langage d'écriture : Markdown (défaut) ou LaTeX (corps du document)."
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Espace cible (défaut : le premier espace)."
+          },
+          "parent_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Page parente (même espace)."
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 16,
+            "description": "Émoji."
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "latex"
+              ]
+            },
+            "space_id": {
+              "type": "string"
+            },
+            "space": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_by": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "backlinks": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "content",
+            "space_id",
+            "version",
+            "path"
+          ]
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "pages.append",
+      "label": "Compléter une page",
+      "description": "Ajoute une section à la fin d’une page existante (compte rendu, journal…).",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/pages/{page_id}/append"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000,
+            "description": "Texte ajouté à la fin de la page, dans le langage de la page (Markdown ou LaTeX)."
+          },
+          "heading": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Titre de section placé avant le texte ajouté (## … en Markdown, \\section*{…} en LaTeX)."
+          }
+        },
+        "required": [
+          "page_id",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "latex"
+              ]
+            },
+            "space_id": {
+              "type": "string"
+            },
+            "space": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_by": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "backlinks": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "content",
+            "space_id",
+            "version",
+            "path"
+          ]
+        }
+      },
+      "idempotency": "header"
+    },
+    {
+      "id": "pages.replace",
+      "label": "Réécrire une page",
+      "description": "Remplace tout le contenu d’une page (l’ancienne version reste dans l’historique).",
+      "kind": "destructive",
+      "http": {
+        "method": "PUT",
+        "path": "/api/atelier/pages/{page_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 2000000,
+            "description": "Nouveau contenu complet, dans le langage de la page (Markdown ou LaTeX)."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "page_id",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "latex"
+              ]
+            },
+            "space_id": {
+              "type": "string"
+            },
+            "space": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_by": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "backlinks": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "content",
+            "space_id",
+            "version",
+            "path"
+          ]
+        }
+      },
+      "idempotency": "natural"
+    }
+  ],
+  "events": [
+    {
+      "type": "wiki.space.created",
+      "label": "Espace créé",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "wiki.page.created",
+      "label": "Page créée",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "wiki.page.updated",
+      "label": "Page modifiée",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "wiki.page.moved",
+      "label": "Page déplacée",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "wiki.page.deleted",
+      "label": "Page mise à la corbeille",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "wiki.page.restored",
+      "label": "Page restaurée",
+      "data_schema": {
+        "type": "object"
+      }
+    }
+  ]
+}

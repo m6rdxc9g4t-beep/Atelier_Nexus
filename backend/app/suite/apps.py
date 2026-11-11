@@ -16,6 +16,8 @@ APP_COLORS: dict[str, str] = {
     "cuisine": "#9b84dc",
     "dates": "#db373a",
     "convert": "#9d6d1c",
+    "wiki": "#007cbb",
+    "formulaire": "#008478",
 }
 
 APP_NAMES: dict[str, str] = {
@@ -29,11 +31,13 @@ APP_NAMES: dict[str, str] = {
     "cuisine": "Atelier Cuisine",
     "dates": "Atelier Dates",
     "convert": "Atelier Convert",
+    "wiki": "Atelier Wiki",
+    "formulaire": "Atelier Formulaire",
     "github": "GitHub",
 }
 
 #: Applications qui implémentent le contrat `atelier-node/1` (ordre de la carte et du catalogue)
-NODE_APPS = ("viz", "tab", "projets", "convert")
+NODE_APPS = ("viz", "tab", "projets", "convert", "wiki", "formulaire")
 
 #: Nœuds joints en HTTP : app → (attribut de `Settings` qui donne l'adresse, clé du transport
 #: simulé en test). Tab passe par ses fichiers et son serveur MCP (`app/suite/nodes.py`).
@@ -42,6 +46,8 @@ HTTP_NODES: dict[str, tuple[str, str]] = {
     "viz": ("data_via_base_url", "data_via"),
     "projets": ("projets_base_url", "projets"),
     "convert": ("convert_base_url", "convert"),
+    "wiki": ("wiki_base_url", "wiki"),
+    "formulaire": ("formulaire_base_url", "formulaire"),
 }
 
 

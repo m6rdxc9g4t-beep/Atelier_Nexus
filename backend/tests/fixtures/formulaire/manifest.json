@@ -1,0 +1,195 @@
+{
+  "contract": "atelier-node/1",
+  "app": "formulaire",
+  "name": "Atelier Formulaire",
+  "version": "0.1.0",
+  "transport": "http",
+  "actions": [
+    {
+      "id": "forms.list",
+      "label": "Lister les formulaires",
+      "description": "Formulaires avec leur statut et leur nombre de réponses.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/forms"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "forms.get",
+      "label": "Lire un formulaire",
+      "description": "Questions d’un formulaire (identifiants, types, choix) : ce qu’attend responses.submit.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/forms/{form_id}"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "responses.list",
+      "label": "Lire les réponses",
+      "description": "Réponses d’un formulaire, une colonne par question ; since_id pour ne lire que les nouvelles.",
+      "kind": "read",
+      "http": {
+        "method": "GET",
+        "path": "/api/atelier/forms/{form_id}/responses"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          },
+          "since_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Réponses arrivées après celle-ci (reprise incrémentale)."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "default": 1000
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "atelier-table/1",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "natural"
+    },
+    {
+      "id": "responses.submit",
+      "label": "Envoyer une réponse",
+      "description": "Ajoute une réponse à un formulaire, contrôlée comme une réponse saisie à la main.",
+      "kind": "write",
+      "http": {
+        "method": "POST",
+        "path": "/api/atelier/forms/{form_id}/responses"
+      },
+      "mcp_tool": null,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Identifiant numérique, en chaîne."
+          },
+          "answers": {
+            "type": "object",
+            "description": "Identifiant de question → valeur (texte, nombre, booléen, ou liste de choix). Voir forms.get pour les questions."
+          }
+        },
+        "required": [
+          "form_id",
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "format": "json",
+        "schema": {
+          "type": "object"
+        }
+      },
+      "idempotency": "header"
+    }
+  ],
+  "events": [
+    {
+      "type": "formulaire.form.created",
+      "label": "Formulaire créé",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.form.updated",
+      "label": "Formulaire modifié",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.form.opened",
+      "label": "Formulaire ouvert aux réponses",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.form.closed",
+      "label": "Formulaire fermé",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.form.deleted",
+      "label": "Formulaire supprimé",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.response.submitted",
+      "label": "Réponse reçue",
+      "data_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "type": "formulaire.response.deleted",
+      "label": "Réponse supprimée",
+      "data_schema": {
+        "type": "object"
+      }
+    }
+  ]
+}

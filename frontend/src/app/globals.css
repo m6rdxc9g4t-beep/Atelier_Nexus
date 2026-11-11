@@ -239,6 +239,46 @@
   }
 }
 
+/* ─── Au doigt (téléphone, tablette : pointeur grossier) ──────────
+   iOS agrandit toute la page au focus d'un champ dont le texte fait moins de 16 px, et ne revient
+   pas en arrière : les champs de saisie passent à 16 px. Hors couche, pour l'emporter sur les
+   tailles posées par les utilitaires (`text-sm`, `text-base`). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+/* Cibles d'au moins 40 px au doigt (DESIGN.md : lignes de 40 px) : boutons, lignes de navigation,
+   onglets, entrées de menu, champs. À la souris, la densité de la charte (24 à 30 px) ne change
+   pas. Couche « components » : un utilitaire explicite (`min-h-*`, `min-w-*`) garde la main.
+   Cases à cocher et interrupteurs gardent leur taille (leur libellé est cliquable) ; un bouton
+   `role="radio"` (choix d'icône, rythme, application) est lui-même la cible : il suit la règle. */
+@layer components {
+  @media (pointer: coarse) {
+    button:not([role="checkbox"], [role="switch"]),
+    a[data-slot="button"],
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"],
+    summary,
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+    select {
+      min-height: 2.5rem;
+    }
+    button:not([role="checkbox"], [role="switch"]) {
+      min-width: 2.5rem;
+    }
+    /* Un « Détails » agrandi garde son texte au milieu de la ligne, pas collé en haut. Sans effet
+       sur une rangée flex d'une seule ligne : `items-center`, ou `pointer-coarse:flex-wrap` quand
+       ses éléments s'alignent en haut (ToolCall). */
+    summary {
+      align-content: center;
+    }
+  }
+}
+
 /* ─── Carte de décision (validation humaine) ──────────────────────
    État anormal « à vous de décider » : trait de 1 px ambre (--atelier-warn) autour de la carte,
    icône et libellé ambre ; jamais de barre de couleur sur le côté ni de halo. */

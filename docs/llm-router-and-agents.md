@@ -40,7 +40,8 @@ Différences gérées par les providers :
 | Appel d'outil | bloc `tool_use` avec `id` | `tool_calls` **sans id** → le hub génère `call_xxx` |
 | Résultat d'outil | bloc `tool_result` dans un message `user` | message `role: tool` + `tool_name` |
 | Erreur d'outil | `is_error: true` | contenu préfixé `[ERREUR]` |
-| Limite de sortie | `max_tokens` | `options.num_predict` |
+| Limite de sortie | `max_tokens` | `options.num_predict` (borné à `num_ctx`) |
+| Cache de prompt | `cache_control: {type: "ephemeral"}` à la racine (automatique : outils, consignes et historique relus au tarif réduit d'une étape à l'autre) ; `Usage.input_tokens` additionne `input_tokens`, `cache_creation_input_tokens` et `cache_read_input_tokens` | sans objet |
 
 ## 3. LLMRouter
 
@@ -126,7 +127,8 @@ Outils fournis : `current_datetime`, `publish_artifact` (types : `sql`, `dax`, `
 ## 6. Endpoints
 
 ### `GET /api/llm/providers`
-État de chaque provider.
+État de chaque provider, sondés en parallèle et gardé 60 s en mémoire (10 s si l'un est indisponible) ;
+`?refresh=true` le relit, au plus toutes les 10 s. Enregistrer les Réglages recrée le routeur : état relu aussitôt.
 ```json
 [{"name": "anthropic", "configured": true, "available": true, "is_default": true,
   "is_fallback": false, "default_model": "claude-sonnet-5-5", "models": ["…"], "error": null}]

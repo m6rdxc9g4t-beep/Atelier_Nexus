@@ -16,7 +16,8 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "inline-flex h-7 w-fit items-center gap-0.5 rounded-md bg-atelier-hover p-0.5 text-muted-foreground",
+        // Au doigt, les onglets font 40 px (globals.css) : le rail suit leur hauteur
+        "inline-flex h-7 w-fit items-center gap-0.5 rounded-md bg-atelier-hover p-0.5 text-muted-foreground pointer-coarse:h-auto",
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 # Lecture des nœuds de la suite par Nexus (étape 19)
 
-Nexus lit le contrat `atelier-node/1` ([`noeud-atelier.md`](noeud-atelier.md)) de quatre
+Nexus lit le contrat `atelier-node/1` ([`noeud-atelier.md`](noeud-atelier.md)) de six
 applications pour les workflows v2, les déclencheurs et la carte de la suite. Code :
 `backend/app/suite/` (registre des nœuds HTTP : `HTTP_NODES` dans `app/suite/apps.py`).
 
@@ -10,6 +10,8 @@ applications pour les workflows v2, les déclencheurs et la carte de la suite. C
 | Atelier Projets | `GET {PROJETS_BASE_URL}/atelier/manifest` | HTTP | `GET {PROJETS_BASE_URL}/atelier/events` |
 | Atelier Tab | fichier `{TAB_EXPORTS_DIR}/_atelier/manifest.json`, sinon outil MCP `atelier_manifest` | serveur MCP (`TAB_MCP_COMMAND`) | `_atelier/events.jsonl`, sinon outil MCP `atelier_events` |
 | Atelier Convert | `GET {CONVERT_BASE_URL}/atelier/manifest` | HTTP (chemins `/api/…`), délai des actions `CONVERT_TIMEOUT` (120 s : une conversion avec OCR est longue) | `GET {CONVERT_BASE_URL}/atelier/events` (délai `APPS_TIMEOUT`) |
+| Atelier Wiki | `GET {WIKI_BASE_URL}/atelier/manifest` | HTTP (chemins `/api/atelier/…`) | `GET {WIKI_BASE_URL}/atelier/events` |
+| Atelier Formulaire | `GET {FORMULAIRE_BASE_URL}/atelier/manifest` | HTTP (chemins `/api/atelier/…`) | `GET {FORMULAIRE_BASE_URL}/atelier/events` |
 
 Atelier Convert (API sur `127.0.0.1:8010`, défaut `CONVERT_BASE_URL=http://127.0.0.1:8010/api`)
 publie 6 actions : `conversions.list`, `conversions.table` (`atelier-table/1`),
@@ -23,8 +25,23 @@ n'enregistre aucune boîte à outils `convert` : celles de l'extension Agent_Dat
 l'adresse `host.docker.internal` n'est pas une adresse de bouclage : Convert apparaît injoignable,
 comme Viz et Projets.
 
-`GET /api/apps/status` (Réglages → Vérifier) lit le manifeste de Convert sans le cache
-(`state(app, fresh=True)`) : « 6 action(s), 4 événement(s) (nœud atelier-node/1) ».
+Atelier Wiki (API sur `127.0.0.1:3200`, défaut `WIKI_BASE_URL=http://127.0.0.1:3200/api`) publie
+7 actions : `spaces.list`, `pages.search`, `pages.list` (`atelier-table/1`), `pages.get` (contenu
+d'une page), `pages.create` et `pages.append` (écritures, `Idempotency-Key`), `pages.replace`
+(destructive : l'ancienne version reste dans l'historique du wiki) ; 6 événements
+`wiki.space.created` et `wiki.page.created|updated|moved|deleted|restored` (jamais le texte des
+pages). Atelier Formulaire (API sur `127.0.0.1:3300`, défaut
+`FORMULAIRE_BASE_URL=http://127.0.0.1:3300/api`) publie 4 actions : `forms.list`, `forms.get`,
+`responses.list` (`atelier-table/1`, reprise par `since_id`) et `responses.submit` (écriture,
+`Idempotency-Key`) ; 7 événements `formulaire.form.created|updated|opened|closed|deleted` et
+`formulaire.response.submitted|deleted` (jamais le contenu des réponses). Un workflow peut donc
+finir par un compte rendu dans le wiki (`node:wiki/pages.append`) ou partir d'une réponse reçue
+(déclencheur `formulaire.response.submitted`). Les deux applications acceptent un appel serveur
+sans `Origin` depuis `127.0.0.1` ; adresse vide = nœud désactivé. Atelier Mission publie aussi un
+nœud (port 3001), pas encore lu par Nexus.
+
+`GET /api/apps/status` (Réglages → Vérifier) lit le manifeste de Convert, de Wiki et de Formulaire
+sans le cache (`state(app, fresh=True)`) : « 6 action(s), 4 événement(s) (nœud atelier-node/1) ».
 
 ## Statuts
 

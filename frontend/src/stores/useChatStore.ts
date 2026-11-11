@@ -9,6 +9,7 @@ import {
   emptyConversation,
   failLastTurn,
   fromStored,
+  retryable,
   submitApprovals,
 } from "@/features/chat-agent/conversation";
 import { ApiError, api, streamAgent } from "@/lib/api";
@@ -42,6 +43,8 @@ interface ChatState {
   send: (text: string, options?: { localOnly?: boolean; attachments?: AttachmentBlock[] }) => Promise<void>;
   /** Reprend le tour après « Autoriser / Refuser ». */
   decide: (decisions: Record<string, boolean>, options?: { localOnly?: boolean }) => Promise<void>;
+  /** Renvoie la dernière question restée sans réponse (échec, arrêt), sans la retaper. */
+  retry: (options?: { localOnly?: boolean }) => Promise<void>;
   stop: () => void;
   /** Repart d'une conversation vide (l'ancienne reste dans l'historique). */
   reset: () => void;
@@ -142,6 +145,17 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (!submitted) return;
       mutate(agent, () => submitted.conv);
       await run(agent, submitted.approvals, options?.localOnly ?? false);
+    },
+
+    retry: async (options) => {
+      const { agent, streaming } = get();
+      if (streaming) return;
+      const conv = get().conversations[agent];
+      const again = conv ? retryable(conv) : null;
+      if (!again) return;
+      // Le tour en échec est remplacé par la même question, renvoyée avec ses fichiers
+      mutate(agent, () => addUserTurn(again.conv, again.text, again.attachments));
+      await run(agent, null, options?.localOnly ?? false);
     },
 
     stop: () => get().controller?.abort(),

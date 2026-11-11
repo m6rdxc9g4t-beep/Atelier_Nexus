@@ -152,6 +152,15 @@ jeu). Le catalogue (`GET /api/workflows/catalog`) les donne tels que l'applicati
   `sha256(run_id, step_id, uses, entrée)[:32]` ; la reprise exécute exactement l'entrée montrée. Un
   jeton absent ou périmé laisse l'exécution en attente ; deux reprises simultanées n'exécutent
   qu'une fois (passage atomique `awaiting_approval → running`).
+- **Exécution interrompue** : si Nexus s'arrête pendant une étape (application quittée, erreur de base), l'exécution
+  restée `running` est close au démarrage suivant (`WorkflowRepository.fail_interrupted_runs`, appelée une seule fois,
+  avant tout lancement) : statut `failed`, étape entamée en erreur `INTERRUPTED` (son action a pu aboutir ou non : à
+  vérifier dans l'application), étapes suivantes sautées. Il reste à relancer le workflow. Seul un démarrage **sans
+  autre Nexus sur la même base** fait ce nettoyage (`InstanceGuard`, `app/db/instances.py`) : une deuxième ouverture de
+  l'app de bureau partage `nexus.db` avec la première et ne ferme pas ses exécutions en cours. Chaque processus tient
+  un verrou du système sur un fichier de `nexus.db.instances/` tant qu'il sert (libéré par le système même après un
+  arrêt brutal). Si une fenêtre s'arrête en pleine étape alors qu'une autre sert encore, l'exécution reste `running`
+  jusqu'au prochain démarrage seul. PostgreSQL (docker-compose) : un seul serveur, pas de garde.
 - **Définition figée au lancement** : modifier le workflow pendant une validation ne change pas ce
   qui sera exécuté. Le mode de validation aussi est retenu au lancement ; s'il passe à
   `every_step` pendant l'exécution, les étapes suivantes l'appliquent (le plus strict l'emporte).

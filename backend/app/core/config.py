@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Ports Nexus : 3100 (UI) / 8100 (API) — 3000 et 8000 sont pris par Projets et Viz
     cors_origins: str = "http://localhost:3100,http://127.0.0.1:3100"
+    #: Hôtes acceptés par l'API en plus du bouclage et de ceux de CORS_ORIGINS (séparés par des
+    #: virgules, sans port) : accès par un autre nom, ex. réseau local (app/api/local_only.py)
+    allowed_hosts: str = ""
 
     # Persistance
     database_url: str = "postgresql+asyncpg://atelier:change-me@localhost:5432/atelier_nexus"
@@ -84,6 +87,10 @@ class Settings(BaseSettings):
     # Atelier Convert (SUITE.md §2 : API sur 8010, bouclage uniquement) : nœud atelier-node/1 des
     # workflows, vide = désactivé. Mêmes variables que l'extension Agent_DatAnalyst (un seul .env).
     convert_base_url: str | None = "http://127.0.0.1:8010/api"
+    # Atelier Wiki (3200) et Atelier Formulaire (3300) : nœuds atelier-node/1 des workflows
+    # (pages, formulaires et réponses), bouclage uniquement, vide = désactivé
+    wiki_base_url: str | None = "http://127.0.0.1:3200/api"
+    formulaire_base_url: str | None = "http://127.0.0.1:3300/api"
     #: Délai d'une action de Convert : une conversion avec OCR dépasse les 20 s d'APPS_TIMEOUT
     convert_timeout: float = Field(default=120.0, gt=0, le=1800)
     # Atelier Tab n'a pas d'API : on lit les instantanés que l'app de bureau publie
@@ -133,6 +140,8 @@ class Settings(BaseSettings):
         "cine_base_url",
         "savoir_base_url",
         "convert_base_url",
+        "wiki_base_url",
+        "formulaire_base_url",
         "tab_exports_dir",
         "tab_mcp_command",
         "frontend_dist",
@@ -193,6 +202,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
 
 
 @lru_cache

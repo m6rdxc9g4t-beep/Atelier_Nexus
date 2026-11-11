@@ -36,13 +36,16 @@ Premier groupe des Réglages, en boutons radio :
 
 - **Liste blanche** (`FIELDS`) : APPROVAL_MODE, CLAUDE_MODE, CLAUDE_CLI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL,
   OLLAMA_NUM_CTX, LLM_DEFAULT_PROVIDER, LLM_FALLBACK_PROVIDER, DATA_VIA_BASE_URL, PROJETS_BASE_URL, PROJETS_IMPORT_TOKEN,
-  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, CONVERT_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
+  TRESORERIE_BASE_URL, CINE_BASE_URL, SAVOIR_BASE_URL, CONVERT_BASE_URL, WIKI_BASE_URL, FORMULAIRE_BASE_URL, TAB_EXPORTS_DIR, CUISINE_SUPABASE_URL, CUISINE_SUPABASE_ANON_KEY,
   CUISINE_EMAIL, CUISINE_PASSWORD, CUISINE_REFRESH_TOKEN (groupe « Atelier Cuisine »), GITHUB_TOKEN, GITHUB_REPO,
   GITHUB_ALLOWED_REPOS. Tout le reste est refusé — en particulier **`TAB_MCP_COMMAND`** (commande exécutée) et
   `DATABASE_URL`, ainsi que `CLAUDE_CLI_PATH`, qui restent dans le fichier.
 - Validation : adresses `http(s)://`, choix fermés, Atelier Cuisine (adresse HTTPS du projet, clé publique seulement :
   `service_role` / `sb_secret_…` refusées, e-mail valide — [`apps/cuisine.md`](apps/cuisine.md)), pas de retour à la ligne (aucune injection d'une autre clé), puis
   contrôle par le modèle `Settings`. Une valeur refusée ne modifie pas le fichier.
+- Atelier Wiki (`WIKI_BASE_URL`, défaut `http://127.0.0.1:3200/api`) et Atelier Formulaire (`FORMULAIRE_BASE_URL`, défaut
+  `http://127.0.0.1:3300/api`) : nœuds des workflows de la suite, mêmes règles que Convert (bouclage seulement, vide =
+  désactivé) — [`apps/noeuds.md`](apps/noeuds.md).
 - Atelier Convert (`CONVERT_BASE_URL`, défaut `http://127.0.0.1:8010/api`, vide = désactivé) : nœud des workflows de la
   suite, adresse de bouclage seulement (`127.0.0.1`, `localhost`, `::1`) — une autre adresse est enregistrée mais le nœud la
   refuse (« injoignable »). Le délai de ses actions, `CONVERT_TIMEOUT` (120 s, une conversion avec OCR est longue), reste
@@ -54,6 +57,12 @@ Premier groupe des Réglages, en boutons radio :
 - **Origine contrôlée** : refus (403) d'un appel venant d'une autre origine que l'interface de Nexus (origines CORS
   déclarées ou même origine dans l'application de bureau). Le corps JSON impose de toute façon une requête de contrôle
   CORS aux navigateurs.
+- **Requêtes locales seulement** (`app/api/local_only.py`, toute l'API) : un en-tête `Host` qui n'est ni de bouclage
+  (`127.0.0.1`, `localhost`, `[::1]`), ni l'hôte d'une origine de `CORS_ORIGINS` (le VPS : `nexus.<domaine>`), ni listé
+  dans `ALLOWED_HOSTS` (noms séparés par des virgules, sans port) est refusé (403 `forbidden_host`) : une page web dont
+  le domaine est redirigé vers 127.0.0.1 (« DNS rebinding ») ne lit pas les conversations et ne valide rien. Une écriture
+  (POST, PUT, PATCH, DELETE) dont l'`Origin` désigne un autre hôte, ou vaut `null`, est refusée (403
+  `forbidden_origin`) ; sans `Origin` (Hub, scripts), elle passe. `/health` et `/api/health` répondent à tout hôte.
 - Sans clé Claude ni Claude Code, le moteur par défaut devient Ollama (au lieu d'une erreur à chaque message).
 
 Fichier utilisé : `backend/.env` en développement, `~/Library/Application Support/Atelier Nexus/.env` dans
