@@ -44,4 +44,20 @@ describe("au doigt (pointer: coarse)", () => {
     // Hors couche : sinon `text-sm` (couche des utilitaires) l'emporterait et le zoom reviendrait
     expect(layerAt(css, media)).toBeNull();
   });
+
+  it("boutons, entrées de menu et champs font au moins 40 px, sans toucher à la densité à la souris", () => {
+    const at = css.indexOf("min-height: 2.5rem;");
+    expect(at).toBeGreaterThan(0);
+    const media = css.lastIndexOf("@media (pointer: coarse)", at);
+    const rules = block(css, media);
+    for (const target of ["button:not(", 'a[data-slot="button"]', '[role="menuitem"]', "summary", "input:not(", "select"])
+      expect(rules).toContain(target);
+    expect(rules).toContain("min-width: 2.5rem;");
+    // Cases à cocher et interrupteurs (boutons Radix) gardent leur taille
+    expect(rules).toContain('button:not([role="checkbox"], [role="switch"], [role="radio"])');
+    // Aucune taille minimale hors du bloc « au doigt » : la souris garde les 24 à 30 px de la charte
+    expect(css.replace(rules, "")).not.toContain("min-height: 2.5rem;");
+    // Couche « components » : un utilitaire explicite (min-h-*, min-w-*) garde la main
+    expect(layerAt(css, media)).toBe("components");
+  });
 });

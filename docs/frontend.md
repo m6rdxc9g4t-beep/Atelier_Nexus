@@ -66,7 +66,9 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   (`focus-return.ts`), même sans `DialogTrigger` — Réglages, éditeur d'agent, éditeur en graphe, navigation en
   tiroir et livrables sont ouverts par un store, et Radix ne rend le focus qu'à un déclencheur.
 - **Au doigt** (`@media (pointer: coarse)` de `globals.css`, gardé par `src/app/touch.test.ts`) : les champs de saisie
-  font 16 px (en dessous, iOS agrandit toute la page au focus et ne revient pas en arrière).
+  font 16 px (en dessous, iOS agrandit toute la page au focus et ne revient pas en arrière) ; boutons, lignes de
+  navigation, onglets, entrées de menu et champs font au moins 40 px (24 à 30 px à la souris, inchangés). Un rail
+  d'onglets suit leur hauteur (`pointer-coarse:h-auto`).
 - Police : **Inter** embarquée (`--atelier-font`, variantes `cv11` et `ss03`), chiffres tabulaires dans les données
   (`tabular-nums`). Aucune ressource externe (pas de Google Fonts).
 - Thème : Système / Clair / Sombre (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ;
