@@ -5,18 +5,44 @@ import { ONLINE_LABEL, checkHealth, suiteApps } from "./suite";
 afterEach(() => vi.unstubAllEnvs());
 
 describe("sélecteur « Suite Atelier »", () => {
-  it("liste les neuf applications, Nexus en tête", () => {
+  it("liste les onze applications, Nexus en tête", () => {
     expect(suiteApps().map((a) => a.id)).toEqual([
       "nexus",
       "viz",
       "tab",
       "projets",
       "convert",
+      "wiki",
+      "formulaire",
       "tresorerie",
       "cine",
       "savoir",
       "cuisine",
     ]);
+  });
+
+  it("Wiki et Formulaire, que Nexus orchestre, sont sondés sur leur API (3200 et 3300)", () => {
+    expect(suiteApps().find((a) => a.id === "wiki")).toMatchObject({
+      name: "Atelier Wiki",
+      short: "Wiki",
+      url: "http://127.0.0.1:3200",
+      healthUrl: "http://127.0.0.1:3200/api/health",
+    });
+    expect(suiteApps().find((a) => a.id === "formulaire")).toMatchObject({
+      name: "Atelier Formulaire",
+      short: "Formulaire",
+      url: "http://127.0.0.1:3300",
+      healthUrl: "http://127.0.0.1:3300/api/health",
+    });
+  });
+
+  it("les adresses de Wiki et Formulaire se surchargent (sans barre finale)", () => {
+    vi.stubEnv("NEXT_PUBLIC_ATELIER_WIKI_URL", " https://wiki.example.org/ ");
+    vi.stubEnv("NEXT_PUBLIC_ATELIER_FORMULAIRE_URL", "https://formulaire.example.org//");
+    const wiki = suiteApps().find((a) => a.id === "wiki");
+    expect(wiki?.url).toBe("https://wiki.example.org");
+    expect(wiki?.healthUrl).toBe("https://wiki.example.org/api/health");
+    expect(suiteApps().find((a) => a.id === "formulaire")?.url).toBe("https://formulaire.example.org");
   });
 
   it("Atelier Cuisine est une app en ligne, jamais sondée", () => {
