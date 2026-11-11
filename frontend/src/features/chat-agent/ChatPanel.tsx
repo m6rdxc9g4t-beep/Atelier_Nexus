@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
-import { emptyConversation, pendingApproval } from "@/features/chat-agent/conversation";
+import { emptyConversation, pendingApproval, retryable } from "@/features/chat-agent/conversation";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
 import { WorkflowsDialog } from "@/features/workflows/WorkflowsDialog";
 import { PROVIDER_SHORT, effectiveProvider } from "@/lib/labels";
@@ -48,6 +48,7 @@ export function ChatPanel({
   const sendText = useChatStore((s) => s.send);
   const decideStore = useChatStore((s) => s.decide);
   const stop = useChatStore((s) => s.stop);
+  const retryStore = useChatStore((s) => s.retry);
   const reset = useChatStore((s) => s.reset);
   const restore = useChatStore((s) => s.restore);
   const opening = useChatStore((s) => s.opening);
@@ -72,6 +73,8 @@ export function ChatPanel({
   const send = (text: string, attachments: AttachmentBlock[] = []) => sendText(text, { localOnly, attachments });
   const decide = (decisions: Record<string, boolean>) => void decideStore(decisions, { localOnly });
   const empty = conversation.turns.length === 0;
+  // Dernière question restée sans réponse (échec, arrêt) : « Réessayer » la renvoie telle quelle
+  const canRetry = !blocked && !streaming && retryable(conversation) !== null;
   const starters = agent?.starters?.length ? agent.starters : FALLBACK_STARTERS;
   const agentLabel = (name: string) => agents.find((a) => a.name === name)?.display_name ?? name;
   const pending = pendingApproval(conversation);
@@ -136,6 +139,7 @@ export function ChatPanel({
               agentLabel={agentLabel}
               onDecide={decide}
               onSaveWorkflow={agent ? () => setCapturing(true) : undefined}
+              onRetry={canRetry ? () => void retryStore({ localOnly }) : undefined}
               pendingRef={setPendingCard}
               scroller={scroller}
             />

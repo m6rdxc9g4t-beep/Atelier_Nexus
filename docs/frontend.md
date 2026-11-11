@@ -158,7 +158,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 
 ## 5. Historique des conversations
 
-Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer.
+Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer. Le message d'erreur du dernier tour propose alors **Réessayer** (`retryable` de `conversation.ts`, `retry` du store) : la même question repart avec ses fichiers, à la place du tour raté — sauf si des actions avaient déjà commencé ou si une validation était en jeu (elles seraient relancées).
 
 ## 5 bis. Lien profond (Atelier Hub)
 

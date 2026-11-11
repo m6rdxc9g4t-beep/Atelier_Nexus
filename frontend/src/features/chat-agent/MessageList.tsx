@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Info, Workflow } from "lucide-react";
+import { ChevronRight, Info, RotateCw, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ interface MessageListProps {
   onDecide: (decisions: Record<string, boolean>) => void;
   /** « Enregistrer en workflow » sous le dernier tour réussi qui a utilisé des outils. */
   onSaveWorkflow?: () => void;
+  /** « Réessayer » sur le dernier tour en échec : renvoie la même question (absent si impossible). */
+  onRetry?: () => void;
   /** Carte de validation en attente du dernier tour (dock de décision) */
   pendingRef?: (el: HTMLElement | null) => void;
   /** Conteneur qui défile : le fil ne suit la réponse que si l'on est resté en bas */
@@ -43,6 +45,7 @@ export function MessageList({
   agentLabel,
   onDecide,
   onSaveWorkflow,
+  onRetry,
   pendingRef,
   scroller,
 }: MessageListProps) {
@@ -89,6 +92,7 @@ export function MessageList({
             agentLabel={agentLabel}
             onDecide={onDecide}
             onSaveWorkflow={last && !streaming ? onSaveWorkflow : undefined}
+            onRetry={last && !streaming ? onRetry : undefined}
             pendingRef={last ? pendingRef : undefined}
           />
         );
@@ -121,6 +125,7 @@ function AgentTurn({
   agentLabel,
   onDecide,
   onSaveWorkflow,
+  onRetry,
   pendingRef,
 }: {
   turn: ChatTurn;
@@ -131,6 +136,7 @@ function AgentTurn({
   agentLabel: (name: string) => string;
   onDecide: (decisions: Record<string, boolean>) => void;
   onSaveWorkflow?: () => void;
+  onRetry?: () => void;
   pendingRef?: (el: HTMLElement | null) => void;
 }) {
   const name = agent?.display_name ?? "Agent";
@@ -198,7 +204,18 @@ function AgentTurn({
           }
         })}
         {turn.error && (
-          <Callout tone="destructive" role="alert">
+          <Callout
+            tone="destructive"
+            role="alert"
+            action={
+              onRetry && (
+                <Button size="sm" variant="outline" onClick={onRetry}>
+                  <RotateCw />
+                  Réessayer
+                </Button>
+              )
+            }
+          >
             {turn.error}
           </Callout>
         )}
