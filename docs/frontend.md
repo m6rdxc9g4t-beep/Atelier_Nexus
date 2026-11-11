@@ -68,7 +68,10 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 - **Au doigt** (`@media (pointer: coarse)` de `globals.css`, gardé par `src/app/touch.test.ts`) : les champs de saisie
   font 16 px (en dessous, iOS agrandit toute la page au focus et ne revient pas en arrière) ; boutons, lignes de
   navigation, onglets, entrées de menu et champs font au moins 40 px (24 à 30 px à la souris, inchangés). Un rail
-  d'onglets suit leur hauteur (`pointer-coarse:h-auto`).
+  d'onglets suit leur hauteur (`pointer-coarse:h-auto`). Un bouton `role="radio"` (choix d'icône, rythme) est une
+  cible comme une autre ; seuls cases à cocher et interrupteurs, dont le libellé est cliquable, gardent leur taille.
+  Un `<summary>` agrandi garde son contenu au milieu (`align-content: center`) ; s'il est une rangée flex, il
+  centre ses éléments (`items-center`) ou porte `pointer-coarse:flex-wrap`.
 - Police : **Inter** embarquée (`--atelier-font`, variantes `cv11` et `ss03`), chiffres tabulaires dans les données
   (`tabular-nums`). Aucune ressource externe (pas de Google Fonts).
 - Thème : Système / Clair / Sombre (`src/components/theme/`), en bas de la barre latérale et dans Réglages › Apparence ;
@@ -158,7 +161,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 
 ## 5. Historique des conversations
 
-Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer. Le message d'erreur du dernier tour propose alors **Réessayer** (`retryable` de `conversation.ts`, `retry` du store) : la même question repart avec ses fichiers, à la place du tour raté — sauf si des actions avaient déjà commencé ou si une validation était en jeu (elles seraient relancées).
+Historique : le client renvoie l'historique complet à chaque tour et y ajoute les `new_messages` de l'événement `done`. En cas d'erreur ou d'arrêt, la question sans réponse reste affichée mais sort de l'historique, pour pouvoir continuer. Le message d'erreur du dernier tour propose alors **Réessayer** (`retryable` de `conversation.ts`, `retry` du store) : la même question repart avec ses fichiers, à la place du tour raté — sauf si des actions avaient déjà commencé ou si une validation était en jeu (elles seraient relancées). Le bouton disparaît avec le tour remplacé : le focus passe à la zone de saisie (`focusAfterRetry` de `retryFocus.ts`), sauf après un appui au doigt, où le clavier à l'écran recouvrirait la réponse.
 
 ## 5 bis. Lien profond (Atelier Hub)
 
