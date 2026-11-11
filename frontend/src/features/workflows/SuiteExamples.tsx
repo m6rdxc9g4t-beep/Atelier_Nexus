@@ -117,7 +117,8 @@ export function SuiteExamples() {
   return (
     <Card role="region" className="gap-3 p-4" aria-labelledby="exemples-suite-titre">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
+        {/* Base de 16rem : sur un écran étroit, le choix de l'histoire passe dessous au lieu d'écraser le texte */}
+        <div className="min-w-0 flex-[1_1_16rem]">
           <h2 id="exemples-suite-titre" className="flex items-center gap-1.5 text-sm font-semibold">
             <BookOpen className="size-4 text-atelier-faint" aria-hidden />
             Exemples de la suite
