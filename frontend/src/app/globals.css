@@ -270,6 +270,12 @@
     button:not([role="checkbox"], [role="switch"]) {
       min-width: 2.5rem;
     }
+    /* Un « Détails » agrandi garde son texte au milieu de la ligne, pas collé en haut. Sans effet
+       sur une rangée flex d'une seule ligne : `items-center`, ou `pointer-coarse:flex-wrap` quand
+       ses éléments s'alignent en haut (ToolCall). */
+    summary {
+      align-content: center;
+    }
   }
 }
 

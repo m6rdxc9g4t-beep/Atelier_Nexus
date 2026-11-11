@@ -97,7 +97,9 @@ export function ToolCall({ entry, label }: { entry: ActivityEntry; label: string
   return (
     <li>
       <details className="group/tool">
-        <summary className="-mx-1.5 flex cursor-pointer list-none items-start gap-2 rounded-md px-1.5 py-1 text-muted-foreground select-none hover:bg-accent hover:text-foreground [&::-webkit-details-marker]:hidden">
+        {/* Au doigt la ligne fait 40 px : `flex-wrap` rend actif l'`align-content: center` de
+            globals.css (la rangée se centre, ses éléments restent alignés sur la première ligne) */}
+        <summary className="-mx-1.5 flex cursor-pointer list-none items-start gap-2 rounded-md px-1.5 py-1 text-muted-foreground select-none hover:bg-accent hover:text-foreground pointer-coarse:flex-wrap [&::-webkit-details-marker]:hidden">
           <ActionStatusIcon status={entry.status} className="mt-0.5" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-foreground">{label}</span>

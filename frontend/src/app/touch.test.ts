@@ -82,4 +82,19 @@ describe("au doigt (pointer: coarse)", () => {
     expect(radios.length).toBeGreaterThan(0);
     for (const radio of radios) expect(["button", "Button"], radio.file).toContain(radio.tag);
   });
+
+  it("un « Détails » agrandi garde son texte au milieu de la ligne", () => {
+    const rules = block(css, css.lastIndexOf("@media (pointer: coarse)", css.indexOf("min-height: 2.5rem;")));
+    expect(rules).toMatch(/summary \{\s*align-content: center;\s*\}/);
+    // `align-content` ne centre pas une rangée flex d'une seule ligne : elle centre ses éléments
+    // (`items-center`) ou passe à la ligne au doigt (`pointer-coarse:flex-wrap`)
+    const summaries = sources.flatMap(({ file, text }) =>
+      [...text.matchAll(/<summary\s+className="([^"]*)"/g)].map((match) => ({ file, classes: (match[1] ?? "").split(/\s+/) })),
+    );
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const { file, classes } of summaries) {
+      if (!classes.includes("flex")) continue;
+      expect(classes.includes("items-center") || classes.includes("pointer-coarse:flex-wrap"), file).toBe(true);
+    }
+  });
 });
