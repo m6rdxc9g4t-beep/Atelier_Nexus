@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { registerToolLabels } from "@/features/chat-agent/ToolCall";
 import { ApiError, api } from "@/lib/api";
+import { stable } from "@/lib/stable";
 import type { AgentInfo, AppStatus, ProviderStatus } from "@/types/api";
 
 export interface BackendState {
@@ -41,9 +42,10 @@ export function useBackend(): BackendState {
       ]);
       if (ctrl.signal.aborted) return;
       registerToolLabels(a);
-      setAgents(a);
-      setProviders(p);
-      setApps(d);
+      // Relecture identique (le cas courant, toutes les 30 s) : mêmes références, aucun re-rendu
+      setAgents((before) => stable(before, a));
+      setProviders((before) => stable(before, p));
+      setApps((before) => stable(before, d));
       setError(null);
     } catch (err) {
       if (ctrl.signal.aborted) return;
