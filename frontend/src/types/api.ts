@@ -333,6 +333,8 @@ export interface SettingsField {
   /** Secret configuré : « …abcd ». */
   hint: string | null;
   source: "fichier" | "environnement" | "défaut";
+  /** Avertissement propre à ce serveur, affiché avec l'aide (ex. « Accès à Claude » sans effet : jeton du forfait). */
+  notice?: string | null;
 }
 
 export interface SettingsView {

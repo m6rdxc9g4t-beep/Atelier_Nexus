@@ -120,6 +120,8 @@ class SettingsField(BaseModel):
     configured: bool
     #: Secret : « …abcd »
     hint: str | None = None
+    #: Avertissement propre à ce serveur, affiché avec l'aide (ex. réglage sans effet)
+    notice: str | None = None
     source: Literal["fichier", "environnement", "défaut"]
 
 
@@ -292,11 +294,8 @@ def view(settings: Settings, path: Path, *, token_mode: bool = False) -> Setting
                 label=spec.label,
                 group=spec.group,
                 kind=spec.kind,
-                help=(
-                    f"{TOKEN_MODE_NOTE} {spec.help}"
-                    if token_mode and spec.key == "CLAUDE_MODE"
-                    else spec.help
-                ),
+                help=spec.help,
+                notice=TOKEN_MODE_NOTE if token_mode and spec.key == "CLAUDE_MODE" else None,
                 choices=list(spec.choices),
                 value=None if spec.kind == "secret" else (text or ""),
                 configured=bool(text),

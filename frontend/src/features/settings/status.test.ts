@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { AppStatus, ProviderStatus, SettingsField, SettingsView } from "@/types/api";
 
 import {
+  LOCKED_NOTE,
   checkLines,
   countBySection,
+  fieldNote,
   firstFieldWith,
   firstSectionWith,
   hasStatus,
@@ -91,6 +93,19 @@ describe("rubriques des Réglages", () => {
     expect(checkLines("Modèles", { providers: [missing], apps: [] })[0]).toMatchObject({ ok: false, down: false });
     // Sans jeton, un moteur non configuré reste « non configuré », quelle que soit son erreur
     expect(providerDetail({ ...provider("anthropic", false, false), access: "cli" })).toBe("non configuré");
+  });
+
+  it("garde l'avertissement du serveur sous un champ, même verrouillé", () => {
+    const base = field("CLAUDE_MODE", "Modèles");
+    const notice = "Sans effet sur ce serveur : Claude passe par le jeton du forfait.";
+    // Sans avertissement : l'aide, ou la mention du verrou — comme avant
+    expect(fieldNote({ ...base, help: "Aide." })).toBe("Aide.");
+    expect(fieldNote({ ...base, help: "Aide.", source: "environnement" })).toBe(LOCKED_NOTE);
+    expect(fieldNote({ ...base, help: "Aide.", notice: null })).toBe("Aide.");
+    // Avec : il précède l'aide ou le verrou (cas du VPS : CLAUDE_MODE fixé par l'environnement)
+    expect(fieldNote({ ...base, help: "Aide.", notice })).toBe(`${notice} Aide.`);
+    expect(fieldNote({ ...base, help: "Aide.", source: "environnement", notice })).toBe(`${notice} ${LOCKED_NOTE}`);
+    expect(fieldNote({ ...base, notice })).toBe(notice);
   });
 
   it("range Cuisine et GitHub à part, les autres apps dans Applications Atelier", () => {

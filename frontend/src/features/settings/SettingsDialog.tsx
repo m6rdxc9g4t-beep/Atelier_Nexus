@@ -48,6 +48,7 @@ import {
   type SectionStatus,
   checkLines,
   countBySection,
+  fieldNote,
   firstFieldWith,
   firstSectionWith,
   hasStatus,
@@ -486,7 +487,7 @@ function FieldRow({
 }) {
   const id = `setting-${field.key}`;
   const locked = field.source === "environnement";
-  const note = locked ? "Fixé par une variable d'environnement : modifiable seulement à la source." : field.help;
+  const note = fieldNote(field);
   const describedBy = note || error ? `${id}-note` : undefined;
   const invalid = error ? true : undefined;
 

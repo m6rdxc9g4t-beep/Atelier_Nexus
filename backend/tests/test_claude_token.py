@@ -177,10 +177,11 @@ def test_without_token_settings_view_is_unchanged(tmp_path: Path) -> None:
 
     shown = view(Settings(_env_file=None), tmp_path / ".env")  # type: ignore[call-arg]
     for field in shown.fields:
-        assert field.help == BY_KEY[field.key].help and TOKEN_MODE_NOTE not in field.help
+        assert field.help == BY_KEY[field.key].help and field.notice is None
     noted = view(Settings(_env_file=None), tmp_path / ".env", token_mode=True)  # type: ignore[call-arg]
-    changed = [f.key for f, g in zip(noted.fields, shown.fields, strict=True) if f != g]
-    assert changed == ["CLAUDE_MODE"]
+    changed = [f for f, g in zip(noted.fields, shown.fields, strict=True) if f != g]
+    assert [f.key for f in changed] == ["CLAUDE_MODE"]
+    assert changed[0].notice == TOKEN_MODE_NOTE and changed[0].help == BY_KEY["CLAUDE_MODE"].help
 
 
 def test_without_token_nothing_changes(data_dir: Path) -> None:
@@ -321,7 +322,8 @@ def test_api_says_the_mode_and_never_returns_the_token(api: TestClient) -> None:
     fields = {f["key"]: f for f in settings.json()["fields"]}
     assert TOKEN_ENV not in fields and CLI_TOKEN_ENV not in fields
     # Le réglage « Accès à Claude » dit qu'il est sans effet (le jeton l'emporte)
-    assert fields["CLAUDE_MODE"]["help"].startswith("Sans effet sur ce serveur")
+    assert fields["CLAUDE_MODE"]["notice"].startswith("Sans effet sur ce serveur")
+    assert [k for k, f in fields.items() if f["notice"]] == ["CLAUDE_MODE"]
     for response in (providers, settings):
         assert TOKEN not in response.text and "sk-ant-oat" not in response.text
     # Pas modifiable depuis l'interface (liste blanche des Réglages)

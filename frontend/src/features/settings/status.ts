@@ -6,7 +6,7 @@
 
 import type { DotStatus } from "@/components/ui/status-dot";
 import { PROVIDER_LABEL } from "@/lib/labels";
-import type { AppStatus, ProviderStatus, SettingsGroup, SettingsView } from "@/types/api";
+import type { AppStatus, ProviderStatus, SettingsField, SettingsGroup, SettingsView } from "@/types/api";
 
 /** Rubrique : « Apparence » (préférence de cet appareil) ou un groupe de champs du serveur. */
 export type Section = "Apparence" | SettingsGroup;
@@ -121,6 +121,19 @@ export function sectionStatus(section: Section, check: Check | null, checking: b
   const label = `${up} sur ${total} joignable${up >= 2 ? "s" : ""}`;
   if (up === total) return { status: "up", label };
   return { status: up === 0 ? "down" : "warning", label };
+}
+
+/** Champ fixé par une variable d'environnement du serveur : non modifiable depuis l'interface. */
+export const LOCKED_NOTE = "Fixé par une variable d'environnement : modifiable seulement à la source.";
+
+/**
+ * Texte sous un champ : son aide, ou la mention du verrou s'il est fixé par l'environnement ;
+ * précédé de l'avertissement du serveur quand il y en a un (« Accès à Claude » sans effet quand
+ * Claude passe par le jeton du forfait) — visible même si le champ est verrouillé.
+ */
+export function fieldNote(field: Pick<SettingsField, "help" | "source" | "notice">): string {
+  const base = field.source === "environnement" ? LOCKED_NOTE : field.help;
+  return [field.notice, base].filter(Boolean).join(" ");
 }
 
 /** Nombre de clés (changements en attente, erreurs) par rubrique. */
