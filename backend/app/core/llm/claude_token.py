@@ -9,6 +9,9 @@ par la variable d'environnement `CLAUDE_OAUTH_TOKEN`.
   du processus** : aucun autre sous-processus (serveur MCP de Tab, autre application ouverte…)
   n'en hérite. Seule la CLI Claude le reçoit, sous le nom `CLAUDE_CODE_OAUTH_TOKEN`
   (`claude_code_provider.py`).
+- App de bureau : la mise à jour au lancement (git, npm, pip) se fait avant l'import de
+  `main.py`, donc avant ce retrait ; ses commandes reçoivent un environnement sans le jeton
+  (`desktop_update.command_environment`, bibliothèque standard : ce module-ci dépend de pydantic).
 - Il n'est lu que dans l'environnement : ni dans le `.env` (fichier réécrit par l'écran
   Réglages), ni dans `Settings`. Il n'est écrit nulle part, n'apparaît dans aucune réponse d'API,
   erreur, journal ou argument de ligne de commande (`SecretStr` : jamais dans un `repr`).

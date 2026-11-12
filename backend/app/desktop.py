@@ -60,6 +60,7 @@ from app.desktop_update import (
     LOG_NAME,
     Layout,
     UpdateError,
+    command_environment,
     display_path,
     log_dir,
     nexus_home,
@@ -406,6 +407,7 @@ def system_appearance() -> str:
     try:
         result = subprocess.run(
             ["/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle"],
+            env=command_environment(),
             capture_output=True,
             text=True,
             check=False,

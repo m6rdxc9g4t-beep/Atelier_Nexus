@@ -109,6 +109,10 @@ from pathlib import Path
 args = sys.argv[1:]
 with open(os.environ["FAKE_NPM_CALLS"], "a", encoding="utf-8") as calls:
     calls.write("npm " + " ".join(args) + "\\n")
+# Jeton du forfait Claude : npm et ses scripts d'installation ne doivent jamais le recevoir
+with open(os.environ["FAKE_NPM_CALLS"] + ".jeton", "a", encoding="utf-8") as seen:
+    names = sorted(k for k in os.environ if "OAUTH_TOKEN" in k.upper())
+    seen.write(",".join(names) + "\\n")
 fail = os.environ.get("FAKE_NPM_FAIL")
 if args[:1] == ["ci"]:
     if fail == "ci":
@@ -168,6 +172,18 @@ def npm_calls(tmp_path: Path) -> list[str]:
     calls = tmp_path / "npm-calls.txt"
     lines = calls.read_text().splitlines() if calls.exists() else []
     calls.unlink(missing_ok=True)
+    return lines
+
+
+#: Faux jeton du forfait Claude, sous les deux noms (celui de Nexus, celui de la CLI)
+TOKEN_ENV = {"CLAUDE_OAUTH_TOKEN": "sk-ant-oat01-faux-jeton", "CLAUDE_CODE_OAUTH_TOKEN": "faux"}
+
+
+def npm_token_sightings(tmp_path: Path) -> list[str]:
+    """Une ligne par appel du faux npm : les variables du jeton qu'il a reçues (vide : aucune)."""
+    seen = tmp_path / "npm-calls.txt.jeton"
+    lines = seen.read_text().splitlines() if seen.exists() else []
+    seen.unlink(missing_ok=True)
     return lines
 
 
@@ -309,6 +325,82 @@ def test_npm_environment(tmp_path: Path) -> None:
     assert env["PATH"].split(os.pathsep)[0] == str(tmp_path / "bin")  # node à côté de npm
     assert env["NEXUS_EXPORT"] == "1" and env["NEXT_PUBLIC_API_URL"] == ""
     assert env["HOME"] == "/h"
+
+
+# ─── Jeton du forfait Claude : jamais transmis aux commandes de la mise à jour ───
+
+
+def test_command_environment_drops_the_subscription_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = {**TOKEN_ENV, "claude_oauth_token": "casse de Windows", "PATH": "/usr/bin", "HOME": "/h"}
+    assert du.command_environment(base) == {"PATH": "/usr/bin", "HOME": "/h"}
+    assert base["CLAUDE_OAUTH_TOKEN"]  # l'environnement reçu n'est pas modifié
+
+    for name, value in TOKEN_ENV.items():
+        monkeypatch.setenv(name, value)
+    env = du.command_environment()  # par défaut : l'environnement du processus
+    assert not set(TOKEN_ENV) & set(env) and env["PATH"] == os.environ["PATH"]
+    # Le processus garde le jeton : le serveur le lit ensuite (main.py), pour la CLI Claude seule
+    assert os.environ["CLAUDE_OAUTH_TOKEN"] == TOKEN_ENV["CLAUDE_OAUTH_TOKEN"]
+
+
+def test_npm_environment_never_carries_the_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in TOKEN_ENV.items():
+        monkeypatch.setenv(name, value)
+    npm = tmp_path / "bin" / "npm"
+    for env in (du.npm_environment(npm), du.npm_environment(npm, {**TOKEN_ENV, "PATH": "/bin"})):
+        assert not set(TOKEN_ENV) & set(env) and env["NEXUS_EXPORT"] == "1"
+
+
+def test_update_commands_never_receive_the_token(
+    layout: du.Layout, npm: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`npm ci` et la compilation (scripts d'installation des dépendances compris) tournent avant
+    que le serveur ne retire le jeton de l'environnement : ils ne le reçoivent pas."""
+    for name, value in TOKEN_ENV.items():
+        monkeypatch.setenv(name, value)
+    assert update(layout, npm) == ["npm", "build"]
+    assert npm_token_sightings(tmp_path) == ["", ""]  # deux appels, aucune variable du jeton
+    log = (tmp_path / "logs" / du.LOG_NAME).read_text(encoding="utf-8")
+    assert TOKEN_ENV["CLAUDE_OAUTH_TOKEN"] not in log
+
+
+def test_run_command_drops_the_token_whatever_the_caller_passes(tmp_path: Path) -> None:
+    """Dernier point de passage de toute commande de la mise à jour (npm, pip, venv)."""
+    code = "import os; print(sorted(k for k in os.environ if 'OAUTH_TOKEN' in k.upper()))"
+    with (tmp_path / "journal.log").open("w+", encoding="utf-8") as log:
+        env = {**os.environ, **TOKEN_ENV}
+        assert du.run_command([sys.executable, "-c", code], tmp_path, env, log) == 0
+        log.seek(0)
+        assert log.read().splitlines()[-1] == "[]"
+
+
+def test_desktop_subprocesses_all_choose_their_environment() -> None:
+    """Garde-fou : dans le lanceur, la mise à jour et la fenêtre, aucun `subprocess.run` /
+    `Popen` n'hérite de l'environnement par défaut (jeton du forfait compris), sauf la fenêtre
+    elle-même, lancée par le raccourci Windows : c'est Nexus, qui lit le jeton."""
+    import ast
+
+    inherits: list[str] = []
+    for name in ("desktop.py", "desktop_update.py", "desktop_launcher.py", "desktop_open.py"):
+        tree = ast.parse((ROOT / "backend" / "app" / name).read_text(encoding="utf-8"))
+        for function in ast.walk(tree):
+            if not isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            for node in ast.walk(function):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "subprocess"
+                    and node.func.attr in {"run", "Popen", "call", "check_call", "check_output"}
+                    and not any(keyword.arg == "env" for keyword in node.keywords)
+                ):
+                    inherits.append(f"{name}:{function.name}")
+    assert inherits == ["desktop_launcher.py:spawn_window"]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="emplacements macOS / Linux")
@@ -504,9 +596,11 @@ class FakeRunner:
     def __init__(self, fail_pip: bool = False) -> None:
         self.fail_pip = fail_pip
         self.calls: list[list[str]] = []
+        self.envs: list[dict[str, str]] = []
 
     def __call__(self, cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[str]) -> int:
         self.calls.append(list(cmd))
+        self.envs.append(dict(env))
         if cmd[1:3] == ["-m", "venv"]:
             python = du.venv_python_path(Path(cmd[3]))
             python.parent.mkdir(parents=True)
@@ -534,6 +628,18 @@ def test_install_venv(layout: du.Layout) -> None:
     (layout.repo / "backend" / "requirements.txt").write_text("fastapi\n")
     assert du.main(["venv", "--check", "--repo", str(layout.repo)]) == 1
     assert du.install_venv(layout, Path("python"), runner=FakeRunner()) is True
+
+
+def test_install_venv_never_gives_the_token_to_pip(
+    layout: du.Layout, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in TOKEN_ENV.items():
+        monkeypatch.setenv(name, value)
+    runner = FakeRunner()
+    assert du.install_venv(layout, Path("/usr/bin/python3"), runner=runner) is True
+    assert len(runner.envs) == 2  # python -m venv, puis pip install
+    for env in runner.envs:
+        assert not set(TOKEN_ENV) & set(env) and env["PATH"] == os.environ["PATH"]
 
 
 def test_install_venv_failure_restores_previous(layout: du.Layout) -> None:
@@ -666,12 +772,21 @@ def test_app_entry_requires_the_repo(tmp_path: Path) -> None:
 def test_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None:
     """Simulation complète hors macOS : venv réel (dépendances vides), faux npm, mise à jour."""
     home, logs = tmp_path / "support", tmp_path / "logs"
+    # « Python du système » espion : consigne les variables du jeton qu'il reçoit, puis le vrai
+    python = tmp_path / "python-du-systeme"
+    python.write_text(
+        f'#!/bin/sh\nenv | grep -c OAUTH_TOKEN >>"{tmp_path}/python.jeton"\n'
+        f'exec "{sys.executable}" "$@"\n'
+    )
+    python.chmod(0o755)
     env = {
         "NEXUS_HOME": str(home),
         "NEXUS_LOG_DIR": str(logs),
-        "NEXUS_PYTHON": sys.executable,
+        "NEXUS_PYTHON": str(python),
         "NEXUS_NPM": str(npm),
         "NEXUS_REPO": "",
+        # Jeton du forfait Claude dans l'environnement d'où l'app est lancée (profil du shell)
+        **TOKEN_ENV,
     }
     (home / "nexus.db").parent.mkdir(parents=True)
     (home / "nexus.db").write_text("données")
@@ -685,6 +800,9 @@ def test_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None
     layout = du.Layout(repo=repo, home=home)
     assert du.served_build(layout) is not None
     assert npm_calls(tmp_path) == ["npm ci --no-audit --no-fund --loglevel=error", "npm run build"]
+    # Ni le Python du système (venv, pip), ni npm n'ont reçu le jeton
+    assert (tmp_path / "python.jeton").read_text().split() == ["0"]
+    assert npm_token_sightings(tmp_path) == ["", ""]
 
     done = run_script(launcher, "--preparer", env=env)  # rien n'a changé
     assert done.returncode == 0 and "Interface déjà à jour." in done.stdout
@@ -698,6 +816,55 @@ def test_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path) -> None
 
     assert (home / "nexus.db").read_text() == "données"  # aucune donnée touchée
     assert du.git(repo, "rev-parse", "HEAD") == head  # jamais de git pull
+
+
+@macos_only
+def test_launcher_gives_the_token_back_to_the_app_only(repo: Path, tmp_path: Path) -> None:
+    """Lancement normal : la fenêtre (desktop.py, dont le serveur lit le jeton puis le retire)
+    le reçoit ; sans jeton fourni, aucune variable n'est créée."""
+    home, logs = tmp_path / "support", tmp_path / "logs"
+    layout = du.Layout(repo=repo, home=home)
+    # Environnement Python déjà à jour : rien à installer, le lanceur ouvre aussitôt la fenêtre
+    layout.venv_python.parent.mkdir(parents=True)
+    layout.venv_python.symlink_to(sys.executable)
+    layout.venv_stamp.write_text(du.requirements_hash(repo) + "\n")
+    # Fausse fenêtre : dit seulement quelles variables du jeton elle a reçues
+    (repo / "backend" / "desktop.py").write_text(
+        "import os\n"
+        "print('fenêtre', sorted(k for k in os.environ if 'OAUTH_TOKEN' in k), flush=True)\n"
+    )
+    env = {"NEXUS_HOME": str(home), "NEXUS_LOG_DIR": str(logs), "NEXUS_REPO": ""}
+    launcher = repo / "scripts" / "macos" / "launcher.sh"
+    log = logs / "atelier-nexus.log"
+
+    done = run_script(launcher, env={**env, **TOKEN_ENV})
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert log.read_text().splitlines()[-1] == f"fenêtre {sorted(TOKEN_ENV)}"
+
+    without = {k: v for k, v in os.environ.items() if k not in TOKEN_ENV}
+    done = subprocess.run(
+        ["bash", str(launcher)],
+        env={**without, "NEXUS_NO_DIALOG": "1", **env},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert log.read_text().splitlines()[-1] == "fenêtre []"
+
+
+def test_windows_launcher_console_run_has_no_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--preparer` (mise à jour seule, aucun serveur) : la commande lancée par le lanceur
+    Windows ne reçoit pas le jeton."""
+    from app import desktop_launcher
+
+    for name, value in TOKEN_ENV.items():
+        monkeypatch.setenv(name, value)
+    code = (
+        "import os, sys; sys.exit(7 if any('OAUTH_TOKEN' in k.upper() for k in os.environ) else 0)"
+    )
+    assert desktop_launcher.run_in_console([sys.executable, "-c", code], Path.cwd()) == 0
+    assert subprocess.run([sys.executable, "-c", code], check=False).returncode == 7  # témoin
 
 
 # ─── Lanceur Windows (app/desktop_launcher.py), multiplateforme ───
@@ -719,6 +886,8 @@ def test_windows_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path)
         "NEXUS_LOG_DIR": str(logs),
         "NEXUS_NPM": str(npm),
         "NEXUS_REPO": "",
+        # Jeton du forfait Claude dans l'environnement du raccourci : jamais transmis à npm
+        **TOKEN_ENV,
     }
     launcher = repo / "backend" / "app" / "desktop_launcher.py"
 
@@ -739,6 +908,7 @@ def test_windows_launcher_full_simulation(repo: Path, npm: Path, tmp_path: Path)
     assert layout.venv_python.exists() and du.served_build(layout) is not None
     assert not home.exists() or not (home / "venv").exists()  # venv dans le dossier local
     assert npm_calls(tmp_path) == ["npm ci --no-audit --no-fund --loglevel=error", "npm run build"]
+    assert npm_token_sightings(tmp_path) == ["", ""]
     stamp = layout.stamp.read_text()
     update_log = (logs / du.LOG_NAME).read_text(encoding="utf-8")
 

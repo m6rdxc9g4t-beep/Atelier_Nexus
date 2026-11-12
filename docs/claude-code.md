@@ -71,7 +71,11 @@ la suite.
 
 - **Où va le jeton** : lu **une fois** au démarrage (`main.py` → `app/core/llm/claude_token.py`), puis **retiré de
   l'environnement du processus** : aucun autre sous-processus (serveur MCP de Tab, application ouverte…) n'en hérite.
-  Il n'est transmis qu'à la CLI Claude, dans son environnement — jamais en argument. Il n'est pas un réglage : ni lu
+  Il n'est transmis qu'à la CLI Claude, dans son environnement — jamais en argument. App de bureau : la mise à jour au
+  lancement se fait **avant** le démarrage du serveur, donc avant ce retrait ; ses commandes (`git`, `npm ci`, la
+  compilation, `pip install`, scripts d'installation des dépendances compris) reçoivent un environnement sans
+  `CLAUDE_OAUTH_TOKEN` ni `CLAUDE_CODE_OAUTH_TOKEN` (`command_environment` de `app/desktop_update.py` ; le lanceur macOS
+  garde le jeton dans une variable non exportée et ne le rend qu'à la fenêtre). Il n'est pas un réglage : ni lu
   dans le `.env` (fichier réécrit par l'écran Réglages), ni dans `Settings`, ni modifiable ou visible depuis
   l'interface ; il n'apparaît dans aucune réponse d'API, erreur ou journal (masqué dans tout message, comme tout ce qui
   a la forme `sk-ant-…`), et n'est écrit dans aucun fichier. Limite : le noyau garde l'environnement de départ du

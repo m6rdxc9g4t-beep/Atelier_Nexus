@@ -35,6 +35,13 @@ for arg in "$@"; do [[ "$arg" == "--preparer" ]] && PREPARE=1; done
 QUIET="$PREPARE"
 [[ "${NEXUS_NO_DIALOG:-}" == 1 ]] && QUIET=1
 
+# Jeton du forfait Claude (docs/claude-code.md) : gardé dans des variables de ce script, non
+# exportées. Rien de ce qui est lancé d'ici (python du système, uv, osascript, pip) n'en hérite ;
+# il n'est rendu qu'à la fenêtre, dont le serveur le lit puis le retire de son environnement.
+FORFAIT_TOKEN="${CLAUDE_OAUTH_TOKEN:-}"
+FORFAIT_CLI_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-}"
+unset CLAUDE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN
+
 # Outils utiles aux agents et à la mise à jour (node/npm, ollama, claude…)
 export PATH="$HOME/.homebrew/bin:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
@@ -142,5 +149,8 @@ if [[ "$PREPARE" == 1 ]]; then
   # Terminal (build_app.sh) : étapes et erreurs affichées ; détail des commandes dans le journal
   exec "$VENV/bin/python" desktop.py --mise-a-jour "$@"
 fi
+# Le jeton du forfait, s'il a été fourni, revient à l'application seule
+[[ -n "$FORFAIT_TOKEN" ]] && export CLAUDE_OAUTH_TOKEN="$FORFAIT_TOKEN"
+[[ -n "$FORFAIT_CLI_TOKEN" ]] && export CLAUDE_CODE_OAUTH_TOKEN="$FORFAIT_CLI_TOKEN"
 # exec : le processus Python reste celui de l'application (une seule icône dans le Dock)
 exec "$VENV/bin/python" desktop.py --mise-a-jour "$@" >>"$LOG" 2>&1
