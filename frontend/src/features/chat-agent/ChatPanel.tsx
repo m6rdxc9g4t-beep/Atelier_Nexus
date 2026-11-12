@@ -131,7 +131,7 @@ export function ChatPanel({
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div ref={setScroller} aria-busy={opening} className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={setScroller} aria-busy={opening} className="relative min-h-0 flex-1 overflow-y-auto">
           {opening && empty ? (
             <ThreadSkeleton />
           ) : empty ? (

@@ -255,7 +255,7 @@ function PanelBody({
               />
             )}
           </div>
-          <ul id={listId} hidden={!listOpen} aria-label="Liste des livrables" className="max-h-44 overflow-y-auto px-2 pb-2">
+          <ul id={listId} hidden={!listOpen} aria-label="Liste des livrables" className="relative max-h-44 overflow-y-auto px-2 pb-2">
             {list.map((a) => {
               const active = a.id === selected.id;
               return (

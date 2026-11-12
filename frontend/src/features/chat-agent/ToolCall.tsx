@@ -123,7 +123,7 @@ function Detail({ label, children }: { label: string; children: string }) {
   return (
     <div>
       <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <pre className="max-h-64 overflow-auto rounded-md border border-atelier-line bg-sunken p-2.5 font-mono text-xs leading-snug break-words whitespace-pre-wrap">
+      <pre className="relative max-h-64 overflow-auto rounded-md border border-atelier-line bg-sunken p-2.5 font-mono text-xs leading-snug break-words whitespace-pre-wrap">
         {children}
       </pre>
     </div>

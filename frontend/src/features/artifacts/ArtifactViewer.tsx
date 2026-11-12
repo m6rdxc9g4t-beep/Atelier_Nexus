@@ -139,7 +139,7 @@ export function ArtifactViewer({ artifact, onRemove }: { artifact: StoredArtifac
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-4">
           {confirming && (
             // Groupe nommé : le focus arrive sur « Annuler », la question est annoncée avec lui
@@ -274,7 +274,7 @@ function DataTable({ table, caption }: { table: TableData; caption?: string }) {
         tabIndex={0}
         aria-labelledby={caption ? captionId : undefined}
         aria-label={caption ? undefined : "Aperçu des données"}
-        className="max-h-[60vh] overflow-auto rounded-md border border-atelier-border bg-card tabular-nums"
+        className="relative max-h-[60vh] overflow-auto rounded-md border border-atelier-border bg-card tabular-nums"
       >
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-sidebar">

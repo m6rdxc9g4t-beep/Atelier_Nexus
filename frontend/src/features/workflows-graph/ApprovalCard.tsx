@@ -96,7 +96,7 @@ function PreviousResult({ step, label }: { step: StepRun; label: string }) {
         </span>
       </p>
       {excerpt && (
-        <pre className="mt-1.5 max-h-32 overflow-auto rounded-md border border-atelier-line bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
+        <pre className="relative mt-1.5 max-h-32 overflow-auto rounded-md border border-atelier-line bg-card p-2 font-mono text-xs leading-snug whitespace-pre-wrap">
           {excerpt}
         </pre>
       )}

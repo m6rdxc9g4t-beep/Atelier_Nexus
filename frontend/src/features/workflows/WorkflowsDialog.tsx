@@ -705,7 +705,7 @@ function StepLine({ step }: { step: StepResult }) {
         <Icon aria-label={label} className={cn("size-3.5", className)} />
       </button>
       {open && step.content && (
-        <pre className="max-h-48 overflow-auto border-t border-atelier-line px-2.5 py-2 font-mono text-xs whitespace-pre-wrap">
+        <pre className="relative max-h-48 overflow-auto border-t border-atelier-line px-2.5 py-2 font-mono text-xs whitespace-pre-wrap">
           {step.content}
         </pre>
       )}

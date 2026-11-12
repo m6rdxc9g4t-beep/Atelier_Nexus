@@ -24,6 +24,14 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   puis sélecteur Suite Atelier, navigation (Accueil, Workflows, Carte de la suite, À valider avec son compteur), agents
   (`AgentSidebar` : recherche sans accents, « / » ou ⌘K / Ctrl+K pour y aller, catégories repliables mémorisées,
   tuile de chaque agent, crayon des agents personnalisés), puis état des applications, thème et Réglages.
+- **La page ne défile jamais** : la coquille (`Workspace.tsx`, `data-slot="app-shell"`) fait exactement la hauteur de la
+  fenêtre (`h-dvh`) et ne laisse rien en sortir (`relative overflow-clip`). La barre latérale occupe toute la hauteur et
+  reste en place ; seules défilent les zones de contenu (accueil, conversation, Studio, panneau Livrables) et, dans la
+  barre, la liste des agents — son pied (applications, thème, Réglages) reste visible. Toute zone qui défile en hauteur
+  (`overflow-y-auto`, `overflow-auto`) est **positionnée** (`relative`) : un élément hors flux (`sr-only`, champ caché
+  d'une case à cocher Radix) placé dans une zone non positionnée échappe à son `overflow`, allonge le document, et la
+  page entière défile en emportant la barre latérale (défaut corrigé le 12/11/2026 sur l'accueil et la liste des
+  workflows). `components/layout/shell.test.ts` garde ces règles.
 - **Barre haute** de 44 px : chaque vue a la sienne sur grand écran (titre de la vue, actions) ; **barre mobile**
   (`AppHeader`, sous lg) : marque, bouton du contexte courant (accueil, onglet du Studio ou agent,
   `headerContext.ts`) qui ouvre le tiroir, « À valider » et la Suite. Sous lg, l'en-tête de la conversation ne garde
