@@ -18,7 +18,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { AppIcon } from "@/components/layout/appIcons";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,7 @@ import {
   layoutFlows,
   mergeEvents,
   splitActions,
+  suiteFlows,
   transportLabel,
   triggerChoices,
   workflowsOf,
@@ -93,9 +94,14 @@ export function SuiteMapView() {
     setMap({ status: "loading" });
     setRefresh((r) => r + 1);
   };
+  const data = map.status === "ready" ? map.data : null;
+  // Échanges du hub et ceux que les workflows ouvrent : les mêmes sur le schéma, la liste et les fiches
+  const flows = useMemo(() => (data ? suiteFlows(data) : []), [data]);
+
+  const top = useRef<HTMLDivElement>(null);
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as MapTab)} className="gap-4">
+    <Tabs ref={top} value={tab} onValueChange={(v) => setTab(v as MapTab)} className="gap-4">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <TabsList aria-label="Vues de la carte" className="max-w-full overflow-x-auto">
           <TabsTrigger value="flows">
@@ -147,14 +153,21 @@ export function SuiteMapView() {
           <TabsContent value="flows">
             <FlowsView
               map={map.data}
+              flows={flows}
               onPick={(app) => {
                 setFocus(app);
                 setTab("apps");
+                // « Voir la fiche » est sous le schéma et disparaît avec lui : la fiche s'ouvre en haut
+                // de page, et le focus passe à l'onglet « Applications » (jamais perdu au clavier)
+                requestAnimationFrame(() => {
+                  top.current?.scrollIntoView({ block: "start" });
+                  top.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+                });
               }}
             />
           </TabsContent>
           <TabsContent value="apps">
-            <AppsGrid map={map.data} flows={map.data.flows} focus={focus} onClearFocus={() => setFocus(null)} />
+            <AppsGrid map={map.data} flows={flows} focus={focus} onClearFocus={() => setFocus(null)} />
           </TabsContent>
         </>
       )}
@@ -434,132 +447,215 @@ function EventTriggerMenu({ app, type, label, describedBy }: { app: string; type
 
 // ─── Flux ────────────────────────────────────────────────────────
 
-/** Taille du schéma (unités SVG = pixels à 100 %) : le texte y reste à 12 px. */
-const FLOW_SIZE = 480;
+/** Largeur disponible d'un élément, suivie au redimensionnement (480 avant la première mesure). */
+function useWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(480);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const next = Math.floor(entries[0]?.contentRect.width ?? 0);
+      if (next > 0) setWidth(next);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
 
-function FlowsView({ map, onPick }: { map: SuiteMap; onPick: (app: string) => void }) {
-  const layout = layoutFlows(map, FLOW_SIZE);
-  if (layout.edges.length === 0) return <p className="text-sm text-muted-foreground">Aucun échange déclaré entre les applications.</p>;
+const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+
+/**
+ * Schéma des échanges : placé par `layoutFlows` à la largeur disponible (jamais de défilement
+ * horizontal, texte à 12 px). Survol ou focus d'une application : ses liens ressortent, les autres
+ * s'estompent. Clic, Entrée ou Espace : l'application est choisie, ses échanges s'écrivent sous le
+ * schéma, avec le bouton « Voir la fiche ». La liste complète reste en texte à côté.
+ */
+function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; onPick: (app: string) => void }) {
+  const [box, width] = useWidth<HTMLDivElement>();
+  const layout = useMemo(() => layoutFlows(map, width), [map, width]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const titleId = useId();
+  const listId = useId();
+  if (layout.links.length === 0) return <p className="text-sm text-muted-foreground">Aucun échange déclaré entre les applications.</p>;
   const known = new Set(map.apps.map((a) => a.app));
+  const chosen = selected && layout.nodes.some((n) => n.id === selected) ? selected : null;
+  const active = hovered ?? chosen;
+  const touches = (link: { a: string; b: string }, id: string) => link.a === id || link.b === id;
+  const near = new Set(active ? layout.links.filter((l) => touches(l, active)).flatMap((l) => [l.a, l.b]) : []);
+  const count = (id: string) => flows.filter((f) => f.from !== f.to && (f.from === id || f.to === id)).length;
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
-      {/* Défilement interne sous 480 px : le texte du schéma ne descend jamais sous 12 px */}
-      <figure className="overflow-x-auto rounded-lg border border-atelier-border bg-card p-2">
-        <svg
-          viewBox={`0 0 ${layout.width} ${layout.height}`}
-          role="img"
-          aria-labelledby="suite-flows-title"
-          className="mx-auto block h-auto w-full max-w-xl min-w-[480px]"
-        >
-          <title id="suite-flows-title">Schéma des échanges entre les applications de la suite</title>
-          <defs>
-            <marker id="suite-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" className="fill-atelier-faint" />
-            </marker>
-          </defs>
-          {layout.edges.map((edge) => (
-            <g key={edge.key}>
-              <path d={edge.path} fill="none" strokeWidth={1.25} markerEnd="url(#suite-flow-arrow)" className="stroke-atelier-border-soft" />
-              <text
-                x={edge.labelX}
-                y={edge.labelY}
-                textAnchor="middle"
-                strokeWidth={4}
-                style={{ paintOrder: "stroke" }}
-                className="fill-muted-foreground stroke-card text-[12px]"
-              >
-                {edge.label}
-              </text>
+      <figure className="min-w-0 rounded-lg border border-atelier-border bg-card p-2">
+        <div ref={box} className="min-w-0">
+          <svg
+            viewBox={`0 0 ${layout.width} ${layout.height}`}
+            width={layout.width}
+            height={layout.height}
+            role="group"
+            aria-labelledby={titleId}
+            aria-describedby={listId}
+            className="mx-auto block h-auto max-w-full"
+          >
+            <title id={titleId}>Schéma des échanges entre les applications de la suite</title>
+            <g aria-hidden>
+              {layout.rail && (
+                <line
+                  x1={layout.rail.x}
+                  y1={layout.rail.y1}
+                  x2={layout.rail.x}
+                  y2={layout.rail.y2}
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                  className="stroke-atelier-border-soft"
+                />
+              )}
+              {layout.links.map((link) => {
+                const on = active !== null && touches(link, active);
+                return (
+                  <g
+                    key={link.key}
+                    className={cn(
+                      "transition-opacity motion-reduce:transition-none",
+                      on ? "text-foreground" : "text-atelier-faint",
+                      active !== null && !on && "opacity-25",
+                    )}
+                  >
+                    <path d={link.path} fill="none" strokeWidth={on ? 1.5 : 1.25} strokeLinecap="round" className="stroke-current" />
+                    {link.heads.map((d) => (
+                      <path key={d} d={d} className="fill-current" />
+                    ))}
+                    {link.label && (
+                      <text
+                        x={link.label.x}
+                        y={link.label.y}
+                        textAnchor={link.label.anchor}
+                        className={cn("text-[12px]", on ? "fill-foreground" : "fill-muted-foreground")}
+                      >
+                        {link.label.text}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
             </g>
-          ))}
-          {layout.nodes.map((node) => {
-            const theme = appTheme(node.id, map.apps.find((a) => a.app === node.id)?.color);
-            const name = appName(map, node.id).replace(/^Atelier /, "");
-            const pickable = known.has(node.id);
-            return (
-              <g
-                key={node.id}
-                {...theme}
-                {...(pickable
-                  ? {
-                      role: "button",
-                      tabIndex: 0,
-                      "aria-label": `Voir l'application ${appName(map, node.id)}`,
-                      className: "cursor-pointer outline-none [&:focus-visible_.tile-ring]:stroke-primary [&:hover_.tile-ring]:stroke-atelier-faint",
-                      onClick: () => onPick(node.id),
-                      onKeyDown: (e: React.KeyboardEvent) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onPick(node.id);
-                        }
-                      },
-                    }
-                  : {})}
-              >
-                {/* Icône de l'app (charte v2) : carré arrondi en dégradé de SA signature, glyphe blanc */}
-                <defs>
-                  <linearGradient id={`suite-tile-${node.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--atelier-signature) 78%, white)" }} />
-                    <stop offset="1" style={{ stopColor: "var(--atelier-signature)" }} />
-                  </linearGradient>
-                </defs>
-                <rect
-                  x={node.x - 24}
-                  y={node.y - 24}
-                  width={48}
-                  height={48}
-                  rx={13}
-                  strokeWidth={2}
-                  className="tile-ring fill-none stroke-transparent"
-                />
-                <rect x={node.x - 20} y={node.y - 20} width={40} height={40} rx={10} fill={`url(#suite-tile-${node.id})`} />
-                <AppIcon
-                  app={node.id}
-                  x={node.x - 11}
-                  y={node.y - 11}
-                  width={22}
-                  height={22}
-                  strokeWidth={2}
-                  className="text-white"
-                  aria-hidden
-                />
-                <text
-                  x={node.x}
-                  y={node.y + 40}
-                  textAnchor="middle"
-                  strokeWidth={4}
-                  style={{ paintOrder: "stroke" }}
-                  className="fill-foreground stroke-card text-[12px] font-medium"
+            {layout.nodes.map((node) => {
+              const theme = appTheme(node.id, map.apps.find((a) => a.app === node.id)?.color);
+              const pressed = chosen === node.id;
+              const gradient = `${titleId}-${node.id}`;
+              return (
+                <g
+                  key={node.id}
+                  {...theme}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={pressed}
+                  aria-label={`${appName(map, node.id)} : ${plural(count(node.id), "échange", "échanges")}`}
+                  className={cn(
+                    "cursor-pointer outline-none transition-opacity motion-reduce:transition-none [&:focus-visible_.tile-ring]:stroke-primary [&:hover_.tile-ring]:stroke-atelier-faint",
+                    active !== null && node.id !== active && !near.has(node.id) && "opacity-40",
+                  )}
+                  onClick={() => setSelected(pressed ? null : node.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelected(pressed ? null : node.id);
+                    } else if (e.key === "Escape" && chosen) setSelected(null);
+                  }}
+                  onMouseEnter={() => setHovered(node.id)}
+                  onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(node.id)}
+                  onBlur={() => setHovered(null)}
                 >
-                  {name}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        <figcaption className="px-1 pt-1 text-xs text-muted-foreground">Choisissez une application pour voir sa fiche.</figcaption>
+                  {/* Icône de l'app (charte v2) : carré arrondi en dégradé de SA signature, glyphe blanc */}
+                  <defs>
+                    <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--atelier-signature) 78%, white)" }} />
+                      <stop offset="1" style={{ stopColor: "var(--atelier-signature)" }} />
+                    </linearGradient>
+                  </defs>
+                  {/* Zone de clic : l'icône et son nom */}
+                  <rect x={node.x - 24} y={node.y - 24} width={48} height={64} fill="transparent" />
+                  <rect
+                    x={node.x - 23}
+                    y={node.y - 23}
+                    width={46}
+                    height={46}
+                    rx={12.5}
+                    strokeWidth={2}
+                    className={cn("tile-ring fill-none", pressed ? "stroke-primary" : "stroke-transparent")}
+                  />
+                  <rect x={node.x - 20} y={node.y - 20} width={40} height={40} rx={10} fill={`url(#${gradient})`} />
+                  <AppIcon app={node.id} x={node.x - 11} y={node.y - 11} width={22} height={22} strokeWidth={2} className="text-white" aria-hidden />
+                  <text x={node.label.x} y={node.label.y} textAnchor={node.label.anchor} className="fill-foreground text-[12px] font-medium">
+                    {node.name}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <figcaption className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-2 border-t border-atelier-line px-1.5 pt-2 pb-1 text-xs text-muted-foreground">
+          <p>
+            Pointe vers Nexus : lecture. Pointe vers une application : écritures validées. Entre deux applications, le lien porte ce
+            qui passe.
+          </p>
+          <div aria-live="polite" className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+            {chosen ? (
+              <>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <p className="mr-auto text-sm text-foreground">
+                    <span className="font-medium">{appName(map, chosen)}</span>{" "}
+                    <span className="text-muted-foreground">· {plural(count(chosen), "échange", "échanges")}</span>
+                  </p>
+                  {known.has(chosen) && (
+                    <Button size="sm" variant="outline" onClick={() => onPick(chosen)}>
+                      <LayoutGrid />
+                      Voir la fiche
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
+                    <X />
+                    Tout afficher
+                  </Button>
+                </div>
+                <ExchangeLines map={map} flows={flows} app={chosen} />
+              </>
+            ) : (
+              <p>Choisissez une application pour voir ses échanges et ouvrir sa fiche.</p>
+            )}
+          </div>
+        </figcaption>
       </figure>
-      <table className="w-full text-sm">
-        <caption className="mb-2 text-left text-xs text-muted-foreground">Échanges entre les applications</caption>
-        <thead>
-          <tr className="text-left text-xs text-muted-foreground">
-            <th className="border-b border-atelier-line py-1.5 pr-2 font-medium">De</th>
-            <th className="border-b border-atelier-line py-1.5 pr-2 font-medium">Vers</th>
-            <th className="border-b border-atelier-line py-1.5 pr-2 font-medium">Quoi</th>
-            <th className="border-b border-atelier-line py-1.5 font-medium">Par</th>
-          </tr>
-        </thead>
-        <tbody>
-          {map.flows.map((f, i) => (
-            <tr key={i}>
-              <td className="border-b border-atelier-line py-1.5 pr-2">{appName(map, f.from)}</td>
-              <td className="border-b border-atelier-line py-1.5 pr-2">{appName(map, f.to)}</td>
-              <td className="border-b border-atelier-line py-1.5 pr-2">{f.label}</td>
-              <td className="border-b border-atelier-line py-1.5 text-muted-foreground">{f.via}</td>
+      {/* La même carte en texte : tous les échanges, ceux de l'application choisie mis en avant */}
+      <div className="min-w-0 overflow-x-auto">
+        <table className="w-full text-sm">
+          {/* Le schéma renvoie à ce titre (aria-describedby), pas aux 20 lignes */}
+          <caption id={listId} className="mb-2 text-left text-xs text-muted-foreground">
+            Liste des échanges entre les applications ({flows.length})
+          </caption>
+          <thead>
+            <tr className="text-left text-xs text-muted-foreground">
+              <th scope="col" className="border-b border-atelier-line py-1.5 pr-2 font-medium">De</th>
+              <th scope="col" className="border-b border-atelier-line py-1.5 pr-2 font-medium">Vers</th>
+              <th scope="col" className="border-b border-atelier-line py-1.5 pr-2 font-medium">Quoi</th>
+              <th scope="col" className="border-b border-atelier-line py-1.5 font-medium">Par</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {flows.map((f, i) => (
+              <tr key={i} className={cn("transition-opacity motion-reduce:transition-none", active !== null && f.from !== active && f.to !== active && "opacity-40")}>
+                <td className="border-b border-atelier-line py-1.5 pr-2 align-top">{appName(map, f.from)}</td>
+                <td className="border-b border-atelier-line py-1.5 pr-2 align-top">{appName(map, f.to)}</td>
+                <td className="border-b border-atelier-line py-1.5 pr-2 align-top">{f.label}</td>
+                <td className="border-b border-atelier-line py-1.5 align-top text-muted-foreground">{f.via}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
