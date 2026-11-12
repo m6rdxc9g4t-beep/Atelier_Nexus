@@ -89,7 +89,10 @@ la suite.
   dossier de l'exécutable, puis `/usr/local/bin`, sont en tête du `PATH` de la CLI.
 - **Erreurs** : jeton refusé ou expiré → « refaites claude setup-token… et mettez à jour le jeton du serveur
   (CLAUDE_OAUTH_TOKEN), puis redémarrez Nexus » ; limite du forfait → erreur transitoire qui reprend le message de la
-  CLI (repli vers Ollama si `LLM_FALLBACK_PROVIDER=ollama`) ; programme absent → « absent de ce serveur ».
+  CLI (repli vers Ollama si `LLM_FALLBACK_PROVIDER=ollama`) ; programme absent → « absent de ce serveur ». La limite
+  est reconnue d'abord, et un refus par ses mots (`authentication_error`, `OAuth`, `expired`…) ou par un statut 401
+  annoncé comme tel (« API Error: 401 ») : les chiffres « 401 » d'un nombre (conversation trop longue de 240117 jetons,
+  heure de remise à zéro du forfait) ne font pas refaire le jeton pour rien.
 - **Usage personnel** : le jeton est celui du forfait d'une personne ; ne pas ouvrir ce Nexus à d'autres. Les
   **limites du forfait sont partagées** entre toutes les applications de la suite qui s'en servent (et avec Claude Code
   sur l'ordinateur) : un workflow gourmand ici peut épuiser le quota des autres.

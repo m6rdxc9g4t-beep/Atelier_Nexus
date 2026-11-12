@@ -373,6 +373,69 @@ async def test_subscription_limit_repeats_the_cli_message(
     assert "partagé entre les applications" in message and TOKEN not in message
 
 
+@pytest.mark.parametrize("mode", ["limit_401", "limit_login"])
+async def test_a_limit_that_looks_like_a_refusal_stays_a_limit(
+    token_router: LLMRouter, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    """« 401 » dans l'heure de remise à zéro, « /login » pour changer de compte : toujours une
+    limite (transitoire, repli possible), jamais « refaites claude setup-token »."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
+    with pytest.raises(ProviderUnavailableError) as caught:
+        await token_router.complete(ask(), provider="anthropic")
+    message = str(caught.value)
+    assert "Limite du forfait Claude atteinte" in message and "limit" in message
+    assert "refusé ou expiré" not in message and "setup-token" not in message
+
+
+async def test_a_number_containing_401_is_not_a_refused_token(
+    token_router: LLMRouter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Conversation trop longue (240117 jetons) : l'erreur de la CLI telle quelle, pas un jeton
+    à refaire."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "too_long")
+    with pytest.raises(ProviderRequestError) as caught:
+        await token_router.complete(ask(), provider="anthropic")
+    message = str(caught.value)
+    assert "Claude Code a renvoyé une erreur" in message
+    assert "Prompt is too long: 240117 tokens" in message
+    assert "refusé ou expiré" not in message and "setup-token" not in message
+
+
+@pytest.mark.parametrize(
+    ("detail", "refused"),
+    [
+        # Refus : statut 401 annoncé comme tel, ou mots d'un jeton invalide
+        ('API Error: 401 {"type":"error"}', True),
+        ("Request failed with status code 401", True),
+        ("HTTP 401", True),
+        ("401 Unauthorized", True),
+        ("Invalid bearer token", True),
+        ("OAuth token has expired. Please obtain a new token.", True),
+        ('{"type":"authentication_error"}', True),
+        ("oauth_token_expired", True),
+        ("Invalid API key · Please run /login", True),
+        # « 401 » dans un nombre, ou autre statut : pas un refus
+        ("Prompt is too long: 240117 tokens > 200000 maximum", False),
+        ("API Error: 4010 inconnu", False),
+        ("API Error: 500 Internal server error (request 4017401)", False),
+        ("Sortie invalide à la ligne 401", False),
+    ],
+)
+def test_refusal_is_recognized_by_bounded_patterns(
+    tmp_path: Path, detail: str, refused: bool
+) -> None:
+    from pydantic import SecretStr
+
+    provider = ClaudeCodeProvider(
+        binary=FAKE, token=SecretStr(TOKEN), private_home=tmp_path / "prive"
+    )
+    error = provider._error(detail)
+    assert isinstance(error, ProviderRequestError)
+    assert ("refusé ou expiré" in str(error)) is refused
+    if not refused:
+        assert detail in str(error)  # le message de la CLI, tel quel
+
+
 @pytest.mark.parametrize("mode", ["echo", "crash"])
 async def test_a_cli_error_that_repeats_the_token_is_masked(
     token_router: LLMRouter, monkeypatch: pytest.MonkeyPatch, mode: str

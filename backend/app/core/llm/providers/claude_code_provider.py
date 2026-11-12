@@ -30,6 +30,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -115,10 +116,14 @@ _TOKEN_AUTH_WORDS = (
     "oauth",
     "bearer",
     "expired",
-    "401",
     "unauthorized",
     "invalid api key",
 )
+#: Statut HTTP 401 annoncé comme tel (« API Error: 401 », « status code 401 ») : jamais les
+#: chiffres « 401 » d'un nombre (taille d'une conversation, heure de remise à zéro du forfait)
+_STATUS_401 = re.compile(r"(?:error|status|code|http)[^\w\n]{0,3}401(?!\d)")
+#: Mots d'une limite d'utilisation ou d'un service saturé (erreur transitoire)
+_LIMIT_WORDS = ("limit", "quota", "overloaded")
 
 
 def find_claude_binary(configured: str | None = None) -> str | None:
@@ -515,16 +520,27 @@ class ClaudeCodeProvider(LLMProvider):
                 structured = {"text": result}
         return to_response(structured, model, usage_of(payload))
 
+    def _refused(self, lowered: str) -> bool:
+        """Vrai si le message (en minuscules) est un refus d'authentification."""
+        if self._token is None:
+            return any(word in lowered for word in _AUTH_WORDS)
+        return any(word in lowered for word in _TOKEN_AUTH_WORDS) or bool(
+            _STATUS_401.search(lowered)
+        )
+
     def _error(self, detail: str) -> Exception:
         # Jamais de jeton dans un message (la CLI pourrait répéter celui qu'elle a reçu)
         detail = scrub(detail, self._token)
         lowered = detail.lower()
         by_token = self._token is not None
-        if any(word in lowered for word in (_TOKEN_AUTH_WORDS if by_token else _AUTH_WORDS)):
+        # La limite d'abord : son message peut porter un mot ou un nombre qui ressemble à un
+        # refus (« /login » pour changer de compte, heure de remise à zéro) ; conseiller de
+        # refaire le jeton serait faux, et l'erreur ne serait plus transitoire (repli sur Ollama)
+        limited = any(word in lowered for word in _LIMIT_WORDS)
+        if not limited and self._refused(lowered):
             return ProviderRequestError(
                 TOKEN_REFUSED if by_token else NOT_LOGGED_IN, provider=self.name
             )
-        limited = "limit" in lowered or "quota" in lowered or "overloaded" in lowered
         if limited and by_token:
             # Transitoire (repli vers Ollama s'il est configuré) ; le message de la CLI est repris
             return ProviderUnavailableError(

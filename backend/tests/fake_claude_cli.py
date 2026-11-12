@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Faux programme `claude` (Claude Code) pour les tests : mêmes options, même sortie JSON.
 
-FAKE_CLAUDE_MODE : text | tool | login | limit | slow | auth_off | expired | echo | crash.
+FAKE_CLAUDE_MODE : text | tool | login | limit | limit_401 | limit_login | too_long | slow |
+auth_off | expired | echo | crash.
 Chaque appel est consigné dans FAKE_CLAUDE_LOG (PID, arguments, entrée standard, variables
 sensibles, dossier courant) — `auth status` compris, sur une ligne `{"auth_status": true}`.
 `expired` : jeton du forfait refusé (401) ; `echo` et `crash` répètent le jeton reçu dans leur
 message d'erreur (sortie JSON, puis sortie d'erreur brute) : Nexus doit le masquer.
+`limit_401`, `limit_login` : limite du forfait dont le message ressemble à un refus (« 401 » dans
+l'heure de remise à zéro, « /login » pour changer de compte) ; `too_long` : conversation trop
+longue, « 401 » dans le nombre de jetons — ni l'une ni l'autre n'est un jeton refusé.
 """
 
 import json
@@ -120,6 +124,29 @@ if mode == "crash":
 if mode == "limit":
     out(
         {"type": "result", "is_error": True, "result": "Claude AI usage limit reached|1760900000"},
+        1,
+    )
+if mode == "limit_401":
+    out(
+        {"type": "result", "is_error": True, "result": "Claude AI usage limit reached|1794010000"},
+        1,
+    )
+if mode == "limit_login":
+    out(
+        {
+            "type": "result",
+            "is_error": True,
+            "result": "You've hit your usage limit · resets 3pm · /login to switch accounts",
+        },
+        1,
+    )
+if mode == "too_long":
+    out(
+        {
+            "type": "result",
+            "is_error": True,
+            "result": "Prompt is too long: 240117 tokens > 200000 maximum",
+        },
         1,
     )
 if mode == "tool" and "## Résultat de" not in stdin:
