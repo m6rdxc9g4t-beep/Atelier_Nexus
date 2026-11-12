@@ -78,6 +78,26 @@ export function suiteFlows(map: SuiteMap): SuiteFlow[] {
   return flows;
 }
 
+/** Identifiant technique d'une action, écrit sous son libellé : une lecture dit aussi son format de sortie. */
+export const actionDetail = (action: Pick<SuiteMapAction, "id" | "kind" | "output_format">) =>
+  action.kind === "read" && action.output_format ? `${action.id} · ${action.output_format}` : action.id;
+
+type MapTool = SuiteMapApp["nexus_tools"][number];
+
+/**
+ * Outils Nexus d'une application, rangés par boîte (dans l'ordre où le hub les donne) : la boîte
+ * s'écrit une fois en tête de son groupe plutôt que sur chaque ligne.
+ */
+export function toolsByBox(tools: MapTool[]): { toolset: string; tools: MapTool[] }[] {
+  const groups: { toolset: string; tools: MapTool[] }[] = [];
+  for (const tool of tools) {
+    const group = groups.find((g) => g.toolset === tool.toolset);
+    if (group) group.tools.push(tool);
+    else groups.push({ toolset: tool.toolset, tools: [tool] });
+  }
+  return groups;
+}
+
 /** Nom court d'une application sur le schéma (« Atelier Tab » → « Tab »). */
 export const shortName = (map: Pick<SuiteMap, "apps">, id: string) =>
   id === HUB ? "Nexus" : (map.apps.find((a) => a.app === id)?.name ?? id).replace(/^Atelier /, "");

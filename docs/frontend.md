@@ -58,9 +58,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   `agentApps()` (applications d'un agent d'après ses boîtes). Seule l'icône d'une app porte sa couleur.
 - **Primitives** (`src/components/ui/`) : `card`, `callout` (info, warning, destructive ; `signature` et `success` neutres, avec
   action), `decision-card` (anatomie unique des validations : conversation, éditeur, « À valider »), `skeleton`,
-  `segmented`, `kbd`, `status-dot`, `section-label`, `hint` (précision d'une ligne au survol ou au focus de son `group/hint`,
-  posée sous son ancêtre `relative` sans jamais dépasser sa largeur : à préférer à `title` dans une grille de colonnes,
-  dont l'info-bulle du navigateur recouvre la voisine), `empty-state`, `sheet` (côté `left` ou `right`), `dialog` (props
+  `segmented`, `kbd`, `status-dot`, `section-label`, `empty-state`, `sheet` (côté `left` ou `right`), `dialog` (props
   `size` sm | md | lg | xl et `scroll="body"` avec `DialogBody`), `badge`, `button` (30 px ; variantes `outline`,
   `ghost`, `soft` neutre ; un seul bouton principal par écran), `segmented` (`segmentedRail` / `segmentedItem`, aussi
   utilisés par le sélecteur de thème).
@@ -150,7 +148,11 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
     n'est ajouté tant que le manifeste n'est pas lu (application injoignable).
   - **Fiches** : un libellé long passe à la ligne, étiquette et « + » restent entiers à 17 px du bord dans toutes les
     colonnes ; une liste de lignes est une grille `grid-cols-[minmax(0,1fr)]` (une piste `auto` s'élargit au libellé le
-    plus long et pousse le « + » hors de la fiche) ; identifiant technique, format et rôle du « + » dans une bulle `hint`.
+    plus long et pousse le « + » hors de la fiche). Aucune bulle flottante : l'identifiant technique (et le format de
+    sortie d'une lecture, `actionDetail`) s'écrit sous le libellé, en chasse fixe, comme sur une étape du graphe ; il se
+    lit au doigt comme au clavier et ne couvre jamais la ligne suivante ni la colonne voisine (pas de `title` non plus
+    dans une grille de colonnes). « Outils Nexus » suit la même forme : une ligne par outil, « Écriture » si elle est
+    validée, rangées par boîte (`toolsByBox`).
 
 ## 4 bis. Déclencheurs et « À valider »
 

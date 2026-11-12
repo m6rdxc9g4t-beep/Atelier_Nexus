@@ -4,6 +4,7 @@ import { suiteMapFixture } from "@/features/workflows-graph/fixtures";
 import type { SuiteEventsEntry, SuiteMap, SuiteMapApp } from "@/types/api";
 
 import {
+  actionDetail,
   actionUses,
   boxesOverlap,
   eventLabel,
@@ -15,6 +16,7 @@ import {
   splitActions,
   suiteFlows,
   textWidth,
+  toolsByBox,
   transportLabel,
   triggerChoices,
   workflowsOf,
@@ -38,6 +40,29 @@ describe("entrées et sorties d'une application", () => {
     expect(outgoing.map((f) => f.to)).toEqual(["viz"]);
     expect(workflowsOf(suiteMapFixture, "projets").map((w) => w.id)).toEqual(["wf_1"]);
     expect(workflowsOf(suiteMapFixture, "cine")).toEqual([]);
+  });
+});
+
+describe("précision écrite dans une ligne de fiche (plus de bulle flottante)", () => {
+  it("donne l'identifiant d'une action, et le format de sortie d'une lecture", () => {
+    const { inputs, outputs } = splitActions(projets);
+    expect(actionDetail(inputs[0]!)).toBe("work_items.create");
+    expect(actionDetail(outputs[0]!)).toBe("work_items.list · atelier-table/1");
+    expect(actionDetail({ id: "x.read", kind: "read", output_format: "" })).toBe("x.read");
+  });
+
+  it("range les outils Nexus par boîte, dans l'ordre du hub", () => {
+    const tool = (name: string, toolset: string, kind: "read" | "write" = "read") => ({ name, toolset, kind });
+    const groups = toolsByBox([
+      tool("projets_list_projects", "projets_read"),
+      tool("projets_create_story", "projets_write", "write"),
+      tool("projets_dashboard", "projets_read"),
+    ]);
+    expect(groups.map((g) => [g.toolset, g.tools.map((t) => t.name)])).toEqual([
+      ["projets_read", ["projets_list_projects", "projets_dashboard"]],
+      ["projets_write", ["projets_create_story"]],
+    ]);
+    expect(toolsByBox([])).toEqual([]);
   });
 });
 

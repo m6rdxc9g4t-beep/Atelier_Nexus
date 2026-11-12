@@ -21,7 +21,6 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { AppIcon } from "@/components/layout/appIcons";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Card } from "@/components/ui/card";
@@ -32,7 +31,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Hint } from "@/components/ui/hint";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +45,7 @@ import { cn } from "@/lib/utils";
 import type { SuiteEventsEntry, SuiteFlow, SuiteMap, SuiteMapAction, SuiteMapApp } from "@/types/api";
 
 import {
+  actionDetail,
   actionUses,
   eventLabel,
   feedWarnings,
@@ -55,6 +54,7 @@ import {
   mergeEvents,
   splitActions,
   suiteFlows,
+  toolsByBox,
   transportLabel,
   triggerChoices,
   workflowsOf,
@@ -246,10 +246,27 @@ const plusClass = "shrink-0 text-atelier-faint hover:text-foreground";
  * Ligne d'une fiche : le libellé prend la place et passe à la ligne, étiquette et « + » restent
  * entiers, alignés sur sa première ligne (au doigt, où le « + » fait 40 px : centrés).
  */
-const lineClass = "group/hint relative flex items-start gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent pointer-coarse:items-center";
-const lineLabelClass = "min-w-0 flex-1 py-0.5 text-sm break-words";
-/** Précision du « + », montrée dans la bulle de la ligne quand il est survolé ou a le focus. */
-const plusHintClass = "hidden text-muted-foreground group-has-[button:focus-visible]/hint:block group-has-[button:hover]/hint:block";
+const lineClass = "flex items-start gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent pointer-coarse:items-center";
+const lineTextClass = "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] py-0.5";
+const lineLabelClass = "text-sm break-words";
+/**
+ * Précision technique (identifiant, format, boîte), écrite sous le libellé comme sur une étape du
+ * graphe : toujours lisible, au doigt comme au clavier, et jamais par-dessus la ligne suivante
+ * (une bulle flottante masquait la suite de la liste).
+ */
+const lineDetailClass = "font-mono text-xs break-words text-muted-foreground";
+
+/** Libellé d'une ligne et, dessous, sa précision technique (`id` : cible d'un `aria-describedby`). */
+function LineText({ label, detail, id }: { label: string; detail: string; id?: string }) {
+  return (
+    <span className={lineTextClass}>
+      <span className={lineLabelClass}>{label}</span>
+      <span id={id} className={lineDetailClass}>
+        {detail}
+      </span>
+    </span>
+  );
+}
 
 /** Échanges d'une application, en texte : sens, autre application, nature et transport. */
 function ExchangeLines({ map, flows, app, className }: { map: SuiteMap; flows: SuiteFlow[]; app: string; className?: string }) {
@@ -276,7 +293,7 @@ function ActionLine({ app, action }: { app: string; action: SuiteMapAction }) {
   const hint = useId();
   return (
     <li className={lineClass}>
-      <span className={lineLabelClass}>{action.label}</span>
+      <LineText label={action.label} detail={actionDetail(action)} id={hint} />
       {action.kind !== "read" && <KindBadge kind={action.kind} className="mt-0.5 pointer-coarse:mt-0" />}
       <Button
         variant="ghost"
@@ -288,10 +305,6 @@ function ActionLine({ app, action }: { app: string; action: SuiteMapAction }) {
       >
         <Plus />
       </Button>
-      <Hint id={hint}>
-        <span className="font-mono">{action.kind === "read" ? `${action.id} · ${action.output_format}` : action.id}</span>
-        <span className={plusHintClass}>+ : créer un workflow à partir de cette action</span>
-      </Hint>
     </li>
   );
 }
@@ -340,22 +353,24 @@ function AppCard({ app, map, flows }: { app: SuiteMapApp; map: SuiteMap; flows: 
           </Fold>
 
           <Fold icon={Wrench} title="Outils Nexus" count={app.nexus_tools.length}>
-            {/* La bulle se pose sous la liste (ancêtre `relative`), à la largeur de la fiche */}
-            <ul className="relative flex flex-wrap gap-1">
-              {app.nexus_tools.map((tool) => (
-                <li key={tool.name} className="group/hint max-w-full">
-                  <Badge variant={tool.kind === "write" ? "warning" : "outline"} className="max-w-full">
-                    <span className="truncate">{toolLabel(tool.name)}</span>
-                  </Badge>
-                  <Hint>
-                    <span className="font-mono">{tool.name}</span>
-                    <span className="text-muted-foreground">
-                      Boîte {tool.toolset} · {tool.kind === "write" ? "écriture validée" : "lecture"}
-                    </span>
-                  </Hint>
-                </li>
+            {/* Une ligne par outil, comme les actions (nom technique dessous, « Écriture » si validée), par boîte */}
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
+              {toolsByBox(app.nexus_tools).map((box) => (
+                <section key={box.toolset} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5">
+                  <p className="text-xs break-words text-muted-foreground">
+                    Boîte <span className="font-mono">{box.toolset}</span>
+                  </p>
+                  <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
+                    {box.tools.map((tool) => (
+                      <li key={tool.name} className="flex items-start gap-1.5">
+                        <LineText label={toolLabel(tool.name)} detail={tool.name} />
+                        {tool.kind === "write" && <KindBadge kind="write" className="mt-0.5" />}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           </Fold>
 
           <Fold icon={Bot} title="Agents" count={app.agents.length}>
@@ -395,17 +410,13 @@ function AppCard({ app, map, flows }: { app: SuiteMapApp; map: SuiteMap; flows: 
   );
 }
 
-/** Événement d'une fiche : libellé, « + » s'il peut lancer un workflow, type technique dans la bulle. */
+/** Événement d'une fiche : libellé, type technique dessous, « + » s'il peut lancer un workflow. */
 function EventLine({ app, type, label }: { app: string; type: string; label: string }) {
   const hint = useId();
   return (
     <li className={lineClass}>
-      <span className={lineLabelClass}>{label}</span>
+      <LineText label={label} detail={type} id={hint} />
       <EventTriggerMenu app={app} type={type} label={label} describedBy={hint} />
-      <Hint id={hint}>
-        <span className="font-mono">{type}</span>
-        <span className={plusHintClass}>+ : lancer un workflow quand cet événement arrive</span>
-      </Hint>
     </li>
   );
 }
