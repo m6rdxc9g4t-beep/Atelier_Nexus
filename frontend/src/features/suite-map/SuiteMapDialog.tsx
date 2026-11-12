@@ -2,6 +2,8 @@
 
 import {
   ArrowDownToLine,
+  ArrowLeft,
+  ArrowRight,
   ArrowUpFromLine,
   Bell,
   Bot,
@@ -16,7 +18,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
 import { AppIcon } from "@/components/layout/appIcons";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +32,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Hint } from "@/components/ui/hint";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +43,8 @@ import { appTheme } from "@/features/workflows-graph/catalog";
 import { AppStatusDot, AppTile, KindBadge } from "@/features/workflows-graph/StepBadges";
 import { ApiError, api } from "@/lib/api";
 import { useWorkflowStudioStore } from "@/stores/useWorkflowStudioStore";
-import type { SuiteEventsEntry, SuiteMap, SuiteMapAction, SuiteMapApp } from "@/types/api";
+import { cn } from "@/lib/utils";
+import type { SuiteEventsEntry, SuiteFlow, SuiteMap, SuiteMapAction, SuiteMapApp } from "@/types/api";
 
 import {
   actionUses,
@@ -150,7 +154,7 @@ export function SuiteMapView() {
             />
           </TabsContent>
           <TabsContent value="apps">
-            <AppsGrid map={map.data} focus={focus} onClearFocus={() => setFocus(null)} />
+            <AppsGrid map={map.data} flows={map.data.flows} focus={focus} onClearFocus={() => setFocus(null)} />
           </TabsContent>
         </>
       )}
@@ -163,7 +167,7 @@ export function SuiteMapView() {
 
 // ─── Applications ────────────────────────────────────────────────
 
-function AppsGrid({ map, focus, onClearFocus }: { map: SuiteMap; focus: string | null; onClearFocus: () => void }) {
+function AppsGrid({ map, flows, focus, onClearFocus }: { map: SuiteMap; flows: SuiteFlow[]; focus: string | null; onClearFocus: () => void }) {
   if (map.apps.length === 0) return <p className="text-sm text-muted-foreground">Aucune application connue du hub.</p>;
   const shown = focus ? map.apps.filter((a) => a.app === focus) : map.apps;
   return (
@@ -181,7 +185,7 @@ function AppsGrid({ map, focus, onClearFocus }: { map: SuiteMap; focus: string |
       )}
       <ul className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(shown.length ? shown : map.apps).map((app) => (
-          <AppCard key={app.app} app={app} map={map} />
+          <AppCard key={app.app} app={app} map={map} flows={flows} />
         ))}
       </ul>
     </div>
@@ -225,50 +229,86 @@ function Fold({ icon: Icon, title, count, children }: { icon: typeof Bell; title
 }
 
 const plusClass = "shrink-0 text-atelier-faint hover:text-foreground";
+/**
+ * Ligne d'une fiche : le libellé prend la place et passe à la ligne, étiquette et « + » restent
+ * entiers, alignés sur sa première ligne (au doigt, où le « + » fait 40 px : centrés).
+ */
+const lineClass = "group/hint relative flex items-start gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent pointer-coarse:items-center";
+const lineLabelClass = "min-w-0 flex-1 py-0.5 text-sm break-words";
+/** Précision du « + », montrée dans la bulle de la ligne quand il est survolé ou a le focus. */
+const plusHintClass = "hidden text-muted-foreground group-has-[button:focus-visible]/hint:block group-has-[button:hover]/hint:block";
 
-function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
+/** Échanges d'une application, en texte : sens, autre application, nature et transport. */
+function ExchangeLines({ map, flows, app, className }: { map: SuiteMap; flows: SuiteFlow[]; app: string; className?: string }) {
+  const { incoming, outgoing } = flowsOf(flows, app);
+  const line = (f: SuiteFlow, other: string, Icon: typeof ArrowLeft, sense: string, key: string) => (
+    <li key={key} className="flex items-start gap-1.5">
+      <Icon className="mt-[3px] size-3.5 shrink-0 text-atelier-faint" aria-hidden />
+      <span className="min-w-0 break-words">
+        <span className="sr-only">{sense} </span>
+        <span className="text-foreground">{appName(map, other)}</span> · {f.label} <span className="text-atelier-faint">· par {f.via}</span>
+      </span>
+    </li>
+  );
+  return (
+    <ul className={cn("grid grid-cols-[minmax(0,1fr)] gap-0.5 text-sm text-muted-foreground", className)}>
+      {incoming.map((f, i) => line(f, f.from, ArrowLeft, "Reçoit de", `in-${i}`))}
+      {outgoing.map((f, i) => line(f, f.to, ArrowRight, "Envoie à", `out-${i}`))}
+    </ul>
+  );
+}
+
+function ActionLine({ app, action }: { app: string; action: SuiteMapAction }) {
   const openEditor = useWorkflowStudioStore((s) => s.openEditor);
-  const { inputs, outputs } = splitActions(app);
-  const { incoming, outgoing } = flowsOf(map.flows, app.app);
-  const workflows = workflowsOf(map, app.app);
-
-  const actionLine = (action: SuiteMapAction) => (
-    <li
-      key={action.id}
-      className="flex items-center gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent"
-      title={action.kind === "read" ? `${action.id} · ${action.output_format}` : action.id}
-    >
-      <span className="min-w-0 flex-1 truncate text-sm">{action.label}</span>
-      {action.kind !== "read" && <KindBadge kind={action.kind} />}
+  const hint = useId();
+  return (
+    <li className={lineClass}>
+      <span className={lineLabelClass}>{action.label}</span>
+      {action.kind !== "read" && <KindBadge kind={action.kind} className="mt-0.5 pointer-coarse:mt-0" />}
       <Button
         variant="ghost"
         size="icon-xs"
         className={plusClass}
         aria-label={`Créer un workflow à partir de « ${action.label} »`}
-        title="Créer un workflow à partir de cette action"
-        onClick={() => openEditor({ kind: "new", agent: null, uses: actionUses(app.app, action.id) })}
+        aria-describedby={hint}
+        onClick={() => openEditor({ kind: "new", agent: null, uses: actionUses(app, action.id) })}
       >
         <Plus />
       </Button>
+      <Hint id={hint}>
+        <span className="font-mono">{action.kind === "read" ? `${action.id} · ${action.output_format}` : action.id}</span>
+        <span className={plusHintClass}>+ : créer un workflow à partir de cette action</span>
+      </Hint>
     </li>
   );
+}
+
+function AppCard({ app, map, flows }: { app: SuiteMapApp; map: SuiteMap; flows: SuiteFlow[] }) {
+  const openEditor = useWorkflowStudioStore((s) => s.openEditor);
+  const { inputs, outputs } = splitActions(app);
+  const { incoming, outgoing } = flowsOf(flows, app.app);
+  const workflows = workflowsOf(map, app.app);
+  const actionLine = (action: SuiteMapAction) => <ActionLine key={action.id} app={app.app} action={action} />;
 
   return (
     <li className="min-w-0">
       <Card className="gap-3 p-3.5">
-        <header className="flex items-start gap-2.5" title={`Transport : ${transportLabel(app.transport)}`}>
+        <header className="flex items-start gap-2.5">
           <AppTile app={app.app} color={app.color} />
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-semibold">{app.name}</h3>
-            <AppStatusDot status={app.status} className="text-xs" />
+            <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-atelier-faint">
+              <AppStatusDot status={app.status} className="text-xs" />
+              {app.transport && <span>· par {transportLabel(app.transport)}</span>}
+            </p>
           </div>
         </header>
 
         <Section icon={ArrowDownToLine} title="Entrées" count={inputs.length}>
-          <ul className="grid gap-0.5">{inputs.map(actionLine)}</ul>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">{inputs.map(actionLine)}</ul>
         </Section>
         <Section icon={ArrowUpFromLine} title="Sorties" count={outputs.length}>
-          <ul className="grid gap-0.5">{outputs.map(actionLine)}</ul>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">{outputs.map(actionLine)}</ul>
         </Section>
         {app.status === "no_contract" && app.actions.length === 0 && (
           <p className="flex items-start gap-1.5 text-xs text-warning-ink">
@@ -279,60 +319,55 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
 
         <div className="grid grid-cols-[minmax(0,1fr)] border-t border-atelier-line pt-2">
           <Fold icon={Bell} title="Événements" count={app.events.length}>
-            <ul className="grid gap-0.5">
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
               {app.events.map((ev) => (
-                <li key={ev.type} title={ev.type} className="flex items-center gap-1.5 rounded-md py-0.5 pr-0.5 pl-1.5 hover:bg-accent">
-                  <span className="min-w-0 flex-1 truncate text-sm">{ev.label}</span>
-                  <EventTriggerMenu app={app.app} type={ev.type} label={ev.label} />
-                </li>
+                <EventLine key={ev.type} app={app.app} type={ev.type} label={ev.label} />
               ))}
             </ul>
           </Fold>
 
           <Fold icon={Wrench} title="Outils Nexus" count={app.nexus_tools.length}>
-            <ul className="flex flex-wrap gap-1">
+            {/* La bulle se pose sous la liste (ancêtre `relative`), à la largeur de la fiche */}
+            <ul className="relative flex flex-wrap gap-1">
               {app.nexus_tools.map((tool) => (
-                <li key={tool.name} title={`${tool.name} · boîte ${tool.toolset}`}>
-                  <Badge variant={tool.kind === "write" ? "warning" : "outline"}>{toolLabel(tool.name)}</Badge>
+                <li key={tool.name} className="group/hint max-w-full">
+                  <Badge variant={tool.kind === "write" ? "warning" : "outline"} className="max-w-full">
+                    <span className="truncate">{toolLabel(tool.name)}</span>
+                  </Badge>
+                  <Hint>
+                    <span className="font-mono">{tool.name}</span>
+                    <span className="text-muted-foreground">
+                      Boîte {tool.toolset} · {tool.kind === "write" ? "écriture validée" : "lecture"}
+                    </span>
+                  </Hint>
                 </li>
               ))}
             </ul>
           </Fold>
 
           <Fold icon={Bot} title="Agents" count={app.agents.length}>
-            <ul className="grid gap-1">
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
               {app.agents.map((agent) => (
-                <li key={agent.name} className="flex items-center gap-1.5 text-sm">
-                  <AgentIcon icon={agent.icon} className="size-3.5 shrink-0 text-atelier-faint" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{agent.display_name}</span>
-                  <span className="text-xs text-muted-foreground">{agent.writes ? "lit et écrit" : "lecture seule"}</span>
+                <li key={agent.name} className="flex items-start gap-1.5 text-sm">
+                  <AgentIcon icon={agent.icon} className="mt-[3px] size-3.5 shrink-0 text-atelier-faint" aria-hidden />
+                  <span className="min-w-0 flex-1 break-words">{agent.display_name}</span>
+                  <span className="shrink-0 pt-px text-xs text-muted-foreground">{agent.writes ? "lit et écrit" : "lecture seule"}</span>
                 </li>
               ))}
             </ul>
           </Fold>
 
           <Fold icon={Waypoints} title="Échanges" count={incoming.length + outgoing.length}>
-            <ul className="grid gap-0.5 text-sm text-muted-foreground">
-              {incoming.map((f, i) => (
-                <li key={`in-${i}`} title={`Par ${f.via}`}>
-                  ← <span className="text-foreground">{appName(map, f.from)}</span> · {f.label}
-                </li>
-              ))}
-              {outgoing.map((f, i) => (
-                <li key={`out-${i}`} title={`Par ${f.via}`}>
-                  → <span className="text-foreground">{appName(map, f.to)}</span> · {f.label}
-                </li>
-              ))}
-            </ul>
+            <ExchangeLines map={map} flows={flows} app={app.app} />
           </Fold>
 
           <Fold icon={Waypoints} title="Workflows" count={workflows.length}>
-            <ul className="grid gap-0.5">
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
               {workflows.map((wf) => (
                 <li key={wf.id}>
                   <button
                     type="button"
-                    className="w-full truncate rounded-md px-1.5 py-0.5 text-left text-sm text-accent-ink hover:bg-accent hover:underline"
+                    className="w-full rounded-md px-1.5 py-0.5 text-left text-sm break-words text-accent-ink hover:bg-accent hover:underline"
                     onClick={() => openEditor({ kind: "open", id: wf.id })}
                   >
                     {wf.title}
@@ -347,8 +382,23 @@ function AppCard({ app, map }: { app: SuiteMapApp; map: SuiteMap }) {
   );
 }
 
+/** Événement d'une fiche : libellé, « + » s'il peut lancer un workflow, type technique dans la bulle. */
+function EventLine({ app, type, label }: { app: string; type: string; label: string }) {
+  const hint = useId();
+  return (
+    <li className={lineClass}>
+      <span className={lineLabelClass}>{label}</span>
+      <EventTriggerMenu app={app} type={type} label={label} describedBy={hint} />
+      <Hint id={hint}>
+        <span className="font-mono">{type}</span>
+        <span className={plusHintClass}>+ : lancer un workflow quand cet événement arrive</span>
+      </Hint>
+    </li>
+  );
+}
+
 /** « + » d'un événement : workflow déclenché par cet événement (nouveau, ou celui ouvert en dernier). */
-function EventTriggerMenu({ app, type, label }: { app: string; type: string; label: string }) {
+function EventTriggerMenu({ app, type, label, describedBy }: { app: string; type: string; label: string; describedBy: string }) {
   const openEditor = useWorkflowStudioStore((s) => s.openEditor);
   const last = useWorkflowStudioStore((s) => s.lastWorkflow);
   const choices = triggerChoices(app, type, last);
@@ -359,7 +409,7 @@ function EventTriggerMenu({ app, type, label }: { app: string; type: string; lab
       size="icon-xs"
       className={plusClass}
       aria-label={`Lancer un workflow quand « ${label} » arrive`}
-      title="Lancer un workflow quand cet événement arrive"
+      aria-describedby={describedBy}
       {...props}
     >
       <Plus />
