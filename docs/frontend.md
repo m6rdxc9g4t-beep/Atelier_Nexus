@@ -143,6 +143,9 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   - Survol ou focus d'une application : ses liens ressortent, les autres s'estompent (schéma et liste). Clic, Entrée ou
     Espace (`aria-pressed`, Échap pour annuler) : ses échanges s'écrivent sous le schéma, avec « Voir la fiche » (le focus
     passe alors à l'onglet « Applications »). La liste complète des échanges reste en texte à côté du schéma.
+  - Un bouton qui disparaît avec ce qu'il referme rend toujours le focus, jamais laissé sur `<body>` : « Tout afficher »
+    à l'application qui était choisie, sans la remettre en avant (`focusQuietly` : rien ne reste estompé), « Voir la
+    fiche » et « Toutes les applications » à l'onglet courant.
   - `suiteFlows(map)` : aux échanges du hub s'ajoutent ceux que les workflows ouvrent — une application dont le manifeste
     déclare des actions sans outil Nexus (Wiki, Formulaire, Convert ; écritures de Viz) est reliée « par workflow ». Rien
     n'est ajouté tant que le manifeste n'est pas lu (application injoignable).

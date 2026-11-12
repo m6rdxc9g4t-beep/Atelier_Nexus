@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { suiteMapFixture } from "@/features/workflows-graph/fixtures";
 import type { SuiteEventsEntry, SuiteMap, SuiteMapApp } from "@/types/api";
@@ -11,6 +11,7 @@ import {
   feedWarnings,
   flowNodes,
   flowsOf,
+  focusQuietly,
   layoutFlows,
   mergeEvents,
   splitActions,
@@ -287,6 +288,29 @@ describe("schéma des flux", () => {
     const lanes = layout.links.filter((l) => l.path.includes("Q")).map((l) => Number(/Q (\d+)/.exec(l.path)![1]));
     expect(lanes).toHaveLength(3);
     expect(new Set(lanes).size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("retour du focus à un nœud du schéma (« Tout afficher »)", () => {
+  it("rend le focus sans que le nœud se mette en avant : `quiet` est vrai pendant l'appel seulement", () => {
+    const quiet = { current: false };
+    const seen: boolean[] = [];
+    const focus = vi.fn(() => seen.push(quiet.current));
+    expect(focusQuietly({ isConnected: true, focus }, quiet)).toBe(true);
+    expect(focus).toHaveBeenCalledOnce();
+    expect(seen).toEqual([true]);
+    expect(quiet.current).toBe(false);
+  });
+
+  it("ne fait rien si le nœud a disparu, et relâche `quiet` même si le focus échoue", () => {
+    const quiet = { current: false };
+    const focus = vi.fn();
+    expect(focusQuietly({ isConnected: false, focus }, quiet)).toBe(false);
+    expect(focusQuietly(null, quiet)).toBe(false);
+    expect(focusQuietly(undefined, quiet)).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+    expect(() => focusQuietly({ isConnected: true, focus: () => { throw new Error("x"); } }, quiet)).toThrow("x");
+    expect(quiet.current).toBe(false);
   });
 });
 

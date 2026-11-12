@@ -98,6 +98,28 @@ export function toolsByBox(tools: MapTool[]): { toolset: string; tools: MapTool[
   return groups;
 }
 
+/** Ce qu'il faut d'un élément pour lui rendre le focus (injecté dans les tests, sans DOM). */
+export interface QuietTarget {
+  isConnected: boolean;
+  focus: () => void;
+}
+
+/**
+ * Rend le focus à un nœud du schéma sans que son `onFocus` ne le mette en avant : `quiet.current`
+ * est vrai le temps de l'appel (après « Tout afficher », rien ne doit rester estompé). Faux si le
+ * nœud a disparu.
+ */
+export function focusQuietly(target: QuietTarget | null | undefined, quiet: { current: boolean }): boolean {
+  if (!target || !target.isConnected) return false;
+  quiet.current = true;
+  try {
+    target.focus();
+  } finally {
+    quiet.current = false;
+  }
+  return true;
+}
+
 /** Nom court d'une application sur le schéma (« Atelier Tab » → « Tab »). */
 export const shortName = (map: Pick<SuiteMap, "apps">, id: string) =>
   id === HUB ? "Nexus" : (map.apps.find((a) => a.app === id)?.name ?? id).replace(/^Atelier /, "");

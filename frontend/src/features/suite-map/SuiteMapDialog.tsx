@@ -50,6 +50,7 @@ import {
   eventLabel,
   feedWarnings,
   flowsOf,
+  focusQuietly,
   layoutFlows,
   mergeEvents,
   splitActions,
@@ -99,6 +100,12 @@ export function SuiteMapView() {
   const flows = useMemo(() => (data ? suiteFlows(data) : []), [data]);
 
   const top = useRef<HTMLDivElement>(null);
+  // Un bouton qui disparaît avec ce qu'il referme (« Voir la fiche », « Toutes les applications »)
+  // rend le focus à l'onglet courant : jamais perdu sur <body> au clavier
+  const focusTab = () =>
+    requestAnimationFrame(() =>
+      top.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true }),
+    );
 
   return (
     <Tabs ref={top} value={tab} onValueChange={(v) => setTab(v as MapTab)} className="gap-4">
@@ -158,16 +165,22 @@ export function SuiteMapView() {
                 setFocus(app);
                 setTab("apps");
                 // « Voir la fiche » est sous le schéma et disparaît avec lui : la fiche s'ouvre en haut
-                // de page, et le focus passe à l'onglet « Applications » (jamais perdu au clavier)
-                requestAnimationFrame(() => {
-                  top.current?.scrollIntoView({ block: "start" });
-                  top.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
-                });
+                // de page, et le focus passe à l'onglet « Applications »
+                requestAnimationFrame(() => top.current?.scrollIntoView({ block: "start" }));
+                focusTab();
               }}
             />
           </TabsContent>
           <TabsContent value="apps">
-            <AppsGrid map={map.data} flows={flows} focus={focus} onClearFocus={() => setFocus(null)} />
+            <AppsGrid
+              map={map.data}
+              flows={flows}
+              focus={focus}
+              onClearFocus={() => {
+                setFocus(null);
+                focusTab();
+              }}
+            />
           </TabsContent>
         </>
       )}
@@ -490,6 +503,9 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
   const [hovered, setHovered] = useState<string | null>(null);
   const titleId = useId();
   const listId = useId();
+  const nodeEls = useRef(new Map<string, SVGGElement>());
+  // Vrai le temps de rendre le focus à un nœud sans le mettre en avant (« Tout afficher »)
+  const quiet = useRef(false);
   if (layout.links.length === 0) return <p className="text-sm text-muted-foreground">Aucun échange déclaré entre les applications.</p>;
   const known = new Set(map.apps.map((a) => a.app));
   const chosen = selected && layout.nodes.some((n) => n.id === selected) ? selected : null;
@@ -563,6 +579,10 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
                   role="button"
                   tabIndex={0}
                   aria-pressed={pressed}
+                  ref={(el) => {
+                    if (el) nodeEls.current.set(node.id, el);
+                    else nodeEls.current.delete(node.id);
+                  }}
                   aria-label={`${appName(map, node.id)} : ${plural(count(node.id), "échange", "échanges")}`}
                   className={cn(
                     "cursor-pointer outline-none transition-opacity motion-reduce:transition-none [&:focus-visible_.tile-ring]:stroke-primary [&:hover_.tile-ring]:stroke-atelier-faint",
@@ -577,7 +597,9 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
                   }}
                   onMouseEnter={() => setHovered(node.id)}
                   onMouseLeave={() => setHovered(null)}
-                  onFocus={() => setHovered(node.id)}
+                  onFocus={() => {
+                    if (!quiet.current) setHovered(node.id);
+                  }}
                   onBlur={() => setHovered(null)}
                 >
                   {/* Icône de l'app (charte v2) : carré arrondi en dégradé de SA signature, glyphe blanc */}
@@ -627,7 +649,16 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
                       Voir la fiche
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      // Le bouton disparaît avec la sélection : le focus revient à l'application qui
+                      // était choisie, sans la remettre en avant (tout est de nouveau affiché)
+                      focusQuietly(nodeEls.current.get(chosen), quiet);
+                      setSelected(null);
+                    }}
+                  >
                     <X />
                     Tout afficher
                   </Button>
