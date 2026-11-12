@@ -64,6 +64,21 @@ function appsOf(section: Section, apps: AppStatus[]): AppStatus[] {
   return id ? apps.filter((a) => a.id === id) : [];
 }
 
+/** Mention du mode d'accès à Claude par le jeton du forfait (jamais le jeton lui-même). */
+export const TOKEN_ACCESS = "forfait, par jeton";
+
+/**
+ * Détail d'un moteur : modèle (et « moteur par défaut »), raison s'il ne répond pas. Claude joint
+ * par le jeton du forfait du serveur le dit (« forfait, par jeton ») ; jeton fourni mais programme
+ * `claude` absent : la raison donnée par le serveur remplace « non configuré ».
+ */
+export function providerDetail(p: ProviderStatus): string {
+  const byToken = p.access === "token";
+  if (!p.configured) return byToken && p.error ? p.error : "non configuré";
+  if (!p.available) return p.error ?? "injoignable";
+  return `${p.is_default ? "moteur par défaut, " : ""}${p.default_model}${byToken ? ` (${TOKEN_ACCESS})` : ""}`;
+}
+
 /**
  * Lignes d'état d'une rubrique : chaque moteur (configuré ou non) pour « Modèles », chaque
  * application configurée pour les autres ; aucune pour Apparence et Validation des actions.
@@ -75,11 +90,7 @@ export function checkLines(section: Section, check: Check): CheckLine[] {
       label: PROVIDER_LABEL[p.name] ?? p.name,
       ok: p.configured && p.available,
       down: p.configured && !p.available,
-      detail: !p.configured
-        ? "non configuré"
-        : p.available
-          ? `${p.is_default ? "moteur par défaut, " : ""}${p.default_model}`
-          : (p.error ?? "injoignable"),
+      detail: providerDetail(p),
     }));
   }
   return appsOf(section, check.apps)
