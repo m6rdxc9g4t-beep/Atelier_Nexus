@@ -103,7 +103,7 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 | `src/components/layout/lazyViews.ts` | **Chargement à la demande** : la conversation (et `react-markdown`), le Studio, l'éditeur en graphe (`@xyflow/react`), les Réglages et l'éditeur d'agent sont chargés par `next/dynamic` depuis `Workspace.tsx`, puis préchargés quand le navigateur est au repos (`whenIdle`) ; la visionneuse de livrables l'est depuis `ArtifactPanel.tsx`. Paquet initial de l'accueil : 1,40 Mo → 0,85 Mo de JS (433 → 273 Ko compressés). `lazyViews.test.ts` refuse un import statique de ces vues dans l'écran principal ou la barre latérale (`SettingsButton` vit pour cela dans son propre fichier) |
 | `src/features/workflows/` | Workflows (Étapes 18 et 24) : `WorkflowsStudio` (vue plein cadre : onglets Workflows — « Mes workflows » / « Modèles de la suite » —, Carte de la suite, À valider), `WorkflowsDialog.tsx` (bouton Workflows de la conversation et `MyWorkflows` : cartes avec chaîne d'applications, lancement v1, « Passer en graphe », badge « Simple » pour un v1), `TemplateGallery` (modèles de `GET /api/workflows/library`, disponibilité, prérequis repliés, « Utiliser ce modèle »), `WorkflowEditor` (enregistrer un tour, modifier un v1). Logique pure testée : `form.ts`, `chain.ts` (chaîne d'applications d'un workflow), `studio.ts` (onglet, filtres, modèles mis en avant, `missingLines`, cible « Utiliser ce modèle ») |
 | `src/features/workflows-graph/` | Éditeur de workflows v2 en graphe (`@xyflow/react`, contrat `docs/workflows-v2-api.md`) : `WorkflowGraphEditor` (fenêtre plein écran, ≥ 1024 px), `Palette` (catalogue par application), `StepNode`, `Inspector` (étape, condition, paramètres, formulaire généré depuis `input_schema`, menu « Utiliser… »), `RunPanel` (lancement, suivi, validation, historique). Logique pure testée : `graph.ts` (étapes ↔ nœuds/arêtes, ancêtres, ordre, couches, état d'exécution), `validate.ts`, `refs.ts` / `templates.ts` (gabarits), `schemaForm.ts`, `catalog.ts`, `draft.ts` (dont `draftFromTemplate` : copie non enregistrée d'un modèle, `saveState`), `run.ts`, `leave.ts` (quitter l'éditeur vers la liste ou les modèles) ; doubles du contrat dans `fixtures.ts` |
-| `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée) |
+| `src/features/suite-map/` | Carte de la suite (`GET /api/suite/map`, `/api/suite/events`) : entrées / sorties / événements / outils / agents par app, schéma des flux, derniers événements ; `suiteMap.ts` (logique pure, testée : `suiteFlows`, placement du schéma `layoutFlows`) |
 | `src/features/workflow-triggers/` | Déclencheurs (contrat `docs/declencheurs-api.md`) : `TriggersPanel` (onglet de l'éditeur : liste, formulaire horaire / événement, « Tester maintenant »), `InboxDialog.tsx` (`InboxButton` de la barre mobile, `InboxView` de l'onglet « À valider »), `useInboxCount` + `sharedPoll.ts` (une seule lecture partagée par tous les badges), `OriginBadge`. Logique pure testée : `summary.ts` (résumés FR, jours consécutifs, pluriels, dates relatives), `form.ts` (brouillon ↔ corps, validation aux bornes du contrat, gabarits `{{event.…}}`, événement d'exemple), `origin.ts` (origine d'une exécution, badge) ; doubles dans `fixtures.ts` |
 | `src/features/workflows-graph/ApprovalCard.tsx` | Carte de validation d'une étape (`DecisionCard` : badge Lecture / Écriture / Destructif, résumé, entrée résolue sous « Détails », Refuser / Autoriser), avec le résultat de l'étape précédente juste au-dessus (`previousStep`, `resultExcerpt` de `run.ts`) ; partagée par le suivi et « À valider » |
 | `src/features/chat-agent/ApprovalCard.tsx`, `DecisionDock` | Validation dans le chat (`DecisionCard`) : une ligne par appel (nature, application, paramètres sous « Détails », Refuser / Autoriser), « Envoyer mes choix » pour plusieurs appels, reçu après décision ; dock « L'agent attend votre accord · Voir » au-dessus du composer quand la carte est hors de vue (il n'autorise jamais) ; jamais de « tout autoriser » |
@@ -132,6 +132,36 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
 - **Carte de la suite** : « + » sur une action ouvre un nouveau workflow de suite qui commence par `node:<app>/<action>` ;
   « + » sur un événement (Viz, Projets, Tab, Convert) ouvre un nouveau workflow avec un déclencheur événement prérempli, ou
   l'ajoute au dernier workflow ouvert dans l'éditeur.
+  - **Schéma des flux** (`layoutFlows(map, largeur)`, pur) : Nexus en tête d'un rail vertical ; à gauche, en colonne, les
+    applications qui échangent entre elles (sources d'abord : flèche verticale, libellé à sa gauche ; un lien qui saute une
+    ligne passe par un couloir en marge, libellé sur son départ) ; à droite les autres. **Un seul lien par paire** : avec
+    Nexus, pas de libellé, les pointes disent le sens (vers Nexus : lecture ; vers l'application : écritures validées) et
+    chaque lien arrive sur le rail à sa hauteur. Le schéma se calcule à la largeur mesurée (320 à 560 px, texte toujours à
+    12 px, jamais de défilement horizontal). Les tests exigent, pour la liste réelle des 11 applications et de 320 à 560 px,
+    qu'aucune boîte (libellé, nom, icône) n'en recouvre une autre et qu'aucun tracé n'en traverse. Toute nouvelle règle de
+    placement s'y ajoute.
+  - Survol ou focus d'une application : ses liens ressortent, les autres s'estompent (schéma et liste). Clic, Entrée ou
+    Espace (`aria-pressed`, Échap pour annuler) : ses échanges s'écrivent sous le schéma, avec « Voir la fiche » (le focus
+    passe alors à l'onglet « Applications »). La liste complète des échanges reste en texte à côté du schéma.
+  - Un bouton qui disparaît avec ce qu'il referme rend toujours le focus, jamais laissé sur `<body>` : « Tout afficher »
+    à l'application qui était choisie, sans la remettre en avant (`focusQuietly` : rien ne reste estompé), « Voir la
+    fiche » et « Toutes les applications » à l'onglet courant.
+  - `suiteFlows(map)` : aux échanges du hub s'ajoutent ceux que les workflows ouvrent — une application dont le manifeste
+    déclare des actions sans outil Nexus (Wiki, Formulaire, Convert ; écritures de Viz) est reliée « par workflow ». Rien
+    n'est ajouté tant que le manifeste n'est pas lu (application injoignable).
+  - `unreadNodes(map)` : une application-nœud du hub (transport déclaré) sans aucun échange lu avec Nexus — arrêtée,
+    non configurée, sans contrat ou sans action — reste reliée au rail par un trait en pointillé, sans pointe
+    (`FlowLink.unread`) : Wiki, Formulaire et Convert ne paraissent plus étrangères au hub quand la suite est arrêtée.
+    La légende le dit quand il y en a, le nom accessible du nœud donne la raison (« injoignable, échanges avec Nexus non
+    lus »), et la liste en texte les nomme sous le tableau et dans les échanges de l'application choisie. Une
+    application sans transport (Ciné, GitHub…) n'est jamais reliée d'office.
+  - **Fiches** : un libellé long passe à la ligne, étiquette et « + » restent entiers à 17 px du bord dans toutes les
+    colonnes ; une liste de lignes est une grille `grid-cols-[minmax(0,1fr)]` (une piste `auto` s'élargit au libellé le
+    plus long et pousse le « + » hors de la fiche). Aucune bulle flottante : l'identifiant technique (et le format de
+    sortie d'une lecture, `actionDetail`) s'écrit sous le libellé, en chasse fixe, comme sur une étape du graphe ; il se
+    lit au doigt comme au clavier et ne couvre jamais la ligne suivante ni la colonne voisine (pas de `title` non plus
+    dans une grille de colonnes). « Outils Nexus » suit la même forme : une ligne par outil, « Écriture » si elle est
+    validée, rangées par boîte (`toolsByBox`).
 
 ## 4 bis. Déclencheurs et « À valider »
 
@@ -190,6 +220,11 @@ servi par le backend avec ses vues chargées à la demande, retour du focus au c
 40 px au doigt, « Réessayer » après une coupure du flux, sélecteur de la suite. À savoir : `next dev` ne recompile
 pas toujours `globals.css` à chaud (cache de `.next/dev`) — après une modification de ce fichier, relancer le
 serveur de développement, dossier `.next/dev` supprimé.
+
+Carte de la suite revue le 2026-11-12, vérifiée dans Chromium (1440, 1280 et 390 px, clair et sombre, avant / après)
+sur la carte du hub complétée par les manifestes enregistrés de Viz, Tab, Projets, Convert, Wiki et Formulaire :
+schéma sans chevauchement (boîtes réelles des textes et des icônes mesurées), sans défilement horizontal à 390 px,
+au clavier et au doigt ; fiches sans ligne rognée, « + » alignés, bulles contenues dans leur fiche.
 
 Refonte visuelle vérifiée le 2026-10-25 dans Chromium (1440 × 900 clair et sombre, 375 × 812) : accueil, barre
 latérale et tiroir, Studio (mes workflows, modèles, carte), modèle copié dans l'éditeur, conversation avec le
