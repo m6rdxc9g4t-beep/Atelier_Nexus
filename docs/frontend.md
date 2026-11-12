@@ -149,6 +149,12 @@ Charte v2 « Linear » de la suite (6 nov. 2026, `Atelier_Deploy/DESIGN.md`) : s
   - `suiteFlows(map)` : aux échanges du hub s'ajoutent ceux que les workflows ouvrent — une application dont le manifeste
     déclare des actions sans outil Nexus (Wiki, Formulaire, Convert ; écritures de Viz) est reliée « par workflow ». Rien
     n'est ajouté tant que le manifeste n'est pas lu (application injoignable).
+  - `unreadNodes(map)` : une application-nœud du hub (transport déclaré) sans aucun échange lu avec Nexus — arrêtée,
+    non configurée, sans contrat ou sans action — reste reliée au rail par un trait en pointillé, sans pointe
+    (`FlowLink.unread`) : Wiki, Formulaire et Convert ne paraissent plus étrangères au hub quand la suite est arrêtée.
+    La légende le dit quand il y en a, le nom accessible du nœud donne la raison (« injoignable, échanges avec Nexus non
+    lus »), et la liste en texte les nomme sous le tableau et dans les échanges de l'application choisie. Une
+    application sans transport (Ciné, GitHub…) n'est jamais reliée d'office.
   - **Fiches** : un libellé long passe à la ligne, étiquette et « + » restent entiers à 17 px du bord dans toutes les
     colonnes ; une liste de lignes est une grille `grid-cols-[minmax(0,1fr)]` (une piste `auto` s'élargit au libellé le
     plus long et pousse le « + » hors de la fiche). Aucune bulle flottante : l'identifiant technique (et le format de

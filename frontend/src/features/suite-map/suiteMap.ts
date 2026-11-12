@@ -78,6 +78,33 @@ export function suiteFlows(map: SuiteMap): SuiteFlow[] {
   return flows;
 }
 
+/** Pourquoi une application-nœud du hub n'a aucun échange lu avec Nexus. */
+const UNREAD_REASON = {
+  unreachable: "injoignable",
+  not_configured: "non configurée",
+  no_contract: "sans contrat",
+  ok: "aucune action déclarée",
+} as const satisfies Record<SuiteMapApp["status"], string>;
+
+export interface UnreadNode {
+  app: string;
+  reason: string;
+}
+
+/**
+ * Applications-nœuds que le hub connaît (transport déclaré) mais dont aucun échange avec Nexus
+ * n'est lu : manifeste hors d'atteinte (application arrêtée) ou vide. Elles restent reliées au rail
+ * du schéma, par un trait sans pointe, et sont nommées dans la liste en texte : sans cela, une
+ * suite arrêtée montrait Wiki et Formulaire comme étrangères au hub.
+ */
+export function unreadNodes(map: SuiteMap): UnreadNode[] {
+  const flows = suiteFlows(map);
+  return map.apps
+    .filter((a) => a.app !== HUB && a.transport !== null)
+    .filter((a) => !flows.some((f) => (f.from === a.app && f.to === HUB) || (f.from === HUB && f.to === a.app)))
+    .map((a) => ({ app: a.app, reason: UNREAD_REASON[a.status] }));
+}
+
 /** Identifiant technique d'une action, écrit sous son libellé : une lecture dit aussi son format de sortie. */
 export const actionDetail = (action: Pick<SuiteMapAction, "id" | "kind" | "output_format">) =>
   action.kind === "read" && action.output_format ? `${action.id} · ${action.output_format}` : action.id;
@@ -156,6 +183,8 @@ export interface FlowLink {
   path: string;
   /** Pointes : une par sens présent (triangles pleins) */
   heads: string[];
+  /** Échanges non lus (application-nœud injoignable ou sans action) : trait sans pointe, en pointillé */
+  unread: boolean;
   /** Libellé (échanges entre applications seulement : avec Nexus, les pointes disent le sens) */
   label: { text: string; x: number; y: number; anchor: "end"; box: FlowBox } | null;
   /** Points du tracé, pour vérifier qu'il ne traverse ni icône ni texte */
@@ -215,14 +244,17 @@ function chainOrder(ids: string[], flows: SuiteFlow[]): string[] {
  * tête d'un rail vertical ; à gauche, en colonne, les applications qui échangent entre elles
  * (flèches verticales, libellé à leur gauche ; un lien qui saute une ligne passe par un couloir
  * en marge) ; à droite les autres. Chaque application rejoint le rail à sa hauteur : un seul lien
- * par paire, le sens donné par les pointes (vers Nexus : lecture ; vers l'application : écritures).
+ * par paire, le sens donné par les pointes (vers Nexus : lecture ; vers l'application : écritures) ;
+ * un nœud du hub dont les échanges ne sont pas lus (`unreadNodes`) y arrive par un trait sans pointe.
  * Les libellés sont posés à la première place libre : jamais sur une icône, un nom ou un autre
  * libellé. Coordonnées en unités SVG (= pixels).
  */
 export function layoutFlows(map: SuiteMap, available = 480): FlowLayout {
   const flows = suiteFlows(map).filter((f) => f.from !== f.to);
   const ids = flowNodes({ ...map, flows });
-  const hasHub = ids.includes(HUB) && flows.some((f) => f.from === HUB || f.to === HUB);
+  const unread = unreadNodes(map).map((n) => n.app);
+  const hasHub = flows.some((f) => f.from === HUB || f.to === HUB) || unread.length > 0;
+  if (hasHub && !ids.includes(HUB)) ids.push(HUB);
   const apps = ids.filter((id) => id !== HUB || !hasHub);
   const between = flows.filter((f) => apps.includes(f.from) && apps.includes(f.to));
   const chained = apps.filter((id) => between.some((f) => f.from === id || f.to === id));
@@ -239,6 +271,8 @@ export function layoutFlows(map: SuiteMap, available = 480): FlowLayout {
     pair.flows.push(f);
     pairs.set(key, pair);
   }
+  // Un nœud du hub sans échange lu reste relié au rail (trait sans pointe)
+  for (const app of unread) pairs.set(`${app}~${HUB}`, { a: app, b: HUB, flows: [] });
   const appPairs = [...pairs.values()].filter((p) => p.b !== HUB || !hasHub);
   const labelOf = (p: { flows: SuiteFlow[] }) => [...new Set(p.flows.map((f) => f.label))].join(" · ");
   const row = (id: string) => leftIds.indexOf(id);
@@ -341,6 +375,7 @@ export function layoutFlows(map: SuiteMap, available = 480): FlowLayout {
         flows: p.flows,
         path: `M ${x1} ${n.y} H ${x2}`,
         heads,
+        unread: p.flows.length === 0,
         label: null,
         points: [0, 0.25, 0.5, 0.75, 1].map((t) => ({ x: x1 + (x2 - x1) * t, y: n.y })),
       });
@@ -381,6 +416,7 @@ export function layoutFlows(map: SuiteMap, available = 480): FlowLayout {
         ...p,
         path: `M ${up.x} ${y1} V ${y2}`,
         heads,
+        unread: false,
         label: place(labelOf(p), [{ right: up.x - 10, middle }]),
         points: [0, 0.5, 1].map((t) => ({ x: up.x, y: y1 + (y2 - y1) * t })),
       });
@@ -398,6 +434,7 @@ export function layoutFlows(map: SuiteMap, available = 480): FlowLayout {
       ...p,
       path: `M ${x} ${y1} H ${lane + r} Q ${lane} ${y1} ${lane} ${y1 + r} V ${y2 - r} Q ${lane} ${y2} ${lane + r} ${y2} H ${x}`,
       heads,
+      unread: false,
       // Au-dessus du départ, sinon sous l'arrivée, puis les deux autres côtés
       label: place(labelOf(p), [
         { right: x - 4, middle: y1 - 11 },

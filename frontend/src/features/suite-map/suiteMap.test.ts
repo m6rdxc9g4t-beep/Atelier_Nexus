@@ -20,6 +20,7 @@ import {
   toolsByBox,
   transportLabel,
   triggerChoices,
+  unreadNodes,
   workflowsOf,
 } from "./suiteMap";
 
@@ -150,6 +151,26 @@ describe("échanges de la carte", () => {
     const pairs = suiteFlows(realSuite()).map((f) => `${f.from}>${f.to}`);
     expect(new Set(pairs).size).toBe(pairs.length);
   });
+
+  it("nomme les applications-nœuds dont aucun échange avec Nexus n'est lu", () => {
+    // Suite arrêtée : Viz, Tab et Projets gardent leurs outils Nexus ; Convert, Wiki et Formulaire n'ont que leur manifeste
+    expect(unreadNodes(realSuite(false))).toEqual([
+      { app: "convert", reason: "injoignable" },
+      { app: "wiki", reason: "injoignable" },
+      { app: "formulaire", reason: "injoignable" },
+    ]);
+    // Manifestes lus : tout est relié par ses actions
+    expect(unreadNodes(realSuite())).toEqual([]);
+    // Une application sans transport (Ciné, GitHub…) n'est pas un nœud du hub : jamais reliée d'office
+    const lone: SuiteMap = { ...realSuite(false), flows: [] };
+    expect(unreadNodes(lone).map((n) => n.app)).toEqual(["viz", "tab", "projets", "convert", "wiki", "formulaire"]);
+    // Joignable mais manifeste vide, non configurée, sans contrat : la raison suit l'état
+    const states: SuiteMap = {
+      ...lone,
+      apps: lone.apps.map((a) => ({ ...a, status: a.app === "viz" ? "ok" : a.app === "tab" ? "not_configured" : a.app === "projets" ? "no_contract" : a.status })),
+    };
+    expect(unreadNodes(states).slice(0, 3).map((n) => n.reason)).toEqual(["aucune action déclarée", "non configurée", "sans contrat"]);
+  });
 });
 
 describe("schéma des flux", () => {
@@ -190,6 +211,36 @@ describe("schéma des flux", () => {
       "Jeux de données",
       "Nouvelle table",
     ]);
+  });
+
+  it("relie au rail, par un trait sans pointe, un nœud du hub dont le manifeste n'est pas lu", () => {
+    const layout = layoutFlows(realSuite(false), 480);
+    const link = (a: string) => layout.links.find((l) => l.a === a && l.b === "nexus");
+    for (const app of ["convert", "wiki", "formulaire"]) {
+      expect(link(app), app).toMatchObject({ unread: true, heads: [], flows: [], label: null });
+      const node = layout.nodes.find((n) => n.id === app)!;
+      // Du bord de l'icône au rail, à la hauteur de l'application
+      expect(link(app)!.path).toBe(`M ${node.x + Math.sign(layout.rail!.x - node.x) * 24} ${node.y} H ${layout.rail!.x - Math.sign(layout.rail!.x - node.x) * 4}`);
+    }
+    // Lus par les outils Nexus : pointes, jamais « non lu »
+    expect(link("viz")).toMatchObject({ unread: false });
+    expect(link("viz")!.heads).toHaveLength(1);
+    // Hors du hub (Ciné sans outil ni transport) : aucun lien inventé
+    const cine = { ...realSuite(false), flows: realSuite(false).flows.filter((f) => f.from !== "cine" && f.to !== "cine") };
+    expect(layoutFlows(cine, 480).links.some((l) => l.a === "cine")).toBe(false);
+    // Manifestes lus : plus aucun trait sans pointe
+    expect(layoutFlows(realSuite(), 480).links.filter((l) => l.unread)).toEqual([]);
+    expect(layout.links.filter((l) => l.unread)).toHaveLength(3);
+    expect(layout.links).toHaveLength(4 + 11);
+  });
+
+  it("garde Nexus et son rail quand aucun échange n'est lu (suite arrêtée, aucun outil)", () => {
+    const layout = layoutFlows({ ...realSuite(false), flows: [] }, 340);
+    expect(layout.nodes[0]).toMatchObject({ id: "nexus", hub: true });
+    expect(layout.rail).not.toBeNull();
+    expect(layout.links.map((l) => l.a).sort()).toEqual(["convert", "formulaire", "projets", "tab", "viz", "wiki"]);
+    expect(layout.links.every((l) => l.unread && l.heads.length === 0)).toBe(true);
+    expect(layout.width).toBeLessThanOrEqual(340);
   });
 
   it("répartit les arrivées le long du rail de Nexus : jamais deux du même côté à la même hauteur", () => {
@@ -261,7 +312,8 @@ describe("schéma des flux", () => {
   });
 
   it("réunit un aller-retour entre deux applications en un seul lien à deux pointes", () => {
-    const map = { ...suiteMapFixture, apps: suiteMapFixture.apps.map((a) => ({ ...a, actions: [] })), flows: [
+    // Applications hors du hub (ni action ni transport) : aucun rail
+    const map = { ...suiteMapFixture, apps: suiteMapFixture.apps.map((a) => ({ ...a, actions: [], transport: null })), flows: [
       { from: "tab", to: "viz", label: "a", via: "x" },
       { from: "viz", to: "tab", label: "b", via: "x" },
     ] };
@@ -272,7 +324,7 @@ describe("schéma des flux", () => {
   });
 
   it("ignore un flux d'une application vers elle-même", () => {
-    const map = { ...suiteMapFixture, apps: suiteMapFixture.apps.map((a) => ({ ...a, actions: [] })), flows: [{ from: "viz", to: "viz", label: "boucle", via: "x" }] };
+    const map = { ...suiteMapFixture, apps: suiteMapFixture.apps.map((a) => ({ ...a, actions: [], transport: null })), flows: [{ from: "viz", to: "viz", label: "boucle", via: "x" }] };
     expect(layoutFlows(map).links).toEqual([]);
   });
 
@@ -283,7 +335,9 @@ describe("schéma des flux", () => {
       flows: [flow("viz", "tab", "Un"), flow("tab", "projets", "Deux"), flow("projets", "convert", "Trois"), flow("viz", "projets", "Quatre"), flow("viz", "convert", "Cinq"), flow("tab", "convert", "Six")],
     };
     const layout = layoutFlows(map, 480);
-    const labels = layout.links.map((l) => l.label!.box);
+    // Les six échanges entre applications portent un libellé (les traits « non lus » vers le rail n'en ont pas)
+    const labels = layout.links.filter((l) => !l.unread).map((l) => l.label!.box);
+    expect(labels).toHaveLength(6);
     for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) expect(boxesOverlap(labels[i]!, labels[j]!)).toBe(false);
     const lanes = layout.links.filter((l) => l.path.includes("Q")).map((l) => Number(/Q (\d+)/.exec(l.path)![1]));
     expect(lanes).toHaveLength(3);

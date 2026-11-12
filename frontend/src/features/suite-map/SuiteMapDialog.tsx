@@ -10,6 +10,7 @@ import {
   ChevronRight,
   LayoutGrid,
   Map as MapIcon,
+  Minus,
   Plus,
   RefreshCw,
   Rss,
@@ -58,6 +59,7 @@ import {
   toolsByBox,
   transportLabel,
   triggerChoices,
+  unreadNodes,
   workflowsOf,
 } from "./suiteMap";
 
@@ -284,6 +286,7 @@ function LineText({ label, detail, id }: { label: string; detail: string; id?: s
 /** Échanges d'une application, en texte : sens, autre application, nature et transport. */
 function ExchangeLines({ map, flows, app, className }: { map: SuiteMap; flows: SuiteFlow[]; app: string; className?: string }) {
   const { incoming, outgoing } = flowsOf(flows, app);
+  const unread = unreadNodes(map).find((n) => n.app === app);
   const line = (f: SuiteFlow, other: string, Icon: typeof ArrowLeft, sense: string, key: string) => (
     <li key={key} className="flex items-start gap-1.5">
       <Icon className="mt-[3px] size-3.5 shrink-0 text-atelier-faint" aria-hidden />
@@ -297,6 +300,15 @@ function ExchangeLines({ map, flows, app, className }: { map: SuiteMap; flows: S
     <ul className={cn("grid grid-cols-[minmax(0,1fr)] gap-0.5 text-sm text-muted-foreground", className)}>
       {incoming.map((f, i) => line(f, f.from, ArrowLeft, "Reçoit de", `in-${i}`))}
       {outgoing.map((f, i) => line(f, f.to, ArrowRight, "Envoie à", `out-${i}`))}
+      {/* Le trait sans pointe du schéma, en texte */}
+      {unread && (
+        <li className="flex items-start gap-1.5">
+          <Minus className="mt-[3px] size-3.5 shrink-0 text-atelier-faint" aria-hidden />
+          <span className="min-w-0 break-words">
+            <span className="text-foreground">Nexus</span> · aucun échange lu <span className="text-atelier-faint">· {unread.reason}</span>
+          </span>
+        </li>
+      )}
     </ul>
   );
 }
@@ -494,7 +506,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
  * Schéma des échanges : placé par `layoutFlows` à la largeur disponible (jamais de défilement
  * horizontal, texte à 12 px). Survol ou focus d'une application : ses liens ressortent, les autres
  * s'estompent. Clic, Entrée ou Espace : l'application est choisie, ses échanges s'écrivent sous le
- * schéma, avec le bouton « Voir la fiche ». La liste complète reste en texte à côté.
+ * schéma, avec le bouton « Voir la fiche ». La liste complète reste en texte à côté. Un nœud du hub
+ * dont les échanges ne sont pas lus (application arrêtée) garde un trait en pointillé vers le rail.
  */
 function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; onPick: (app: string) => void }) {
   const [box, width] = useWidth<HTMLDivElement>();
@@ -506,6 +519,7 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
   const nodeEls = useRef(new Map<string, SVGGElement>());
   // Vrai le temps de rendre le focus à un nœud sans le mettre en avant (« Tout afficher »)
   const quiet = useRef(false);
+  const unread = useMemo(() => unreadNodes(map), [map]);
   if (layout.links.length === 0) return <p className="text-sm text-muted-foreground">Aucun échange déclaré entre les applications.</p>;
   const known = new Set(map.apps.map((a) => a.app));
   const chosen = selected && layout.nodes.some((n) => n.id === selected) ? selected : null;
@@ -513,6 +527,13 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
   const touches = (link: { a: string; b: string }, id: string) => link.a === id || link.b === id;
   const near = new Set(active ? layout.links.filter((l) => touches(l, active)).flatMap((l) => [l.a, l.b]) : []);
   const count = (id: string) => flows.filter((f) => f.from !== f.to && (f.from === id || f.to === id)).length;
+  /** Nom accessible d'un nœud : « 2 échanges », et s'il n'est pas lu : « injoignable, échanges avec Nexus non lus » */
+  const summary = (id: string) => {
+    const reason = unread.find((n) => n.app === id)?.reason;
+    const read = plural(count(id), "échange", "échanges");
+    if (!reason) return read;
+    return `${count(id) > 0 ? `${read} ; ` : ""}${reason}, échanges avec Nexus non lus`;
+  };
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
       <figure className="min-w-0 rounded-lg border border-atelier-border bg-card p-2">
@@ -550,7 +571,14 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
                       active !== null && !on && "opacity-25",
                     )}
                   >
-                    <path d={link.path} fill="none" strokeWidth={on ? 1.5 : 1.25} strokeLinecap="round" className="stroke-current" />
+                    <path
+                      d={link.path}
+                      fill="none"
+                      strokeWidth={on ? 1.5 : 1.25}
+                      strokeLinecap="round"
+                      strokeDasharray={link.unread ? "1 5" : undefined}
+                      className="stroke-current"
+                    />
                     {link.heads.map((d) => (
                       <path key={d} d={d} className="fill-current" />
                     ))}
@@ -583,7 +611,7 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
                     if (el) nodeEls.current.set(node.id, el);
                     else nodeEls.current.delete(node.id);
                   }}
-                  aria-label={`${appName(map, node.id)} : ${plural(count(node.id), "échange", "échanges")}`}
+                  aria-label={`${appName(map, node.id)} : ${summary(node.id)}`}
                   className={cn(
                     "cursor-pointer outline-none transition-opacity motion-reduce:transition-none [&:focus-visible_.tile-ring]:stroke-primary [&:hover_.tile-ring]:stroke-atelier-faint",
                     active !== null && node.id !== active && !near.has(node.id) && "opacity-40",
@@ -634,6 +662,7 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
           <p>
             Pointe vers Nexus : lecture. Pointe vers une application : écritures validées. Entre deux applications, le lien porte ce
             qui passe.
+            {unread.length > 0 && " Pointillé sans pointe : application reliée à Nexus dont les échanges ne sont pas lus (injoignable, par exemple)."}
           </p>
           <div aria-live="polite" className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
             {chosen ? (
@@ -697,6 +726,11 @@ function FlowsView({ map, flows, onPick }: { map: SuiteMap; flows: SuiteFlow[]; 
             ))}
           </tbody>
         </table>
+        {unread.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Reliées à Nexus, sans échange lu : {unread.map((n) => `${appName(map, n.app)} (${n.reason})`).join(", ")}.
+          </p>
+        )}
       </div>
     </div>
   );
