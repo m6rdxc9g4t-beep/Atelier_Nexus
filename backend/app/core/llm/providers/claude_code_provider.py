@@ -14,6 +14,14 @@ d'agent ne voit pas la différence avec l'API.
 Précautions (identiques à Savoir) : ANTHROPIC_API_KEY / AUTH_TOKEN / BASE_URL retirées de
 l'environnement (sinon la clé serait facturée à l'usage), aucun outil de Claude Code
 (`--tools ""`), pas de MCP ni de commandes, pas de session conservée, dossier de travail vide.
+
+Mode jeton (décision de l'utilisateur : « je veux que Claude forfait cli soit actif car c'est
+personnel ça sera mon forfait Claude ») : sur un serveur sans session `claude`, la même CLI,
+avec exactement les mêmes drapeaux, s'authentifie par le jeton de `claude setup-token`
+(`CLAUDE_OAUTH_TOKEN`, lu une fois : `claude_token.py`). Seuls écarts à la liste blanche :
+`CLAUDE_CODE_OAUTH_TOKEN` est ajouté à l'environnement de la CLI, et `HOME` /
+`CLAUDE_CONFIG_DIR` pointent vers un dossier privé du dossier de données (aucune session
+d'utilisateur à lire). Disponibilité : exécutable + jeton, sans `claude auth status`.
 """
 
 from __future__ import annotations
@@ -30,8 +38,11 @@ from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 from typing import Any
 
+from pydantic import SecretStr
+
+from app.core.llm.claude_token import CLI_TOKEN_ENV, TOKEN_ENV, ensure_private_home, scrub
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
-from app.core.llm.providers.base import LLMProvider
+from app.core.llm.providers.base import LLMProvider, ProviderAccess
 from app.core.llm.types import (
     AttachmentBlock,
     ContentBlock,
@@ -82,6 +93,31 @@ INSTRUCTION = (
 NOT_LOGGED_IN = (
     "Claude Code n'est pas connecté : ouvrez le Terminal, tapez « claude » et connectez-vous "
     "avec votre compte Claude, puis réessayez."
+)
+NOT_INSTALLED = (
+    "Claude Code est introuvable : installez-le (https://claude.com/claude-code), puis "
+    "lancez « claude » une fois dans un terminal pour vous connecter."
+)
+#: Mode jeton : la CLI doit être dans l'image du serveur (aucune connexion à faire)
+TOKEN_NO_CLI = (
+    f"Le jeton du forfait Claude est fourni ({TOKEN_ENV}), mais le programme « claude » "
+    "(Claude Code) est absent de ce serveur : installez-le dans l'image, ou indiquez son chemin "
+    "(CLAUDE_CLI_PATH)."
+)
+TOKEN_REFUSED = (
+    "Le jeton du forfait Claude est refusé ou expiré : refaites « claude setup-token » sur votre "
+    f"ordinateur et mettez à jour le jeton du serveur ({TOKEN_ENV}), puis redémarrez Nexus."
+)
+#: Mots d'un refus d'authentification (session absente, jeton invalide ou expiré)
+_AUTH_WORDS = ("login", "log in", "authenticat", "not logged")
+_TOKEN_AUTH_WORDS = (
+    *_AUTH_WORDS,
+    "oauth",
+    "bearer",
+    "expired",
+    "401",
+    "unauthorized",
+    "invalid api key",
 )
 
 
@@ -332,25 +368,52 @@ class ClaudeCodeProvider(LLMProvider):
     name = "anthropic"
 
     def __init__(
-        self, *, binary: str | None, default_model: str = "sonnet", timeout: float = 300.0
+        self,
+        *,
+        binary: str | None,
+        default_model: str = "sonnet",
+        timeout: float = 300.0,
+        token: SecretStr | None = None,
+        private_home: Path | None = None,
     ) -> None:
         super().__init__(default_model)
         self.binary = binary
         self.timeout = timeout
+        if token is not None and private_home is None:
+            raise ValueError("Mode jeton : un dossier privé est requis (HOME de la CLI).")
+        #: Jeton du forfait (mode jeton) : transmis à la CLI seule, jamais affiché
+        self._token = token
+        self._private_home = private_home
 
     @property
     def is_configured(self) -> bool:
         return self.binary is not None
 
+    @property
+    def access(self) -> ProviderAccess:
+        return "token" if self._token is not None else "cli"
+
+    @property
+    def config_error(self) -> str | None:
+        return TOKEN_NO_CLI if self._token is not None and self.binary is None else None
+
+    def _environment(self, binary: str) -> dict[str, str]:
+        """Environnement de la CLI : la liste blanche ; en mode jeton, le jeton et un dossier
+        privé à la place de celui de l'utilisateur (seuls écarts à SUITE.md §5.3)."""
+        env = subscription_env(binary)
+        if self._token is not None and self._private_home is not None:
+            config = ensure_private_home(self._private_home)
+            env = {k: v for k, v in env.items() if k.upper() not in ("HOME", "CLAUDE_CONFIG_DIR")}
+            env["HOME"] = str(self._private_home)
+            env["CLAUDE_CONFIG_DIR"] = str(config)
+            env[CLI_TOKEN_ENV] = self._token.get_secret_value()
+        return env
+
     async def _exec(
         self, args: list[str], stdin: str | None, timeout: float
     ) -> tuple[int, str, str]:
         if self.binary is None:
-            raise ProviderRequestError(
-                "Claude Code est introuvable : installez-le (https://claude.com/claude-code), puis "
-                "lancez « claude » une fois dans un terminal pour vous connecter.",
-                provider=self.name,
-            )
+            raise ProviderRequestError(self.config_error or NOT_INSTALLED, provider=self.name)
         # Windows : `claude.cmd` (npm) passerait les arguments (prompt système, schéma) par
         # cmd.exe, qui les réinterprète : lancé par node.exe directement, sinon refusé
         command = windows_command([self.binary, *args])
@@ -361,6 +424,13 @@ class ClaudeCodeProvider(LLMProvider):
                 "(https://claude.com/claude-code) ou indiquez son chemin (CLAUDE_CLI_PATH).",
                 provider=self.name,
             )
+        try:
+            env = await asyncio.to_thread(self._environment, command[0])
+        except OSError as exc:
+            raise ProviderUnavailableError(
+                f"Impossible de préparer le dossier privé de Claude Code : {exc}",
+                provider=self.name,
+            ) from exc
         with tempfile.TemporaryDirectory(prefix="nexus-claude-") as workdir:
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -368,7 +438,7 @@ class ClaudeCodeProvider(LLMProvider):
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=subscription_env(command[0]),
+                    env=env,
                     cwd=workdir,
                     creationflags=NO_WINDOW,
                 )
@@ -429,7 +499,8 @@ class ClaudeCodeProvider(LLMProvider):
         except ValueError:
             payload = None
         if not isinstance(payload, dict):
-            detail = (stderr or stdout or "erreur inconnue").strip()[:400]
+            # Masqué AVANT d'être coupé : un jeton à cheval sur la coupe resterait en partie lisible
+            detail = scrub((stderr or stdout or "erreur inconnue").strip(), self._token)[:400]
             raise self._error(detail)
         if payload.get("is_error") or code != 0:
             raise self._error(str(payload.get("result") or stderr or "erreur inconnue").strip())
@@ -445,15 +516,24 @@ class ClaudeCodeProvider(LLMProvider):
         return to_response(structured, model, usage_of(payload))
 
     def _error(self, detail: str) -> Exception:
+        # Jamais de jeton dans un message (la CLI pourrait répéter celui qu'elle a reçu)
+        detail = scrub(detail, self._token)
         lowered = detail.lower()
-        if (
-            "login" in lowered
-            or "log in" in lowered
-            or "authenticat" in lowered
-            or "not logged" in lowered
-        ):
-            return ProviderRequestError(NOT_LOGGED_IN, provider=self.name)
-        if "limit" in lowered or "quota" in lowered or "overloaded" in lowered:
+        by_token = self._token is not None
+        if any(word in lowered for word in (_TOKEN_AUTH_WORDS if by_token else _AUTH_WORDS)):
+            return ProviderRequestError(
+                TOKEN_REFUSED if by_token else NOT_LOGGED_IN, provider=self.name
+            )
+        limited = "limit" in lowered or "quota" in lowered or "overloaded" in lowered
+        if limited and by_token:
+            # Transitoire (repli vers Ollama s'il est configuré) ; le message de la CLI est repris
+            return ProviderUnavailableError(
+                "Limite du forfait Claude atteinte (ou service saturé) — Claude Code répond : "
+                f"« {detail[:200]} ». Le forfait est partagé entre les applications de la suite : "
+                "réessayez plus tard, ou utilisez Ollama en attendant.",
+                provider=self.name,
+            )
+        if limited:
             # Transitoire : permet le repli vers Ollama s'il est configuré
             return ProviderUnavailableError(
                 "Limite d'utilisation de votre abonnement Claude atteinte (ou service saturé) : "
@@ -472,6 +552,12 @@ class ClaudeCodeProvider(LLMProvider):
         yield ResponseComplete(response=response)
 
     async def list_models(self) -> list[str]:
+        if self._token is not None:
+            # Mode jeton : disponible = exécutable + jeton ; pas de session à vérifier
+            # (`claude auth status` lirait un dossier d'utilisateur qui n'existe pas ici)
+            if self.binary is None:
+                raise ProviderUnavailableError(TOKEN_NO_CLI, provider=self.name)
+            return list(CLI_MODELS)
         code, stdout, _ = await self._exec(["auth", "status"], None, 20)
         try:
             info = json.loads(stdout or "{}")

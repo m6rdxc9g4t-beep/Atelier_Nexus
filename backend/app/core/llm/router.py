@@ -19,10 +19,13 @@ from functools import lru_cache
 from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
+from app.core.llm.claude_token import private_home, subscription_token
 from app.core.llm.errors import ProviderNotConfiguredError, ProviderUnavailableError
 from app.core.llm.providers import AnthropicProvider, LLMProvider, OllamaProvider
+from app.core.llm.providers.base import ProviderAccess
 from app.core.llm.providers.claude_code_provider import ClaudeCodeProvider, find_claude_binary
 from app.core.llm.types import LLMRequest, LLMResponse, LLMStreamEvent, ProviderName
+from app.core.settings_editor import env_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,9 @@ class ProviderStatus(BaseModel):
     default_model: str
     models: list[str]
     error: str | None = None
+    #: Claude : accès par clé API (`api`), par la session `claude` de l'utilisateur (`cli`) ou par
+    #: le jeton du forfait (`token`). Le jeton lui-même n'est jamais renvoyé. None : Ollama
+    access: ProviderAccess | None = None
 
 
 class LLMRouter:
@@ -73,7 +79,19 @@ class LLMRouter:
             default_model=settings.anthropic_model,
             timeout=settings.anthropic_timeout,
         )
-        if settings.claude_mode == "cli" or (settings.claude_mode == "auto" and not api_key):
+        token = subscription_token()
+        if token is not None:
+            # Jeton du forfait (CLAUDE_OAUTH_TOKEN) : la CLI isolée, prioritaire sur la clé API
+            # et sur CLAUDE_MODE. CLI absente : Claude est « non configuré » avec la raison, jamais
+            # un repli silencieux sur la clé (facturée à l'usage, contre le choix de l'utilisateur)
+            claude = ClaudeCodeProvider(
+                binary=find_claude_binary(settings.claude_cli_path),
+                default_model=settings.claude_cli_model,
+                timeout=settings.claude_cli_timeout,
+                token=token,
+                private_home=private_home(env_file_path().parent),
+            )
+        elif settings.claude_mode == "cli" or (settings.claude_mode == "auto" and not api_key):
             binary = find_claude_binary(settings.claude_cli_path)
             if binary or settings.claude_mode == "cli":
                 # Abonnement Claude par Claude Code (sans clé API)
@@ -110,7 +128,8 @@ class LLMRouter:
             raise ProviderNotConfiguredError(f"Provider inconnu : {resolved}", provider=resolved)
         if not provider.is_configured:
             raise ProviderNotConfiguredError(
-                f"Le provider « {resolved} » n'est pas configuré.", provider=resolved
+                provider.config_error or f"Le provider « {resolved} » n'est pas configuré.",
+                provider=resolved,
             )
         return provider
 
@@ -185,7 +204,8 @@ class LLMRouter:
 
     async def _probe(self, name: ProviderName, provider: LLMProvider) -> ProviderStatus:
         models: list[str] = []
-        error: str | None = None
+        # Non configuré : la raison quand elle est connue (jeton fourni mais CLI absente)
+        error: str | None = None if provider.is_configured else provider.config_error
         available = False
         if provider.is_configured:
             try:
@@ -202,6 +222,7 @@ class LLMRouter:
             default_model=provider.default_model,
             models=models,
             error=error,
+            access=provider.access,
         )
 
 

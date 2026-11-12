@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Faux programme `claude` (Claude Code) pour les tests : mêmes options, même sortie JSON.
 
-FAKE_CLAUDE_MODE : text | tool | login | limit | slow | auth_off. Chaque appel est consigné
-dans FAKE_CLAUDE_LOG (PID, arguments, entrée standard, variables sensibles, dossier courant).
+FAKE_CLAUDE_MODE : text | tool | login | limit | slow | auth_off | expired | echo | crash.
+Chaque appel est consigné dans FAKE_CLAUDE_LOG (PID, arguments, entrée standard, variables
+sensibles, dossier courant) — `auth status` compris, sur une ligne `{"auth_status": true}`.
+`expired` : jeton du forfait refusé (401) ; `echo` et `crash` répètent le jeton reçu dans leur
+message d'erreur (sortie JSON, puis sortie d'erreur brute) : Nexus doit le masquer.
 """
 
 import json
@@ -19,6 +22,9 @@ args = sys.argv[1:]
 log = os.environ.get("FAKE_CLAUDE_LOG")
 
 if args[:2] == ["auth", "status"]:
+    if log:
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"auth_status": True, "args": args}) + "\n")
     print(
         json.dumps(
             {
@@ -42,6 +48,16 @@ if log:
                     "env": {
                         k: os.environ.get(k)
                         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
+                    },
+                    # Authentification : jeton du forfait, dossiers de l'utilisateur
+                    "auth": {
+                        k: os.environ.get(k)
+                        for k in (
+                            "CLAUDE_CODE_OAUTH_TOKEN",
+                            "CLAUDE_OAUTH_TOKEN",
+                            "HOME",
+                            "CLAUDE_CONFIG_DIR",
+                        )
                     },
                     "env_names": sorted(os.environ),
                 },
@@ -85,6 +101,22 @@ if mode == "slow":
     time.sleep(30)
 if mode == "login":
     out({"type": "result", "is_error": True, "result": "Invalid API key · Please run /login"}, 1)
+received = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "")
+if mode == "expired":
+    out(
+        {
+            "type": "result",
+            "is_error": True,
+            "result": 'API Error: 401 {"type":"error","error":{"type":"authentication_error",'
+            '"message":"OAuth token has expired. Please obtain a new token."}}',
+        },
+        1,
+    )
+if mode == "echo":
+    out({"type": "result", "is_error": True, "result": f"Panne interne avec {received} !"}, 1)
+if mode == "crash":
+    print("x" * 380 + f" jeton {received} fin", file=sys.stderr)
+    sys.exit(2)
 if mode == "limit":
     out(
         {"type": "result", "is_error": True, "result": "Claude AI usage limit reached|1760900000"},

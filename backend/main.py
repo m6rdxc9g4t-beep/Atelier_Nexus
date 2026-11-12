@@ -36,11 +36,15 @@ from app.api.errors import register_error_handlers
 from app.api.local_only import LocalOnlyMiddleware
 from app.core.config import get_settings
 from app.core.llm import get_llm_router
+from app.core.llm.claude_token import capture_token
 from app.db.instances import InstanceGuard
 from app.db.repository import StorageError
 from app.db.workflows import WorkflowRepository
 from app.triggers.service import TriggerDeps, TriggerService
 
+# Jeton du forfait Claude (CLAUDE_OAUTH_TOKEN) : lu une fois, puis retiré de l'environnement du
+# processus avant tout le reste — aucun sous-processus autre que la CLI Claude n'en hérite
+capture_token()
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger("atelier_nexus")

@@ -10,7 +10,7 @@ import anthropic
 from anthropic.types import Message as AnthropicMessage
 
 from app.core.llm.errors import ProviderRequestError, ProviderUnavailableError
-from app.core.llm.providers.base import LLMProvider
+from app.core.llm.providers.base import LLMProvider, ProviderAccess
 from app.core.llm.types import (
     AttachmentBlock,
     ContentBlock,
@@ -133,6 +133,10 @@ class AnthropicProvider(LLMProvider):
     @property
     def is_configured(self) -> bool:
         return self._client is not None
+
+    @property
+    def access(self) -> ProviderAccess:
+        return "api"
 
     def _require_client(self) -> anthropic.AsyncAnthropic:
         if self._client is None:
