@@ -76,7 +76,7 @@ export function Palette({
         <Segmented label="Nature des actions" value={kind} onChange={setKind} options={KIND_OPTIONS} className="w-full [&>button]:flex-1 [&>button]:justify-center" />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="relative min-h-0 flex-1 overflow-y-auto p-2">
         {error && (
           <Callout tone="destructive" role="alert" className="m-1">
             Catalogue indisponible : {error}

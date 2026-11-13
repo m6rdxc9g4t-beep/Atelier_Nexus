@@ -34,6 +34,28 @@ Relancer la commande répare l'installation ; `-Desinstaller` retire lanceur, ra
 données (`%APPDATA%\Atelier Nexus\` : `.env`, `nexus.db`). Journaux : `%LOCALAPPDATA%\Atelier Nexus\Logs\`.
 Détails : [`docs/desktop.md`](docs/desktop.md#windows).
 
+## Claude avec votre forfait sur un serveur (`CLAUDE_OAUTH_TOKEN`)
+
+Sur un serveur (VPS), il n'y a pas de session `claude` connectée. Pour que le moteur Claude passe quand même par le
+**forfait** (Pro, Max) plutôt que par une clé API facturée à l'usage :
+
+1. sur votre ordinateur, `claude setup-token` affiche un jeton `sk-ant-oat01-…` valable un an ;
+2. sur le serveur, fournissez-le au backend par la variable d'environnement **`CLAUDE_OAUTH_TOKEN`** et installez le
+   programme `claude` (Claude Code) dans l'image (`CLAUDE_CLI_PATH` s'il n'est pas trouvé seul), puis redémarrez.
+
+Jeton renseigné : Claude = la CLI Claude Code isolée (mêmes drapeaux qu'en local : aucun outil, aucun MCP, aucune
+session, dossier vide, conversation sur l'entrée standard), **prioritaire** sur `CLAUDE_MODE` et sur
+`ANTHROPIC_API_KEY`. Le jeton est lu une fois au démarrage, retiré de l'environnement du processus, transmis à la CLI
+seule ; il n'est jamais renvoyé, journalisé ni écrit. La CLI travaille dans un dossier privé, `claude-forfait/`, à côté
+du `.env`. Sans cette variable, rien ne change. Agents « 100 % local » : toujours Ollama.
+
+- **Usage personnel** : c'est le forfait d'une personne. Ne partagez pas l'accès à ce Nexus.
+- **Limites partagées** : le quota du forfait est commun à toutes les applications de la suite qui l'utilisent, et à
+  Claude Code sur votre ordinateur. Limite atteinte : message clair, et repli sur Ollama si `LLM_FALLBACK_PROVIDER=ollama`.
+- Jeton expiré ou refusé (au bout d'un an, ou révoqué) : refaites `claude setup-token` et mettez à jour la variable.
+
+Détail et sûreté : [`docs/claude-code.md`](docs/claude-code.md).
+
 ## Validation de chaque action
 
 Par défaut (`APPROVAL_MODE=every_step`, Réglages → « Validation des actions » → **Chaque action**), toute action d'un agent

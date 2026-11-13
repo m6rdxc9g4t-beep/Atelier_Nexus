@@ -104,7 +104,7 @@ export function AppSidebar({ agents, apps, onCreateAgent, onEditAgent }: AppSide
         />
       </nav>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
+      <div className="relative min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
         <AgentSidebar
           agents={agents}
           active={!studio && view === "agents" ? agent : null}

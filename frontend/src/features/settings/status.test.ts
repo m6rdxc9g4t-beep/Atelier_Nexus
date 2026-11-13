@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { AppStatus, ProviderStatus, SettingsField, SettingsView } from "@/types/api";
 
 import {
+  LOCKED_NOTE,
   checkLines,
   countBySection,
+  fieldNote,
   firstFieldWith,
   firstSectionWith,
   hasStatus,
   pendingLabel,
+  providerDetail,
   sectionStatus,
   sections,
 } from "./status";
@@ -71,6 +74,38 @@ describe("rubriques des Réglages", () => {
     ]);
     // Seul le moteur configuré compte pour la pastille
     expect(sectionStatus("Modèles", check, false)).toEqual({ status: "up", label: "Joignable" });
+  });
+
+  it("dit quand Claude passe par le jeton du forfait, sans changer les autres modes", () => {
+    const claude = (extra: Partial<ProviderStatus>) => ({ ...provider("anthropic", true, true, true), ...extra });
+    // Jeton du forfait fourni au serveur (CLAUDE_OAUTH_TOKEN) : le mode est dit, jamais le jeton
+    expect(providerDetail(claude({ access: "token" }))).toBe("moteur par défaut, sonnet (forfait, par jeton)");
+    expect(providerDetail(claude({ access: "token", is_default: false }))).toBe("sonnet (forfait, par jeton)");
+    // Clé API, session « claude », serveur plus ancien (champ absent) : affichage d'avant
+    for (const access of ["api", "cli", null, undefined] as const)
+      expect(providerDetail(claude({ access }))).toBe("moteur par défaut, sonnet");
+    // Jeton refusé ou limite atteinte : le message du serveur
+    const refused = claude({ access: "token", available: false, error: "Le jeton du forfait Claude est refusé ou expiré." });
+    expect(providerDetail(refused)).toBe("Le jeton du forfait Claude est refusé ou expiré.");
+    // Jeton fourni mais programme « claude » absent du serveur : la raison, pas « non configuré »
+    const missing = { ...provider("anthropic", false, false), access: "token" as const, error: "« claude » est absent de ce serveur." };
+    expect(providerDetail(missing)).toBe("« claude » est absent de ce serveur.");
+    expect(checkLines("Modèles", { providers: [missing], apps: [] })[0]).toMatchObject({ ok: false, down: false });
+    // Sans jeton, un moteur non configuré reste « non configuré », quelle que soit son erreur
+    expect(providerDetail({ ...provider("anthropic", false, false), access: "cli" })).toBe("non configuré");
+  });
+
+  it("garde l'avertissement du serveur sous un champ, même verrouillé", () => {
+    const base = field("CLAUDE_MODE", "Modèles");
+    const notice = "Sans effet sur ce serveur : Claude passe par le jeton du forfait.";
+    // Sans avertissement : l'aide, ou la mention du verrou — comme avant
+    expect(fieldNote({ ...base, help: "Aide." })).toBe("Aide.");
+    expect(fieldNote({ ...base, help: "Aide.", source: "environnement" })).toBe(LOCKED_NOTE);
+    expect(fieldNote({ ...base, help: "Aide.", notice: null })).toBe("Aide.");
+    // Avec : il précède l'aide ou le verrou (cas du VPS : CLAUDE_MODE fixé par l'environnement)
+    expect(fieldNote({ ...base, help: "Aide.", notice })).toBe(`${notice} Aide.`);
+    expect(fieldNote({ ...base, help: "Aide.", source: "environnement", notice })).toBe(`${notice} ${LOCKED_NOTE}`);
+    expect(fieldNote({ ...base, notice })).toBe(notice);
   });
 
   it("range Cuisine et GitHub à part, les autres apps dans Applications Atelier", () => {

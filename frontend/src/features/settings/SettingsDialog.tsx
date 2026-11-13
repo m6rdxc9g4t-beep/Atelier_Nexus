@@ -48,6 +48,7 @@ import {
   type SectionStatus,
   checkLines,
   countBySection,
+  fieldNote,
   firstFieldWith,
   firstSectionWith,
   hasStatus,
@@ -245,7 +246,7 @@ function SettingsForm({ onSaved, onClose }: { onSaved: () => Promise<void> | voi
       >
         <TabsList
           aria-label="Rubriques des Réglages"
-          className="h-auto w-full shrink-0 justify-start gap-0.5 overflow-x-auto rounded-none border-0 border-b border-atelier-line bg-transparent p-2 sm:w-52 sm:flex-col sm:items-stretch sm:overflow-x-visible sm:overflow-y-auto sm:border-r sm:border-b-0 sm:p-3"
+          className="relative h-auto w-full shrink-0 justify-start gap-0.5 overflow-x-auto rounded-none border-0 border-b border-atelier-line bg-transparent p-2 sm:w-52 sm:flex-col sm:items-stretch sm:overflow-x-visible sm:overflow-y-auto sm:border-r sm:border-b-0 sm:p-3"
         >
           {order.map((s) => (
             <SectionTab
@@ -486,7 +487,7 @@ function FieldRow({
 }) {
   const id = `setting-${field.key}`;
   const locked = field.source === "environnement";
-  const note = locked ? "Fixé par une variable d'environnement : modifiable seulement à la source." : field.help;
+  const note = fieldNote(field);
   const describedBy = note || error ? `${id}-note` : undefined;
   const invalid = error ? true : undefined;
 

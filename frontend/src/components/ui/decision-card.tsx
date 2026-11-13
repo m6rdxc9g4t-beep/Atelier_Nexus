@@ -85,7 +85,7 @@ function DecisionDetails({ label, children }: { label: string; children: string 
       <summary className="cursor-pointer px-2.5 py-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
         {label}
       </summary>
-      <pre className="max-h-56 overflow-auto border-t border-atelier-line p-2.5 font-mono text-xs leading-snug whitespace-pre-wrap">
+      <pre className="relative max-h-56 overflow-auto border-t border-atelier-line p-2.5 font-mono text-xs leading-snug whitespace-pre-wrap">
         {children}
       </pre>
     </details>

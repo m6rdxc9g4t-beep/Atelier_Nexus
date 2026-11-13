@@ -177,7 +177,10 @@ Run = Callable[[Sequence[str], Path], int]
 
 
 def spawn_window(cmd: Sequence[str], cwd: Path, log: IO[str]) -> None:
-    """Lance la fenêtre sans l'attendre ; sorties dans le journal (pythonw n'en a pas)."""
+    """Lance la fenêtre sans l'attendre ; sorties dans le journal (pythonw n'en a pas).
+
+    Seul sous-processus du lanceur à hériter de l'environnement entier : c'est Nexus lui-même,
+    dont le serveur lit le jeton du forfait Claude puis le retire (`main.py`)."""
     subprocess.Popen(
         list(cmd),
         cwd=cwd,
@@ -189,8 +192,10 @@ def spawn_window(cmd: Sequence[str], cwd: Path, log: IO[str]) -> None:
 
 
 def run_in_console(cmd: Sequence[str], cwd: Path) -> int:
-    """`--preparer` : exécute dans la console courante et renvoie le code de sortie."""
-    return subprocess.run(list(cmd), cwd=cwd, check=False).returncode
+    """`--preparer` : exécute dans la console courante et renvoie le code de sortie.
+
+    Mise à jour seule (aucun serveur lancé) : sans le jeton du forfait Claude."""
+    return subprocess.run(list(cmd), cwd=cwd, env=du.command_environment(), check=False).returncode
 
 
 @contextlib.contextmanager

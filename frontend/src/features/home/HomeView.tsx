@@ -75,7 +75,7 @@ export function HomeView({
         <House className="size-4 text-atelier-faint" aria-hidden />
         <span className="text-sm font-semibold">Accueil</span>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-9 px-5 py-8 sm:px-8 lg:py-10">
         <section className="flex flex-col gap-5">
           <div>

@@ -876,7 +876,7 @@ function EditorBody({
                 </TabsTrigger>
               </TabsList>
             </div>
-            <TabsContent value="inspect" className="overflow-x-hidden overflow-y-auto p-4">
+            <TabsContent value="inspect" className="relative overflow-x-hidden overflow-y-auto p-4">
               {selectedStep ? (
                 <StepInspector
                   key={selectedStep.id}
@@ -913,7 +913,7 @@ function EditorBody({
                 </>
               )}
             </TabsContent>
-            <TabsContent value="run" className="overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "run"}>
+            <TabsContent value="run" className="relative overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "run"}>
               <RunPanel
                 ref={runPanel}
                 workflowId={draft.id}
@@ -931,7 +931,7 @@ function EditorBody({
               />
             </TabsContent>
             {/* Toujours monté : un formulaire en cours survit au passage par un autre onglet */}
-            <TabsContent value="triggers" className="overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "triggers"}>
+            <TabsContent value="triggers" className="relative overflow-x-hidden overflow-y-auto p-4" forceMount hidden={panel !== "triggers"}>
               <TriggersPanel
                 workflowId={draft.id}
                 dirty={dirty}

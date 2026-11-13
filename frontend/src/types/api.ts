@@ -193,6 +193,12 @@ export interface ProviderStatus {
   default_model: string;
   models: string[];
   error: string | null;
+  /**
+   * Claude : accès par clé API (`api`), par la session `claude` de l'ordinateur (`cli`) ou par le
+   * jeton du forfait fourni au serveur (`token`, CLAUDE_OAUTH_TOKEN). Le jeton n'est jamais
+   * renvoyé. Null ou absent : Ollama, ou serveur plus ancien.
+   */
+  access?: "api" | "cli" | "token" | null;
 }
 
 export interface DataViaStatus {
@@ -327,6 +333,8 @@ export interface SettingsField {
   /** Secret configuré : « …abcd ». */
   hint: string | null;
   source: "fichier" | "environnement" | "défaut";
+  /** Avertissement propre à ce serveur, affiché avec l'aide (ex. « Accès à Claude » sans effet : jeton du forfait). */
+  notice?: string | null;
 }
 
 export interface SettingsView {

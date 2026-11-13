@@ -1,4 +1,4 @@
-"""Réglages communs des tests : jamais d'appel réel à Claude Code.
+"""Réglages communs des tests : jamais d'appel réel à Claude Code, jamais le jeton du forfait.
 
 `claude` peut être installé sur la machine de test : sans cette précaution, le mode
 « auto » choisirait l'abonnement et les tests dépendraient de l'environnement.
@@ -33,6 +33,18 @@ def _no_claude_code(monkeypatch: pytest.MonkeyPatch) -> None:
 
     extra = ("FAKE_CLAUDE_MODE", "FAKE_CLAUDE_LOG")
     monkeypatch.setattr(claude_code_provider, "CLI_ENV", (*claude_code_provider.CLI_ENV, *extra))
+
+
+@pytest.fixture(autouse=True)
+def _no_subscription_token(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Jeton du forfait Claude (`CLAUDE_OAUTH_TOKEN`) : jamais celui de la machine de test, ni
+    celui d'un autre test (il est lu une fois puis gardé en mémoire, `claude_token.py`)."""
+    from app.core.llm.claude_token import TOKEN_ENV, forget_token
+
+    monkeypatch.delenv(TOKEN_ENV, raising=False)
+    forget_token()
+    yield
+    forget_token()
 
 
 @pytest.fixture(autouse=True)

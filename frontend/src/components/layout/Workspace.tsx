@@ -109,9 +109,15 @@ export function Workspace() {
   );
 
   return (
-    <div className="flex h-dvh">
-      {/* Grand écran : barre latérale fixe. Toujours montée (le choix du thème s'y applique). */}
-      <aside className="hidden w-[232px] shrink-0 border-r border-atelier-line bg-sidebar lg:block">{sidebar}</aside>
+    // Coquille : exactement la hauteur de la fenêtre, et rien n'en sort. La page elle-même ne défile
+    // jamais ; seules défilent les zones de contenu (accueil, conversation, Studio, liste des agents),
+    // toutes positionnées (`relative`) : un élément hors flux (`sr-only`, case à cocher Radix) placé
+    // dans une zone non positionnée échappe à son `overflow`, allonge le document et, au défilement,
+    // emporte la barre latérale avec la page. `relative` + `overflow-clip` : même un oubli reste dedans.
+    <div data-slot="app-shell" className="relative flex h-dvh overflow-clip">
+      {/* Grand écran : barre latérale sur toute la hauteur, toujours en place (sa liste d'agents défile
+          en elle, son pied reste visible). Toujours montée (le choix du thème s'y applique). */}
+      <aside className="hidden h-full w-[232px] shrink-0 border-r border-atelier-line bg-sidebar lg:block">{sidebar}</aside>
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent aria-describedby={undefined} className="lg:hidden">
           <SheetTitle className="sr-only">Navigation</SheetTitle>

@@ -120,6 +120,8 @@ class SettingsField(BaseModel):
     configured: bool
     #: Secret : « …abcd »
     hint: str | None = None
+    #: Avertissement propre à ce serveur, affiché avec l'aide (ex. réglage sans effet)
+    notice: str | None = None
     source: Literal["fichier", "environnement", "défaut"]
 
 
@@ -261,7 +263,16 @@ def _cuisine_problem(key: str, value: str) -> str | None:
     return None
 
 
-def view(settings: Settings, path: Path) -> SettingsView:
+#: Jeton du forfait fourni au serveur (CLAUDE_OAUTH_TOKEN) : il l'emporte sur ce réglage
+TOKEN_MODE_NOTE = (
+    "Sans effet sur ce serveur : Claude passe par le jeton du forfait (CLAUDE_OAUTH_TOKEN), "
+    "prioritaire sur ce réglage et sur la clé API."
+)
+
+
+def view(settings: Settings, path: Path, *, token_mode: bool = False) -> SettingsView:
+    """Réglages affichés. `token_mode` : le jeton du forfait Claude est fourni au processus — le
+    champ « Accès à Claude » le dit (le jeton lui-même n'est jamais un réglage ni renvoyé)."""
     in_file = read_env_file(path)
     fields: list[SettingsField] = []
     for spec in FIELDS:
@@ -284,6 +295,7 @@ def view(settings: Settings, path: Path) -> SettingsView:
                 group=spec.group,
                 kind=spec.kind,
                 help=spec.help,
+                notice=TOKEN_MODE_NOTE if token_mode and spec.key == "CLAUDE_MODE" else None,
                 choices=list(spec.choices),
                 value=None if spec.kind == "secret" else (text or ""),
                 configured=bool(text),

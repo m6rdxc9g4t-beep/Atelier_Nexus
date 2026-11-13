@@ -4,6 +4,8 @@
 !.env.example
 # Session Supabase d'Atelier Cuisine (jetons), écrite à côté du .env
 cuisine-session.json
+# Dossier privé de la CLI Claude en mode jeton du forfait (CLAUDE_OAUTH_TOKEN), à côté du .env
+claude-forfait/
 
 # Python
 __pycache__/

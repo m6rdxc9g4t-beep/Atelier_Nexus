@@ -139,6 +139,9 @@ async def test_agent_loop_with_tools(
     [
         ("login", ProviderRequestError, "pas connecté"),
         ("limit", ProviderUnavailableError, "Limite d'utilisation"),
+        # Limite dont le message parle de « /login » (changer de compte) : toujours une limite
+        ("limit_login", ProviderUnavailableError, "Limite d'utilisation"),
+        ("limit_401", ProviderUnavailableError, "Limite d'utilisation"),
     ],
 )
 async def test_errors_are_readable(

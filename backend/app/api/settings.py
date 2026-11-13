@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.apps import clear_status_cache
 from app.core.config import get_settings
+from app.core.llm.claude_token import subscription_token
 from app.core.llm.router import get_llm_router
 from app.core.settings_editor import (
     SettingsError,
@@ -57,7 +58,7 @@ def reload_settings() -> None:
 
 @router.get("", response_model=SettingsView)
 async def read_settings(_: Guard) -> SettingsView:
-    return view(get_settings(), env_file_path())
+    return view(get_settings(), env_file_path(), token_mode=subscription_token() is not None)
 
 
 @router.put("", response_model=SettingsView, responses={422: {"description": "Réglage refusé"}})
@@ -85,4 +86,4 @@ async def update_settings(update: SettingsUpdate, _: Guard) -> SettingsView | JS
             },
         )
     reload_settings()
-    return view(get_settings(), path)
+    return view(get_settings(), path, token_mode=subscription_token() is not None)

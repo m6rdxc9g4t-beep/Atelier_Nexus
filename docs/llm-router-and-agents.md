@@ -131,8 +131,10 @@ Outils fournis : `current_datetime`, `publish_artifact` (types : `sql`, `dax`, `
 `?refresh=true` le relit, au plus toutes les 10 s. Enregistrer les Réglages recrée le routeur : état relu aussitôt.
 ```json
 [{"name": "anthropic", "configured": true, "available": true, "is_default": true,
-  "is_fallback": false, "default_model": "claude-sonnet-5-5", "models": ["…"], "error": null}]
+  "is_fallback": false, "default_model": "claude-sonnet-5-5", "models": ["…"], "error": null, "access": "api"}]
 ```
+`access` (Claude seulement, `null` pour Ollama) : `api` (clé), `cli` (session `claude` de l'ordinateur) ou `token`
+(jeton du forfait fourni au serveur, [`claude-code.md`](claude-code.md)) ; le jeton lui-même n'est jamais renvoyé.
 
 ### `GET /api/agents`
 Agents enregistrés et leurs outils.

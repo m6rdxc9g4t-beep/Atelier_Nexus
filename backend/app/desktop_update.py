@@ -71,12 +71,28 @@ EXIT_VENV_RESTORED = 3
 #: Code de sortie de `venv` : échec, aucun environnement utilisable
 EXIT_VENV_FAILED = 4
 
+#: Jeton du forfait Claude (docs/claude-code.md), sous le nom que lit Nexus et sous celui que lit
+#: la CLI : jamais transmis aux commandes de la mise à jour (`command_environment`)
+TOKEN_VARS = frozenset({"CLAUDE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"})
+
 Runner = Callable[[Sequence[str], Path, Mapping[str, str], IO[str]], int]
 Status = Callable[[str], None]
 
 
 class UpdateError(Exception):
     """Échec d'une étape ; le message (en français) s'affiche dans l'écran de démarrage."""
+
+
+def command_environment(base: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environnement d'une commande lancée avant le serveur (git, shell de connexion, npm, pip) :
+    celui du processus, sans le jeton du forfait Claude.
+
+    La mise à jour se fait avant que le serveur ne lise le jeton et ne le retire de
+    l'environnement (`main.py`) : sans cela, `npm ci`, la compilation et `pip install`, scripts
+    d'installation des dépendances compris, en hériteraient. Noms comparés sans casse (Windows).
+    """
+    env = os.environ if base is None else base
+    return {k: v for k, v in env.items() if k.upper() not in TOKEN_VARS}
 
 
 # ─── Dossiers ─────────────────────────────────────────────────────
@@ -253,6 +269,7 @@ def git(repo: Path, *args: str) -> str | None:
     try:
         done = subprocess.run(
             ["git", "-C", str(repo), *args],
+            env=command_environment(),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -455,7 +472,7 @@ def run_command(cmd: Sequence[str], cwd: Path, env: Mapping[str, str], log: IO[s
         done = subprocess.run(
             windows_command(cmd),
             cwd=cwd,
-            env=dict(env),
+            env=command_environment(env),  # jamais le jeton du forfait, quel que soit l'appelant
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -488,6 +505,7 @@ def login_shell_npm(timeout: float = 15.0) -> Path | None:
         try:
             done = subprocess.run(
                 [str(zsh), flags, "command -v npm"],
+                env=command_environment(),
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -569,8 +587,9 @@ def find_npm(
 def npm_environment(
     npm: Path, base: Mapping[str, str] | None = None, platform: str = sys.platform
 ) -> dict[str, str]:
-    """Environnement de npm : dossier de `npm` (donc de `node`) en tête du PATH, export statique."""
-    env = dict(os.environ if base is None else base)
+    """Environnement de npm : dossier de `npm` (donc de `node`) en tête du PATH, export statique ;
+    sans le jeton du forfait Claude (`command_environment`)."""
+    env = command_environment(base)
     windows = platform == "win32"
     # Windows : le nom réel peut être « Path » ; une seule entrée, sinon l'une masque l'autre
     key = next((k for k in env if k.upper() == "PATH"), "PATH") if windows else "PATH"
@@ -748,7 +767,7 @@ def install_venv(
                         "Les dépendances Python d'Atelier Nexus doivent être mises à jour, mais "
                         "l'application est déjà ouverte : fermez ses fenêtres, puis rouvrez-la."
                     ) from exc
-            env = dict(os.environ)
+            env = command_environment()  # pip et ses scripts d'installation : sans le jeton
             python = str(layout.venv_python)
             pip = [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
             requirements = [arg for name in REQUIREMENTS for arg in ("-r", str(layout.repo / name))]

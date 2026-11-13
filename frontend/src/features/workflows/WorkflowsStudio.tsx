@@ -81,7 +81,7 @@ export function WorkflowsStudio({ agents }: { agents: AgentInfo[] }) {
           </Button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="relative min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-5 lg:py-5">
             <TabsContent value="workflows" className="grid grid-cols-[minmax(0,1fr)] gap-4">
               <Segmented<ListSection>

@@ -64,6 +64,10 @@ Premier groupe des Réglages, en boutons radio :
   (POST, PUT, PATCH, DELETE) dont l'`Origin` désigne un autre hôte, ou vaut `null`, est refusée (403
   `forbidden_origin`) ; sans `Origin` (Hub, scripts), elle passe. `/health` et `/api/health` répondent à tout hôte.
 - Sans clé Claude ni Claude Code, le moteur par défaut devient Ollama (au lieu d'une erreur à chaque message).
+- Le **jeton du forfait Claude** (`CLAUDE_OAUTH_TOKEN`, [`claude-code.md`](claude-code.md)) n'est pas un réglage : variable
+  d'environnement du processus seulement, jamais lue dans le `.env`, jamais affichée ni modifiable ici. Quand il est
+  fourni, le champ « Accès à Claude » indique qu'il est sans effet (le jeton l'emporte) et l'état des moteurs dit
+  « forfait, par jeton ».
 
 Fichier utilisé : `backend/.env` en développement, `~/Library/Application Support/Atelier Nexus/.env` dans
 l'application de bureau.

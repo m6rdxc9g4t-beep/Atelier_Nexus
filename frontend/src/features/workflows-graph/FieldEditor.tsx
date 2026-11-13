@@ -41,7 +41,7 @@ export function TemplateMenu({
           Utiliser…
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
+      <DropdownMenuContent align="end" className="relative max-h-80 w-72 overflow-y-auto">
         {groups.map((group, i) => (
           <div key={`${group.label}-${i}`}>
             {i > 0 && <DropdownMenuSeparator />}
